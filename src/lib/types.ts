@@ -115,3 +115,31 @@ export interface ActivateResult {
   inviteCode: string;
   membershipId: string;
 }
+
+// ---------------------------------------------------------------------------
+// Create team from scratch (team-first / invite-first onboarding)
+// ---------------------------------------------------------------------------
+
+/** Klient → create_team_from_scratch() RPC. Enten clubId eller clubName. */
+export interface CreateTeamPayload {
+  teamName: string;
+  sport: string; // sport-slug (f.eks. 'fotball')
+  ageGroup: string;
+  clubId?: string;
+  clubName?: string;
+  gender?: 'male' | 'female' | 'mixed';
+  level?: 'recreational' | 'competitive';
+  color?: string;
+}
+
+export interface CreateResult {
+  teamSpaceId: string;
+  inviteCode: string;
+  membershipId: string;
+}
+
+/** Klubb-autocomplete-treff. */
+export interface ClubSearchResult {
+  id: string;
+  name: string;
+}

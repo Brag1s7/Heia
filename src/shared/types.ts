@@ -140,10 +140,10 @@ export type HomeStackParamList = {
 };
 
 export type OnboardingStackParamList = {
-  Welcome: undefined;
-  Auth: undefined;
-  FindTeam: undefined;
-  TeamJoin: {teamId: string; clubName: string; teamName: string; ageGroup: string; sportDisplayName: string};
+  WelcomeIntent: undefined;
+  Auth: {mode?: 'login' | 'register'} | undefined;
+  JoinTeamCode: {prefillCode?: string} | undefined;
+  CreateTeam: undefined;
 };
 
 export type KalenderStackParamList = {
