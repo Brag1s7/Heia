@@ -4,6 +4,10 @@ import type {
   InviteCodeResult,
   JoinResult,
   ActivateResult,
+  CreateTeamPayload,
+  CreateResult,
+  ClubSearchResult,
+  Sport,
 } from '../types';
 
 function mapEnrichedMembership(row: any): EnrichedMembership {
@@ -45,44 +49,6 @@ function mapEnrichedMembership(row: any): EnrichedMembership {
       },
     },
   };
-}
-
-export interface TeamSearchResult {
-  id: string;
-  name: string;
-  ageGroup: string;
-  gender: string;
-  level: string;
-  clubName: string;
-  sportSlug: string;
-  sportDisplayName: string;
-}
-
-export async function searchTeams(query?: string): Promise<TeamSearchResult[]> {
-  let q = supabase
-    .from('teams')
-    .select('*, club:clubs(name), sport:sports(slug, display_name)')
-    .order('name');
-
-  if (query && query.trim().length > 0) {
-    q = q.or(`name.ilike.%${query}%,clubs.name.ilike.%${query}%`);
-  }
-
-  const {data, error} = await q.limit(50);
-  if (error) {
-    throw error;
-  }
-
-  return (data || []).map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    ageGroup: row.age_group,
-    gender: row.gender,
-    level: row.level,
-    clubName: row.club?.name ?? '',
-    sportSlug: row.sport?.slug ?? '',
-    sportDisplayName: row.sport?.display_name ?? '',
-  }));
 }
 
 export async function getUserMemberships(): Promise<EnrichedMembership[]> {
@@ -169,6 +135,95 @@ export async function activateTeamSpace(
     p_team_id: teamId,
     p_display_name: displayName,
     p_color: color,
+  });
+
+  if (error) {
+    throw error;
+  }
+  return {
+    teamSpaceId: data.team_space_id,
+    inviteCode: data.invite_code,
+    membershipId: data.membership_id,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Create-from-scratch onboarding (team-first / invite-first)
+// ---------------------------------------------------------------------------
+
+/** Klubb-autocomplete under lagopprettelse. Tom query → ingen treff. */
+export async function searchClubs(query: string): Promise<ClubSearchResult[]> {
+  const q = query.trim();
+  if (q.length === 0) {
+    return [];
+  }
+
+  const {data, error} = await supabase
+    .from('clubs')
+    .select('id, name')
+    .ilike('name', `%${q}%`)
+    .order('name')
+    .limit(10);
+
+  if (error) {
+    throw error;
+  }
+  return (data || []).map((row: any) => ({id: row.id, name: row.name}));
+}
+
+// Idretter er statisk referansedata — cache i minnet for hele app-økten,
+// med dedup av samtidige kall, så CreateTeam-velgeren kan vises uten spinner.
+let sportsCache: Sport[] | null = null;
+let sportsInflight: Promise<Sport[]> | null = null;
+
+/** Synkron lesing av cachede idretter (null hvis ikke lastet ennå). */
+export function getCachedSports(): Sport[] | null {
+  return sportsCache;
+}
+
+/** Idretts-picker. Cacher resultatet; kall den tidlig for å forhåndslaste. */
+export async function getSports(): Promise<Sport[]> {
+  if (sportsCache) {
+    return sportsCache;
+  }
+  if (sportsInflight) {
+    return sportsInflight;
+  }
+  sportsInflight = (async () => {
+    try {
+      const {data, error} = await supabase
+        .from('sports')
+        .select('id, slug, display_name')
+        .order('display_name');
+      if (error) {
+        throw error;
+      }
+      sportsCache = (data || []).map((row: any) => ({
+        id: row.id,
+        slug: row.slug,
+        displayName: row.display_name,
+      }));
+      return sportsCache;
+    } finally {
+      sportsInflight = null;
+    }
+  })();
+  return sportsInflight;
+}
+
+/** Oppretter klubb (finn/opprett) + team + team_space + trener-membership i én RPC. */
+export async function createTeamFromScratch(
+  payload: CreateTeamPayload,
+): Promise<CreateResult> {
+  const {data, error} = await supabase.rpc('create_team_from_scratch', {
+    p_team_name: payload.teamName,
+    p_sport: payload.sport,
+    p_age_group: payload.ageGroup,
+    p_club_id: payload.clubId ?? null,
+    p_club_name: payload.clubName ?? null,
+    p_gender: payload.gender ?? null,
+    p_level: payload.level ?? null,
+    p_color: payload.color ?? '#6366F1',
   });
 
   if (error) {

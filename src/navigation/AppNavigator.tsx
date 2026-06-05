@@ -4,14 +4,14 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
-import {useAuth, useActiveTeam} from '../context';
+import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
 import {SupportScreen} from '../screens/SupportScreen';
-import {WelcomeScreen} from '../screens/WelcomeScreen';
+import {WelcomeIntentScreen} from '../screens/WelcomeIntentScreen';
 import {AuthScreen} from '../screens/AuthScreen';
-import {FindTeamScreen} from '../screens/FindTeamScreen';
-import {TeamJoinScreen} from '../screens/TeamJoinScreen';
+import {JoinTeamCodeScreen} from '../screens/JoinTeamCodeScreen';
+import {CreateTeamScreen} from '../screens/CreateTeamScreen';
 import {KalenderScreen} from '../screens/KalenderScreen';
 import {ProfilScreen} from '../screens/ProfilScreen';
 import {InboxScreen} from '../screens/InboxScreen';
@@ -100,15 +100,21 @@ function ProfilStackNavigator() {
 // ---------------------------------------------------------------------------
 // Onboarding stack (velkommen + auth + team join)
 // ---------------------------------------------------------------------------
-function OnboardingStackNavigator({initialRoute}: {initialRoute: keyof OnboardingStackParamList}) {
+function OnboardingStackNavigator() {
   return (
     <OnboardingNav.Navigator
-      initialRouteName={initialRoute}
+      initialRouteName="WelcomeIntent"
       screenOptions={{headerShown: false}}>
-      <OnboardingNav.Screen name="Welcome" component={WelcomeScreen} />
+      <OnboardingNav.Screen
+        name="WelcomeIntent"
+        component={WelcomeIntentScreen}
+      />
       <OnboardingNav.Screen name="Auth" component={AuthScreen} />
-      <OnboardingNav.Screen name="FindTeam" component={FindTeamScreen} />
-      <OnboardingNav.Screen name="TeamJoin" component={TeamJoinScreen} />
+      <OnboardingNav.Screen
+        name="JoinTeamCode"
+        component={JoinTeamCodeScreen}
+      />
+      <OnboardingNav.Screen name="CreateTeam" component={CreateTeamScreen} />
     </OnboardingNav.Navigator>
   );
 }
@@ -191,10 +197,11 @@ function MainTabs() {
 // ---------------------------------------------------------------------------
 // Loading screen mens session sjekkes
 // ---------------------------------------------------------------------------
-function LoadingScreen() {
+function LoadingScreen({message}: {message?: string}) {
   return (
     <View style={styles.loadingScreen}>
       <ActivityIndicator size="large" color={colors.heia} />
+      {message ? <Text style={styles.loadingText}>{message}</Text> : null}
     </View>
   );
 }
@@ -205,19 +212,26 @@ function LoadingScreen() {
 export function AppNavigator() {
   const {session, profile, loading} = useAuth();
   const {userMemberships, loading: teamLoading} = useActiveTeam();
+  const {pendingAction} = useOnboarding();
 
-  if (loading || (session && teamLoading)) {
+  const hasTeam = userMemberships.length > 0;
+
+  // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
+  if (loading || (session && !profile) || (session && teamLoading)) {
     return <LoadingScreen />;
   }
 
-  const hasTeam = userMemberships.length > 0;
+  // Innlogget med en pending intent (auth-before-commit): fullfør join/create.
+  if (session && profile && !hasTeam && pendingAction) {
+    return <LoadingScreen message="Setter opp laget…" />;
+  }
 
   return (
     <NavigationContainer>
       {session && profile && hasTeam ? (
         <MainTabs />
       ) : (
-        <OnboardingStackNavigator key={session ? 'authed' : 'guest'} initialRoute={session ? 'FindTeam' : 'Welcome'} />
+        <OnboardingStackNavigator key={session ? 'authed' : 'guest'} />
       )}
     </NavigationContainer>
   );
@@ -276,5 +290,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: spacing.lg,
+  },
+  loadingText: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
 });

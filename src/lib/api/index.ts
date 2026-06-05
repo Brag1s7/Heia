@@ -4,4 +4,8 @@ export {
   lookupInviteCode,
   joinTeamSpace,
   activateTeamSpace,
+  createTeamFromScratch,
+  searchClubs,
+  getSports,
+  getCachedSports,
 } from './teams';

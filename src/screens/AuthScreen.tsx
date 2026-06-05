@@ -11,16 +11,20 @@ import {
   ScrollView,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Button} from '../components';
 import {useAuth} from '../context';
+import type {OnboardingStackParamList} from '../shared/types';
 
 type Mode = 'login' | 'register';
 
-export function AuthScreen() {
+type Props = NativeStackScreenProps<OnboardingStackParamList, 'Auth'>;
+
+export function AuthScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const {signIn, signUp} = useAuth();
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(route.params?.mode ?? 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -55,17 +59,25 @@ export function AuthScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[styles.header, {paddingTop: insets.top + spacing.lg}]}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          style={styles.backButton}>
+          <Text style={styles.backText}>‹ Tilbake</Text>
+        </Pressable>
+      </View>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + spacing['4xl'],
+            paddingTop: spacing.lg,
             paddingBottom: insets.bottom + spacing['3xl'],
           },
         ]}
         keyboardShouldPersistTaps="handled">
-        {/* Header */}
+        {/* Tittel */}
         <Text style={styles.title}>
           {mode === 'login' ? 'Velkommen tilbake' : 'Opprett konto'}
         </Text>
@@ -179,6 +191,19 @@ export function AuthScreen() {
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.sm,
+  },
+  backButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+  },
+  backText: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
   screen: {
     flex: 1,
