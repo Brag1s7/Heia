@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-08_
+_Sist oppdatert: 2026-07-08 (etter Fase 2C + merge av main)_
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -8,93 +8,77 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
 ## Hvor vi er
 
-Vi følger en godkjent 4-fase-plan for «Team Activity Loop». **Fase 0 (invite-loopen) er ferdig og kjører i simulator. Vi er nå inne i Fase 1 (design) — se egen seksjon under.**
+Vi følger en godkjent fase-plan for «Team Activity Loop».
+**Fase 0 (invite-loop), Fase 1 (design), og hele Fase 2 (ekte feed: tekst,
+reaksjoner, kommentarer, bilde) er ferdig, committet og verifisert i simulator.
+Neste steg er Fase 3 — Event/kamp.**
 
-Backend (Supabase) er nesten komplett fra før: datamodell + RLS + lese-RPC-er
-(`get_team_feed`, `get_event_with_rsvp`, `get_team_members`) og skrive-RPC-er
-(`create_team_from_scratch`, `join_team_space`, `activate_team_space`,
-`upsert_rsvp`). RLS tillater direkte member/admin-insert for feed/kommentar/
-reaksjon/event, så få nye RPC-er trengs.
+Branch: `Brage`. `npx tsc --noEmit` er grønn. Alt pushet til `origin/Brage`.
 
-Frontend: kun onboarding var koblet til Supabase. Alt «inni» appen
-(TeamHome-feed, Kalender, EventDetail) er fortsatt **mock** fra
-`src/data/teamData.ts` + `src/shared/mockData.ts`. Det er det Fase 2–3 fikser.
-
----
-
-## Fase 0 — gjort (invite-loop)
-
-- `src/components/InviteCodeCard.tsx` — viser koden stort (markerbar: hold inne → iOS «Kopier»), «Del invitasjon» via native `Share`. **Kun react-native core, ingen native tredjeparts-modul.**
-- `src/screens/InviteScreen.tsx` — egen skjerm, «Laget er klart! 🎉»-variant ved nyopprettelse.
-- `src/context/OnboardingContext.tsx` — `justCreatedTeamSpaceId` settes i `executeCreate`, nulles av TeamHome (engangs-reveal).
-- `src/screens/TeamHomeScreen.tsx` — engangs-reveal etter opprettelse + invite-CTA når feeden er tom.
-- `src/screens/ProfilScreen.tsx` — «Inviter til laget»-rad.
-- `src/navigation/AppNavigator.tsx` + `src/shared/types.ts` — `Invite`-rute i Hjem- og Profil-stack.
-- Typecheck (`npx tsc --noEmit`) er **grønn**.
-
-## Fase 0 — løse tråder
-
-1. ~~`@react-native-clipboard/clipboard` ubrukt~~ **LØST 2026-07-08:** pakken er fjernet (`npm uninstall`), package.json/lock tilbake til HEAD. Hold-inne-kopiering + Del dekker behovet uten native modul.
-2. **ÅPEN — End-to-end-verifisering:** opprett lag → reveal → del via Share; bli med via kode. (Ikke kjørt ende-til-ende i simulator ennå.)
-
-## Konsolidering — GJORT 2026-07-08
-
-Alt verifisert arbeid er nå committet på `Brage` i tre logiske commits (var tidligere ucommittet i arbeidstreet):
-- `f971ad1` **Fase 0: team invite loop**
-- `ea092e2` **Fase 1: Stadium Light-designretning** (Diff 1 + Diff 2 + design-docs + screenshots)
-- `d906037` **TEMP: dev-seed feed** (ren revert av denne fjerner hele dev-seed-hacket i Fase 2)
-
-Arbeidstre rent, `npx tsc --noEmit` grønn. Ikke pushet.
+### Ekte vs. mock akkurat nå
+- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer).
+- **Fortsatt mock:** events/kalender. `TeamHomeScreen` henter live-kamp-banneret fra `getEventsForTeamSpace` (`src/data/teamData.ts`). Det er dette Fase 3 fjerner. Dev-seed-feeden er allerede ryddet bort.
 
 ---
 
-## Fase 1 — design (PÅGÅR)
+## Backend (Supabase) — tilstand
 
-Retning satt og research gjort. Fire design-docs styrer arbeidet (les i rekkefølge):
-1. [docs/design-notes-chatgpt.md](design-notes-chatgpt.md) — ChatGPT-innspill + reality-check mot koden.
-2. [docs/design-research-premium-ui.md](design-research-premium-ui.md) — skills/plugins/templates som referanse, IKKE kildekode. Kjerneregel: alt gjennom `src/theme/tokens.ts` + egne primitiver; ingen NativeWind/Expo/UI-bibliotek/template-kode; glass + Reanimated utsatt til egen native-økt.
-3. [docs/home-feed-design-directions.md](home-feed-design-directions.md) — **VALGT: Retning A «Stadium Light»** (lyst, fresh, sosialt, litt varme fra B — IKKE mørkt stadium).
-4. [docs/feedcard-reference-spec.md](feedcard-reference-spec.md) — FeedCard-spec + implementeringsrekkefølge (Diff 1 → Diff 2).
+Prosjektet er linket (ref `sswncdrbsrfieudkdmhj`, config `Heia_Prod`). Migrasjoner
+00001–00018 er nå alle deployet til remote (00016/00017 var hand-kjørt fra før;
+reconciliert med `migration repair` 2026-07-08).
 
-### Diff 1 — GJORT (tsc grønn, ingen review-funn)
-Retnings-uavhengige forbedringer:
-- `tokens.ts`: **la til** `heiaInk` (#047857, WCAG-trygg grønn til tekst/ikon — ~5.5:1 på hvit) og `surfaceMuted` (#F1F2F4, nøytral chip-flate).
-- `Chip.tsx`: pastellfyll → **nøytral bg + farget aksent-prikk**; `live` beholder rødt (semantisk).
-- Kontrast-fix rolle-pill `heia` (#02ffab) → `heiaInk`: i `FeedCard.tsx` **og** `ProfilScreen.tsx` «Trener»-badge (`heiaPressed`→`heiaInk`). #02ffab er nå kun FYLL, aldri tekst.
+Eksisterende RPC-er: lese — `get_team_feed`, `get_event_with_rsvp`,
+`get_team_members`; skrive — `create_team_from_scratch`, `join_team_space`,
+`activate_team_space`, `upsert_rsvp`. RLS tillater direkte member/admin-insert
+for feed/kommentar/reaksjon/event, så få nye RPC-er trengs.
 
-### Diff 2 — GJORT & VERIFISERT (tsc grønn, ingen review-funn, screenshots før/etter)
-FeedCard proof-of-direction (`FeedCard.tsx`), + tokens:
-- `tokens.ts`: **la til** `borderSubtle` (#EDEEF0) og `shadows.cardResting`. **⚠️ Cleanup (IKKE additivt): FJERNET `treningBg`/`kampBg`/`sosialtBg`** — pastell-bg-tokens som ble ubrukte da Chip/FeedCard gikk over til nøytral+prikk. Bevisst opprydding; bekreftet ubrukt + tsc grønn. `*Text`-variantene beholdt (brukes som prikkfarger).
-- `FeedCard.tsx`: kort radius 12→24, rolig 1px `borderSubtle` + mykt `cardResting`-løft; betinget **type-markør** (kun `resultat`/`match_*`/`paaminnelse` — vanlig melding/bilde badges IKKE); betinget grønn **energy-rail** (kun `resultat`/`match_*`); større media (200→220h, radius 8→16); inline **ReactionBar** «👏 Heia / 💬 Kommenter». Match-minutt bevart («45′ KAMP»).
+Storage: privat bucket `feed-media` (00018) med INSERT/SELECT/DELETE-policyer
+gated på lagmedlemskap. Path-konvensjon `{team_space_id}/{filnavn}`.
 
-Screenshots: `docs/screenshots/` — `baseline-*`, `diff2-before-home.png`, `diff2-after-home.png`.
+---
 
-### ⚠️ Midlertidige/uferdige ting i Fase 1 (må håndteres)
-- **Dev-seed/mock-feed er MIDLERTIDIG og MÅ FJERNES i Fase 2.** For å kunne se FeedCard visuelt (aktivt lag HAMKAM G12 har ekte Supabase-id men ingen mock-feed): `src/shared/mockData.ts` `devSeedFeed` (3 poster) + `__DEV__`-fallback i `getFeedForTeamSpace` (`src/data/teamData.ts`) som re-stempler dev-poster med aktivt teamSpaceId når ekte feed er tom. `__DEV__`-gated → lekker ikke til prod, men fjern helt når ekte feed kommer.
-- **ReactionBar er PRESENTASJONS-ONLY.** «Heia»/«Kommenter» gjør ingenting. **Skal IKKE shippe som fake interaksjon** — krever ekte wiring (Fase 2) eller feature-flag/skjul før release.
-- **Ekte match_event-poster (Fjellørn ts1) blir også restylet** av FeedCard-endringen (mister oransje matchBadge, får grønn rail+markør). Tilsiktet konsistens.
-- **Bottom-nav-ikonene skal gjøres «mer premium» (form, ikke farge)** — brukerønske, eget punkt til senere nav-diff.
+## Fase 2 — GJORT (ekte feed)
 
-### Pre-existing changes før denne økten (IKKE del av Diff 1/2)
-Følgende var allerede `M`/`??` i git ved sesjonsstart (Fase 0-arbeid) og må ikke forveksles med design-arbeidet: `package.json`, `package-lock.json`, `src/components/index.ts`, `src/context/OnboardingContext.tsx`, `src/navigation/AppNavigator.tsx`, `src/screens/TeamHomeScreen.tsx`, `src/shared/types.ts`, `src/components/InviteCodeCard.tsx`, `src/screens/InviteScreen.tsx`. `ProfilScreen.tsx` hadde en pre-existing «Inviter til laget»-ListRow — kun `roleBadgeTrenerText`-fargen er min Diff 1.
+- **2A tekst** (`b7f26a4`): `src/lib/api/feed.ts` (`getTeamFeed`, `createTextPost`), TeamHome async feed + compose-boks.
+- **2B reaksjon + kommentarer** (`1aff5ba`): `toggleReaction`, `src/lib/api/comments.ts`, `CommentsScreen`, ekte 👏 Heia.
+- **2C bilde** (`6ff0b56`): privat Storage-upload (base64 → ArrayBuffer via `base64-arraybuffer`), `createImagePost`, signerte URL-er (batch `createSignedUrls`) i `getTeamFeed`; `react-native-image-picker`; «📷 Legg til bilde» + preview + fjern i TeamHome; `NSPhotoLibraryUsageDescription`. FeedCard uendret (brukte alt `item.imageUrl`).
+- Merge av `origin/main` (`62e6dd7`): main hadde en squash-commit (`Brage #12`) som var en eldre delmengde; 5 konflikter i `OnboardingContext.tsx` + `AppNavigator.tsx` løst ved å beholde Brage-siden.
 
-### Neste anbefalte steg (etter ny chat)
-1. ~~Rydd Fase 0-tråd + commit design-arbeidet~~ **GJORT** (se «Konsolidering» over).
-2. **Vurder FeedCard-retningen bredt:** hvis godkjent, ekstraher `ReactionBar` til egen primitiv, og vurder samme kontrast-fix på `LiveMatchBanner`-score (stor grønn tekst på hvit — samme klasse-bug, flagget).
-3. **Bred Home/feed-refaktor** på resten (TeamHeader, empty state, supportCard) i «Stadium Light».
-4. **Så Fase 2 (ekte feed)** — som fjerner dev-seed/mock-fallback og wirer ReactionBar mot ekte data.
+### Kjente v1-begrensninger (akseptert)
+- Bilde-upload + de tre insertene (media, feed_posts, media_attachments) er **ikke atomiske** → mulig foreldreløs fil ved feil midtveis. Atomisk RPC + opprydding utsatt.
+- Signerte bilde-URL-er utløper (1t) — greit, feeden refetches.
 
-## Neste faser (godkjent plan)
+---
 
-- **Fase 2 — Ekte feed**: `src/lib/api/feed.ts` (get_team_feed, createTextPost, toggleReaction, evt. kommentarer), refaktorer `FeedCard` fra mock til ny `FeedPost`-type, koble TeamHome, fjern mock-feed. Bilde = Fase 2b (krever Supabase Storage-bucket + `react-native-image-picker`).
-- **Fase 3 — Event/kamp**: `src/lib/api/events.ts`, ny RPC `create_event` (atomisk event + match_session for kamp), koble Kalender + EventDetail, `NewEventScreen`, lett RSVP. Events = innholdskilde + forutsetning for live kamp, IKKE Spond-tung RSVP.
+## Fase 3 — Event/kamp (NESTE)
+
+Godkjent plan. Konverterer den siste mock-kilden til ekte data.
+- `src/lib/api/events.ts` — les via `get_event_with_rsvp` (RPC finnes).
+- Ny RPC `create_event` (atomisk event + `match_session` for kamp).
+- Koble **Kalender** + **EventDetail** fra mock → ekte; bytt mock `getEventsForTeamSpace` i TeamHome → ekte events (og dermed ekte live-kamp-banner).
+- `NewEventScreen` + **lett** RSVP.
+- Filosofi: events = innholdskilde + forutsetning for live kamp. IKKE Spond-tung RSVP/admin. Heia er «Strava for ungdomslag».
+
+Foreslått første skive: les-siden først (events.ts + koble Kalender/EventDetail/banner til ekte data), deretter skrive-siden (create_event + NewEventScreen), deretter RSVP. Én smal skive per samtale.
+
+---
+
+## Arbeidsmåte (for å spare tokens + beholde kontekst)
+
+1. Ny samtale per skive. Start alltid med: «Les docs/STATUS-HANDOFF.md og fortsett.»
+2. Én smal vertikal skive per samtale.
+3. Når en oppgave er ferdig oppdaterer Claude denne fila og sier fra at du trygt kan åpne ny samtale. (Fast regel — du trenger ikke be om det.)
+4. Varige ting (hvem du er, produktidentitet, arbeidsstil) ligger i Claudes minne og følger med automatisk.
 
 ---
 
 ## VIKTIGE LÆRDOMMER (ikke gjenta)
 
-- **ALDRI kjør `pod install` eller andre lange native/build-kommandoer i bakgrunnen mens brukeren kjører appen.** Det skapte ressurskonflikt + tre Metro-instanser som slåss → app hang på «loading from Metro». Kjør slike kommandoer bevisst, i forgrunnen, når brukeren er klar, og forklar at rebuild trengs etterpå.
-- **Claude kan ikke kjøre Metro for brukeren** (sandkassen binder ikke nettverksport → tom logg, server kommer ikke opp). **Brukeren kjører `npm start` i sin egen terminal** og lar den stå åpen. Første oppstart av RN 0.83 tar 1–2 min — ikke drep den.
-- **RN 0.83 har ikke lenger innebygd Clipboard i core.** En knapp som kopierer krever native modul (pod install + rebuild). Uten den: bruk `<Text selectable>` (hold inne → kopier) — ingen native avhengighet.
-- **Ikke referer en native modul som ikke er bygget inn** — `TurboModuleRegistry.getEnforcing('RNCClipboard')` krasjer ved import (og lazy-require hjalp ikke pålitelig). Fjern referansen helt.
+- **ALDRI kjør `pod install`/lange native/build-kommandoer i bakgrunnen mens appen kjører.** Skaper ressurskonflikt + flere Metro-instanser → app henger på «loading from Metro». Kjør i forgrunnen når brukeren er klar, og si fra at rebuild trengs.
+- **Claude kan ikke kjøre Metro/simulator** (sandkassen binder ikke port). Brukeren kjører `npm start` selv og lar den stå. Første RN 0.83-oppstart tar 1–2 min.
+- **Ny native modul krever full rebuild** (`pod install` + Xcode/`run-ios`), ikke bare Metro-reload.
+- **RN 0.83 har ikke Clipboard i core.** Kopiering krever native modul; ellers `<Text selectable>`.
+- **Ikke referer en native modul som ikke er bygget inn** — krasjer ved import.
+- **RN-bildeupload:** base64 → ArrayBuffer (`base64-arraybuffer` `decode`), IKKE fil-URI direkte i supabase-js `.upload()`.
+- **ESLint-serveren i editoren er treg** og viser av og til stale «problems» rett etter merge/rebuild — de forsvinner når den kjører gjennom. tsc er sannhetskilden.
 - Miljø: Node v24, RN 0.83.1, Metro 0.83.3, ingen watchman, ingen node-version-manager.
