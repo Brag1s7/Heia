@@ -1,4 +1,4 @@
-import React, {useState, useCallback} from 'react';
+import React, {useState, useCallback, useEffect} from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import {
   LiveMatchBanner,
   TeamHeader,
 } from '../components';
-import {useActiveTeam} from '../context';
+import {useActiveTeam, useOnboarding} from '../context';
 import {
   getEventsForTeamSpace,
   getFeedForTeamSpace,
@@ -31,11 +31,23 @@ export function TeamHomeScreen() {
   const navigation = useNavigation<Nav>();
   const [refreshing, setRefreshing] = useState(false);
   const {activeTeamSpace, activeTeamSpaceId} = useActiveTeam();
+  const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 1200);
   }, []);
+
+  // Vis invite-koden én gang rett etter at laget er opprettet.
+  useEffect(() => {
+    if (
+      justCreatedTeamSpaceId &&
+      justCreatedTeamSpaceId === activeTeamSpaceId
+    ) {
+      clearJustCreated();
+      navigation.navigate('Invite', {firstTime: true});
+    }
+  }, [justCreatedTeamSpaceId, activeTeamSpaceId, clearJustCreated, navigation]);
 
   if (!activeTeamSpace || !activeTeamSpaceId) return null;
 
@@ -75,11 +87,24 @@ export function TeamHomeScreen() {
 
       {/* Feed — hovedinnhold */}
       <SectionHeader title="Siste fra laget" />
-      {teamFeed.map(item => (
-        <View key={item.id} style={styles.cardWrap}>
-          <FeedCard item={item} />
+      {teamFeed.length === 0 ? (
+        <View style={styles.emptyFeed}>
+          <Text style={styles.emptyTitle}>Ingen aktivitet ennå</Text>
+          <Text style={styles.emptyText}>
+            Inviter foreldre og spillere så blir laget levende.
+          </Text>
+          <Button
+            title="Inviter laget"
+            onPress={() => navigation.navigate('Invite')}
+          />
         </View>
-      ))}
+      ) : (
+        teamFeed.map(item => (
+          <View key={item.id} style={styles.cardWrap}>
+            <FeedCard item={item} />
+          </View>
+        ))
+      )}
 
       {/* Støtt laget */}
       <View style={styles.supportCard}>
@@ -112,6 +137,24 @@ const styles = StyleSheet.create({
   cardWrap: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  emptyFeed: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    padding: spacing.xl,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  emptyTitle: {
+    ...typography.heading3,
+  },
+  emptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   supportCard: {
     marginHorizontal: spacing.lg,

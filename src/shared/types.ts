@@ -137,6 +137,7 @@ export type HomeStackParamList = {
   TeamHome: undefined;
   EventDetail: {eventId: string};
   Support: undefined;
+  Invite: {firstTime?: boolean} | undefined;
 };
 
 export type OnboardingStackParamList = {
@@ -153,4 +154,5 @@ export type KalenderStackParamList = {
 
 export type ProfilStackParamList = {
   Profil: undefined;
+  Invite: {firstTime?: boolean} | undefined;
 };

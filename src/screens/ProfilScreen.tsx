@@ -103,6 +103,14 @@ export function ProfilScreen() {
 
       {/* Meny */}
       <View style={styles.menuSection}>
+        {activeMembership && (
+          <ListRow
+            icon={<Text style={styles.menuIcon}>{'  '}</Text>}
+            title="Inviter til laget"
+            subtitle="Del invitasjonskoden"
+            onPress={() => navigation.navigate('Invite' as never)}
+          />
+        )}
         <ListRow
           icon={<Text style={styles.menuIcon}>{'  '}</Text>}
           title="Logg ut"
