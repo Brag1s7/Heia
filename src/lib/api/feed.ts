@@ -1,10 +1,14 @@
 import {supabase} from '../supabase';
 import type {FeedItem, UserRole} from '../../shared/types';
 
+// Merkevare-reaksjonen: 👏 «Heia». Én emoji nå (utvides senere ved behov).
+export const HEIA_EMOJI = '👏';
+
 // get_team_feed() returnerer flate rader med author-info + aggregater.
 // Vi mapper til eksisterende FeedItem så FeedCard er uendret.
 // Media/matchEvent er utenfor scope for tekst-slicen (Fase 2b/3).
 function mapFeedRow(row: any): FeedItem {
+  const counts = (row.reaction_counts ?? {}) as Record<string, number>;
   return {
     id: row.id,
     teamSpaceId: row.team_space_id,
@@ -20,6 +24,9 @@ function mapFeedRow(row: any): FeedItem {
     createdAt: new Date(row.created_at),
     content: row.content,
     eventId: row.event_id ?? undefined,
+    heiaCount: counts[HEIA_EMOJI] ?? 0,
+    commentCount: Number(row.comment_count ?? 0),
+    iReacted: false, // fylles inn nedenfor fra egne reaksjoner
   };
 }
 
@@ -37,9 +44,73 @@ export async function getTeamFeed(
     throw error;
   }
   // team_space_id er ikke i RPC-radene — stemple fra argumentet.
-  return (data || []).map((row: any) =>
+  const items = (data || []).map((row: any) =>
     mapFeedRow({...row, team_space_id: teamSpaceId}),
   );
+
+  // get_team_feed sier hvor mange som har reagert, men ikke om JEG har det.
+  // Én ekstra spørring (RLS lar meg se lagets reaksjoner) markerer mine.
+  if (items.length > 0) {
+    const {
+      data: {user},
+    } = await supabase.auth.getUser();
+    if (user) {
+      const {data: mine} = await supabase
+        .from('reactions')
+        .select('feed_post_id')
+        .eq('user_id', user.id)
+        .eq('emoji', HEIA_EMOJI)
+        .in(
+          'feed_post_id',
+          items.map((i: FeedItem) => i.id),
+        );
+      const reactedIds = new Set((mine || []).map((r: any) => r.feed_post_id));
+      for (const item of items) {
+        item.iReacted = reactedIds.has(item.id);
+      }
+    }
+  }
+
+  return items;
+}
+
+/**
+ * Toggle 👏 «Heia» på en post. currentlyReacted styrer retningen
+ * (kalleren kjenner tilstanden fra feed-dataen), så vi slipper en
+ * ekstra rundtur. RLS: insert krever user_id = auth.uid() + medlemskap;
+ * delete kun egne rader.
+ */
+export async function toggleReaction(
+  postId: string,
+  currentlyReacted: boolean,
+): Promise<void> {
+  const {
+    data: {user},
+  } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+
+  if (currentlyReacted) {
+    const {error} = await supabase
+      .from('reactions')
+      .delete()
+      .eq('feed_post_id', postId)
+      .eq('user_id', user.id)
+      .eq('emoji', HEIA_EMOJI);
+    if (error) {
+      throw error;
+    }
+  } else {
+    const {error} = await supabase.from('reactions').insert({
+      feed_post_id: postId,
+      user_id: user.id,
+      emoji: HEIA_EMOJI,
+    });
+    if (error) {
+      throw error;
+    }
+  }
 }
 
 /**

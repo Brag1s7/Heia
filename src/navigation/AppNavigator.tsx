@@ -9,6 +9,7 @@ import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
 import {InviteScreen} from '../screens/InviteScreen';
 import {SupportScreen} from '../screens/SupportScreen';
+import {CommentsScreen} from '../screens/CommentsScreen';
 import {WelcomeIntentScreen} from '../screens/WelcomeIntentScreen';
 import {AuthScreen} from '../screens/AuthScreen';
 import {JoinTeamCodeScreen} from '../screens/JoinTeamCodeScreen';
@@ -67,6 +68,11 @@ function HomeStackNavigator() {
         name="Invite"
         component={InviteScreen}
         options={{title: 'Inviter'}}
+      />
+      <HomeStack.Screen
+        name="Comments"
+        component={CommentsScreen}
+        options={{title: 'Kommentarer'}}
       />
     </HomeStack.Navigator>
   );

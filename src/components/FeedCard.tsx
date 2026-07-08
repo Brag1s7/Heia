@@ -1,11 +1,13 @@
 import React from 'react';
-import {View, Text, Image, StyleSheet} from 'react-native';
+import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar} from './Avatar';
 import type {FeedItem} from '../shared/types';
 
 interface FeedCardProps {
   item: FeedItem;
+  onHeia?: () => void;
+  onComment?: () => void;
 }
 
 function timeAgo(date: Date): string {
@@ -53,10 +55,12 @@ function isMatchType(item: FeedItem): boolean {
   );
 }
 
-export function FeedCard({item}: FeedCardProps) {
+export function FeedCard({item, onHeia, onComment}: FeedCardProps) {
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
   const marker = getMarker(item);
   const showRail = item.type === 'resultat' || isMatchType(item);
+  const heiaCount = item.heiaCount ?? 0;
+  const commentCount = item.commentCount ?? 0;
 
   return (
     <View style={styles.card}>
@@ -96,16 +100,30 @@ export function FeedCard({item}: FeedCardProps) {
         </View>
       )}
 
-      {/* Reaksjoner — lettvekt, merkevare-drevet (presentasjons-only, wires i Fase 2) */}
+      {/* Reaksjoner — lettvekt, merkevare-drevet */}
       <View style={styles.reactions}>
-        <View style={styles.reactionBtn}>
+        <Pressable
+          style={styles.reactionBtn}
+          onPress={onHeia}
+          hitSlop={8}>
           <Text style={styles.reactionEmoji}>👏</Text>
-          <Text style={styles.reactionLabel}>Heia</Text>
-        </View>
-        <View style={styles.reactionBtn}>
+          <Text
+            style={[
+              styles.reactionLabel,
+              item.iReacted && styles.reactionLabelActive,
+            ]}>
+            {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.reactionBtn}
+          onPress={onComment}
+          hitSlop={8}>
           <Text style={styles.reactionEmoji}>💬</Text>
-          <Text style={styles.reactionLabel}>Kommenter</Text>
-        </View>
+          <Text style={styles.reactionLabel}>
+            {commentCount > 0 ? `${commentCount} kommentarer` : 'Kommenter'}
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -219,5 +237,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     color: colors.textSecondary,
+  },
+  reactionLabelActive: {
+    color: colors.heiaInk,
+    fontWeight: '700',
   },
 });

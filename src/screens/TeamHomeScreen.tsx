@@ -22,7 +22,7 @@ import {
 } from '../components';
 import {useActiveTeam, useOnboarding} from '../context';
 import {getEventsForTeamSpace} from '../data/teamData';
-import {getTeamFeed, createTextPost} from '../lib/api/feed';
+import {getTeamFeed, createTextPost, toggleReaction} from '../lib/api/feed';
 import type {FeedItem, HomeStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
@@ -64,6 +64,39 @@ export function TeamHomeScreen() {
     setRefreshing(true);
     loadFeed();
   }, [loadFeed]);
+
+  const handleToggleHeia = useCallback(async (post: FeedItem) => {
+    const wasReacted = post.iReacted ?? false;
+    const delta = wasReacted ? -1 : 1;
+    // Optimistisk lokal oppdatering — snappy, og trygt å reversere ved feil.
+    setFeed(prev =>
+      prev.map(p =>
+        p.id === post.id
+          ? {
+              ...p,
+              iReacted: !wasReacted,
+              heiaCount: Math.max(0, (p.heiaCount ?? 0) + delta),
+            }
+          : p,
+      ),
+    );
+    try {
+      await toggleReaction(post.id, wasReacted);
+    } catch (e) {
+      // Reverter til forrige tilstand.
+      setFeed(prev =>
+        prev.map(p =>
+          p.id === post.id
+            ? {
+                ...p,
+                iReacted: wasReacted,
+                heiaCount: Math.max(0, (p.heiaCount ?? 0) - delta),
+              }
+            : p,
+        ),
+      );
+    }
+  }, []);
 
   const handlePost = useCallback(async () => {
     if (!activeTeamSpaceId || composeText.trim().length === 0 || posting) return;
@@ -173,7 +206,16 @@ export function TeamHomeScreen() {
       ) : (
         feed.map(item => (
           <View key={item.id} style={styles.cardWrap}>
-            <FeedCard item={item} />
+            <FeedCard
+              item={item}
+              onHeia={() => handleToggleHeia(item)}
+              onComment={() =>
+                navigation.navigate('Comments', {
+                  postId: item.id,
+                  teamSpaceId: activeTeamSpaceId,
+                })
+              }
+            />
           </View>
         ))
       )}
