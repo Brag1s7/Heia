@@ -32,12 +32,19 @@ Frontend: kun onboarding var koblet til Supabase. Alt «inni» appen
 - `src/navigation/AppNavigator.tsx` + `src/shared/types.ts` — `Invite`-rute i Hjem- og Profil-stack.
 - Typecheck (`npx tsc --noEmit`) er **grønn**.
 
-## Fase 0 — løse tråder å rydde i ny chat
+## Fase 0 — løse tråder
 
-1. **`@react-native-clipboard/clipboard` er installert i package.json men brukes ikke** (vi fjernet all bruk fordi native-modulen ikke var i binæren og krasjet appen). Beslutning trengs:
-   - **Enten** fjern pakken (`npm uninstall @react-native-clipboard/clipboard`) for å holde rent, **eller**
-   - behold den og kjør `pod install` + rebuild i Xcode for å få en dedikert ett-trykks «Kopier»-knapp. (Hold-inne-kopiering + Del dekker behovet uten dette.)
-2. End-to-end-verifisering: opprett lag → reveal → del via Share; bli med via kode.
+1. ~~`@react-native-clipboard/clipboard` ubrukt~~ **LØST 2026-07-08:** pakken er fjernet (`npm uninstall`), package.json/lock tilbake til HEAD. Hold-inne-kopiering + Del dekker behovet uten native modul.
+2. **ÅPEN — End-to-end-verifisering:** opprett lag → reveal → del via Share; bli med via kode. (Ikke kjørt ende-til-ende i simulator ennå.)
+
+## Konsolidering — GJORT 2026-07-08
+
+Alt verifisert arbeid er nå committet på `Brage` i tre logiske commits (var tidligere ucommittet i arbeidstreet):
+- `f971ad1` **Fase 0: team invite loop**
+- `ea092e2` **Fase 1: Stadium Light-designretning** (Diff 1 + Diff 2 + design-docs + screenshots)
+- `d906037` **TEMP: dev-seed feed** (ren revert av denne fjerner hele dev-seed-hacket i Fase 2)
+
+Arbeidstre rent, `npx tsc --noEmit` grønn. Ikke pushet.
 
 ---
 
@@ -72,7 +79,7 @@ Screenshots: `docs/screenshots/` — `baseline-*`, `diff2-before-home.png`, `dif
 Følgende var allerede `M`/`??` i git ved sesjonsstart (Fase 0-arbeid) og må ikke forveksles med design-arbeidet: `package.json`, `package-lock.json`, `src/components/index.ts`, `src/context/OnboardingContext.tsx`, `src/navigation/AppNavigator.tsx`, `src/screens/TeamHomeScreen.tsx`, `src/shared/types.ts`, `src/components/InviteCodeCard.tsx`, `src/screens/InviteScreen.tsx`. `ProfilScreen.tsx` hadde en pre-existing «Inviter til laget»-ListRow — kun `roleBadgeTrenerText`-fargen er min Diff 1.
 
 ### Neste anbefalte steg (etter ny chat)
-1. **Rydd Fase 0-tråd:** ubrukt `@react-native-clipboard/clipboard` (se under) + evt. commit av design-arbeidet.
+1. ~~Rydd Fase 0-tråd + commit design-arbeidet~~ **GJORT** (se «Konsolidering» over).
 2. **Vurder FeedCard-retningen bredt:** hvis godkjent, ekstraher `ReactionBar` til egen primitiv, og vurder samme kontrast-fix på `LiveMatchBanner`-score (stor grønn tekst på hvit — samme klasse-bug, flagget).
 3. **Bred Home/feed-refaktor** på resten (TeamHeader, empty state, supportCard) i «Stadium Light».
 4. **Så Fase 2 (ekte feed)** — som fjerner dev-seed/mock-fallback og wirer ReactionBar mot ekte data.
