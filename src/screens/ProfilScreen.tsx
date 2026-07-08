@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   roleBadgeTrenerText: {
-    color: colors.heiaPressed,
+    color: colors.heiaInk,
   },
   roleBadgeForelderText: {
     color: colors.textSecondary,
