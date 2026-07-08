@@ -588,37 +588,3 @@ const feedTs2: FeedItem[] = [
 
 export const feedItems: FeedItem[] = [...feedTs1, ...feedTs2];
 
-// ---------------------------------------------------------------------------
-// ⚠️ MIDLERTIDIG DEV-SEED (Fase 1 / Diff 2) — FJERNES i Fase 2 (ekte feed)
-// Kun for å kunne se FeedCard visuelt i simulator på runtime-opprettede lag
-// (HAMKAM G12 e.l.) som ikke har mock-feed. teamSpaceId settes av
-// getFeedForTeamSpace sin __DEV__-fallback, så verdien her er irrelevant.
-// ---------------------------------------------------------------------------
-export const devSeedFeed: FeedItem[] = [
-  {
-    id: 'dev_resultat',
-    teamSpaceId: 'dev',
-    type: 'resultat',
-    author: {...users[1], role: 'trener'},
-    createdAt: daysFromNow(0, 16, 30),
-    content: 'Vi vant 3–1 mot Lillehammer! To mål av Erlend og ett av Sofie. Sterk laginnsats hele veien. 💚',
-  },
-  {
-    id: 'dev_melding',
-    teamSpaceId: 'dev',
-    type: 'melding',
-    author: {...users[1], role: 'trener'},
-    createdAt: daysFromNow(0, 9, 15),
-    content: 'Husk trening i morgen kl 17. Vi jobber med pasningsspill — ta med vannflaske og godt humør!',
-  },
-  {
-    id: 'dev_bilde',
-    teamSpaceId: 'dev',
-    type: 'bilde',
-    author: {...users[2], role: 'forelder'},
-    createdAt: daysFromNow(-1, 18, 45),
-    content: 'For en gjeng! Stolt lagforelder etter kampen i dag.',
-    imageUrl: 'https://picsum.photos/seed/heiadev/400/300',
-  },
-];
-

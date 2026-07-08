@@ -9,3 +9,4 @@ export {
   getSports,
   getCachedSports,
 } from './teams';
+export {getTeamFeed, createTextPost} from './feed';

@@ -1,6 +1,5 @@
 import type {
   HeiaEvent,
-  FeedItem,
   Membership,
   Team,
   TeamSpace,
@@ -9,8 +8,6 @@ import type {
 } from '../shared/types';
 import {
   events,
-  feedItems,
-  devSeedFeed,
   teamSpaces,
   memberships,
   users,
@@ -19,17 +16,6 @@ import {
 
 export function getEventsForTeamSpace(teamSpaceId: string): HeiaEvent[] {
   return events.filter(e => e.teamSpaceId === teamSpaceId);
-}
-
-export function getFeedForTeamSpace(teamSpaceId: string): FeedItem[] {
-  const real = feedItems.filter(f => f.teamSpaceId === teamSpaceId);
-  // ⚠️ MIDLERTIDIG DEV-FALLBACK (Fase 1 / Diff 2) — FJERNES i Fase 2.
-  // Viser dev-seed i tomme, runtime-opprettede lag så FeedCard kan verifiseres
-  // visuelt. teamSpaceId re-stemples så postene tilhører det aktive laget.
-  if (__DEV__ && real.length === 0) {
-    return devSeedFeed.map(f => ({...f, teamSpaceId}));
-  }
-  return real;
 }
 
 export function getMembersForTeamSpace(

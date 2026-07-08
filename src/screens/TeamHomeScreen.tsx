@@ -5,6 +5,9 @@ import {
   ScrollView,
   RefreshControl,
   StyleSheet,
+  TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -18,11 +21,9 @@ import {
   TeamHeader,
 } from '../components';
 import {useActiveTeam, useOnboarding} from '../context';
-import {
-  getEventsForTeamSpace,
-  getFeedForTeamSpace,
-} from '../data/teamData';
-import type {HomeStackParamList} from '../shared/types';
+import {getEventsForTeamSpace} from '../data/teamData';
+import {getTeamFeed, createTextPost} from '../lib/api/feed';
+import type {FeedItem, HomeStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 
@@ -33,10 +34,50 @@ export function TeamHomeScreen() {
   const {activeTeamSpace, activeTeamSpaceId} = useActiveTeam();
   const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
 
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [composeText, setComposeText] = useState('');
+  const [posting, setPosting] = useState(false);
+
+  const loadFeed = useCallback(async () => {
+    if (!activeTeamSpaceId) return;
+    setError(null);
+    try {
+      const items = await getTeamFeed(activeTeamSpaceId);
+      setFeed(items);
+    } catch (e) {
+      setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [activeTeamSpaceId]);
+
+  // Last feed når aktivt lag endres.
+  useEffect(() => {
+    setLoading(true);
+    loadFeed();
+  }, [loadFeed]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1200);
-  }, []);
+    loadFeed();
+  }, [loadFeed]);
+
+  const handlePost = useCallback(async () => {
+    if (!activeTeamSpaceId || composeText.trim().length === 0 || posting) return;
+    setPosting(true);
+    try {
+      await createTextPost(activeTeamSpaceId, composeText);
+      setComposeText('');
+      await loadFeed();
+    } catch (e) {
+      Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
+    } finally {
+      setPosting(false);
+    }
+  }, [activeTeamSpaceId, composeText, posting, loadFeed]);
 
   // Vis invite-koden én gang rett etter at laget er opprettet.
   useEffect(() => {
@@ -52,9 +93,8 @@ export function TeamHomeScreen() {
   if (!activeTeamSpace || !activeTeamSpaceId) return null;
 
   const teamEvents = getEventsForTeamSpace(activeTeamSpaceId);
-  const teamFeed = getFeedForTeamSpace(activeTeamSpaceId);
 
-  // Finn live kamp
+  // Finn live kamp (fortsatt mock — events kommer i Fase 3)
   const liveMatch = teamEvents.find(
     e => e.type === 'kamp' && e.matchStatus === 'live',
   );
@@ -87,11 +127,43 @@ export function TeamHomeScreen() {
 
       {/* Feed — hovedinnhold */}
       <SectionHeader title="Siste fra laget" />
-      {teamFeed.length === 0 ? (
+
+      {/* Compose — skriv en enkel tekstpost */}
+      <View style={styles.composeCard}>
+        <TextInput
+          style={styles.composeInput}
+          value={composeText}
+          onChangeText={setComposeText}
+          placeholder="Del noe med laget…"
+          placeholderTextColor={colors.textTertiary}
+          multiline
+          editable={!posting}
+        />
+        <View style={styles.composeActions}>
+          <Button
+            title="Publiser"
+            onPress={handlePost}
+            disabled={composeText.trim().length === 0}
+            loading={posting}
+          />
+        </View>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator
+          style={styles.feedLoader}
+          color={colors.heia}
+        />
+      ) : error ? (
+        <View style={styles.emptyFeed}>
+          <Text style={styles.emptyText}>{error}</Text>
+        </View>
+      ) : feed.length === 0 ? (
         <View style={styles.emptyFeed}>
           <Text style={styles.emptyTitle}>Ingen aktivitet ennå</Text>
           <Text style={styles.emptyText}>
-            Inviter foreldre og spillere så blir laget levende.
+            Skriv den første meldingen, eller inviter foreldre og spillere så
+            blir laget levende.
           </Text>
           <Button
             title="Inviter laget"
@@ -99,7 +171,7 @@ export function TeamHomeScreen() {
           />
         </View>
       ) : (
-        teamFeed.map(item => (
+        feed.map(item => (
           <View key={item.id} style={styles.cardWrap}>
             <FeedCard item={item} />
           </View>
@@ -137,6 +209,29 @@ const styles = StyleSheet.create({
   cardWrap: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
+  },
+  composeCard: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    gap: spacing.md,
+  },
+  composeInput: {
+    ...typography.body,
+    color: colors.textPrimary,
+    minHeight: 44,
+    textAlignVertical: 'top',
+  },
+  composeActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  feedLoader: {
+    marginTop: spacing.xl,
   },
   emptyFeed: {
     marginHorizontal: spacing.lg,
