@@ -2,6 +2,8 @@ import React, {useState, useCallback, useEffect} from 'react';
 import {
   View,
   Text,
+  Image,
+  Pressable,
   ScrollView,
   RefreshControl,
   StyleSheet,
@@ -9,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import {launchImageLibrary} from 'react-native-image-picker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useNavigation} from '@react-navigation/native';
@@ -22,8 +25,17 @@ import {
 } from '../components';
 import {useActiveTeam, useOnboarding} from '../context';
 import {getEventsForTeamSpace} from '../data/teamData';
-import {getTeamFeed, createTextPost, toggleReaction} from '../lib/api/feed';
+import {
+  getTeamFeed,
+  createTextPost,
+  createImagePost,
+  toggleReaction,
+} from '../lib/api/feed';
+import type {ImagePostInput} from '../lib/api/feed';
 import type {FeedItem, HomeStackParamList} from '../shared/types';
+
+/** Valgt bilde i compose-boksen: preview-uri + payload for opplasting. */
+type SelectedImage = ImagePostInput & {uri: string};
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 
@@ -38,6 +50,7 @@ export function TeamHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composeText, setComposeText] = useState('');
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [posting, setPosting] = useState(false);
 
   const loadFeed = useCallback(async () => {
@@ -98,19 +111,57 @@ export function TeamHomeScreen() {
     }
   }, []);
 
+  const handlePickImage = useCallback(async () => {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      selectionLimit: 1,
+    });
+    if (result.didCancel) return;
+    const asset = result.assets?.[0];
+    if (!asset?.base64 || !asset.uri) {
+      Alert.alert('Kunne ikke hente bildet', 'Prøv et annet bilde.');
+      return;
+    }
+    setSelectedImage({
+      uri: asset.uri,
+      base64: asset.base64,
+      mimeType: asset.type ?? 'image/jpeg',
+      fileName: asset.fileName ?? 'bilde.jpg',
+      sizeBytes: asset.fileSize ?? asset.base64.length,
+      width: asset.width,
+      height: asset.height,
+    });
+  }, []);
+
+  const handleRemoveImage = useCallback(() => {
+    setSelectedImage(null);
+  }, []);
+
+  const canPost = composeText.trim().length > 0 || selectedImage !== null;
+
   const handlePost = useCallback(async () => {
-    if (!activeTeamSpaceId || composeText.trim().length === 0 || posting) return;
+    if (!activeTeamSpaceId || !canPost || posting) return;
     setPosting(true);
     try {
-      await createTextPost(activeTeamSpaceId, composeText);
+      if (selectedImage) {
+        await createImagePost({
+          teamSpaceId: activeTeamSpaceId,
+          content: composeText,
+          image: selectedImage,
+        });
+      } else {
+        await createTextPost(activeTeamSpaceId, composeText);
+      }
       setComposeText('');
+      setSelectedImage(null);
       await loadFeed();
     } catch (e) {
       Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
     } finally {
       setPosting(false);
     }
-  }, [activeTeamSpaceId, composeText, posting, loadFeed]);
+  }, [activeTeamSpaceId, canPost, composeText, selectedImage, posting, loadFeed]);
 
   // Vis invite-koden én gang rett etter at laget er opprettet.
   useEffect(() => {
@@ -172,11 +223,34 @@ export function TeamHomeScreen() {
           multiline
           editable={!posting}
         />
+        {selectedImage && (
+          <View style={styles.imagePreview}>
+            <Image
+              source={{uri: selectedImage.uri}}
+              style={styles.previewThumb}
+              resizeMode="cover"
+            />
+            <Pressable
+              style={styles.removeImageBtn}
+              onPress={handleRemoveImage}
+              hitSlop={8}
+              disabled={posting}>
+              <Text style={styles.removeImageText}>Fjern bilde</Text>
+            </Pressable>
+          </View>
+        )}
         <View style={styles.composeActions}>
+          <Pressable
+            style={styles.addImageBtn}
+            onPress={handlePickImage}
+            hitSlop={8}
+            disabled={posting}>
+            <Text style={styles.addImageText}>📷 Legg til bilde</Text>
+          </Pressable>
           <Button
             title="Publiser"
             onPress={handlePost}
-            disabled={composeText.trim().length === 0}
+            disabled={!canPost}
             loading={posting}
           />
         </View>
@@ -270,7 +344,35 @@ const styles = StyleSheet.create({
   },
   composeActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  addImageBtn: {
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.sm,
+  },
+  addImageText: {
+    ...typography.body,
+    color: colors.heiaInk,
+    fontWeight: '600',
+  },
+  imagePreview: {
+    gap: spacing.sm,
+    alignItems: 'flex-start',
+  },
+  previewThumb: {
+    width: '100%',
+    height: 200,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surfaceMuted,
+  },
+  removeImageBtn: {
+    paddingVertical: spacing.xs,
+  },
+  removeImageText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    fontWeight: '600',
   },
   feedLoader: {
     marginTop: spacing.xl,
