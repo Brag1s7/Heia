@@ -1,6 +1,5 @@
 import type {
   HeiaEvent,
-  FeedItem,
   Membership,
   Team,
   TeamSpace,
@@ -9,7 +8,6 @@ import type {
 } from '../shared/types';
 import {
   events,
-  feedItems,
   teamSpaces,
   memberships,
   users,
@@ -18,10 +16,6 @@ import {
 
 export function getEventsForTeamSpace(teamSpaceId: string): HeiaEvent[] {
   return events.filter(e => e.teamSpaceId === teamSpaceId);
-}
-
-export function getFeedForTeamSpace(teamSpaceId: string): FeedItem[] {
-  return feedItems.filter(f => f.teamSpaceId === teamSpaceId);
 }
 
 export function getMembersForTeamSpace(

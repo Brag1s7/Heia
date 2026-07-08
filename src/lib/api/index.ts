@@ -9,3 +9,5 @@ export {
   getSports,
   getCachedSports,
 } from './teams';
+export {getTeamFeed, createTextPost, toggleReaction} from './feed';
+export {getComments, createComment} from './comments';

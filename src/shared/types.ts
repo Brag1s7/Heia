@@ -120,6 +120,18 @@ export interface FeedItem {
   imageUrl?: string;
   matchEvent?: MatchEvent;
   eventId?: string;
+  // Engasjement (Fase 2B) — 👏 «Heia»-reaksjoner + kommentarer
+  heiaCount?: number;
+  iReacted?: boolean;
+  commentCount?: number;
+}
+
+/** Én kommentar på en feed-post. */
+export interface FeedComment {
+  id: string;
+  author: User & {role?: UserRole};
+  createdAt: Date;
+  content: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +149,8 @@ export type HomeStackParamList = {
   TeamHome: undefined;
   EventDetail: {eventId: string};
   Support: undefined;
+  Invite: {firstTime?: boolean} | undefined;
+  Comments: {postId: string; teamSpaceId: string};
 };
 
 export type OnboardingStackParamList = {
@@ -153,4 +167,5 @@ export type KalenderStackParamList = {
 
 export type ProfilStackParamList = {
   Profil: undefined;
+  Invite: {firstTime?: boolean} | undefined;
 };

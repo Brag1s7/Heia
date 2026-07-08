@@ -8,10 +8,14 @@ export const colors = {
   heia: '#02ffab',
   heiaPressed: '#00D492',
   heiaSoft: 'rgba(2, 255, 171, 0.10)',
+  // Mørk, WCAG-trygg grønn til TEKST/IKON på lyst (#02ffab er kun fyll — feiler kontrast som tekst)
+  heiaInk: '#047857',
 
   // Flater
   background: '#F7F7F8',
   surface: '#FFFFFF',
+  // Nøytral, dempet flate til chips o.l. (erstatter pastell-fyll)
+  surfaceMuted: '#F1F2F4',
 
   // Tekst
   textPrimary: '#1A1D26',
@@ -20,18 +24,17 @@ export const colors = {
 
   // Grenser
   border: '#E5E7EB',
+  // Rolig 1px kort-kant på lyst (premium-separasjon sammen med cardResting)
+  borderSubtle: '#EDEEF0',
 
   // Semantisk
   error: '#EF4444',
   success: '#22C55E',
   warning: '#F59E0B',
 
-  // Event-type bakgrunner
-  treningBg: '#EEF2FF',
+  // Event-type aksentfarger (brukes som prikk på nøytrale chips)
   treningText: '#4F46E5',
-  kampBg: '#FFF7ED',
   kampText: '#EA580C',
-  sosialtBg: '#FAF5FF',
   sosialtText: '#9333EA',
 } as const;
 
@@ -144,5 +147,14 @@ export const shadows = {
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 6,
+  } satisfies ViewStyle,
+
+  // Mykt ambient-løft for feed-kort på nær-hvit bakgrunn (premium light)
+  cardResting: {
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.07,
+    shadowRadius: 20,
+    elevation: 3,
   } satisfies ViewStyle,
 } as const;

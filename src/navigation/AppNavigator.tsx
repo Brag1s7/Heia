@@ -7,7 +7,9 @@ import {colors, typography, spacing} from '../theme';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
+import {InviteScreen} from '../screens/InviteScreen';
 import {SupportScreen} from '../screens/SupportScreen';
+import {CommentsScreen} from '../screens/CommentsScreen';
 import {WelcomeIntentScreen} from '../screens/WelcomeIntentScreen';
 import {AuthScreen} from '../screens/AuthScreen';
 import {JoinTeamCodeScreen} from '../screens/JoinTeamCodeScreen';
@@ -62,6 +64,16 @@ function HomeStackNavigator() {
         component={SupportScreen}
         options={{title: 'Støtt laget'}}
       />
+      <HomeStack.Screen
+        name="Invite"
+        component={InviteScreen}
+        options={{title: 'Inviter'}}
+      />
+      <HomeStack.Screen
+        name="Comments"
+        component={CommentsScreen}
+        options={{title: 'Kommentarer'}}
+      />
     </HomeStack.Navigator>
   );
 }
@@ -91,8 +103,17 @@ function KalenderStackNavigator() {
 // ---------------------------------------------------------------------------
 function ProfilStackNavigator() {
   return (
-    <ProfilNav.Navigator screenOptions={{headerShown: false}}>
-      <ProfilNav.Screen name="Profil" component={ProfilScreen} />
+    <ProfilNav.Navigator screenOptions={stackScreenOptions}>
+      <ProfilNav.Screen
+        name="Profil"
+        component={ProfilScreen}
+        options={{headerShown: false}}
+      />
+      <ProfilNav.Screen
+        name="Invite"
+        component={InviteScreen}
+        options={{title: 'Inviter'}}
+      />
     </ProfilNav.Navigator>
   );
 }

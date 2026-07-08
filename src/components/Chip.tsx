@@ -9,47 +9,49 @@ interface ChipProps {
   type: ChipType;
 }
 
-const chipConfig: Record<ChipType, {bg: string; text: string; label: string}> =
-  {
-    trening: {
-      bg: colors.treningBg,
-      text: colors.treningText,
-      label: 'TRENING',
-    },
-    kamp: {bg: colors.kampBg, text: colors.kampText, label: 'KAMP'},
-    sosialt: {
-      bg: colors.sosialtBg,
-      text: colors.sosialtText,
-      label: 'SOSIALT',
-    },
-    annet: {
-      bg: colors.background,
-      text: colors.textSecondary,
-      label: 'ANNET',
-    },
-    live: {
-      bg: 'rgba(239, 68, 68, 0.1)',
-      text: colors.error,
-      label: 'LIVE',
-    },
-  };
+// Nøytral chip-bg + farget aksent-prikk. `live` er semantisk kritisk og beholder rødt fyll.
+const chipConfig: Record<ChipType, {dot: string; label: string}> = {
+  trening: {dot: colors.treningText, label: 'TRENING'},
+  kamp: {dot: colors.kampText, label: 'KAMP'},
+  sosialt: {dot: colors.sosialtText, label: 'SOSIALT'},
+  annet: {dot: colors.textTertiary, label: 'ANNET'},
+  live: {dot: colors.error, label: 'LIVE'},
+};
 
 export function Chip({type}: ChipProps) {
   const config = chipConfig[type];
+  const isLive = type === 'live';
 
   return (
-    <View style={[styles.chip, {backgroundColor: config.bg}]}>
-      <Text style={[styles.text, {color: config.text}]}>{config.label}</Text>
+    <View
+      style={[
+        styles.chip,
+        {backgroundColor: isLive ? 'rgba(239, 68, 68, 0.1)' : colors.surfaceMuted},
+      ]}>
+      {!isLive && (
+        <View style={[styles.dot, {backgroundColor: config.dot}]} />
+      )}
+      <Text style={[styles.text, {color: isLive ? colors.error : colors.textSecondary}]}>
+        {config.label}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: radius.sm,
     alignSelf: 'flex-start',
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.full,
   },
   text: {
     ...typography.label,

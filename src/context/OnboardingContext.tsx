@@ -34,6 +34,12 @@ interface OnboardingContextValue {
   setLastError: (msg: string | null) => void;
   executeJoin: (inviteCode: string, role: MemberRole) => Promise<void>;
   executeCreate: (payload: CreateTeamPayload) => Promise<void>;
+  /**
+   * Settes til team_space-id rett etter at et lag er opprettet fra bunnen.
+   * TeamHome bruker det til å vise invite-koden én gang, og nuller det så.
+   */
+  justCreatedTeamSpaceId: string | null;
+  clearJustCreated: () => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | undefined>(
@@ -48,7 +54,14 @@ export function OnboardingProvider({children}: PropsWithChildren) {
     null,
   );
   const [lastError, setLastError] = useState<string | null>(null);
+  const [justCreatedTeamSpaceId, setJustCreatedTeamSpaceId] = useState<
+    string | null
+  >(null);
   const runningRef = useRef(false);
+
+  const clearJustCreated = useCallback(() => {
+    setJustCreatedTeamSpaceId(null);
+  }, []);
 
   const setPendingAction = useCallback((action: PendingAction) => {
     setLastError(null);
@@ -74,6 +87,7 @@ export function OnboardingProvider({children}: PropsWithChildren) {
       const result = await createTeamFromScratch(payload);
       await refreshMemberships();
       setActiveTeamSpace(result.teamSpaceId);
+      setJustCreatedTeamSpaceId(result.teamSpaceId);
     },
     [refreshMemberships, setActiveTeamSpace],
   );
@@ -128,6 +142,8 @@ export function OnboardingProvider({children}: PropsWithChildren) {
         setLastError,
         executeJoin,
         executeCreate,
+        justCreatedTeamSpaceId,
+        clearJustCreated,
       }}>
       {children}
     </OnboardingContext.Provider>
