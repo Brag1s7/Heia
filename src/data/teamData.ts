@@ -10,6 +10,7 @@ import type {
 import {
   events,
   feedItems,
+  devSeedFeed,
   teamSpaces,
   memberships,
   users,
@@ -21,7 +22,14 @@ export function getEventsForTeamSpace(teamSpaceId: string): HeiaEvent[] {
 }
 
 export function getFeedForTeamSpace(teamSpaceId: string): FeedItem[] {
-  return feedItems.filter(f => f.teamSpaceId === teamSpaceId);
+  const real = feedItems.filter(f => f.teamSpaceId === teamSpaceId);
+  // ⚠️ MIDLERTIDIG DEV-FALLBACK (Fase 1 / Diff 2) — FJERNES i Fase 2.
+  // Viser dev-seed i tomme, runtime-opprettede lag så FeedCard kan verifiseres
+  // visuelt. teamSpaceId re-stemples så postene tilhører det aktive laget.
+  if (__DEV__ && real.length === 0) {
+    return devSeedFeed.map(f => ({...f, teamSpaceId}));
+  }
+  return real;
 }
 
 export function getMembersForTeamSpace(
