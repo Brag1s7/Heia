@@ -16,7 +16,8 @@ Neste steg er Fase 3B-2 — lagre RSVP + fjerne «Ta rollen».
 Branch: `Brage`. `npx tsc --noEmit` er grønn. `npx eslint src` har 6 errors +
 5 warnings, alle fra før (ubrukte variabler i `CommentsScreen`/`InviteScreen`,
 `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
-**Fase 3B-1 er IKKE verifisert i simulator ennå** (se «Test dette først»).
+Fase 3B-1 er verifisert i simulator (bruker bekreftet at opprettelse i kalenderen
+virker). **Bugfiksen for «bli med i lag nr. 2» er IKKE verifisert ennå.**
 Ikke pushet til `origin/Brage` ennå.
 
 ### Ekte vs. mock akkurat nå
@@ -112,6 +113,28 @@ nettopp for å slippe rebuild. Bytt hvis det blir for stivt.)
 4. Trykk `+` som forelder (eller sett `role='forelder'` i `memberships`) →
    kun «Del med laget». Valgarket skal aldri være tomt.
 5. «Del med laget» → compose-boksen får fokus, også når du alt står på Hjem.
+
+## Bugfiks 2026-07-09 — bli med i lag nr. 2
+
+Funnet under testing av 3B-1.
+
+- **Ventende join ble stille forkastet.** Resume-effekten i `OnboardingContext`
+  avbrøt tidlig når `hasTeam` var sann. En bruker som var trener i lag A, logget
+  ut, tastet koden til lag B og logget inn igjen, fikk `hasTeam=true` i det
+  profilen lastet → join-en mot lag B kjørte aldri, uten feilmelding. Guarden er
+  fjernet; `runningRef` + `clearPendingAction` hindrer dobbeltkjøring alene.
+  `userMemberships.length` er også ute av dep-arrayet (den var det som trigget
+  re-kjøringer guarden skulle beskytte mot).
+- **`AppNavigator`** viser nå «Setter opp laget…» også når brukeren alt har et
+  lag, og `Alert`-er `lastError` i det tilfellet — før forsvant feilen i
+  stillhet, siden `WelcomeIntentScreen` (som viser den) ikke er montert da.
+- **Legge til lag når man er innlogget.** `JoinTeamCode` + `CreateTeam` er nå
+  også registrert i `ProfilStack`, med nye menyvalg «Bli med i et lag» og
+  «Opprett et nytt lag». Begge skjermene henter navigasjon via `useNavigation`
+  i stedet for skjerm-props, så de kan monteres i to stacker. De kaller
+  `navigation.goBack()` selv når `hadTeam` — da bytter ikke `AppNavigator` skjerm.
+- **Rolle-etiketter:** `ProfilScreen` viste «Forelder» for lagleder/admin/spiller.
+  Nå en `ROLE_LABELS`-tabell, og rolle-badgen bruker `isTeamAdmin()`.
 
 ## Fase 3B-2 — NESTE (lett RSVP + reporter-opprydding)
 

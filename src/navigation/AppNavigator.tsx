@@ -1,5 +1,12 @@
-import React, {useState} from 'react';
-import {Pressable, Text, StyleSheet, View, ActivityIndicator} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {
+  Alert,
+  Pressable,
+  Text,
+  StyleSheet,
+  View,
+  ActivityIndicator,
+} from 'react-native';
 import {
   NavigationContainer,
   useNavigation,
@@ -134,6 +141,17 @@ function ProfilStackNavigator() {
         name="Invite"
         component={InviteScreen}
         options={{title: 'Inviter'}}
+      />
+      {/* Skjermene tegner sin egen «‹ Tilbake» og topp-padding. */}
+      <ProfilNav.Screen
+        name="JoinTeamCode"
+        component={JoinTeamCodeScreen}
+        options={{headerShown: false}}
+      />
+      <ProfilNav.Screen
+        name="CreateTeam"
+        component={CreateTeamScreen}
+        options={{headerShown: false}}
       />
     </ProfilNav.Navigator>
   );
@@ -286,9 +304,18 @@ function LoadingScreen({message}: {message?: string}) {
 export function AppNavigator() {
   const {session, profile, loading} = useAuth();
   const {userMemberships, loading: teamLoading} = useActiveTeam();
-  const {pendingAction} = useOnboarding();
+  const {pendingAction, lastError, setLastError} = useOnboarding();
 
   const hasTeam = userMemberships.length > 0;
+
+  // WelcomeIntent viser lastError for en gjest. Har brukeren alt et lag rendres
+  // MainTabs, og feilen ville forsvunnet i stillhet — så vi sier fra her.
+  useEffect(() => {
+    if (lastError && hasTeam) {
+      Alert.alert('Noe gikk galt', lastError);
+      setLastError(null);
+    }
+  }, [lastError, hasTeam, setLastError]);
 
   // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
   if (loading || (session && !profile) || (session && teamLoading)) {
@@ -296,7 +323,8 @@ export function AppNavigator() {
   }
 
   // Innlogget med en pending intent (auth-before-commit): fullfør join/create.
-  if (session && profile && !hasTeam && pendingAction) {
+  // Gjelder også når brukeren alt har et lag og blir med i sitt neste.
+  if (session && profile && pendingAction) {
     return <LoadingScreen message="Setter opp laget…" />;
   }
 

@@ -48,8 +48,7 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(
 
 export function OnboardingProvider({children}: PropsWithChildren) {
   const {session, profile} = useAuth();
-  const {refreshMemberships, setActiveTeamSpace, userMemberships} =
-    useActiveTeam();
+  const {refreshMemberships, setActiveTeamSpace} = useActiveTeam();
   const [pendingAction, setPendingActionState] = useState<PendingAction | null>(
     null,
   );
@@ -93,17 +92,13 @@ export function OnboardingProvider({children}: PropsWithChildren) {
   );
 
   // Resume-effekt: kjør pending action når brukeren er autentisert.
-  // clearPendingAction kalles ETTER at execute* har awaited refresh, så
-  // hasTeam er true før pending nulles (ingen flicker innom intent-skjermen).
+  //
+  // Ikke avbryt fordi brukeren allerede har et lag. En trener som logger inn
+  // for å bli med i lag nr. 2 har hasTeam=true i det profilen lastes, og
+  // join-en ville blitt stille forkastet. runningRef hindrer dobbeltkjøring,
+  // og clearPendingAction hindrer ny kjøring etterpå.
   useEffect(() => {
-    const hasTeam = userMemberships.length > 0;
-    if (
-      !session?.user ||
-      !profile ||
-      !pendingAction ||
-      runningRef.current ||
-      hasTeam
-    ) {
+    if (!session?.user || !profile || !pendingAction || runningRef.current) {
       return;
     }
     runningRef.current = true;
@@ -126,7 +121,6 @@ export function OnboardingProvider({children}: PropsWithChildren) {
     session?.user,
     profile,
     pendingAction,
-    userMemberships.length,
     executeJoin,
     executeCreate,
     clearPendingAction,

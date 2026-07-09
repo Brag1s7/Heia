@@ -11,22 +11,29 @@ import {
   ScrollView,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {Button} from '../components';
-import {useAuth, useOnboarding} from '../context';
+import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
 import type {Sport, ClubSearchResult, CreateTeamPayload} from '../lib/types';
 import type {OnboardingStackParamList} from '../shared/types';
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, 'CreateTeam'>;
+// Brukes både i onboarding-stacken og fra Profil («Opprett et nytt lag»).
+type Nav = NativeStackNavigationProp<OnboardingStackParamList, 'CreateTeam'>;
 
 type SelectedClub = {id?: string; name: string};
 
-export function CreateTeamScreen({navigation}: Props) {
+export function CreateTeamScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<Nav>();
   const {session} = useAuth();
+  const {userMemberships} = useActiveTeam();
   const {setPendingAction, executeCreate} = useOnboarding();
+
+  // Se JoinTeamCodeScreen: har vi alt et lag, må vi lukke skjermen selv.
+  const hadTeam = userMemberships.length > 0;
 
   const [teamName, setTeamName] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
@@ -158,6 +165,9 @@ export function CreateTeamScreen({navigation}: Props) {
     try {
       // executeCreate oppdaterer memberships → AppNavigator bytter til MainTabs.
       await executeCreate(payload);
+      if (hadTeam) {
+        navigation.goBack();
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Kunne ikke opprette laget.');
       setSubmitting(false);
