@@ -46,11 +46,14 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
         <View style={styles.content}>
           <Chip type={event.type} />
           <Text style={styles.title}>{event.title}</Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>{event.location}</Text>
-          </View>
+          {event.location && (
+            <View style={styles.metaRow}>
+              <Text style={styles.meta}>{event.location}</Text>
+            </View>
+          )}
           <Text style={styles.meta}>
-            {formatTime(event.startTime)} – {formatTime(event.endTime)}
+            {formatTime(event.startTime)}
+            {event.endTime ? ` – ${formatTime(event.endTime)}` : ''}
           </Text>
         </View>
       </View>

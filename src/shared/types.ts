@@ -14,7 +14,12 @@ export type RSVPStatus = 'kommer' | 'kan_ikke' | 'venter';
 
 export type UserRole = 'trener' | 'forelder' | 'spiller';
 
-export type MatchStatus = 'upcoming' | 'live' | 'halfTime' | 'finished';
+export type MatchStatus =
+  | 'upcoming'
+  | 'live'
+  | 'halfTime'
+  | 'finished'
+  | 'cancelled';
 
 export type MatchEventType =
   | 'avspark'
@@ -33,8 +38,8 @@ export interface MatchEvent {
   minute: number;
   player?: string;
   description: string;
-  reportedBy: string;
-  createdAt: Date;
+  reportedBy?: string;
+  createdAt?: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,8 +90,9 @@ export interface HeiaEvent {
   type: EventType;
   title: string;
   startTime: Date;
-  endTime: Date;
-  location: string;
+  /** Valgfri i databasen — en hendelse trenger ikke sluttidspunkt. */
+  endTime?: Date;
+  location?: string;
   description?: string;
   rsvp: RSVPSummary;
   score?: {home: number; away: number};
@@ -101,6 +107,23 @@ export interface RSVPSummary {
   notComing: number;
   pending: number;
   myStatus: RSVPStatus;
+}
+
+/** Én rad i oppmøtelisten. Foreldre kan svare på vegne av et barn. */
+export interface EventAttendee {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  childName?: string;
+}
+
+/** Event med oppmøtelister — kun tilgjengelig på detaljskjermen. */
+export interface HeiaEventDetail extends HeiaEvent {
+  attendees: {
+    coming: EventAttendee[];
+    notComing: EventAttendee[];
+    pending: EventAttendee[];
+  };
 }
 
 export interface FeedItem {

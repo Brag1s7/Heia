@@ -62,6 +62,9 @@ export function ScoreBoard({
       {matchStatus === 'finished' && (
         <Text style={styles.status}>Kampen er ferdig</Text>
       )}
+      {matchStatus === 'cancelled' && (
+        <Text style={styles.status}>Kampen er avlyst</Text>
+      )}
     </View>
   );
 }

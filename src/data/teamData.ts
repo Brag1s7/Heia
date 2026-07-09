@@ -1,22 +1,11 @@
 import type {
-  HeiaEvent,
   Membership,
   Team,
   TeamSpace,
   User,
   UserRole,
 } from '../shared/types';
-import {
-  events,
-  teamSpaces,
-  memberships,
-  users,
-  teams,
-} from '../shared/mockData';
-
-export function getEventsForTeamSpace(teamSpaceId: string): HeiaEvent[] {
-  return events.filter(e => e.teamSpaceId === teamSpaceId);
-}
+import {teamSpaces, memberships, users, teams} from '../shared/mockData';
 
 export function getMembersForTeamSpace(
   teamSpaceId: string,

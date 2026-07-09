@@ -24,7 +24,7 @@ import {
   TeamHeader,
 } from '../components';
 import {useActiveTeam, useOnboarding} from '../context';
-import {getEventsForTeamSpace} from '../data/teamData';
+import {getLiveMatch} from '../lib/api/events';
 import {
   getTeamFeed,
   createTextPost,
@@ -32,7 +32,7 @@ import {
   toggleReaction,
 } from '../lib/api/feed';
 import type {ImagePostInput} from '../lib/api/feed';
-import type {FeedItem, HomeStackParamList} from '../shared/types';
+import type {FeedItem, HeiaEvent, HomeStackParamList} from '../shared/types';
 
 /** Valgt bilde i compose-boksen: preview-uri + payload for opplasting. */
 type SelectedImage = ImagePostInput & {uri: string};
@@ -47,6 +47,7 @@ export function TeamHomeScreen() {
   const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composeText, setComposeText] = useState('');
@@ -56,10 +57,17 @@ export function TeamHomeScreen() {
   const loadFeed = useCallback(async () => {
     if (!activeTeamSpaceId) return;
     setError(null);
+    // Banneret er sekundært: feiler kampoppslaget skjuler vi det heller enn
+    // å blokkere feeden.
+    const livePromise = getLiveMatch(activeTeamSpaceId).catch(() => null);
     try {
-      const items = await getTeamFeed(activeTeamSpaceId);
+      const [items, live] = await Promise.all([
+        getTeamFeed(activeTeamSpaceId),
+        livePromise,
+      ]);
       setFeed(items);
-    } catch (e) {
+      setLiveMatch(live);
+    } catch {
       setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
     } finally {
       setLoading(false);
@@ -95,7 +103,7 @@ export function TeamHomeScreen() {
     );
     try {
       await toggleReaction(post.id, wasReacted);
-    } catch (e) {
+    } catch {
       // Reverter til forrige tilstand.
       setFeed(prev =>
         prev.map(p =>
@@ -156,7 +164,7 @@ export function TeamHomeScreen() {
       setComposeText('');
       setSelectedImage(null);
       await loadFeed();
-    } catch (e) {
+    } catch {
       Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
     } finally {
       setPosting(false);
@@ -175,13 +183,6 @@ export function TeamHomeScreen() {
   }, [justCreatedTeamSpaceId, activeTeamSpaceId, clearJustCreated, navigation]);
 
   if (!activeTeamSpace || !activeTeamSpaceId) return null;
-
-  const teamEvents = getEventsForTeamSpace(activeTeamSpaceId);
-
-  // Finn live kamp (fortsatt mock — events kommer i Fase 3)
-  const liveMatch = teamEvents.find(
-    e => e.type === 'kamp' && e.matchStatus === 'live',
-  );
 
   return (
     <ScrollView

@@ -1,5 +1,11 @@
-import React, {useState} from 'react';
-import {View, Text, ScrollView, StyleSheet} from 'react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
@@ -21,17 +27,14 @@ import {
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam} from '../context';
-import {
-  getEventsForTeamSpace,
-  getMembersForTeamSpace,
-  getUserRoleInTeam,
-} from '../data/teamData';
-import {eventAttendees, liveMatchEvents} from '../shared/mockData';
+import {getMembersForTeamSpace, getUserRoleInTeam} from '../data/teamData';
+import {getEventDetail} from '../lib/api/events';
 import type {
+  EventAttendee,
+  HeiaEventDetail,
   HomeStackParamList,
   RSVPStatus,
-  User,
-  UserRole,
+  RSVPSummary,
 } from '../shared/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
@@ -71,39 +74,94 @@ function formatDateLong(date: Date): string {
   return `${day} ${dateNum}. ${month}`;
 }
 
+/**
+ * Speiler brukerens valg i tallene uten å telle svaret to ganger:
+ * `base` er serverens summer, der `base.myStatus` allerede er med.
+ */
+function applyMyStatus(base: RSVPSummary, myStatus: RSVPStatus): RSVPSummary {
+  if (myStatus === base.myStatus) return base;
+
+  const next = {...base, myStatus};
+  const bucket = {
+    kommer: 'coming',
+    kan_ikke: 'notComing',
+    venter: 'pending',
+  } as const;
+
+  const from = bucket[base.myStatus];
+  const to = bucket[myStatus];
+  next[from] = Math.max(0, next[from] - 1);
+  next[to] += 1;
+  return next;
+}
+
 export function EventDetailScreen({route}: Props) {
   const insets = useSafeAreaInsets();
   const {profile: currentUser} = useAuth();
   const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
   const {eventId} = route.params;
 
-  const teamEvents = activeTeamSpaceId
-    ? getEventsForTeamSpace(activeTeamSpaceId)
-    : [];
-  const event = teamEvents.find(e => e.id === eventId) ?? teamEvents[0];
+  // Medlemsdata for kampreporter-UI-et er fortsatt mock — det ryddes når
+  // live-kamp kobles til ekte match_sessions.
   const teamMembers = activeTeamSpaceId
     ? getMembersForTeamSpace(activeTeamSpaceId)
     : [];
   const teamName = activeTeamSpace?.displayName ?? '';
 
-  const [myStatus, setMyStatus] = useState<RSVPStatus>(
-    event?.rsvp.myStatus ?? 'venter',
-  );
+  const [event, setEvent] = useState<HeiaEventDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [myStatus, setMyStatus] = useState<RSVPStatus>('venter');
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [reporterModalVisible, setReporterModalVisible] = useState(false);
   const [reporterSheetVisible, setReporterSheetVisible] = useState(false);
   const [selectedActionType, setSelectedActionType] =
     useState<ReporterActionType>('mål_oss');
-  const [reporterId, setReporterId] = useState<string | undefined>(
-    event?.reporterId,
-  );
+  const [reporterId, setReporterId] = useState<string | undefined>(undefined);
   const [pushNotification, setPushNotification] = useState({
     visible: false,
     title: '',
     message: '',
   });
 
-  if (!event) return null;
+  const loadEvent = useCallback(async () => {
+    if (!activeTeamSpaceId) {
+      setLoading(false);
+      return;
+    }
+    setError(null);
+    try {
+      const detail = await getEventDetail(eventId, activeTeamSpaceId);
+      setEvent(detail);
+      setMyStatus(detail.rsvp.myStatus);
+      setReporterId(detail.reporterId);
+    } catch {
+      setError('Kunne ikke laste hendelsen.');
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId, activeTeamSpaceId]);
+
+  useEffect(() => {
+    loadEvent();
+  }, [loadEvent]);
+
+  if (loading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={colors.heia} />
+      </View>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.emptyText}>{error ?? 'Fant ikke hendelsen.'}</Text>
+      </View>
+    );
+  }
 
   const isLiveMatch =
     event.type === 'kamp' &&
@@ -118,34 +176,12 @@ export function EventDetailScreen({route}: Props) {
     ? teamMembers.find(u => u.id === reporterId)
     : undefined;
 
-  // Oppmøteliste
-  const attendees = eventAttendees[eventId as keyof typeof eventAttendees] ?? {
-    coming: teamMembers.slice(0, event.rsvp.coming),
-    notComing: teamMembers.slice(
-      event.rsvp.coming,
-      event.rsvp.coming + event.rsvp.notComing,
-    ),
-    pending: teamMembers.slice(
-      event.rsvp.coming + event.rsvp.notComing,
-      event.rsvp.coming + event.rsvp.notComing + event.rsvp.pending,
-    ),
-  };
+  const attendees = event.attendees;
 
-  // Beregn oppdatert RSVP
-  const rsvp = {
-    ...event.rsvp,
-    myStatus,
-    coming:
-      myStatus === 'kommer' ? event.rsvp.coming + 1 : event.rsvp.coming,
-    pending:
-      myStatus !== 'venter'
-        ? Math.max(0, event.rsvp.pending - 1)
-        : event.rsvp.pending,
-    notComing:
-      myStatus === 'kan_ikke'
-        ? event.rsvp.notComing + 1
-        : event.rsvp.notComing,
-  };
+  // Serveren teller allerede mitt svar. Vis derfor mitt valg som en endring
+  // fra det lagrede svaret: trekk fra det gamle, legg til det nye.
+  // (RSVP lagres ikke ennå — det kommer i skrive-skiven av Fase 3.)
+  const rsvp = applyMyStatus(event.rsvp, myStatus);
 
   const handleReporterAction = (type: ReporterActionType) => {
     if (type === 'pause' || type === 'slutt') {
@@ -210,7 +246,7 @@ export function EventDetailScreen({route}: Props) {
   // LIVE KAMP-MODUS
   // -----------------------------------------------------------------------
   if (isLiveMatch && event.score && event.opponent) {
-    const matchEvents = event.matchEvents ?? liveMatchEvents;
+    const matchEvents = event.matchEvents ?? [];
 
     return (
       <View style={styles.screen}>
@@ -342,9 +378,13 @@ export function EventDetailScreen({route}: Props) {
           <MetaRow label="Dato" value={formatDateLong(event.startTime)} />
           <MetaRow
             label="Tid"
-            value={`${formatTime(event.startTime)} – ${formatTime(event.endTime)}`}
+            value={
+              event.endTime
+                ? `${formatTime(event.startTime)} – ${formatTime(event.endTime)}`
+                : formatTime(event.startTime)
+            }
           />
-          <MetaRow label="Sted" value={event.location} />
+          {event.location && <MetaRow label="Sted" value={event.location} />}
         </View>
         {event.description && (
           <Text style={styles.description}>{event.description}</Text>
@@ -412,7 +452,7 @@ function AttendanceSection({
   emptyText,
 }: {
   title: string;
-  users: (User & {role?: UserRole})[];
+  users: EventAttendee[];
   emptyText?: string;
 }) {
   return (
@@ -421,12 +461,13 @@ function AttendanceSection({
       {attendeeList.length === 0 && emptyText ? (
         <Text style={styles.emptyText}>{emptyText}</Text>
       ) : (
-        attendeeList.map((user, index) => (
+        attendeeList.map((attendee, index) => (
+          // En forelder kan svare for flere barn — id alene er ikke unik.
           <ListRow
-            key={user.id}
-            icon={<Avatar name={user.name} size="sm" />}
-            title={user.name}
-            subtitle={user.role === 'trener' ? 'Trener' : undefined}
+            key={`${attendee.id}-${attendee.childName ?? 'selv'}`}
+            icon={<Avatar name={attendee.childName ?? attendee.name} size="sm" />}
+            title={attendee.childName ?? attendee.name}
+            subtitle={attendee.childName ? `Meldt av ${attendee.name}` : undefined}
             showBorder={index < attendeeList.length - 1}
           />
         ))
@@ -441,6 +482,12 @@ function AttendanceSection({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.background,
   },
   section: {
