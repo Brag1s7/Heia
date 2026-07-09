@@ -1,12 +1,19 @@
-import React from 'react';
-import {Text, StyleSheet, View, ActivityIndicator} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
+import React, {useState} from 'react';
+import {Pressable, Text, StyleSheet, View, ActivityIndicator} from 'react-native';
+import {
+  NavigationContainer,
+  useNavigation,
+  type NavigationProp,
+} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
+import {CreateSheet} from '../components';
+import {isTeamAdmin} from '../shared/roles';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
+import {NewEventScreen} from '../screens/NewEventScreen';
 import {InviteScreen} from '../screens/InviteScreen';
 import {SupportScreen} from '../screens/SupportScreen';
 import {CommentsScreen} from '../screens/CommentsScreen';
@@ -58,6 +65,20 @@ function HomeStackNavigator() {
         name="EventDetail"
         component={EventDetailScreen}
         options={{title: 'Hendelse'}}
+      />
+      <HomeStack.Screen
+        name="NewEvent"
+        component={NewEventScreen}
+        options={({navigation}) => ({
+          title: 'Ny hendelse',
+          presentation: 'modal',
+          // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
+          headerLeft: () => (
+            <Pressable onPress={navigation.goBack} hitSlop={8}>
+              <Text style={styles.headerAction}>Avbryt</Text>
+            </Pressable>
+          ),
+        })}
       />
       <HomeStack.Screen
         name="Support"
@@ -141,15 +162,11 @@ function OnboardingStackNavigator() {
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder for Opprett-tab
+// Opprett-tab. Rendres aldri: tabPress avbrytes og åpner CreateSheet i stedet.
+// Bottom-tabs krever likevel en komponent for skjermen.
 // ---------------------------------------------------------------------------
 function OpprettScreen() {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderText}>Ny hendelse</Text>
-      <Text style={styles.placeholderSub}>Kommer snart</Text>
-    </View>
-  );
+  return <View style={styles.placeholder} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +184,28 @@ const tabIcons: Record<keyof RootTabParamList, string> = {
 // Hoved-tabs
 // ---------------------------------------------------------------------------
 function MainTabs() {
+  const navigation = useNavigation<NavigationProp<RootTabParamList>>();
+  const {activeRole} = useActiveTeam();
+  const [sheetVisible, setSheetVisible] = useState(false);
+
+  const closeSheet = () => setSheetVisible(false);
+
+  const handleShare = () => {
+    closeSheet();
+    // Ny nonce hver gang, ellers fokuserer ikke compose-boksen på nytt.
+    navigation.navigate('HjemStack', {
+      screen: 'TeamHome',
+      params: {composeNonce: Date.now()},
+    });
+  };
+
+  const handleNewEvent = () => {
+    closeSheet();
+    navigation.navigate('HjemStack', {screen: 'NewEvent'});
+  };
+
   return (
+    <>
     <Tab.Navigator
       screenOptions={({route}) => ({
         headerShown: false,
@@ -201,6 +239,12 @@ function MainTabs() {
         name="Opprett"
         component={OpprettScreen}
         options={{tabBarLabel: ''}}
+        listeners={{
+          tabPress: e => {
+            e.preventDefault();
+            setSheetVisible(true);
+          },
+        }}
       />
       <Tab.Screen
         name="Inbox"
@@ -212,6 +256,15 @@ function MainTabs() {
         options={{tabBarLabel: 'Profil'}}
       />
     </Tab.Navigator>
+
+    <CreateSheet
+      visible={sheetVisible}
+      canCreateEvent={isTeamAdmin(activeRole)}
+      onClose={closeSheet}
+      onShare={handleShare}
+      onNewEvent={handleNewEvent}
+    />
+    </>
   );
 }
 
@@ -295,16 +348,11 @@ const styles = StyleSheet.create({
   placeholder: {
     flex: 1,
     backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
   },
-  placeholderText: {
-    ...typography.heading2,
-  },
-  placeholderSub: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
+  headerAction: {
+    ...typography.body,
+    color: colors.heiaInk,
+    fontWeight: '600',
   },
   loadingScreen: {
     flex: 1,

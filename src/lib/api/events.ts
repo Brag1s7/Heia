@@ -191,6 +191,47 @@ export async function getLiveMatch(
   return row ? mapEventRow(row, teamSpaceId, emptyRsvp()) : null;
 }
 
+/** Felter `NewEventScreen` samler inn. `opponent`/`isHome` gjelder kun kamp. */
+export interface CreateEventInput {
+  teamSpaceId: string;
+  type: EventType;
+  title: string;
+  startTime: Date;
+  endTime?: Date;
+  location?: string;
+  description?: string;
+  opponent?: string;
+  isHome?: boolean;
+}
+
+/**
+ * Oppretter en hendelse via `create_event` (SECURITY DEFINER). RPC-en er
+ * nødvendig for at en kamp og dens match_session skal bli til i samme
+ * transaksjon — to klient-inserts kunne etterlatt en kamp uten session.
+ * Returnerer id-en til den nye hendelsen.
+ */
+export async function createEvent(input: CreateEventInput): Promise<string> {
+  const isMatch = input.type === 'kamp';
+
+  const {data, error} = await supabase.rpc('create_event', {
+    p_team_space_id: input.teamSpaceId,
+    p_type: input.type,
+    p_title: input.title,
+    p_start_time: input.startTime.toISOString(),
+    p_end_time: input.endTime?.toISOString() ?? null,
+    p_location: input.location ?? null,
+    p_description: input.description ?? null,
+    p_opponent: isMatch ? (input.opponent ?? null) : null,
+    p_is_home: isMatch ? (input.isHome ?? true) : true,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data as any).event_id as string;
+}
+
 function mapAttendees(rows: any): EventAttendee[] {
   return ((rows ?? []) as any[]).map(a => ({
     id: a.id,

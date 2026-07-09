@@ -16,5 +16,6 @@ export {ReporterModal} from './ReporterModal';
 export {ReporterBar} from './ReporterBar';
 export {ReporterSheet} from './ReporterSheet';
 export {SimulatedPush} from './SimulatedPush';
+export {CreateSheet} from './CreateSheet';
 export {TeamHeader} from './TeamHeader';
 export {InviteCodeCard} from './InviteCodeCard';

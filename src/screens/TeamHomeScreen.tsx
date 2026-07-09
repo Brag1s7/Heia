@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {useState, useCallback, useEffect, useRef} from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 import {launchImageLibrary} from 'react-native-image-picker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
 import {
   SectionHeader,
@@ -38,10 +38,13 @@ import type {FeedItem, HeiaEvent, HomeStackParamList} from '../shared/types';
 type SelectedImage = ImagePostInput & {uri: string};
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
+type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
 
 export function TeamHomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
+  const composeRef = useRef<TextInput>(null);
   const [refreshing, setRefreshing] = useState(false);
   const {activeTeamSpace, activeTeamSpaceId} = useActiveTeam();
   const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
@@ -171,6 +174,15 @@ export function TeamHomeScreen() {
     }
   }, [activeTeamSpaceId, canPost, composeText, selectedImage, posting, loadFeed]);
 
+  // «Del med laget» i +-valgarket sender en ny nonce hit for hvert trykk,
+  // så compose-boksen får fokus også når vi allerede står på TeamHome.
+  const composeNonce = route.params?.composeNonce;
+  useEffect(() => {
+    if (composeNonce) {
+      composeRef.current?.focus();
+    }
+  }, [composeNonce]);
+
   // Vis invite-koden én gang rett etter at laget er opprettet.
   useEffect(() => {
     if (
@@ -216,6 +228,7 @@ export function TeamHomeScreen() {
       {/* Compose — skriv en enkel tekstpost */}
       <View style={styles.composeCard}>
         <TextInput
+          ref={composeRef}
           style={styles.composeInput}
           value={composeText}
           onChangeText={setComposeText}

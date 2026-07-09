@@ -1,3 +1,5 @@
+import type {NavigatorScreenParams} from '@react-navigation/native';
+
 // ---------------------------------------------------------------------------
 // Sport & Event-typer — skalerbar via enum-utvidelse
 // ---------------------------------------------------------------------------
@@ -12,7 +14,13 @@ export type EventType = 'trening' | 'kamp' | 'sosialt' | 'annet';
 
 export type RSVPStatus = 'kommer' | 'kan_ikke' | 'venter';
 
-export type UserRole = 'trener' | 'forelder' | 'spiller';
+/** Speiler memberships.role i databasen. Se isTeamAdmin() i shared/roles.ts. */
+export type UserRole =
+  | 'trener'
+  | 'lagleder'
+  | 'admin'
+  | 'forelder'
+  | 'spiller';
 
 export type MatchStatus =
   | 'upcoming'
@@ -161,7 +169,9 @@ export interface FeedComment {
 // Navigation types
 // ---------------------------------------------------------------------------
 export type RootTabParamList = {
-  HjemStack: undefined;
+  // NavigatorScreenParams gjør at «+»-valgarket kan navigere rett inn i
+  // en skjerm i Hjem-stacken, typesikkert.
+  HjemStack: NavigatorScreenParams<HomeStackParamList> | undefined;
   KalenderStack: undefined;
   Opprett: undefined;
   Inbox: undefined;
@@ -169,8 +179,10 @@ export type RootTabParamList = {
 };
 
 export type HomeStackParamList = {
-  TeamHome: undefined;
+  /** composeNonce settes av «Del med laget» for å fokusere compose-boksen. */
+  TeamHome: {composeNonce?: number} | undefined;
   EventDetail: {eventId: string};
+  NewEvent: undefined;
   Support: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};

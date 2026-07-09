@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-09 (etter Fase 3A — les-siden for events)_
+_Sist oppdatert: 2026-07-09 (etter Fase 3B-1 — opprett hendelse)_
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -9,17 +9,19 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 ## Hvor vi er
 
 Vi følger en godkjent fase-plan for «Team Activity Loop».
-**Fase 0 (invite-loop), Fase 1 (design), hele Fase 2 (ekte feed) og
-Fase 3A (ekte events — les-siden) er ferdig.** Neste steg er Fase 3B —
-skrive-siden (`create_event` + `NewEventScreen`).
+**Fase 0 (invite-loop), Fase 1 (design), hele Fase 2 (ekte feed),
+Fase 3A (ekte events — lesing) og Fase 3B-1 (opprett hendelse) er ferdig.**
+Neste steg er Fase 3B-2 — lagre RSVP + fjerne «Ta rollen».
 
-Branch: `Brage`. `npx tsc --noEmit` og `npx eslint` er grønne.
-Fase 3A er verifisert i simulator (trening i kalenderen + live-banner via seedet
-SQL) og committet. Ikke pushet til `origin/Brage` ennå.
+Branch: `Brage`. `npx tsc --noEmit` er grønn. `npx eslint src` har 6 errors +
+5 warnings, alle fra før (ubrukte variabler i `CommentsScreen`/`InviteScreen`,
+`exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
+**Fase 3B-1 er IKKE verifisert i simulator ennå** (se «Test dette først»).
+Ikke pushet til `origin/Brage` ennå.
 
 ### Ekte vs. mock akkurat nå
-- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), **events/kalender/event-detalj/live-banner (lesing)**.
-- **Fortsatt mock:** kun medlemslisten i kampreporter-UI-et på `EventDetailScreen` (`getMembersForTeamSpace`/`getUserRoleInTeam` i `src/data/teamData.ts`). Den koden er uansett uåpnelig i dag, siden ingen `match_sessions` kan opprettes før Fase 3B. Ryddes når live-kamp kobles på.
+- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner (lesing), **opprettelse av hendelser + kamper**, rollesjekk (fra membership).
+- **Fortsatt mock:** kun medlemslisten i kampreporter-UI-et på `EventDetailScreen` (`getMembersForTeamSpace` i `src/data/teamData.ts`). Ryddes når live-kamp kobles på (Fase 3C). `getUserRoleInTeam` er ikke lenger i bruk.
 - Mock-events, mock-feed og mock-oppmøtelister er slettet fra `src/shared/mockData.ts` (~350 linjer). Fila har nå kun `users`/`teams`/`teamSpaces`/`memberships`.
 
 ---
@@ -27,13 +29,13 @@ SQL) og committet. Ikke pushet til `origin/Brage` ennå.
 ## Backend (Supabase) — tilstand
 
 Prosjektet er linket (ref `sswncdrbsrfieudkdmhj`, config `Heia_Prod`). Migrasjoner
-00001–00018 er nå alle deployet til remote (00016/00017 var hand-kjørt fra før;
-reconciliert med `migration repair` 2026-07-08).
+00001–00019 er alle deployet til remote (00016/00017 var hand-kjørt fra før;
+reconciliert med `migration repair` 2026-07-08). `supabase db push` fungerer.
 
 Eksisterende RPC-er: lese — `get_team_feed`, `get_event_with_rsvp`,
 `get_team_members`; skrive — `create_team_from_scratch`, `join_team_space`,
-`activate_team_space`, `upsert_rsvp`. RLS tillater direkte member/admin-insert
-for feed/kommentar/reaksjon/event, så få nye RPC-er trengs.
+`activate_team_space`, `upsert_rsvp`, `create_event`. RLS tillater direkte
+member/admin-insert for feed/kommentar/reaksjon/event, så få nye RPC-er trengs.
 
 Storage: privat bucket `feed-media` (00018) med INSERT/SELECT/DELETE-policyer
 gated på lagmedlemskap. Path-konvensjon `{team_space_id}/{filnavn}`.
@@ -76,12 +78,54 @@ Ingen nye migrasjoner, ingen nye native moduler → **kun Metro-reload, ingen re
 
 ---
 
-## Fase 3B — Skrive-siden (NESTE)
+## Fase 3B-1 — GJORT (opprett hendelse)
 
-- Ny RPC `create_event` (atomisk event + `match_session` for kamp) → migrasjon `00019`. Må selv sjekke `is_team_admin()`, siden SECURITY DEFINER omgår RLS.
-- `NewEventScreen` + rollestyrt valgark bak `+`-knappen (se beslutninger under).
-- Deretter **lett** RSVP (`upsert_rsvp` finnes allerede).
-- Filosofi: events = innholdskilde + forutsetning for live kamp. IKKE Spond-tung RSVP/admin. Heia er «Strava for ungdomslag».
+Ingen nye native moduler → **kun Metro-reload, ingen rebuild.**
+(Dato/tid er bevisst laget i ren JS, ikke `@react-native-community/datetimepicker`,
+nettopp for å slippe rebuild. Bytt hvis det blir for stivt.)
+
+- **Migrasjon `00019_create_event.sql` (deployet):** `create_event()` RPC.
+  SECURITY DEFINER omgår RLS, så den sjekker `is_team_admin()` selv. Oppretter
+  event + (for `kamp`) `match_session` i status `planlagt` i samme transaksjon,
+  slik at en kamp aldri kan mangle session-rad. Returnerer `{event_id, match_session_id}`.
+- **`createEvent(input)` i `src/lib/api/events.ts`** — `opponent`/`is_home`
+  nulles ut for ikke-kamp.
+- **`NewEventScreen`** — type-chips, motstander + hjemme/borte for kamp,
+  30-dagers dag-scroller, `HH:MM`-maskert tidsfelt, varighet-chips (1 t / 1½ t /
+  2 t / ingen sluttid), sted, tittel (valgfri — faller tilbake på f.eks.
+  «Kamp mot Lyn»), beskjed. Etter lagring: lukk modalen + hopp til kalenderen,
+  som refetcher ved fokus.
+- **`CreateSheet`** — valgarket bak `+`. `tabPress` på `Opprett`-taben
+  `preventDefault()`-es, så skjermen aldri rendres.
+- **«Del med laget»** sender en ny `composeNonce` til `TeamHome` for hvert
+  trykk, som fokuserer compose-boksen (ellers ville andre trykk ikke gjort noe).
+- **Rollesprekken lukket:** `UserRole` har nå `lagleder` + `admin`,
+  `src/shared/roles.ts` eksporterer `isTeamAdmin(role)` (speiler `is_team_admin()`
+  i `00008`), og `TeamContext` eksponerer `activeRole`. `EventDetailScreen`
+  bruker den i stedet for mock-oppslaget `getUserRoleInTeam`.
+
+### Test dette først (Metro-reload, ingen rebuild)
+1. Trykk `+` som trener → valgarket viser «Del med laget» + «Ny hendelse».
+2. Lag en trening → havner i kalenderen på riktig dag/tid.
+3. Lag en kamp med motstander → `EventCard` viser motstander; sjekk i SQL at
+   `match_sessions`-raden finnes (`status='planlagt'`).
+4. Trykk `+` som forelder (eller sett `role='forelder'` i `memberships`) →
+   kun «Del med laget». Valgarket skal aldri være tomt.
+5. «Del med laget» → compose-boksen får fokus, også når du alt står på Hjem.
+
+## Fase 3B-2 — NESTE (lett RSVP + reporter-opprydding)
+
+- **RSVP lagrer ikke ennå.** `EventDetailScreen` oppdaterer bare lokal state.
+  Bytt `setMyStatus` mot `upsert_rsvp` (RPC finnes) + refetch. ~10 linjer.
+  `applyMyStatus()` trekker allerede fra det lagrede svaret, så tallene
+  dobbelttelles ikke mens man venter på serveren.
+- **Fjern «Ta rollen» i `ReporterBar`.** RLS på `match_sessions` lar bare
+  `reporter_id = auth.uid()` ELLER admin gjøre UPDATE. Når `reporter_id` er NULL
+  blir første ledd NULL → usant, så en forelder kan ikke ta en ledig rolle.
+  Følger beslutning 3 under: fjern knappen (ikke løsne policyen).
+
+Filosofi: events = innholdskilde + forutsetning for live kamp. IKKE Spond-tung
+RSVP/admin. Heia er «Strava for ungdomslag».
 
 ### LÅSTE BESLUTNINGER (bruker, 2026-07-09)
 
@@ -89,23 +133,18 @@ Ingen nye migrasjoner, ingen nye native moduler → **kun Metro-reload, ingen re
    Trener/lagleder/admin ser i tillegg «Ny hendelse». Reporter ser «Start kamp»
    når laget har en kamp i dag. Knappen skal aldri være død for en forelder —
    den er appens mest fremhevede knapp, og foreldre er de fleste brukerne.
-   (`OpprettScreen` i `AppNavigator.tsx` er i dag bare en placeholder.)
+   ✅ Bygget, bortsett fra «Start kamp» — den venter på Fase 3C, siden ingenting
+   kan starte en kamp ennå og en død knapp er verre enn ingen knapp.
 2. **Kun trener/lagleder/admin kan opprette hendelser** — som RLS allerede sier.
-   Ingen migrasjon for rettigheter.
+   Ingen migrasjon for rettigheter. ✅ Bygget.
 3. **Trener tildeler kampreporter.** «Ta rollen»-knappen i `ReporterBar` skal
-   fjernes; reporter velges via `ReporterSheet`.
+   fjernes; reporter velges via `ReporterSheet`. → 3B-2.
 
-### TO SPREKKER Å FIKSE I 3B (funnet 2026-07-09)
-
-- **Appens `UserRole` mangler `lagleder` og `admin`** (`src/shared/types.ts`),
-  mens DB har begge. Derfor gjør `EventDetailScreen` sjekken
-  `isCurrentUserAdmin = role === 'trener'` — en lagleder som DB *tillater* å
-  opprette hendelser, ville ikke sett knappen. Utvid unionen og innfør en
-  felles `isTeamAdmin(role)`-hjelper.
-- **`ReporterBar`s «Ta rollen» kan ikke virke.** RLS på `match_sessions` lar
-  bare `reporter_id = auth.uid()` ELLER admin gjøre UPDATE. Når `reporter_id`
-  er NULL blir første ledd NULL → usant, så en forelder kan ikke ta en ledig
-  rolle. Følger beslutning 3: fjern knappen (ikke løsne policyen).
+### Idé parkert i 3B-1
+`create_event` kunne også lagt en `paaminnelse`-post i feeden («Ny kamp mot Lyn»)
+— `feed_posts` har allerede `event_id` og typen. Droppet for å holde skiven smal
+og fordi `FeedCard` ikke er testet på den typen. Vurder i 3C sammen med
+`match_event` → feed-post.
 
 ### Live kamp — slik er flyten tenkt (skjemaet er allerede bygget for den)
 
@@ -119,8 +158,9 @@ live-modus med `ScoreBoard` + `ReporterActions` → hvert trykk skriver en rad i
 senere en push). Det er Strava-øyeblikket — «MÅL! 2–1» mens kampen pågår.
 I dag viser `ReporterActions` kun en simulert push og lagrer ingenting.
 
-### Slik tester du Fase 3A før 3B (ingen create_event ennå)
-Kalenderen er tom til det finnes ekte rader. Kjør i Supabase SQL-editor
+### Seed-SQL (fortsatt nyttig for **live** kamp)
+Vanlige hendelser lages nå i appen. Men ingenting kan sette en kamp i `live`
+før Fase 3C, så hero-banneret må fortsatt seedes. Kjør i Supabase SQL-editor
 (finn `<TS_ID>` med `select id, display_name from team_spaces;`):
 
 ```sql

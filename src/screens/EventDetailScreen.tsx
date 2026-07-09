@@ -27,8 +27,9 @@ import {
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam} from '../context';
-import {getMembersForTeamSpace, getUserRoleInTeam} from '../data/teamData';
+import {getMembersForTeamSpace} from '../data/teamData';
 import {getEventDetail} from '../lib/api/events';
+import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
   HeiaEventDetail,
@@ -98,7 +99,7 @@ function applyMyStatus(base: RSVPSummary, myStatus: RSVPStatus): RSVPSummary {
 export function EventDetailScreen({route}: Props) {
   const insets = useSafeAreaInsets();
   const {profile: currentUser} = useAuth();
-  const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
+  const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
   const {eventId} = route.params;
 
   // Medlemsdata for kampreporter-UI-et er fortsatt mock — det ryddes når
@@ -167,11 +168,9 @@ export function EventDetailScreen({route}: Props) {
     event.type === 'kamp' &&
     (event.matchStatus === 'live' || event.matchStatus === 'halfTime');
   const isCurrentUserReporter = reporterId === currentUser?.id;
-  const currentUserRole =
-    currentUser && activeTeamSpaceId
-      ? getUserRoleInTeam(currentUser.id, activeTeamSpaceId)
-      : null;
-  const isCurrentUserAdmin = currentUserRole === 'trener';
+  // Samme rolleregel som is_team_admin() i RLS — en lagleder skal se det
+  // samme som en trener.
+  const isCurrentUserAdmin = isTeamAdmin(activeRole);
   const reporter = reporterId
     ? teamMembers.find(u => u.id === reporterId)
     : undefined;

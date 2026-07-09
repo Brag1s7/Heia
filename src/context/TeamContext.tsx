@@ -11,6 +11,7 @@ import {useAuth} from './UserContext';
 import {getUserMemberships} from '../lib/api/teams';
 import type {
   EnrichedMembership,
+  MemberRole,
   TeamSpace,
   Team,
 } from '../lib/types';
@@ -19,6 +20,8 @@ interface TeamContextValue {
   activeTeamSpaceId: string | null;
   activeTeamSpace: TeamSpace | null;
   activeTeam: Team | null;
+  /** Innlogget brukers rolle i det aktive lagrommet. */
+  activeRole: MemberRole | null;
   userMemberships: EnrichedMembership[];
   loading: boolean;
   setActiveTeamSpace: (teamSpaceId: string) => void;
@@ -86,6 +89,13 @@ export function TeamProvider({children}: PropsWithChildren) {
     [userMemberships, activeTeamSpaceId],
   );
 
+  const activeRole = useMemo(
+    () =>
+      userMemberships.find(m => m.teamSpaceId === activeTeamSpaceId)?.role ??
+      null,
+    [userMemberships, activeTeamSpaceId],
+  );
+
   const setActiveTeamSpace = useCallback((teamSpaceId: string) => {
     setActiveTeamSpaceId(teamSpaceId);
   }, []);
@@ -96,6 +106,7 @@ export function TeamProvider({children}: PropsWithChildren) {
         activeTeamSpaceId,
         activeTeamSpace,
         activeTeam,
+        activeRole,
         userMemberships,
         loading,
         setActiveTeamSpace,

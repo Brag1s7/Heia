@@ -16,4 +16,9 @@ export {
   toggleReaction,
 } from './feed';
 export {getComments, createComment} from './comments';
-export {getTeamEvents, getLiveMatch, getEventDetail} from './events';
+export {
+  getTeamEvents,
+  getLiveMatch,
+  getEventDetail,
+  createEvent,
+} from './events';
