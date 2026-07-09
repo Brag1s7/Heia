@@ -16,8 +16,8 @@ Neste steg er Fase 3B-2 — lagre RSVP + fjerne «Ta rollen».
 Branch: `Brage`. `npx tsc --noEmit` er grønn. `npx eslint src` har 6 errors +
 5 warnings, alle fra før (ubrukte variabler i `CommentsScreen`/`InviteScreen`,
 `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
-Fase 3B-1 er verifisert i simulator (bruker bekreftet at opprettelse i kalenderen
-virker). **Bugfiksen for «bli med i lag nr. 2» er IKKE verifisert ennå.**
+Alt under er verifisert i simulator av brukeren: opprette hendelser, bli med i
+lag nr. 2, legge til lag fra Profil, og tilbake-knappene.
 Ikke pushet til `origin/Brage` ennå.
 
 ### Ekte vs. mock akkurat nå
@@ -135,6 +135,11 @@ Funnet under testing av 3B-1.
   `navigation.goBack()` selv når `hadTeam` — da bytter ikke `AppNavigator` skjerm.
 - **Rolle-etiketter:** `ProfilScreen` viste «Forelder» for lagleder/admin/spiller.
   Nå en `ROLE_LABELS`-tabell, og rolle-badgen bruker `isTeamAdmin()`.
+- **Tilbake-knappen:** `JoinTeamCode`/`CreateTeam` tegnet sin egen «‹ Tilbake»
+  fordi onboarding-stacken skjuler headeren globalt. Begge bruker nå den vanlige
+  stack-headeren (`stackScreenOptions` + `headerShown: true` + tittel) i begge
+  stackene, og samme innholdsmarger som `InviteScreen`.
+  **Regel: nye skjermer skal bruke stack-headeren, ikke egne tilbake-knapper.**
 
 ## Fase 3B-2 — NESTE (lett RSVP + reporter-opprydding)
 

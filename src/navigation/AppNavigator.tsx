@@ -57,6 +57,16 @@ const stackScreenOptions = {
   headerBackTitle: 'Tilbake',
 };
 
+// Bli med / Opprett lag ligger i to stacker. Onboarding-stacken skjuler
+// headeren globalt, så begge steder må slå den på eksplisitt for å få den
+// samme tilbake-knappen og topplinjen som Inviter, Kommentarer og Hendelse.
+const joinTeamOptions = {...stackScreenOptions, headerShown: true, title: 'Bli med'};
+const createTeamOptions = {
+  ...stackScreenOptions,
+  headerShown: true,
+  title: 'Opprett lag',
+};
+
 // ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)
 // ---------------------------------------------------------------------------
@@ -142,16 +152,15 @@ function ProfilStackNavigator() {
         component={InviteScreen}
         options={{title: 'Inviter'}}
       />
-      {/* Skjermene tegner sin egen «‹ Tilbake» og topp-padding. */}
       <ProfilNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}
-        options={{headerShown: false}}
+        options={joinTeamOptions}
       />
       <ProfilNav.Screen
         name="CreateTeam"
         component={CreateTeamScreen}
-        options={{headerShown: false}}
+        options={createTeamOptions}
       />
     </ProfilNav.Navigator>
   );
@@ -173,8 +182,13 @@ function OnboardingStackNavigator() {
       <OnboardingNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}
+        options={joinTeamOptions}
       />
-      <OnboardingNav.Screen name="CreateTeam" component={CreateTeamScreen} />
+      <OnboardingNav.Screen
+        name="CreateTeam"
+        component={CreateTeamScreen}
+        options={createTeamOptions}
+      />
     </OnboardingNav.Navigator>
   );
 }

@@ -117,16 +117,8 @@ export function JoinTeamCodeScreen() {
   };
 
   return (
-    <View style={[styles.screen, {paddingTop: insets.top + spacing.lg}]}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={styles.backButton}>
-          <Text style={styles.backText}>‹ Tilbake</Text>
-        </Pressable>
-      </View>
-
+    <View style={styles.screen}>
+      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -217,21 +209,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-  },
-  backText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
+  // Samme marger som InviteScreen, så overskriften lander likt under headeren.
   content: {
-    paddingHorizontal: spacing['2xl'],
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
   },
   title: {
     ...typography.heading1,

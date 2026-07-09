@@ -185,15 +185,7 @@ export function CreateTeamScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.header, {paddingTop: insets.top + spacing.lg}]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={styles.backButton}>
-          <Text style={styles.backText}>‹ Tilbake</Text>
-        </Pressable>
-      </View>
-
+      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
       <ScrollView
         style={styles.screen}
         contentContainerStyle={[
@@ -345,24 +337,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-  },
-  backText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
   screen: {
     flex: 1,
   },
+  // Samme marger som InviteScreen, så overskriften lander likt under headeren.
   content: {
-    paddingHorizontal: spacing['2xl'],
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
     gap: spacing.xl,
   },
   title: {
