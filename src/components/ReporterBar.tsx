@@ -8,23 +8,24 @@ interface ReporterBarProps {
   reporter: User | undefined;
   isAdmin: boolean;
   isMe: boolean;
-  isMember: boolean;
   onChangeReporter: () => void;
-  onClaimReporter: () => void;
 }
 
+/**
+ * Rollen tildeles av trener/lagleder — den kan ikke tas.
+ * Det speiler RLS på `match_sessions`, der bare reporteren selv eller en admin
+ * får oppdatere raden: en ledig rolle (reporter_id IS NULL) kan uansett ikke
+ * claimes av et vanlig medlem.
+ */
 export function ReporterBar({
   reporter,
   isAdmin,
   isMe,
-  isMember,
   onChangeReporter,
-  onClaimReporter,
 }: ReporterBarProps) {
-  // Ingen reporter satt
+  // Ingen reporter satt — kun en admin kan gjøre noe med det.
   if (!reporter) {
-    // Kun lagmedlemmer kan claime
-    if (!isMember) {
+    if (!isAdmin) {
       return (
         <View style={styles.container}>
           <View style={styles.emptyDot} />
@@ -36,11 +37,11 @@ export function ReporterBar({
     return (
       <Pressable
         style={({pressed}) => [styles.container, pressed && styles.pressed]}
-        onPress={onClaimReporter}>
+        onPress={onChangeReporter}>
         <View style={styles.emptyDot} />
         <Text style={styles.emptyLabel}>Ingen kampreporter</Text>
-        <View style={styles.claimButton}>
-          <Text style={styles.claimText}>Ta rollen</Text>
+        <View style={styles.assignButton}>
+          <Text style={styles.assignText}>Velg</Text>
         </View>
       </Pressable>
     );
@@ -115,13 +116,13 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     flex: 1,
   },
-  claimButton: {
+  assignButton: {
     backgroundColor: colors.heia,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  claimText: {
+  assignText: {
     ...typography.bodySmall,
     fontWeight: '700',
     color: colors.textPrimary,

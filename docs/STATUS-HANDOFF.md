@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-09 (etter Fase 3B-1 — opprett hendelse)_
+_Sist oppdatert: 2026-07-09 (etter Fase 3B-2 — RSVP lagres)_
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -10,19 +10,25 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
 Vi følger en godkjent fase-plan for «Team Activity Loop».
 **Fase 0 (invite-loop), Fase 1 (design), hele Fase 2 (ekte feed),
-Fase 3A (ekte events — lesing) og Fase 3B-1 (opprett hendelse) er ferdig.**
-Neste steg er Fase 3B-2 — lagre RSVP + fjerne «Ta rollen».
+Fase 3A (ekte events — lesing), Fase 3B-1 (opprett hendelse) og
+Fase 3B-2 (RSVP lagres) er ferdig.**
+Neste steg er Fase 3C — live kamp (det siste mock-hjørnet).
 
 Branch: `Brage`. `npx tsc --noEmit` er grønn. `npx eslint src` har 6 errors +
 5 warnings, alle fra før (ubrukte variabler i `CommentsScreen`/`InviteScreen`,
 `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
-Alt under er verifisert i simulator av brukeren: opprette hendelser, bli med i
-lag nr. 2, legge til lag fra Profil, og tilbake-knappene.
+Alt til og med 3B-1 er verifisert i simulator av brukeren. Av 3B-2 er selve
+lagringen bekreftet; knappe-variantene og offline-rollbacken (punkt 4 i
+testlisten) er ikke kjørt gjennom ennå.
 Ikke pushet til `origin/Brage` ennå.
 
 ### Ekte vs. mock akkurat nå
-- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner (lesing), **opprettelse av hendelser + kamper**, rollesjekk (fra membership).
-- **Fortsatt mock:** kun medlemslisten i kampreporter-UI-et på `EventDetailScreen` (`getMembersForTeamSpace` i `src/data/teamData.ts`). Ryddes når live-kamp kobles på (Fase 3C). `getUserRoleInTeam` er ikke lenger i bruk.
+- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner (lesing), **opprettelse av hendelser + kamper**, **RSVP-svar**, rollesjekk (fra membership).
+- **Fortsatt mock (alt sammen inne i live-kamp-modus på `EventDetailScreen`):**
+  medlemslisten (`getMembersForTeamSpace` i `src/data/teamData.ts`), valg av
+  kampreporter (`handleSelectReporter` setter kun lokal state), og
+  `ReporterActions` (simulert push, lagrer ingenting). Ryddes samlet i Fase 3C.
+  `getUserRoleInTeam` er ikke lenger i bruk.
 - Mock-events, mock-feed og mock-oppmøtelister er slettet fra `src/shared/mockData.ts` (~350 linjer). Fila har nå kun `users`/`teams`/`teamSpaces`/`memberships`.
 
 ---
@@ -73,7 +79,6 @@ Ingen nye migrasjoner, ingen nye native moduler → **kun Metro-reload, ingen re
 - `home_score`/`away_score` tolkes som «oss/dem» uavhengig av `is_home` (ScoreBoard viser alltid eget lag først).
 
 ### Kjente v1-begrensninger (akseptert)
-- **RSVP-knappene lagrer ikke ennå** — de oppdaterer bare lokal state. `applyMyStatus()` i `EventDetailScreen` trekker fra det lagrede svaret før den legger til det nye, så tallene dobbelttelles ikke. Skrive-delen er ~10 linjer: bytt `setMyStatus` mot `upsert_rsvp` (RPC finnes) + refetch.
 - `rsvp.pending` teller kun eksplisitte `venter`-rader, ikke medlemmer som aldri har svart. `RSVPBar` skjuler seg når totalen er 0.
 - `getTeamEvents` henter alle events uten tidsvindu. Fint nå; paginer/filtrer når lag har historikk.
 
@@ -141,19 +146,71 @@ Funnet under testing av 3B-1.
   stackene, og samme innholdsmarger som `InviteScreen`.
   **Regel: nye skjermer skal bruke stack-headeren, ikke egne tilbake-knapper.**
 
-## Fase 3B-2 — NESTE (lett RSVP + reporter-opprydding)
+## Fase 3B-2 — GJORT (RSVP lagres + reporter-opprydding)
 
-- **RSVP lagrer ikke ennå.** `EventDetailScreen` oppdaterer bare lokal state.
-  Bytt `setMyStatus` mot `upsert_rsvp` (RPC finnes) + refetch. ~10 linjer.
-  `applyMyStatus()` trekker allerede fra det lagrede svaret, så tallene
-  dobbelttelles ikke mens man venter på serveren.
-- **Fjern «Ta rollen» i `ReporterBar`.** RLS på `match_sessions` lar bare
-  `reporter_id = auth.uid()` ELLER admin gjøre UPDATE. Når `reporter_id` er NULL
-  blir første ledd NULL → usant, så en forelder kan ikke ta en ledig rolle.
-  Følger beslutning 3 under: fjern knappen (ikke løsne policyen).
+Ingen nye migrasjoner, ingen nye native moduler → **kun Metro-reload.**
+
+- **`setRsvp(eventId, status)` i `src/lib/api/events.ts`** — tynn wrapper rundt
+  `upsert_rsvp` (fantes fra `00015`). `p_child_id` utelates: v1 lar en forelder
+  kun svare for seg selv.
+- **`EventDetailScreen`:** knappene kaller `handleRsvp()`. Svaret vises med én
+  gang (optimistisk `setMyStatus`), lagres, og så refetches hele eventet — det
+  er refetchen som får deg inn i **oppmøtelisten**, som vi ikke kan gjette lokalt.
+  Feiler lagringen: rull tilbake til forrige svar + `Alert`. Knappene er
+  `disabled` mens lagringen pågår, så dobbelttrykk ikke kan race.
+  Trykk på et allerede valgt svar er en no-op (ingen unødig rundtur).
+  - **Knappe-variantene** (`comingVariant`/`notComingVariant` i skjermen).
+    To bommer på rad her, verdt å huske: (1) begge knappene var `secondary` når
+    du svarte «kan ikke» → like rammer, uendret tittel, så det så ut som et
+    uregistrert trykk. (2) Å sette den fravalgte til `ghost` var ikke nok —
+    `secondary` og `ghost` er **begge gjennomsiktige**, så den valgte knappen
+    fikk ingen fargeendring.
+    Fasit: den valgte knappen må skifte **flate**, ikke bare ramme.
+    `Button` har derfor en ny variant **`selected`** (heiaSoft-fyll + heia-ramme
+    + `heiaInk`-tekst) — samme «valgt»-språk som `selectChipSelected` i
+    `NewEventScreen`. `primary` = utfører en handling, `selected` = av/på.
+    Tilstandene: ubesvart → Kommer `secondary`, Kan ikke `ghost`;
+    kommer → `primary` + `ghost`; kan ikke → `ghost` + `selected`.
+    Titlene bekrefter også valget («Du kommer!» / «Du kan ikke»).
+  - Merk: `loadEvent()` svelger sine egne feil (setter `error`), så `catch`-en i
+    `handleRsvp` fyrer **kun** når selve skrivingen feiler. Rollbacken kan derfor
+    ikke bli falsk-positiv. Ikke gjør `loadEvent` throwende uten å fikse det.
+- **«Ta rollen» fjernet fra `ReporterBar`** (beslutning 3). Propsene `isMember`
+  og `onClaimReporter` er borte, og `handleClaimReporter` er slettet.
+  I stedet: når reporter mangler ser **admin** en «Velg»-knapp som åpner
+  `ReporterSheet`; alle andre ser bare «Ingen kampreporter». Uten dette ble
+  tom-tilstanden en blindvei — ingen kunne tildele rollen fra appen.
+  (Selve valget lagres fortsatt ikke — se Fase 3C.)
+
+### Test dette først (Metro-reload, ingen rebuild)
+1. Åpne en trening → trykk «Kommer». Tallet i `RSVPBar` går opp, og du dukker
+   opp i «Kommer»-listen etter refetchen.
+2. Trykk «Kan ikke» → du flytter deg mellom listene, totalen er uendret.
+3. Trykk «Du kommer!» igjen mens den alt er valgt → ingenting skjer.
+4. Skru av nettet → trykk et svar → `Alert` + knappen hopper tilbake.
+5. Gå til kalenderen og tilbake → svaret er det samme (det ligger i DB).
+   Sjekk gjerne `select * from event_rsvps;` i SQL-editoren.
 
 Filosofi: events = innholdskilde + forutsetning for live kamp. IKKE Spond-tung
 RSVP/admin. Heia er «Strava for ungdomslag».
+
+## Fase 3C — NESTE (live kamp)
+
+Den siste mock-lommen, og selve Strava-øyeblikket. Skiven henger sammen:
+
+- **Ekte medlemsliste.** Bytt `getMembersForTeamSpace` mot `get_team_members`
+  (RPC finnes). Må gjøres **først** — `ReporterSheet` viser i dag mock-id-er,
+  så å lagre et reporter-valg nå ville skrevet søppel-uuid-er til
+  `match_sessions.reporter_id`.
+- **Lagre reporter-valget.** Direkte UPDATE på `match_sessions` er nok: RLS
+  tillater `reporter_id = auth.uid()` ELLER admin.
+- **«Start kamp».** Setter `status='live'` + `started_at`. Først da kan
+  `+`-knappen få sitt tredje valg (beslutning 1) og hero-banneret oppstå av seg
+  selv, uten seed-SQL.
+- **`ReporterActions` skriver `match_events`** — og hver hendelse blir også en
+  feed-post (`feed_posts` har alt `match_event_id` + typene `match_event`,
+  `match_start`, `match_end`). I dag viser den kun en simulert push.
+  `minute={55}` i `ScoreBoard` er hardkodet — regn den ut fra `started_at`.
 
 ### LÅSTE BESLUTNINGER (bruker, 2026-07-09)
 
@@ -166,7 +223,9 @@ RSVP/admin. Heia er «Strava for ungdomslag».
 2. **Kun trener/lagleder/admin kan opprette hendelser** — som RLS allerede sier.
    Ingen migrasjon for rettigheter. ✅ Bygget.
 3. **Trener tildeler kampreporter.** «Ta rollen»-knappen i `ReporterBar` skal
-   fjernes; reporter velges via `ReporterSheet`. → 3B-2.
+   fjernes; reporter velges via `ReporterSheet`.
+   ✅ Knappen er fjernet (3B-2). Selve lagringen av valget venter på ekte
+   medlemsliste i 3C.
 
 ### Idé parkert i 3B-1
 `create_event` kunne også lagt en `paaminnelse`-post i feeden («Ny kamp mot Lyn»)

@@ -232,6 +232,27 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
   return (data as any).event_id as string;
 }
 
+/**
+ * Lagrer brukerens eget svar via `upsert_rsvp` (SECURITY DEFINER).
+ * RPC-en validerer medlemskap og status-verdien selv.
+ *
+ * `child_id` utelates: v1 lar en forelder kun svare for seg selv. Skal en
+ * forelder svare for et barn, sendes `p_child_id` — RPC-en sjekker eierskap.
+ */
+export async function setRsvp(
+  eventId: string,
+  status: RSVPStatus,
+): Promise<void> {
+  const {error} = await supabase.rpc('upsert_rsvp', {
+    p_event_id: eventId,
+    p_status: status,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 function mapAttendees(rows: any): EventAttendee[] {
   return ((rows ?? []) as any[]).map(a => ({
     id: a.id,

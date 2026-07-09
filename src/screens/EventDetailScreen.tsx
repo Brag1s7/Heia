@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
@@ -28,7 +29,7 @@ import {
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam} from '../context';
 import {getMembersForTeamSpace} from '../data/teamData';
-import {getEventDetail} from '../lib/api/events';
+import {getEventDetail, setRsvp} from '../lib/api/events';
 import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
@@ -78,6 +79,7 @@ function formatDateLong(date: Date): string {
 /**
  * Speiler brukerens valg i tallene uten å telle svaret to ganger:
  * `base` er serverens summer, der `base.myStatus` allerede er med.
+ * Holder tallene riktige mens svaret er på vei til serveren.
  */
 function applyMyStatus(base: RSVPSummary, myStatus: RSVPStatus): RSVPSummary {
   if (myStatus === base.myStatus) return base;
@@ -114,6 +116,7 @@ export function EventDetailScreen({route}: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [myStatus, setMyStatus] = useState<RSVPStatus>('venter');
+  const [savingRsvp, setSavingRsvp] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [reporterModalVisible, setReporterModalVisible] = useState(false);
   const [reporterSheetVisible, setReporterSheetVisible] = useState(false);
@@ -179,8 +182,42 @@ export function EventDetailScreen({route}: Props) {
 
   // Serveren teller allerede mitt svar. Vis derfor mitt valg som en endring
   // fra det lagrede svaret: trekk fra det gamle, legg til det nye.
-  // (RSVP lagres ikke ennå — det kommer i skrive-skiven av Fase 3.)
   const rsvp = applyMyStatus(event.rsvp, myStatus);
+
+  // Nøyaktig én knapp er fremhevet av gangen, og den valgte skal skifte flate —
+  // ikke bare ramme. `secondary` og `ghost` er begge gjennomsiktige, så et
+  // «kan ikke»-valg tegnet som `secondary` ser ut som et uregistrert trykk.
+  // «Kommer» er `secondary` (ikke `ghost`) i ubesvart tilstand fordi den er
+  // det forventede svaret, og skal invitere til trykk.
+  const comingVariant =
+    myStatus === 'kommer'
+      ? 'primary'
+      : myStatus === 'kan_ikke'
+        ? 'ghost'
+        : 'secondary';
+  const notComingVariant = myStatus === 'kan_ikke' ? 'selected' : 'ghost';
+
+  // Svaret vises med én gang og lagres i bakgrunnen. Refetchen etterpå er det
+  // som får deg inn i oppmøtelisten — den kan vi ikke gjette oss til lokalt.
+  const handleRsvp = async (status: RSVPStatus) => {
+    if (savingRsvp || status === myStatus) return;
+
+    const previous = myStatus;
+    setMyStatus(status);
+    setSavingRsvp(true);
+    try {
+      await setRsvp(eventId, status);
+      await loadEvent();
+    } catch {
+      setMyStatus(previous);
+      Alert.alert(
+        'Kunne ikke lagre svaret',
+        'Sjekk nettforbindelsen og prøv igjen.',
+      );
+    } finally {
+      setSavingRsvp(false);
+    }
+  };
 
   const handleReporterAction = (type: ReporterActionType) => {
     if (type === 'pause' || type === 'slutt') {
@@ -215,16 +252,6 @@ export function EventDetailScreen({route}: Props) {
       visible: true,
       title: `${teamName} · ${actionLabels[selectedActionType]}`,
       message: description || event.title,
-    });
-  };
-
-  const handleClaimReporter = () => {
-    if (!currentUser) return;
-    setReporterId(currentUser.id);
-    setPushNotification({
-      visible: true,
-      title: 'Kampreporter',
-      message: 'Du er nå kampreporter for denne kampen.',
     });
   };
 
@@ -271,9 +298,7 @@ export function EventDetailScreen({route}: Props) {
               reporter={reporter}
               isAdmin={isCurrentUserAdmin}
               isMe={isCurrentUserReporter}
-              isMember={teamMembers.some(u => u.id === currentUser?.id)}
               onChangeReporter={() => setReporterSheetVisible(true)}
-              onClaimReporter={handleClaimReporter}
             />
           </View>
 
@@ -396,15 +421,17 @@ export function EventDetailScreen({route}: Props) {
         <View style={styles.rsvpButtons}>
           <Button
             title={myStatus === 'kommer' ? 'Du kommer!' : 'Kommer'}
-            variant={myStatus === 'kommer' ? 'primary' : 'secondary'}
-            onPress={() => setMyStatus('kommer')}
+            variant={comingVariant}
+            onPress={() => handleRsvp('kommer')}
+            disabled={savingRsvp}
             size="lg"
             style={styles.rsvpBtn}
           />
           <Button
-            title="Kan ikke"
-            variant={myStatus === 'kan_ikke' ? 'secondary' : 'ghost'}
-            onPress={() => setMyStatus('kan_ikke')}
+            title={myStatus === 'kan_ikke' ? 'Du kan ikke' : 'Kan ikke'}
+            variant={notComingVariant}
+            onPress={() => handleRsvp('kan_ikke')}
+            disabled={savingRsvp}
             size="lg"
             style={styles.rsvpBtn}
           />

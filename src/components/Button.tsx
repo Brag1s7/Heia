@@ -9,7 +9,10 @@ import {
 } from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+// `selected` er en av/på-tilstand, ikke et hierarkinivå: samme «valgt»-språk
+// som chipsene (heiaSoft-fyll + heia-ramme). Bruk den når et trykk slår en
+// knapp på, og `primary` når trykket utfører en handling.
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'selected';
 type ButtonSize = 'md' | 'lg';
 
 interface ButtonProps {
@@ -108,6 +111,11 @@ const variantStyles: Record<ButtonVariant, ViewStyle> = {
   ghost: {
     backgroundColor: 'transparent',
   },
+  selected: {
+    backgroundColor: colors.heiaSoft,
+    borderWidth: 1.5,
+    borderColor: colors.heia,
+  },
 };
 
 const pressedStyles: Record<ButtonVariant, ViewStyle> = {
@@ -121,6 +129,9 @@ const pressedStyles: Record<ButtonVariant, ViewStyle> = {
   ghost: {
     backgroundColor: colors.heiaSoft,
   },
+  selected: {
+    borderColor: colors.heiaPressed,
+  },
 };
 
 const variantTextStyles: Record<ButtonVariant, TextStyle> = {
@@ -132,5 +143,9 @@ const variantTextStyles: Record<ButtonVariant, TextStyle> = {
   },
   ghost: {
     color: colors.textSecondary,
+  },
+  // heiaInk, ikke heia: #02ffab er kun fyll og feiler kontrast som tekst.
+  selected: {
+    color: colors.heiaInk,
   },
 };
