@@ -46,6 +46,8 @@ export interface MatchEvent {
   minute: number;
   player?: string;
   description: string;
+  /** `home` = oss, `away` = motstander. Satt for mål. */
+  teamSide?: 'home' | 'away';
   reportedBy?: string;
   createdAt?: Date;
 }
@@ -108,6 +110,10 @@ export interface HeiaEvent {
   matchStatus?: MatchStatus;
   matchEvents?: MatchEvent[];
   reporterId?: string;
+  /** Satt for kamper. Nøkkelen skriving mot match_sessions/match_events går på. */
+  matchSessionId?: string;
+  /** Satt når kampen er startet. Kampminuttet regnes ut fra denne. */
+  startedAt?: Date;
 }
 
 export interface RSVPSummary {

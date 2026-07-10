@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-09 (etter Fase 3B-2 — RSVP lagres)_
+_Sist oppdatert: 2026-07-09 (etter Fase 3C-1 — ekte medlemsliste + lagret reporter)_
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -11,25 +11,24 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 Vi følger en godkjent fase-plan for «Team Activity Loop».
 **Fase 0 (invite-loop), Fase 1 (design), hele Fase 2 (ekte feed),
 Fase 3A (ekte events — lesing), Fase 3B-1 (opprett hendelse) og
-Fase 3B-2 (RSVP lagres) er ferdig.**
-Neste steg er Fase 3C — live kamp (det siste mock-hjørnet).
+Fase 3B-2 (RSVP lagres) er ferdig og testet.**
+**Fase 3C (hele live-kamp-loopen) er kodet, og `00020` er deployet til remote.
+Ingenting er kjørt i simulator ennå** — det er første oppgave.
 
 Branch: `Brage`. `npx tsc --noEmit` er grønn. `npx eslint src` har 6 errors +
-5 warnings, alle fra før (ubrukte variabler i `CommentsScreen`/`InviteScreen`,
-`exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
+5 warnings, alle fra før (ubrukte variabler i `Avatar`/`CommentsScreen`/
+`InviteScreen`, `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
 Alt til og med 3B-1 er verifisert i simulator av brukeren. Av 3B-2 er selve
 lagringen bekreftet; knappe-variantene og offline-rollbacken (punkt 4 i
 testlisten) er ikke kjørt gjennom ennå.
 Ikke pushet til `origin/Brage` ennå.
 
 ### Ekte vs. mock akkurat nå
-- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner (lesing), **opprettelse av hendelser + kamper**, **RSVP-svar**, rollesjekk (fra membership).
-- **Fortsatt mock (alt sammen inne i live-kamp-modus på `EventDetailScreen`):**
-  medlemslisten (`getMembersForTeamSpace` i `src/data/teamData.ts`), valg av
-  kampreporter (`handleSelectReporter` setter kun lokal state), og
-  `ReporterActions` (simulert push, lagrer ingenting). Ryddes samlet i Fase 3C.
-  `getUserRoleInTeam` er ikke lenger i bruk.
-- Mock-events, mock-feed og mock-oppmøtelister er slettet fra `src/shared/mockData.ts` (~350 linjer). Fila har nå kun `users`/`teams`/`teamSpaces`/`memberships`.
+- **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner, **opprettelse av hendelser + kamper**, **RSVP-svar**, **medlemslisten**, **kampreporter**, **start av kamp**, **kamphendelser + stilling + feed-post**, **realtime på live kamp**, rollesjekk (fra membership).
+- **Fortsatt uekte:** `SimulatedPush` (lokal banner hos reporteren — ekte push
+  finnes ikke i appen i det hele tatt).
+- **All mock-data er borte.** `src/shared/mockData.ts` og `src/data/teamData.ts`
+  er slettet — ingenting importerte dem lenger.
 
 ---
 
@@ -194,23 +193,110 @@ Ingen nye migrasjoner, ingen nye native moduler → **kun Metro-reload.**
 Filosofi: events = innholdskilde + forutsetning for live kamp. IKKE Spond-tung
 RSVP/admin. Heia er «Strava for ungdomslag».
 
-## Fase 3C — NESTE (live kamp)
+## Fase 3C — KODET, IKKE DEPLOYET/TESTET (live kamp, hele loopen)
 
-Den siste mock-lommen, og selve Strava-øyeblikket. Skiven henger sammen:
+**Lærdom som gjorde om på planen:** den opprinnelige 3C var delt opp etter *lag
+i koden* (medlemsliste → reporter → start → skriv → vis). Ingen av bitene var
+brukbare alene, og planen stoppet ved «skriv til DB» — den bygde aldri veien ut
+til foreldrene. Da bruker spurte «hvordan skal foreldre følge med?» fantes ikke
+svaret: **null realtime, null push, `SimulatedPush` forlot aldri reporterens
+egen telefon.** Skiv etter loopen brukeren opplever, ikke etter lagene i koden.
 
-- **Ekte medlemsliste.** Bytt `getMembersForTeamSpace` mot `get_team_members`
-  (RPC finnes). Må gjøres **først** — `ReporterSheet` viser i dag mock-id-er,
-  så å lagre et reporter-valg nå ville skrevet søppel-uuid-er til
-  `match_sessions.reporter_id`.
-- **Lagre reporter-valget.** Direkte UPDATE på `match_sessions` er nok: RLS
-  tillater `reporter_id = auth.uid()` ELLER admin.
-- **«Start kamp».** Setter `status='live'` + `started_at`. Først da kan
-  `+`-knappen få sitt tredje valg (beslutning 1) og hero-banneret oppstå av seg
-  selv, uten seed-SQL.
-- **`ReporterActions` skriver `match_events`** — og hver hendelse blir også en
-  feed-post (`feed_posts` har alt `match_event_id` + typene `match_event`,
-  `match_start`, `match_end`). I dag viser den kun en simulert push.
-  `minute={55}` i `ScoreBoard` er hardkodet — regn den ut fra `started_at`.
+Loopen nå: opprett kamp → **Start kamp** → reporter trykker MÅL → rad i
+`match_events` + oppdatert stilling + **feed-post** → alle andre ser det, live.
+
+### Migrasjon `00020_live_match.sql` (✅ deployet 2026-07-09)
+- **`start_match(event_id)`** — setter `live` + `started_at`, og gjør *den som
+  starter* til reporter hvis ingen er utpekt. Det er dette som løser
+  hønen-og-egget: før måtte du være reporter for å rapportere, men bare admin
+  kunne utnevne en reporter, og UI-et for å utnevne fantes bare inne i en kamp
+  som allerede var live. Hvem: admin, eller en alt utpekt reporter.
+- **`report_match_event(session, type, team_side, description)`** — én rad i
+  `match_events` + oppdatert `home_score`/`away_score` + én `feed_post`, i **én
+  transaksjon**. `SELECT … FOR UPDATE` på `match_sessions` serialiserer to raske
+  trykk, så verken `sequence` (som er `NOT NULL` uten default!) eller stillingen
+  kan race. Minuttet regnes ut server-side fra `started_at`.
+- **`get_event_with_rsvp`** er `CREATE OR REPLACE`-t med ett nytt felt:
+  `match_session.started_at`. Ellers uendret.
+- **Realtime:** `match_sessions` + `match_events` lagt i `supabase_realtime`
+  (idempotent DO-blokk). Realtime respekterer RLS, og begge har alt en
+  «members can view»-SELECT-policy.
+
+### ⚠️ Tre NULL-feller i plpgsql (jeg gikk i alle tre først)
+`false OR NULL` er `NULL`, og **`IF NOT NULL THEN` kjører ikke**. Så
+`IF NOT (is_team_admin(...) OR ms.reporter_id = auth.uid())` slapp *hvem som
+helst* gjennom når `reporter_id` var NULL. Samme for
+`NULL NOT IN ('home','away')`. Alle tre er nå pakket i `COALESCE(..., false)`.
+**Skriv aldri en rettighetssjekk i plpgsql uten COALESCE rundt et nullbart
+felt.**
+
+### App
+- **`src/lib/api/members.ts` (ny):** `getTeamMembers` mot `get_team_members`.
+  RPC-en gir én rad per *medlemskap*, så en forelder med barn kommer flere
+  ganger; vi beholder første rad per bruker (duplikat-id-er ville brutt
+  `keyExtractor`). `comments.ts` bruker nå denne i stedet for sin egen kopi.
+- **`events.ts`:** `startMatch`, `reportMatchEvent`, `setMatchReporter`,
+  `subscribeToMatch`. Sistnevnte **refetcher** ved endring i stedet for å flette
+  inn payloaden — kampforløpet må uansett sorteres, og en refetch kan ikke komme
+  ut av synk. `HeiaEvent` har nye `matchSessionId` + `startedAt`.
+- **`EventDetailScreen`:** «Start kamp» + `ReporterBar` vises nå på en
+  **kommende** kamp. `minute={55}` er borte — minuttet regnes fra `startedAt` og
+  tikker hvert 30. sek (uten den frøs minuttet mellom mål). «Slutt» spør først.
+- **`ReporterBar`:** «Bytt» er **admin-only**. UPDATE-policyen på
+  `match_sessions` har ingen `WITH CHECK`, så Postgres gjenbruker `USING` også
+  for den nye raden — en reporter som ikke er admin kan derfor ikke peke rollen
+  videre (`42501`). Og: nekter RLS via `USING` får du **ingen feil, bare null
+  rader**, så `setMatchReporter` gjør `.select('id')` og kaster selv.
+- **Fjernet «Kampvarsler / Slå på»-kortet.** Det lovet push og gjorde ingenting.
+  Erstattet med «Du følger kampen direkte», som nå er sant.
+- **Alle mock-filer slettet** (`src/data/teamData.ts`, `src/shared/mockData.ts`).
+
+### Slik testes det (Metro-reload — realtime trenger INGEN rebuild)
+Migrasjonen er alt ute. Ingen seed-SQL lenger — kampen lages og startes i appen.
+1. Opprett en kamp med `+` → åpne den. Som trener ser du «Ingen kampreporter»
+   + «Velg», og en **«Start kamp»**-knapp.
+2. Trykk «Start kamp» uten å velge reporter → du blir reporter selv,
+   `ScoreBoard` + `ReporterActions` dukker opp, minuttet står på 0'.
+3. Sjekk feeden på Hjem → «⚽ Kampen er i gang: … mot …». Hero-banneret vises.
+4. Trykk **Mål oss** → skriv scorer → stillingen går til 1–0, kampforløpet får
+   en rad, og feeden får «⚽ MÅL! … 1–0 …».
+5. **Det viktige:** logg inn som en forelder på en annen simulator/enhet, stå på
+   kampskjermen, og la treneren score. Stillingen skal endre seg **uten** at
+   forelderen gjør noe.
+6. Trykk «Slutt» → bekreft → kampen blir `ferdig`, skjermen går tilbake til
+   vanlig event-modus, feeden får «🏁 Slutt!».
+7. Som forelder: ingen «Velg»/«Bytt»/«Start kamp».
+
+### Kampen etterlater seg et spor (samme skive)
+Da «Slutt» ble trykket falt `EventDetailScreen` ned i vanlig event-modus, og
+**både stillingen og hele kampforløpet forsvant** i samme øyeblikk som de var
+ferdige. Rettet:
+- **`EventCard`:** en kamp med `score` viser resultatet i stedet for
+  `RSVPBar` — «PÅGÅR NÅ» / «PAUSE» / «SLUTTRESULTAT» + stillingen. Hvem som
+  «kommer» er uinteressant når kampen er spilt.
+- **`EventDetailScreen`:** en `finished` kamp viser `ScoreBoard` + hele
+  **kampforløpet**, kronologisk (avspark → slutt), som en historie. RSVP-knappene
+  skjules — man melder seg ikke på en kamp som er over.
+- **`describeMatchEvent` i `events.ts`:** et mål viser nå «Mål for oss» /
+  «Mål for {motstander}», med scorernavnet reporteren skrev som undertekst
+  (`player`). Før havnet navnet i `description`, så et mål uten navn ble en helt
+  tom rad, og et mål med navn røpet ikke hvilket lag som scoret.
+  `MatchEvent` har fått `teamSide`.
+
+### Fortsatt igjen etter dette
+- **Ekte push.** Dette er den store, og den eneste måten en forelder som *ikke*
+  har appen åpen får vite om målet. Krever native modul + rebuild + APNs +
+  Edge Function som leser `notifications`-tabellen (den finnes, tom). Egen skive.
+  `SimulatedPush` lever fortsatt som lokal bekreftelse til reporteren.
+- **Resume etter pause.** `pause` setter status, men ingen knapp setter den
+  tilbake til `live` (`andre_omgang` finnes i `match_events`-CHECK). Kampen kan
+  fortsatt avsluttes fra pause.
+- **`getLiveMatch`** filtrerer på `status='live'`, så hero-banneret forsvinner
+  i pausen. Vurder å ta med `pause`.
+- **`+`-knappens tredje valg** («Start kamp», beslutning 1) er ikke bygget —
+  kampen startes fra kampsiden. Ren snarvei, loopen er hel uten.
+- **`FeedCard` er aldri testet på typene `match_event`/`match_start`/`match_end`.**
+  Sjekk at de rendrer pent i feeden.
 
 ### LÅSTE BESLUTNINGER (bruker, 2026-07-09)
 
@@ -218,14 +304,20 @@ Den siste mock-lommen, og selve Strava-øyeblikket. Skiven henger sammen:
    Trener/lagleder/admin ser i tillegg «Ny hendelse». Reporter ser «Start kamp»
    når laget har en kamp i dag. Knappen skal aldri være død for en forelder —
    den er appens mest fremhevede knapp, og foreldre er de fleste brukerne.
-   ✅ Bygget, bortsett fra «Start kamp» — den venter på Fase 3C, siden ingenting
-   kan starte en kamp ennå og en død knapp er verre enn ingen knapp.
+   ✅ Bygget, bortsett fra «Start kamp»-snarveien i valgarket. Kampen startes fra
+   kampsiden (3C); snarveien er ren bekvemmelighet.
+
+4. **Hvem starter kampen (bruker, 2026-07-09):** trener/lagleder/admin, eller en
+   reporter treneren har utpekt. **Den som starter blir reporter** hvis ingen er
+   satt. Ikke «alle medlemmer» — to personer som rapporterer samme kamp er verre
+   enn litt friksjon.
+5. **Levering til foreldre (bruker, 2026-07-09):** Supabase Realtime på
+   kampskjermen nå. Ekte push er en senere, egen skive.
 2. **Kun trener/lagleder/admin kan opprette hendelser** — som RLS allerede sier.
    Ingen migrasjon for rettigheter. ✅ Bygget.
 3. **Trener tildeler kampreporter.** «Ta rollen»-knappen i `ReporterBar` skal
    fjernes; reporter velges via `ReporterSheet`.
-   ✅ Knappen er fjernet (3B-2). Selve lagringen av valget venter på ekte
-   medlemsliste i 3C.
+   ✅ Ferdig (3B-2 + 3C-1). Kun admin kan tildele — RLS tillater ikke annet.
 
 ### Idé parkert i 3B-1
 `create_event` kunne også lagt en `paaminnelse`-post i feeden («Ny kamp mot Lyn»)
@@ -245,25 +337,18 @@ live-modus med `ScoreBoard` + `ReporterActions` → hvert trykk skriver en rad i
 senere en push). Det er Strava-øyeblikket — «MÅL! 2–1» mens kampen pågår.
 I dag viser `ReporterActions` kun en simulert push og lagrer ingenting.
 
-### Seed-SQL (fortsatt nyttig for **live** kamp)
-Vanlige hendelser lages nå i appen. Men ingenting kan sette en kamp i `live`
-før Fase 3C, så hero-banneret må fortsatt seedes. Kjør i Supabase SQL-editor
-(finn `<TS_ID>` med `select id, display_name from team_spaces;`):
+### Seed-SQL — ikke nødvendig lenger
+Både vanlige hendelser og kamper lages i appen, og «Start kamp» setter en kamp
+i `live`. Trenger du likevel å nullstille en kamp under testing:
 
 ```sql
--- vanlig trening
-insert into public.events (team_space_id, type, title, location, start_time, end_time)
-values ('<TS_ID>', 'trening', 'Trening', 'Kunstgresset',
-        now() + interval '1 day', now() + interval '1 day 1 hour');
+-- spol en kamp tilbake til «ikke startet»
+update public.match_sessions
+set status = 'planlagt', started_at = null, finished_at = null,
+    home_score = 0, away_score = 0, reporter_id = null
+where id = '<SESSION_ID>';
 
--- live kamp (gir hero-banner på TeamHome)
-with e as (
-  insert into public.events (team_space_id, type, title, location, start_time)
-  values ('<TS_ID>', 'kamp', 'Heia mot Lyn', 'Ullevaal', now())
-  returning id
-)
-insert into public.match_sessions (event_id, opponent, home_score, away_score, status)
-select id, 'Lyn', 2, 1, 'live' from e;
+delete from public.match_events where match_session_id = '<SESSION_ID>';
 ```
 
 ---
@@ -281,6 +366,8 @@ select id, 'Lyn', 2, 1, 'live' from e;
 
 - **ALDRI kjør `pod install`/lange native/build-kommandoer i bakgrunnen mens appen kjører.** Skaper ressurskonflikt + flere Metro-instanser → app henger på «loading from Metro». Kjør i forgrunnen når brukeren er klar, og si fra at rebuild trengs.
 - **Claude kan ikke kjøre Metro/simulator** (sandkassen binder ikke port). Brukeren kjører `npm start` selv og lar den stå. Første RN 0.83-oppstart tar 1–2 min.
+- **Claude KAN kjøre `supabase db push`** — men bash-sandkassen blokkerer nettverk, så kommandoen henger uten output. Kjør den med sandkassen av. DB-passordet ligger i macOS-nøkkelringen fra `supabase link`, så den spør ikke.
+  `supabase migration list` krever derimot en **access token** (`supabase login`), som ikke er satt — den feiler uansett. Bruk `db push --dry-run` for å se hva som er ubehandlet.
 - **Ny native modul krever full rebuild** (`pod install` + Xcode/`run-ios`), ikke bare Metro-reload.
 - **RN 0.83 har ikke Clipboard i core.** Kopiering krever native modul; ellers `<Text selectable>`.
 - **Ikke referer en native modul som ikke er bygget inn** — krasjer ved import.

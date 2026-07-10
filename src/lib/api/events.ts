@@ -32,7 +32,7 @@ const MATCH_STATUS_MAP: Record<string, MatchStatus> = {
 };
 
 const SESSION_COLUMNS =
-  'id, opponent, home_score, away_score, is_home, status, reporter_id';
+  'id, opponent, home_score, away_score, is_home, status, reporter_id, started_at';
 
 const EVENT_COLUMNS = `
   id, type, title, description, location, start_time, end_time,
@@ -92,6 +92,8 @@ function mapEventRow(
       ? (MATCH_STATUS_MAP[session.status as string] ?? 'upcoming')
       : undefined,
     reporterId: session?.reporter_id ?? undefined,
+    matchSessionId: session?.id ?? undefined,
+    startedAt: session?.started_at ? new Date(session.started_at) : undefined,
   };
 }
 
@@ -253,6 +255,131 @@ export async function setRsvp(
   }
 }
 
+/**
+ * Tildeler kampreporter. Ingen RPC trengs — RLS på `match_sessions` slipper
+ * gjennom en admin i lagrommet (eller reporteren selv).
+ *
+ * UPDATE-policyen i `00014` har ingen `WITH CHECK`, så Postgres gjenbruker
+ * `USING`. En reporter som ikke er admin kan derfor ikke peke rollen videre:
+ * den nye raden ville ikke lenger matche `reporter_id = auth.uid()`. Kun admin
+ * skal se «Bytt»-knappen.
+ *
+ * Nekter RLS oppdateringen via `USING` får vi ingen feil, bare null rader —
+ * derfor `.select()` og en eksplisitt sjekk, ellers ville et avvist bytte sett
+ * ut som et vellykket et.
+ */
+export async function setMatchReporter(
+  matchSessionId: string,
+  userId: string,
+): Promise<void> {
+  const {data, error} = await supabase
+    .from('match_sessions')
+    .update({reporter_id: userId})
+    .eq('id', matchSessionId)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+  if (!data || data.length === 0) {
+    throw new Error('Du har ikke tilgang til å bytte kampreporter.');
+  }
+}
+
+/**
+ * Blåser i gang kampen via `start_match`. RPC-en setter `live` + `started_at`,
+ * og gjør den som starter til kampreporter hvis ingen er utpekt — det er slik
+ * «bare trykk start, så rapporterer du» blir sant.
+ *
+ * Kun trener/lagleder/admin eller en allerede utpekt reporter slipper til.
+ */
+export async function startMatch(eventId: string): Promise<void> {
+  const {error} = await supabase.rpc('start_match', {p_event_id: eventId});
+
+  if (error) {
+    throw error;
+  }
+}
+
+/** Hendelsene `ReporterActions` kan sende. RPC-en avviser alt annet. */
+export type ReportableEventType = 'mål' | 'pause' | 'slutt' | 'melding';
+
+export interface ReportMatchEventInput {
+  type: ReportableEventType;
+  /** Påkrevd for mål. `home` = oss, `away` = motstander. */
+  teamSide?: 'home' | 'away';
+  description?: string;
+}
+
+/**
+ * Rapporterer én kamphendelse via `report_match_event`.
+ *
+ * RPC-en gjør tre ting i én transaksjon: skriver `match_events`, oppdaterer
+ * stillingen på `match_sessions`, og legger en post i feeden. Feed-posten er
+ * hele poenget — det er den som når foreldre som ikke sitter på kampskjermen.
+ *
+ * Kampminuttet regnes ut server-side fra `started_at` og sendes ikke inn.
+ */
+export async function reportMatchEvent(
+  matchSessionId: string,
+  input: ReportMatchEventInput,
+): Promise<void> {
+  const {error} = await supabase.rpc('report_match_event', {
+    p_match_session_id: matchSessionId,
+    p_type: input.type,
+    p_team_side: input.teamSide ?? null,
+    p_description: input.description ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Lytter på en pågående kamp og kaller `onChange` når noe skjer.
+ *
+ * Vi refetcher i stedet for å flette inn payloaden: en `match_events`-INSERT
+ * må uansett inn i kampforløpet i riktig rekkefølge, og en refetch kan ikke
+ * komme ut av synk med serveren. Realtime respekterer RLS, så bare lagets
+ * medlemmer får hendelsene.
+ *
+ * Returnerer en oppryddingsfunksjon — kall den når skjermen forlates, ellers
+ * blir kanalen liggende åpen.
+ */
+export function subscribeToMatch(
+  matchSessionId: string,
+  onChange: () => void,
+): () => void {
+  const channel = supabase
+    .channel(`match:${matchSessionId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'match_events',
+        filter: `match_session_id=eq.${matchSessionId}`,
+      },
+      () => onChange(),
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'match_sessions',
+        filter: `id=eq.${matchSessionId}`,
+      },
+      () => onChange(),
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
 function mapAttendees(rows: any): EventAttendee[] {
   return ((rows ?? []) as any[]).map(a => ({
     id: a.id,
@@ -262,16 +389,61 @@ function mapAttendees(rows: any): EventAttendee[] {
   }));
 }
 
-function mapMatchEvents(sessionId: string, rows: any): MatchEvent[] {
-  return ((rows ?? []) as any[]).map(me => ({
-    id: me.id,
-    matchId: sessionId,
-    type: me.type as MatchEventType,
-    minute: me.minute,
-    player: me.player_name ?? undefined,
-    description: me.description ?? '',
-    reportedBy: me.reported_by ?? undefined,
-  }));
+/**
+ * Hva raden skal si i kampforløpet.
+ *
+ * For et mål er `description` det reporteren skrev — som regel hvem som scoret.
+ * Den flyttes derfor til `player`, og selve linjen forteller hvem målet var
+ * for. Uten dette ville et mål uten scorernavn blitt en tom rad, og et mål med
+ * navn ville sagt «Ola» uten å røpe hvilket lag som ledet.
+ */
+function describeMatchEvent(
+  type: MatchEventType,
+  teamSide: 'home' | 'away' | undefined,
+  description: string | undefined,
+  opponent: string,
+): {description: string; player?: string} {
+  if (type === 'mål') {
+    return {
+      description: teamSide === 'away' ? `Mål for ${opponent}` : 'Mål for oss',
+      player: description || undefined,
+    };
+  }
+
+  // De øvrige får en beskrivelse fra RPC-en (avspark, melding) eller ingen.
+  const fallback: Partial<Record<MatchEventType, string>> = {
+    avspark: 'Kampen er i gang',
+    pause: 'Pause',
+    andre_omgang: 'Andre omgang',
+    slutt: 'Slutt',
+  };
+
+  return {description: description || fallback[type] || ''};
+}
+
+function mapMatchEvents(session: any): MatchEvent[] {
+  const opponent = (session.opponent as string) ?? 'motstanderen';
+
+  return ((session.match_events ?? []) as any[]).map(me => {
+    const teamSide = (me.team_side as 'home' | 'away' | null) ?? undefined;
+    const {description, player} = describeMatchEvent(
+      me.type as MatchEventType,
+      teamSide,
+      me.description ?? undefined,
+      opponent,
+    );
+
+    return {
+      id: me.id,
+      matchId: session.id,
+      type: me.type as MatchEventType,
+      minute: me.minute,
+      player: me.player_name ?? player,
+      description,
+      teamSide,
+      reportedBy: me.reported_by ?? undefined,
+    };
+  });
 }
 
 /**
@@ -322,9 +494,7 @@ export async function getEventDetail(
 
   return {
     ...base,
-    matchEvents: session
-      ? mapMatchEvents(session.id, session.match_events)
-      : undefined,
+    matchEvents: session ? mapMatchEvents(session) : undefined,
     attendees: {
       coming: mapAttendees(evt.attendees?.coming),
       notComing: mapAttendees(evt.attendees?.not_coming),

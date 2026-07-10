@@ -28,8 +28,16 @@ import {
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam} from '../context';
-import {getMembersForTeamSpace} from '../data/teamData';
-import {getEventDetail, setRsvp} from '../lib/api/events';
+import {getTeamMembers, type TeamMember} from '../lib/api/members';
+import {
+  getEventDetail,
+  setRsvp,
+  setMatchReporter,
+  startMatch,
+  reportMatchEvent,
+  subscribeToMatch,
+  type ReportMatchEventInput,
+} from '../lib/api/events';
 import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
@@ -76,6 +84,41 @@ function formatDateLong(date: Date): string {
   return `${day} ${dateNum}. ${month}`;
 }
 
+/** `ReporterActions`-knappene → det `report_match_event` faktisk godtar. */
+const ACTION_TO_EVENT: Record<ReporterActionType, ReportMatchEventInput> = {
+  mål_oss: {type: 'mål', teamSide: 'home'},
+  mål_dem: {type: 'mål', teamSide: 'away'},
+  pause: {type: 'pause'},
+  slutt: {type: 'slutt'},
+  melding: {type: 'melding'},
+};
+
+const ACTION_LABELS: Record<ReporterActionType, string> = {
+  mål_oss: 'MÅL!',
+  mål_dem: 'Mål (motstander)',
+  pause: 'Pause',
+  slutt: 'Kampen er ferdig',
+  melding: 'Melding fra kampen',
+};
+
+/**
+ * RPC-ene kaster med engelske meldinger. Oversett de vi kan handle på, og fall
+ * tilbake på noe generelt — en rå Postgres-feil hjelper ingen på sidelinjen.
+ */
+function matchErrorText(e: unknown, fallback: string): string {
+  const message = (e as {message?: string} | null)?.message ?? '';
+  if (message.includes('Match already started')) {
+    return 'Kampen er allerede i gang.';
+  }
+  if (message.includes('Match is not underway')) {
+    return 'Kampen er ikke i gang lenger.';
+  }
+  if (message.includes('Access denied')) {
+    return 'Du har ikke tilgang til å gjøre dette.';
+  }
+  return fallback;
+}
+
 /**
  * Speiler brukerens valg i tallene uten å telle svaret to ganger:
  * `base` er serverens summer, der `base.myStatus` allerede er med.
@@ -104,20 +147,19 @@ export function EventDetailScreen({route}: Props) {
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
   const {eventId} = route.params;
 
-  // Medlemsdata for kampreporter-UI-et er fortsatt mock — det ryddes når
-  // live-kamp kobles til ekte match_sessions.
-  const teamMembers = activeTeamSpaceId
-    ? getMembersForTeamSpace(activeTeamSpaceId)
-    : [];
   const teamName = activeTeamSpace?.displayName ?? '';
 
   const [event, setEvent] = useState<HeiaEventDetail | null>(null);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [myStatus, setMyStatus] = useState<RSVPStatus>('venter');
   const [savingRsvp, setSavingRsvp] = useState(false);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [savingReporter, setSavingReporter] = useState(false);
+  const [savingAction, setSavingAction] = useState(false);
+  const [startingMatch, setStartingMatch] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [reporterModalVisible, setReporterModalVisible] = useState(false);
   const [reporterSheetVisible, setReporterSheetVisible] = useState(false);
   const [selectedActionType, setSelectedActionType] =
@@ -151,6 +193,48 @@ export function EventDetailScreen({route}: Props) {
     loadEvent();
   }, [loadEvent]);
 
+  // Medlemslisten brukes kun av kampreporter-UI-et, så vi henter den først når
+  // vi vet at hendelsen er en kamp — en trening skal ikke koste et RPC-kall.
+  // Feiler den, lever resten av skjermen videre: `reporter` faller tilbake på
+  // et navnløst medlem i stedet for å påstå at rollen er ledig.
+  const isMatchEvent = event?.matchSessionId != null;
+  useEffect(() => {
+    if (!activeTeamSpaceId || !isMatchEvent) return;
+
+    let cancelled = false;
+    getTeamMembers(activeTeamSpaceId)
+      .then(members => {
+        if (!cancelled) setTeamMembers(members);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeamSpaceId, isMatchEvent]);
+
+  // Kampen er i gang (også i pause — da telles minuttene fortsatt).
+  const isUnderway =
+    event?.matchStatus === 'live' || event?.matchStatus === 'halfTime';
+  const liveMatchSessionId = isUnderway ? event?.matchSessionId : undefined;
+
+  // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
+  // ville stillingen stått stille til hun selv dro for å oppdatere.
+  useEffect(() => {
+    if (!liveMatchSessionId) return;
+    return subscribeToMatch(liveMatchSessionId, () => {
+      loadEvent();
+    });
+  }, [liveMatchSessionId, loadEvent]);
+
+  // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
+  // mellom hendelsene — uten denne ville minuttet frosset til neste mål.
+  useEffect(() => {
+    if (!liveMatchSessionId) return;
+    const id = setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [liveMatchSessionId]);
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -170,13 +254,37 @@ export function EventDetailScreen({route}: Props) {
   const isLiveMatch =
     event.type === 'kamp' &&
     (event.matchStatus === 'live' || event.matchStatus === 'halfTime');
+  const isUpcomingMatch =
+    event.type === 'kamp' && event.matchStatus === 'upcoming';
+  // Kampen er spilt: rapporten skal bli stående. Før dette falt skjermen ned i
+  // vanlig event-modus i det «Slutt» ble trykket, og både stillingen og hele
+  // kampforløpet forsvant i samme øyeblikk som de var ferdige.
+  const isFinishedMatch =
+    event.type === 'kamp' && event.matchStatus === 'finished';
   const isCurrentUserReporter = reporterId === currentUser?.id;
   // Samme rolleregel som is_team_admin() i RLS — en lagleder skal se det
   // samme som en trener.
   const isCurrentUserAdmin = isTeamAdmin(activeRole);
+  // Rollen er tildelt så snart `reporterId` finnes. Er medlemslisten ikke lastet
+  // ennå (eller feilet), viser vi et navnløst medlem — `undefined` ville tegnet
+  // tom-tilstanden «Ingen kampreporter» med «Velg»-knapp, som er direkte feil.
   const reporter = reporterId
-    ? teamMembers.find(u => u.id === reporterId)
+    ? (teamMembers.find(u => u.id === reporterId) ?? {
+        id: reporterId,
+        name: 'Medlem',
+      })
     : undefined;
+
+  // Speiler start_match: admin, eller en reporter som alt er utpekt.
+  const canStartMatch = isCurrentUserAdmin || isCurrentUserReporter;
+
+  const matchMinute = event.startedAt
+    ? Math.max(0, Math.floor((nowMs - event.startedAt.getTime()) / 60_000))
+    : undefined;
+
+  // Rapporten leses som en historie: avspark først, slutt sist. Motsatt av
+  // live-modus, der det ferskeste skal ligge øverst.
+  const finishedMatchEvents = event.matchEvents ?? [];
 
   const attendees = event.attendees;
 
@@ -219,52 +327,115 @@ export function EventDetailScreen({route}: Props) {
     }
   };
 
-  const handleReporterAction = (type: ReporterActionType) => {
-    if (type === 'pause' || type === 'slutt') {
-      const label = type === 'pause' ? 'Pause' : 'Kampen er ferdig';
+  const handleStartMatch = async () => {
+    if (startingMatch) return;
+    setStartingMatch(true);
+    try {
+      await startMatch(eventId);
+      await loadEvent();
+    } catch (e) {
+      Alert.alert(
+        'Kunne ikke starte kampen',
+        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+      );
+    } finally {
+      setStartingMatch(false);
+    }
+  };
+
+  /**
+   * Skriver hendelsen, og lar refetchen hente den ferske stillingen — den
+   * regnes ut server-side, så vi kan ikke gjette den lokalt. Realtime fyrer
+   * også en refetch; den ekstra runden er billig og gjør at reporteren ser
+   * hendelsen selv om kanalen skulle svikte.
+   */
+  const submitAction = async (
+    type: ReporterActionType,
+    description?: string,
+  ) => {
+    const sessionId = event.matchSessionId;
+    if (savingAction || !sessionId) return;
+
+    setSavingAction(true);
+    try {
+      await reportMatchEvent(sessionId, {
+        ...ACTION_TO_EVENT[type],
+        description,
+      });
+      await loadEvent();
       setPushNotification({
         visible: true,
-        title: `${teamName} · ${label}`,
-        message:
-          type === 'pause'
-            ? `Pause. ${event.score?.home}-${event.score?.away}.`
-            : `Slutt! ${event.score?.home}-${event.score?.away}.`,
+        title: `${teamName} · ${ACTION_LABELS[type]}`,
+        message: description || event.title,
       });
+    } catch (e) {
+      Alert.alert(
+        'Kunne ikke rapportere',
+        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+      );
+    } finally {
+      setSavingAction(false);
+    }
+  };
+
+  const handleReporterAction = (type: ReporterActionType) => {
+    // «Slutt» avslutter kampen for hele laget og kan ikke angres i appen.
+    if (type === 'slutt') {
+      Alert.alert('Avslutte kampen?', 'Kampen settes til ferdig for alle.', [
+        {text: 'Avbryt', style: 'cancel'},
+        {
+          text: 'Avslutt',
+          style: 'destructive',
+          onPress: () => submitAction('slutt'),
+        },
+      ]);
       return;
     }
 
+    if (type === 'pause') {
+      submitAction('pause');
+      return;
+    }
+
+    // Mål og meldinger får si noe mer — hvem scoret, hva skjedde.
     setSelectedActionType(type);
     setReporterModalVisible(true);
   };
 
   const handleReportSubmit = (description: string) => {
     setReporterModalVisible(false);
-
-    const actionLabels: Record<ReporterActionType, string> = {
-      mål_oss: 'MÅL!',
-      mål_dem: 'Mål (motstander)',
-      pause: 'Pause',
-      slutt: 'Kampen er ferdig',
-      melding: 'Melding fra kampen',
-    };
-
-    setPushNotification({
-      visible: true,
-      title: `${teamName} · ${actionLabels[selectedActionType]}`,
-      message: description || event.title,
-    });
+    submitAction(selectedActionType, description);
   };
 
-  const handleSelectReporter = (userId: string) => {
-    setReporterId(userId);
+  // Samme mønster som handleRsvp: vis valget med én gang, lagre, refetch.
+  // `loadEvent` svelger sine egne feil, så catch-en fyrer kun når selve
+  // skrivingen feiler — rollbacken kan ikke bli falsk-positiv.
+  const handleSelectReporter = async (userId: string) => {
     setReporterSheetVisible(false);
-    const selected = teamMembers.find(u => u.id === userId);
-    if (selected) {
+    if (savingReporter || userId === reporterId || !event.matchSessionId) {
+      return;
+    }
+
+    const previous = reporterId;
+    setReporterId(userId);
+    setSavingReporter(true);
+    try {
+      await setMatchReporter(event.matchSessionId, userId);
+      await loadEvent();
+      const selected = teamMembers.find(u => u.id === userId);
       setPushNotification({
         visible: true,
         title: 'Kampreporter byttet',
-        message: `${selected.name} er nå kampreporter.`,
+        message: `${selected?.name ?? 'Medlemmet'} er nå kampreporter.`,
       });
+    } catch {
+      setReporterId(previous);
+      Alert.alert(
+        'Kunne ikke bytte kampreporter',
+        'Sjekk nettforbindelsen og prøv igjen.',
+      );
+    } finally {
+      setSavingReporter(false);
     }
   };
 
@@ -288,7 +459,7 @@ export function EventDetailScreen({route}: Props) {
               homeScore={event.score.home}
               awayScore={event.score.away}
               matchStatus={event.matchStatus!}
-              minute={55}
+              minute={matchMinute}
             />
           </View>
 
@@ -308,27 +479,13 @@ export function EventDetailScreen({route}: Props) {
               <Card>
                 <View style={styles.notificationRow}>
                   <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>Kampvarsler</Text>
+                    <Text style={styles.notificationTitle}>
+                      Du følger kampen direkte
+                    </Text>
                     <Text style={styles.notificationDesc}>
-                      Få varsel ved mål, pause og slutt
+                      Stillingen og kampforløpet oppdaterer seg av seg selv.
                     </Text>
                   </View>
-                  <Button
-                    title={notificationsEnabled ? 'På' : 'Slå på'}
-                    variant={notificationsEnabled ? 'primary' : 'secondary'}
-                    size="md"
-                    onPress={() => {
-                      setNotificationsEnabled(!notificationsEnabled);
-                      if (!notificationsEnabled) {
-                        setPushNotification({
-                          visible: true,
-                          title: 'Kampvarsler aktivert',
-                          message:
-                            'Du får varsler ved mål, pause og slutt i denne kampen.',
-                        });
-                      }
-                    }}
-                  />
                 </View>
               </Card>
             </View>
@@ -391,9 +548,9 @@ export function EventDetailScreen({route}: Props) {
   // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp)
   // -----------------------------------------------------------------------
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
       {/* Event-info */}
       <Card style={styles.infoCard}>
         <Chip type={event.type} />
@@ -415,28 +572,77 @@ export function EventDetailScreen({route}: Props) {
         )}
       </Card>
 
-      {/* RSVP */}
-      <View style={styles.rsvpSection}>
-        <RSVPBar rsvp={rsvp} />
-        <View style={styles.rsvpButtons}>
-          <Button
-            title={myStatus === 'kommer' ? 'Du kommer!' : 'Kommer'}
-            variant={comingVariant}
-            onPress={() => handleRsvp('kommer')}
-            disabled={savingRsvp}
-            size="lg"
-            style={styles.rsvpBtn}
+      {/* Kommende kamp: her utnevnes reporteren, og herfra startes kampen.
+          Uten dette kunne ingen bli reporter (ReporterBar fantes kun i
+          live-modus), og ingen kamp kunne bli live. */}
+      {isUpcomingMatch && (
+        <View style={styles.matchSection}>
+          <ReporterBar
+            reporter={reporter}
+            isAdmin={isCurrentUserAdmin}
+            isMe={isCurrentUserReporter}
+            onChangeReporter={() => setReporterSheetVisible(true)}
           />
-          <Button
-            title={myStatus === 'kan_ikke' ? 'Du kan ikke' : 'Kan ikke'}
-            variant={notComingVariant}
-            onPress={() => handleRsvp('kan_ikke')}
-            disabled={savingRsvp}
-            size="lg"
-            style={styles.rsvpBtn}
+          {canStartMatch && (
+            <Button
+              title={startingMatch ? 'Starter…' : 'Start kamp'}
+              variant="primary"
+              size="lg"
+              onPress={handleStartMatch}
+              disabled={startingMatch}
+            />
+          )}
+        </View>
+      )}
+
+      {/* Kamprapporten — sluttresultat + alt reporteren meldte inn. */}
+      {isFinishedMatch && event.score && event.opponent && (
+        <View style={styles.matchSection}>
+          <ScoreBoard
+            homeTeam={teamName}
+            awayTeam={event.opponent}
+            homeScore={event.score.home}
+            awayScore={event.score.away}
+            matchStatus={event.matchStatus!}
           />
         </View>
-      </View>
+      )}
+
+      {isFinishedMatch && finishedMatchEvents.length > 0 && (
+        <>
+          <SectionHeader title="Kampforløp" />
+          <View style={styles.timeline}>
+            {finishedMatchEvents.map(me => (
+              <MatchEventRow key={me.id} event={me} />
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* RSVP — meningsløst på en ferdigspilt kamp. */}
+      {!isFinishedMatch && (
+        <View style={styles.rsvpSection}>
+          <RSVPBar rsvp={rsvp} />
+          <View style={styles.rsvpButtons}>
+            <Button
+              title={myStatus === 'kommer' ? 'Du kommer!' : 'Kommer'}
+              variant={comingVariant}
+              onPress={() => handleRsvp('kommer')}
+              disabled={savingRsvp}
+              size="lg"
+              style={styles.rsvpBtn}
+            />
+            <Button
+              title={myStatus === 'kan_ikke' ? 'Du kan ikke' : 'Kan ikke'}
+              variant={notComingVariant}
+              onPress={() => handleRsvp('kan_ikke')}
+              disabled={savingRsvp}
+              size="lg"
+              style={styles.rsvpBtn}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Oppmøteliste */}
       <AttendanceSection
@@ -456,7 +662,19 @@ export function EventDetailScreen({route}: Props) {
           users={attendees.pending}
         />
       )}
-    </ScrollView>
+      </ScrollView>
+
+      {/* Reporter-velger — treneren utnevner i forkant av kampen. */}
+      {isUpcomingMatch && (
+        <ReporterSheet
+          visible={reporterSheetVisible}
+          members={teamMembers}
+          currentReporterId={reporterId}
+          onSelect={handleSelectReporter}
+          onClose={() => setReporterSheetVisible(false)}
+        />
+      )}
+    </View>
   );
 }
 
@@ -572,6 +790,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.md,
     lineHeight: 22,
+  },
+  matchSection: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
   },
   rsvpSection: {
     paddingHorizontal: spacing.lg,

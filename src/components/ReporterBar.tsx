@@ -12,10 +12,11 @@ interface ReporterBarProps {
 }
 
 /**
- * Rollen tildeles av trener/lagleder — den kan ikke tas.
- * Det speiler RLS på `match_sessions`, der bare reporteren selv eller en admin
- * får oppdatere raden: en ledig rolle (reporter_id IS NULL) kan uansett ikke
- * claimes av et vanlig medlem.
+ * Rollen tildeles av trener/lagleder — den kan verken tas eller gis videre.
+ * Det speiler RLS på `match_sessions`: UPDATE-policyen har ingen `WITH CHECK`,
+ * så `USING` gjelder også for den nye raden. Et vanlig medlem kan derfor ikke
+ * claime en ledig rolle, og reporteren selv kan ikke sette en annen inn —
+ * bare admin. Derfor er «Bytt» admin-only.
  */
 export function ReporterBar({
   reporter,
@@ -47,8 +48,6 @@ export function ReporterBar({
     );
   }
 
-  const canChange = isAdmin || isMe;
-
   return (
     <View style={styles.container}>
       <Avatar name={reporter.name} size="sm" />
@@ -58,7 +57,7 @@ export function ReporterBar({
           {isMe ? 'Deg' : reporter.name}
         </Text>
       </View>
-      {canChange && (
+      {isAdmin && (
         <Pressable
           style={({pressed}) => [
             styles.changeButton,
