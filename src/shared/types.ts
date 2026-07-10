@@ -1,3 +1,5 @@
+import type {NavigatorScreenParams} from '@react-navigation/native';
+
 // ---------------------------------------------------------------------------
 // Sport & Event-typer — skalerbar via enum-utvidelse
 // ---------------------------------------------------------------------------
@@ -12,9 +14,20 @@ export type EventType = 'trening' | 'kamp' | 'sosialt' | 'annet';
 
 export type RSVPStatus = 'kommer' | 'kan_ikke' | 'venter';
 
-export type UserRole = 'trener' | 'forelder' | 'spiller';
+/** Speiler memberships.role i databasen. Se isTeamAdmin() i shared/roles.ts. */
+export type UserRole =
+  | 'trener'
+  | 'lagleder'
+  | 'admin'
+  | 'forelder'
+  | 'spiller';
 
-export type MatchStatus = 'upcoming' | 'live' | 'halfTime' | 'finished';
+export type MatchStatus =
+  | 'upcoming'
+  | 'live'
+  | 'halfTime'
+  | 'finished'
+  | 'cancelled';
 
 export type MatchEventType =
   | 'avspark'
@@ -33,8 +46,10 @@ export interface MatchEvent {
   minute: number;
   player?: string;
   description: string;
-  reportedBy: string;
-  createdAt: Date;
+  /** `home` = oss, `away` = motstander. Satt for mål. */
+  teamSide?: 'home' | 'away';
+  reportedBy?: string;
+  createdAt?: Date;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,8 +100,9 @@ export interface HeiaEvent {
   type: EventType;
   title: string;
   startTime: Date;
-  endTime: Date;
-  location: string;
+  /** Valgfri i databasen — en hendelse trenger ikke sluttidspunkt. */
+  endTime?: Date;
+  location?: string;
   description?: string;
   rsvp: RSVPSummary;
   score?: {home: number; away: number};
@@ -94,6 +110,10 @@ export interface HeiaEvent {
   matchStatus?: MatchStatus;
   matchEvents?: MatchEvent[];
   reporterId?: string;
+  /** Satt for kamper. Nøkkelen skriving mot match_sessions/match_events går på. */
+  matchSessionId?: string;
+  /** Satt når kampen er startet. Kampminuttet regnes ut fra denne. */
+  startedAt?: Date;
 }
 
 export interface RSVPSummary {
@@ -101,6 +121,23 @@ export interface RSVPSummary {
   notComing: number;
   pending: number;
   myStatus: RSVPStatus;
+}
+
+/** Én rad i oppmøtelisten. Foreldre kan svare på vegne av et barn. */
+export interface EventAttendee {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+  childName?: string;
+}
+
+/** Event med oppmøtelister — kun tilgjengelig på detaljskjermen. */
+export interface HeiaEventDetail extends HeiaEvent {
+  attendees: {
+    coming: EventAttendee[];
+    notComing: EventAttendee[];
+    pending: EventAttendee[];
+  };
 }
 
 export interface FeedItem {
@@ -138,7 +175,9 @@ export interface FeedComment {
 // Navigation types
 // ---------------------------------------------------------------------------
 export type RootTabParamList = {
-  HjemStack: undefined;
+  // NavigatorScreenParams gjør at «+»-valgarket kan navigere rett inn i
+  // en skjerm i Hjem-stacken, typesikkert.
+  HjemStack: NavigatorScreenParams<HomeStackParamList> | undefined;
   KalenderStack: undefined;
   Opprett: undefined;
   Inbox: undefined;
@@ -146,8 +185,10 @@ export type RootTabParamList = {
 };
 
 export type HomeStackParamList = {
-  TeamHome: undefined;
+  /** composeNonce settes av «Del med laget» for å fokusere compose-boksen. */
+  TeamHome: {composeNonce?: number} | undefined;
   EventDetail: {eventId: string};
+  NewEvent: undefined;
   Support: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};
@@ -168,4 +209,7 @@ export type KalenderStackParamList = {
 export type ProfilStackParamList = {
   Profil: undefined;
   Invite: {firstTime?: boolean} | undefined;
+  // Samme skjermer som i onboarding — her for å legge til lag nr. 2.
+  JoinTeamCode: {prefillCode?: string} | undefined;
+  CreateTeam: undefined;
 };

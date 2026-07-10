@@ -21,11 +21,31 @@ function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * En kamp som er i gang eller spilt viser stillingen, ikke oppmøtet — hvem som
+ * «kommer» er uinteressant når kampen er over. Null for alt annet.
+ */
+function resultLabel(event: HeiaEvent): string | null {
+  if (event.type !== 'kamp' || !event.score) return null;
+
+  switch (event.matchStatus) {
+    case 'live':
+      return 'Pågår nå';
+    case 'halfTime':
+      return 'Pause';
+    case 'finished':
+      return 'Sluttresultat';
+    default:
+      return null;
+  }
+}
+
 export function EventCard({event, onPress, featured = false}: EventCardProps) {
   const start = event.startTime;
   const dayName = dayNames[start.getDay()];
   const dateNum = start.getDate();
   const monthName = monthNames[start.getMonth()];
+  const result = resultLabel(event);
 
   return (
     <Pressable
@@ -46,19 +66,31 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
         <View style={styles.content}>
           <Chip type={event.type} />
           <Text style={styles.title}>{event.title}</Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>{event.location}</Text>
-          </View>
+          {event.location && (
+            <View style={styles.metaRow}>
+              <Text style={styles.meta}>{event.location}</Text>
+            </View>
+          )}
           <Text style={styles.meta}>
-            {formatTime(event.startTime)} – {formatTime(event.endTime)}
+            {formatTime(event.startTime)}
+            {event.endTime ? ` – ${formatTime(event.endTime)}` : ''}
           </Text>
         </View>
       </View>
 
-      {/* RSVP-bar */}
-      <View style={styles.rsvpWrap}>
-        <RSVPBar rsvp={event.rsvp} />
-      </View>
+      {/* Resultat for kamper som er i gang eller spilt, ellers oppmøte. */}
+      {result && event.score ? (
+        <View style={styles.resultWrap}>
+          <Text style={styles.resultLabel}>{result}</Text>
+          <Text style={styles.resultScore}>
+            {event.score.home}–{event.score.away}
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.rsvpWrap}>
+          <RSVPBar rsvp={event.rsvp} />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -120,5 +152,24 @@ const styles = StyleSheet.create({
   },
   rsvpWrap: {
     marginTop: spacing.lg,
+  },
+  resultWrap: {
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  resultLabel: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  resultScore: {
+    ...typography.heading3,
+    fontVariant: ['tabular-nums'],
   },
 });

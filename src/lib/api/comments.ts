@@ -1,29 +1,15 @@
 import {supabase} from '../supabase';
-import type {FeedComment, UserRole} from '../../shared/types';
-
-type MemberInfo = {name: string; avatarUrl?: string; role?: UserRole};
+import {getTeamMembers, type TeamMember} from './members';
+import type {FeedComment} from '../../shared/types';
 
 // profiles-RLS lar deg kun lese egen profil, så en direkte comments→profiles
-// join gir ikke lagkameraters navn. get_team_members (SECURITY DEFINER) gir
-// navn/avatar/rolle for hele laget — vi kobler forfatter klient-side.
+// join gir ikke lagkameraters navn. Vi henter hele laget via get_team_members
+// og kobler forfatter klient-side.
 async function getMemberMap(
   teamSpaceId: string,
-): Promise<Map<string, MemberInfo>> {
-  const {data, error} = await supabase.rpc('get_team_members', {
-    ts_id: teamSpaceId,
-  });
-  if (error) {
-    throw error;
-  }
-  const map = new Map<string, MemberInfo>();
-  for (const row of data || []) {
-    map.set(row.user_id, {
-      name: row.display_name ?? 'Medlem',
-      avatarUrl: row.avatar_url ?? undefined,
-      role: (row.role as UserRole) ?? undefined,
-    });
-  }
-  return map;
+): Promise<Map<string, TeamMember>> {
+  const members = await getTeamMembers(teamSpaceId);
+  return new Map(members.map(m => [m.id, m]));
 }
 
 /** Kommentarer på en post (eldste først), med forfatter fra medlems-mappet. */

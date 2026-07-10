@@ -2,25 +2,40 @@ import React from 'react';
 import {View, Text, ScrollView, Pressable, StyleSheet, Image} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, CommonActions} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar, ListRow} from '../components';
 import {useAuth, useActiveTeam} from '../context';
+import {isTeamAdmin} from '../shared/roles';
+import type {MemberRole} from '../lib/types';
+import type {ProfilStackParamList} from '../shared/types';
+
+type Nav = NativeStackNavigationProp<ProfilStackParamList, 'Profil'>;
+
+const ROLE_LABELS: Record<MemberRole, string> = {
+  trener: 'Trener',
+  lagleder: 'Lagleder',
+  admin: 'Admin',
+  forelder: 'Forelder',
+  spiller: 'Spiller',
+};
 
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const {profile, signOut} = useAuth();
   const {activeTeamSpaceId, userMemberships, setActiveTeamSpace} =
     useActiveTeam();
-  const navigation = useNavigation();
+  const navigation = useNavigation<Nav>();
 
   if (!profile) return null;
 
   const activeMembership = userMemberships.find(
     m => m.teamSpaceId === activeTeamSpaceId,
   );
-  const roleName =
-    activeMembership?.role === 'trener' ? 'Trener' : 'Forelder';
-  const isTrener = activeMembership?.role === 'trener';
+  const roleName = activeMembership
+    ? ROLE_LABELS[activeMembership.role]
+    : 'Forelder';
+  const isTrener = isTeamAdmin(activeMembership?.role);
 
   function handleTeamSwitch(teamSpaceId: string) {
     if (teamSpaceId === activeTeamSpaceId) return;
@@ -90,8 +105,7 @@ export function ProfilScreen() {
                     {m.teamSpace.displayName}
                   </Text>
                   <Text style={styles.teamMeta}>
-                    {m.team.ageGroup} ·{' '}
-                    {m.role === 'trener' ? 'Trener' : 'Forelder'}
+                    {m.team.ageGroup} · {ROLE_LABELS[m.role]}
                   </Text>
                 </View>
                 {isActive && <Text style={styles.activeCheck}>✓</Text>}
@@ -103,12 +117,24 @@ export function ProfilScreen() {
 
       {/* Meny */}
       <View style={styles.menuSection}>
+        <ListRow
+          icon={<Text style={styles.menuIcon}>{'  '}</Text>}
+          title="Bli med i et lag"
+          subtitle="Har du fått en invitasjonskode?"
+          onPress={() => navigation.navigate('JoinTeamCode')}
+        />
+        <ListRow
+          icon={<Text style={styles.menuIcon}>{'  '}</Text>}
+          title="Opprett et nytt lag"
+          subtitle="Du blir trener for laget"
+          onPress={() => navigation.navigate('CreateTeam')}
+        />
         {activeMembership && (
           <ListRow
             icon={<Text style={styles.menuIcon}>{'  '}</Text>}
             title="Inviter til laget"
             subtitle="Del invitasjonskoden"
-            onPress={() => navigation.navigate('Invite' as never)}
+            onPress={() => navigation.navigate('Invite')}
           />
         )}
         <ListRow

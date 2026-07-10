@@ -1,12 +1,26 @@
-import React from 'react';
-import {Text, StyleSheet, View, ActivityIndicator} from 'react-native';
-import {NavigationContainer} from '@react-navigation/native';
+import React, {useEffect, useState} from 'react';
+import {
+  Alert,
+  Pressable,
+  Text,
+  StyleSheet,
+  View,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  NavigationContainer,
+  useNavigation,
+  type NavigationProp,
+} from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
+import {CreateSheet} from '../components';
+import {isTeamAdmin} from '../shared/roles';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
+import {NewEventScreen} from '../screens/NewEventScreen';
 import {InviteScreen} from '../screens/InviteScreen';
 import {SupportScreen} from '../screens/SupportScreen';
 import {CommentsScreen} from '../screens/CommentsScreen';
@@ -43,6 +57,16 @@ const stackScreenOptions = {
   headerBackTitle: 'Tilbake',
 };
 
+// Bli med / Opprett lag ligger i to stacker. Onboarding-stacken skjuler
+// headeren globalt, så begge steder må slå den på eksplisitt for å få den
+// samme tilbake-knappen og topplinjen som Inviter, Kommentarer og Hendelse.
+const joinTeamOptions = {...stackScreenOptions, headerShown: true, title: 'Bli med'};
+const createTeamOptions = {
+  ...stackScreenOptions,
+  headerShown: true,
+  title: 'Opprett lag',
+};
+
 // ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)
 // ---------------------------------------------------------------------------
@@ -58,6 +82,20 @@ function HomeStackNavigator() {
         name="EventDetail"
         component={EventDetailScreen}
         options={{title: 'Hendelse'}}
+      />
+      <HomeStack.Screen
+        name="NewEvent"
+        component={NewEventScreen}
+        options={({navigation}) => ({
+          title: 'Ny hendelse',
+          presentation: 'modal',
+          // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
+          headerLeft: () => (
+            <Pressable onPress={navigation.goBack} hitSlop={8}>
+              <Text style={styles.headerAction}>Avbryt</Text>
+            </Pressable>
+          ),
+        })}
       />
       <HomeStack.Screen
         name="Support"
@@ -114,6 +152,16 @@ function ProfilStackNavigator() {
         component={InviteScreen}
         options={{title: 'Inviter'}}
       />
+      <ProfilNav.Screen
+        name="JoinTeamCode"
+        component={JoinTeamCodeScreen}
+        options={joinTeamOptions}
+      />
+      <ProfilNav.Screen
+        name="CreateTeam"
+        component={CreateTeamScreen}
+        options={createTeamOptions}
+      />
     </ProfilNav.Navigator>
   );
 }
@@ -134,22 +182,23 @@ function OnboardingStackNavigator() {
       <OnboardingNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}
+        options={joinTeamOptions}
       />
-      <OnboardingNav.Screen name="CreateTeam" component={CreateTeamScreen} />
+      <OnboardingNav.Screen
+        name="CreateTeam"
+        component={CreateTeamScreen}
+        options={createTeamOptions}
+      />
     </OnboardingNav.Navigator>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Placeholder for Opprett-tab
+// Opprett-tab. Rendres aldri: tabPress avbrytes og åpner CreateSheet i stedet.
+// Bottom-tabs krever likevel en komponent for skjermen.
 // ---------------------------------------------------------------------------
 function OpprettScreen() {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderText}>Ny hendelse</Text>
-      <Text style={styles.placeholderSub}>Kommer snart</Text>
-    </View>
-  );
+  return <View style={styles.placeholder} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +216,28 @@ const tabIcons: Record<keyof RootTabParamList, string> = {
 // Hoved-tabs
 // ---------------------------------------------------------------------------
 function MainTabs() {
+  const navigation = useNavigation<NavigationProp<RootTabParamList>>();
+  const {activeRole} = useActiveTeam();
+  const [sheetVisible, setSheetVisible] = useState(false);
+
+  const closeSheet = () => setSheetVisible(false);
+
+  const handleShare = () => {
+    closeSheet();
+    // Ny nonce hver gang, ellers fokuserer ikke compose-boksen på nytt.
+    navigation.navigate('HjemStack', {
+      screen: 'TeamHome',
+      params: {composeNonce: Date.now()},
+    });
+  };
+
+  const handleNewEvent = () => {
+    closeSheet();
+    navigation.navigate('HjemStack', {screen: 'NewEvent'});
+  };
+
   return (
+    <>
     <Tab.Navigator
       screenOptions={({route}) => ({
         headerShown: false,
@@ -201,6 +271,12 @@ function MainTabs() {
         name="Opprett"
         component={OpprettScreen}
         options={{tabBarLabel: ''}}
+        listeners={{
+          tabPress: e => {
+            e.preventDefault();
+            setSheetVisible(true);
+          },
+        }}
       />
       <Tab.Screen
         name="Inbox"
@@ -212,6 +288,15 @@ function MainTabs() {
         options={{tabBarLabel: 'Profil'}}
       />
     </Tab.Navigator>
+
+    <CreateSheet
+      visible={sheetVisible}
+      canCreateEvent={isTeamAdmin(activeRole)}
+      onClose={closeSheet}
+      onShare={handleShare}
+      onNewEvent={handleNewEvent}
+    />
+    </>
   );
 }
 
@@ -233,9 +318,18 @@ function LoadingScreen({message}: {message?: string}) {
 export function AppNavigator() {
   const {session, profile, loading} = useAuth();
   const {userMemberships, loading: teamLoading} = useActiveTeam();
-  const {pendingAction} = useOnboarding();
+  const {pendingAction, lastError, setLastError} = useOnboarding();
 
   const hasTeam = userMemberships.length > 0;
+
+  // WelcomeIntent viser lastError for en gjest. Har brukeren alt et lag rendres
+  // MainTabs, og feilen ville forsvunnet i stillhet — så vi sier fra her.
+  useEffect(() => {
+    if (lastError && hasTeam) {
+      Alert.alert('Noe gikk galt', lastError);
+      setLastError(null);
+    }
+  }, [lastError, hasTeam, setLastError]);
 
   // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
   if (loading || (session && !profile) || (session && teamLoading)) {
@@ -243,7 +337,8 @@ export function AppNavigator() {
   }
 
   // Innlogget med en pending intent (auth-before-commit): fullfør join/create.
-  if (session && profile && !hasTeam && pendingAction) {
+  // Gjelder også når brukeren alt har et lag og blir med i sitt neste.
+  if (session && profile && pendingAction) {
     return <LoadingScreen message="Setter opp laget…" />;
   }
 
@@ -295,16 +390,11 @@ const styles = StyleSheet.create({
   placeholder: {
     flex: 1,
     backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
   },
-  placeholderText: {
-    ...typography.heading2,
-  },
-  placeholderSub: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
+  headerAction: {
+    ...typography.body,
+    color: colors.heiaInk,
+    fontWeight: '600',
   },
   loadingScreen: {
     flex: 1,

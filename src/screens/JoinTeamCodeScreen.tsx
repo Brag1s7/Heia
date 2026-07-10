@@ -9,15 +9,19 @@ import {
   ScrollView,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Button} from '../components';
-import {useAuth, useOnboarding} from '../context';
+import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {lookupInviteCode} from '../lib/api/teams';
 import type {InviteCodeResult, MemberRole} from '../lib/types';
 import type {OnboardingStackParamList} from '../shared/types';
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, 'JoinTeamCode'>;
+// Skjermen brukes både i onboarding-stacken og fra Profil («Bli med i et lag
+// til»), så navigasjonen hentes via hooks i stedet for skjerm-props.
+type Nav = NativeStackNavigationProp<OnboardingStackParamList, 'JoinTeamCode'>;
+type Route = RouteProp<OnboardingStackParamList, 'JoinTeamCode'>;
 
 type JoinRole = Extract<MemberRole, 'forelder' | 'trener'>;
 
@@ -26,10 +30,17 @@ const ROLES: {key: JoinRole; label: string; description: string}[] = [
   {key: 'trener', label: 'Trener', description: 'Leder laget'},
 ];
 
-export function JoinTeamCodeScreen({navigation, route}: Props) {
+export function JoinTeamCodeScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
   const {session} = useAuth();
+  const {userMemberships} = useActiveTeam();
   const {setPendingAction, executeJoin} = useOnboarding();
+
+  // Har brukeren alt et lag, bytter ikke AppNavigator skjerm for oss —
+  // da står vi i Profil-stacken og må lukke skjermen selv.
+  const hadTeam = userMemberships.length > 0;
 
   const [code, setCode] = useState(route.params?.prefillCode ?? '');
   const [loading, setLoading] = useState(false);
@@ -96,6 +107,9 @@ export function JoinTeamCodeScreen({navigation, route}: Props) {
     try {
       // executeJoin oppdaterer memberships → AppNavigator bytter til MainTabs.
       await executeJoin(normalizedCode, role);
+      if (hadTeam) {
+        navigation.goBack();
+      }
     } catch (e: any) {
       setError(e?.message ?? 'Kunne ikke bli med i laget.');
       setSubmitting(false);
@@ -103,16 +117,8 @@ export function JoinTeamCodeScreen({navigation, route}: Props) {
   };
 
   return (
-    <View style={[styles.screen, {paddingTop: insets.top + spacing.lg}]}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={styles.backButton}>
-          <Text style={styles.backText}>‹ Tilbake</Text>
-        </Pressable>
-      </View>
-
+    <View style={styles.screen}>
+      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -203,21 +209,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-  },
-  backText: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
+  // Samme marger som InviteScreen, så overskriften lander likt under headeren.
   content: {
-    paddingHorizontal: spacing['2xl'],
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
   },
   title: {
     ...typography.heading1,

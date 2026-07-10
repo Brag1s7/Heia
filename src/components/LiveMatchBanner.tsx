@@ -27,7 +27,9 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
             {event.score.home} – {event.score.away}
           </Text>
         </View>
-        <Text style={styles.location}>{event.location}</Text>
+        {event.location && (
+          <Text style={styles.location}>{event.location}</Text>
+        )}
       </View>
 
       <Text style={styles.arrow}>›</Text>
