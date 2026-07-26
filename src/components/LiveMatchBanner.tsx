@@ -10,7 +10,10 @@ interface LiveMatchBannerProps {
 }
 
 export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
-  if (!event.score || !event.opponent || event.matchStatus !== 'live') {
+  // Pause er også «pågående» — kampen er ikke over, klokka står bare stille.
+  const isUnderway =
+    event.matchStatus === 'live' || event.matchStatus === 'halfTime';
+  if (!event.score || !event.opponent || !isUnderway) {
     return null;
   }
 
@@ -18,7 +21,7 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
     <Pressable
       onPress={onPress}
       style={({pressed}) => [styles.banner, pressed && styles.pressed]}>
-      <LiveBadge />
+      <LiveBadge paused={event.matchStatus === 'halfTime'} />
 
       <View style={styles.matchInfo}>
         <Text style={styles.title}>{event.title}</Text>

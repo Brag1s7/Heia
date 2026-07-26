@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-09 (etter Fase 3C-1 — ekte medlemsliste + lagret reporter)_
+_Sist oppdatert: 2026-07-26 (etter Fase 3D — robust pause/andre omgang)_
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -10,18 +10,18 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
 Vi følger en godkjent fase-plan for «Team Activity Loop».
 **Fase 0 (invite-loop), Fase 1 (design), hele Fase 2 (ekte feed),
-Fase 3A (ekte events — lesing), Fase 3B-1 (opprett hendelse) og
-Fase 3B-2 (RSVP lagres) er ferdig og testet.**
-**Fase 3C (hele live-kamp-loopen) er kodet, og `00020` er deployet til remote.
-Ingenting er kjørt i simulator ennå** — det er første oppgave.
+Fase 3A (ekte events — lesing), Fase 3B (opprett hendelse + RSVP) og
+Fase 3C (hele live-kamp-loopen) er ferdig og verifisert i simulator.**
+**Fase 3D (pause ⇄ andre omgang) er kodet, `00021` er deployet, tsc grønn.**
+Neste store skive er **ekte push** (se «Fortsatt igjen»).
 
-Branch: `Brage`. `npx tsc --noEmit` er grønn. `npx eslint src` har 6 errors +
-5 warnings, alle fra før (ubrukte variabler i `Avatar`/`CommentsScreen`/
+Branch: `Brage` (pushet til `origin/Brage` t.o.m. 3C). `npx eslint src` har 6
+errors + 5 warnings, alle fra før (ubrukte variabler i `Avatar`/`CommentsScreen`/
 `InviteScreen`, `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
-Alt til og med 3B-1 er verifisert i simulator av brukeren. Av 3B-2 er selve
-lagringen bekreftet; knappe-variantene og offline-rollbacken (punkt 4 i
-testlisten) er ikke kjørt gjennom ennå.
-Ikke pushet til `origin/Brage` ennå.
+
+**Tsc-arbeidsmåte (lærdom):** full tsc tar 2–4 min. Kjør den ALLTID i bakgrunn
+(aldri forgrunn-med-timeout, aldri to samtidig), og bruk incremental-cache:
+`npx tsc --noEmit --incremental --tsBuildInfoFile <scratchpad>/heia.tsbuildinfo`.
 
 ### Ekte vs. mock akkurat nå
 - **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner, **opprettelse av hendelser + kamper**, **RSVP-svar**, **medlemslisten**, **kampreporter**, **start av kamp**, **kamphendelser + stilling + feed-post**, **realtime på live kamp**, rollesjekk (fra membership).
@@ -35,8 +35,9 @@ Ikke pushet til `origin/Brage` ennå.
 ## Backend (Supabase) — tilstand
 
 Prosjektet er linket (ref `sswncdrbsrfieudkdmhj`, config `Heia_Prod`). Migrasjoner
-00001–00019 er alle deployet til remote (00016/00017 var hand-kjørt fra før;
-reconciliert med `migration repair` 2026-07-08). `supabase db push` fungerer.
+00001–00021 er alle deployet til remote (00016/00017 var hand-kjørt fra før;
+reconciliert med `migration repair` 2026-07-08). `supabase db push` fungerer
+(kjør med sandkasse av — nettverk kreves; `--dry-run` viser ubehandlede).
 
 Eksisterende RPC-er: lese — `get_team_feed`, `get_event_with_rsvp`,
 `get_team_members`; skrive — `create_team_from_scratch`, `join_team_space`,
@@ -288,15 +289,13 @@ ferdige. Rettet:
   har appen åpen får vite om målet. Krever native modul + rebuild + APNs +
   Edge Function som leser `notifications`-tabellen (den finnes, tom). Egen skive.
   `SimulatedPush` lever fortsatt som lokal bekreftelse til reporteren.
-- **Resume etter pause.** `pause` setter status, men ingen knapp setter den
-  tilbake til `live` (`andre_omgang` finnes i `match_events`-CHECK). Kampen kan
-  fortsatt avsluttes fra pause.
-- **`getLiveMatch`** filtrerer på `status='live'`, så hero-banneret forsvinner
-  i pausen. Vurder å ta med `pause`.
+- ~~Resume etter pause~~ + ~~`getLiveMatch` i pause~~ → **løst i Fase 3D** (under).
 - **`+`-knappens tredje valg** («Start kamp», beslutning 1) er ikke bygget —
   kampen startes fra kampsiden. Ren snarvei, loopen er hel uten.
-- **`FeedCard` er aldri testet på typene `match_event`/`match_start`/`match_end`.**
-  Sjekk at de rendrer pent i feeden.
+- ~~`FeedCard` på match-typene~~ → **verifisert (les-review):** `getMarker`
+  gir grønn rail + «KAMP»-markør + fet innholdstekst, ingen krasj. Minuttet
+  vises ikke i markøren fordi `mapFeedRow` (feed.ts) ikke hydrerer `matchEvent`
+  — kosmetisk, `content`-strengen bærer stilling/minutt. Akseptert v1.
 
 ### LÅSTE BESLUTNINGER (bruker, 2026-07-09)
 
@@ -352,6 +351,37 @@ delete from public.match_events where match_session_id = '<SESSION_ID>';
 ```
 
 ---
+
+## Fase 3D — GJORT (pause ⇄ andre omgang)
+
+Kodet 2026-07-26. Én migrasjon (`00021`, deployet), ingen native moduler →
+**kun Metro-reload.** Lukket to hull fra 3C-lista.
+
+- **Migrasjon `00021_resume_match.sql` (✅ deployet):** `report_match_event` er
+  `CREATE OR REPLACE`-t. Godtar nå også `andre_omgang` (fantes alt i
+  `match_events`-CHECK) → setter `status` tilbake til `live` + feed-post
+  «▶️ Andre omgang i gang». To overgangs-vakter lagt til: `pause` kun fra
+  `live`, `andre_omgang` kun fra `pause` (ellers dobbel pause-rad / falsk
+  gjenopptakelse). Alt annet identisk med `00020`.
+- **`events.ts`:** `ReportableEventType` fikk `andre_omgang`. `getLiveMatch`
+  bruker nå `.in('...status', ['live','pause'])` — banneret overlever pausen.
+- **`ReporterActions`:** «Pause»-knappen bytter til «Fortsett» (▶️) når kampen
+  er i pause — samme plass i griddet, aldri en død knapp. Ny `isPaused`-prop.
+- **`EventDetailScreen`:** `andre_omgang` er et rent av/på-trykk (som pause,
+  ingen modal). `isPaused={matchStatus==='halfTime'}` sendes til `ReporterActions`.
+  Vennlige feiltekster for de nye vaktene (race/realtime-lag).
+- **`LiveBadge` + `LiveMatchBanner`:** banneret vises nå også i `halfTime`.
+  `LiveBadge` fikk `paused`-variant: gul «PAUSE» uten puls (stillestående prikk
+  = stoppet). `LiveMatchBanner` slapp før alt annet enn `status==='live'`.
+
+### Test dette først (Metro-reload, migrasjon alt ute)
+1. Start en kamp → trykk **Pause**. `ScoreBoard` sier PAUSE, feeden får «⏸ Pause»,
+   og handlingsknappen har byttet til **Fortsett**.
+2. Gå til Hjem → hero-banneret står fortsatt der, nå gult «PAUSE» (før forsvant det).
+3. Trykk **Fortsett** → status `live`, feeden får «▶️ Andre omgang i gang»,
+   knappen er «Pause» igjen. Forelder på annen enhet ser byttet via realtime.
+4. Prøv å pause to ganger raskt / fortsette en kamp som alt spilles → vennlig
+   Alert, ingen rar tilstand.
 
 ## Arbeidsmåte (for å spare tokens + beholde kontekst)
 

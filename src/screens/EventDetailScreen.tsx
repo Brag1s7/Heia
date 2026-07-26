@@ -89,6 +89,7 @@ const ACTION_TO_EVENT: Record<ReporterActionType, ReportMatchEventInput> = {
   mål_oss: {type: 'mål', teamSide: 'home'},
   mål_dem: {type: 'mål', teamSide: 'away'},
   pause: {type: 'pause'},
+  andre_omgang: {type: 'andre_omgang'},
   slutt: {type: 'slutt'},
   melding: {type: 'melding'},
 };
@@ -97,6 +98,7 @@ const ACTION_LABELS: Record<ReporterActionType, string> = {
   mål_oss: 'MÅL!',
   mål_dem: 'Mål (motstander)',
   pause: 'Pause',
+  andre_omgang: 'Andre omgang',
   slutt: 'Kampen er ferdig',
   melding: 'Melding fra kampen',
 };
@@ -112,6 +114,12 @@ function matchErrorText(e: unknown, fallback: string): string {
   }
   if (message.includes('Match is not underway')) {
     return 'Kampen er ikke i gang lenger.';
+  }
+  if (message.includes('Match is not paused')) {
+    return 'Kampen er alt i gang.';
+  }
+  if (message.includes('Match is not live')) {
+    return 'Kampen er alt i pause.';
   }
   if (message.includes('Access denied')) {
     return 'Du har ikke tilgang til å gjøre dette.';
@@ -392,8 +400,9 @@ export function EventDetailScreen({route}: Props) {
       return;
     }
 
-    if (type === 'pause') {
-      submitAction('pause');
+    // Pause og «fortsett» er rene av/på-trykk — ingen tekst å skrive.
+    if (type === 'pause' || type === 'andre_omgang') {
+      submitAction(type);
       return;
     }
 
@@ -494,7 +503,10 @@ export function EventDetailScreen({route}: Props) {
           {/* Reporter-verktøy — kun synlig for aktiv reporter */}
           {isCurrentUserReporter && (
             <View style={styles.section}>
-              <ReporterActions onAction={handleReporterAction} />
+              <ReporterActions
+                onAction={handleReporterAction}
+                isPaused={event.matchStatus === 'halfTime'}
+              />
             </View>
           )}
 

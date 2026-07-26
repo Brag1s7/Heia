@@ -172,6 +172,10 @@ export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
 /**
  * Pågående kamp for hero-banneret på TeamHome, eller null.
  * Vi henter ikke RSVP her: banneret viser stilling, ikke oppmøte.
+ *
+ * `pause` er også «pågående» — kampen er ikke over, den har bare stoppet
+ * klokka. Uten den forsvant banneret i pausen og dukket opp igjen i andre
+ * omgang, som om kampen hadde tatt slutt og startet på nytt.
  */
 export async function getLiveMatch(
   teamSpaceId: string,
@@ -181,7 +185,7 @@ export async function getLiveMatch(
     .select(LIVE_MATCH_COLUMNS)
     .eq('team_space_id', teamSpaceId)
     .is('deleted_at', null)
-    .eq('match_sessions.status', 'live')
+    .in('match_sessions.status', ['live', 'pause'])
     .order('start_time', {ascending: false})
     .limit(1);
 
@@ -302,7 +306,12 @@ export async function startMatch(eventId: string): Promise<void> {
 }
 
 /** Hendelsene `ReporterActions` kan sende. RPC-en avviser alt annet. */
-export type ReportableEventType = 'mål' | 'pause' | 'slutt' | 'melding';
+export type ReportableEventType =
+  | 'mål'
+  | 'pause'
+  | 'andre_omgang'
+  | 'slutt'
+  | 'melding';
 
 export interface ReportMatchEventInput {
   type: ReportableEventType;
