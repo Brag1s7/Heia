@@ -6,6 +6,7 @@ export type ReporterActionType =
   | 'mål_oss'
   | 'mål_dem'
   | 'pause'
+  | 'andre_omgang'
   | 'slutt'
   | 'melding';
 
@@ -17,21 +18,35 @@ interface ActionButton {
 
 interface ReporterActionsProps {
   onAction: (type: ReporterActionType) => void;
+  /** I pause bytter «Pause»-knappen til «Fortsett» (andre omgang). */
+  isPaused?: boolean;
 }
 
-const actions: ActionButton[] = [
+const goalActions: ActionButton[] = [
   {type: 'mål_oss', label: 'Mål oss', icon: '⚽'},
   {type: 'mål_dem', label: 'Mål dem', icon: '⚽'},
-  {type: 'pause', label: 'Pause', icon: '⏸'},
-  {type: 'slutt', label: 'Slutt', icon: '🏁'},
-  {type: 'melding', label: 'Kommentar', icon: '💬'},
 ];
 
-export function ReporterActions({onAction}: ReporterActionsProps) {
+const PAUSE_ACTION: ActionButton = {type: 'pause', label: 'Pause', icon: '⏸'};
+const RESUME_ACTION: ActionButton = {
+  type: 'andre_omgang',
+  label: 'Fortsett',
+  icon: '▶️',
+};
+
+export function ReporterActions({onAction, isPaused}: ReporterActionsProps) {
+  // Pause og «fortsett» er samme plass i griddet — du er aldri i begge på én
+  // gang. Slik unngår vi en knapp som er død halvparten av tiden.
+  const smallActions: ActionButton[] = [
+    isPaused ? RESUME_ACTION : PAUSE_ACTION,
+    {type: 'slutt', label: 'Slutt', icon: '🏁'},
+    {type: 'melding', label: 'Kommentar', icon: '💬'},
+  ];
+
   return (
     <View style={styles.container}>
       <View style={styles.goalRow}>
-        {actions.slice(0, 2).map(action => (
+        {goalActions.map(action => (
           <Pressable
             key={action.type}
             onPress={() => onAction(action.type)}
@@ -46,7 +61,7 @@ export function ReporterActions({onAction}: ReporterActionsProps) {
         ))}
       </View>
       <View style={styles.row}>
-        {actions.slice(2).map(action => (
+        {smallActions.map(action => (
           <Pressable
             key={action.type}
             onPress={() => onAction(action.type)}

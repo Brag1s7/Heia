@@ -1,7 +1,12 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "types": ["jest"]
+    "types": ["jest"],
+    // Persistent incremental-cache: `tsc --noEmit` gjenbruker forrige resultat,
+    // så gjentatte typesjekker går på sekunder i stedet for minutter. Cachen
+    // ligger under node_modules (alt git-ignorert), regenereres ved reinstall.
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsc/heia.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["**/node_modules", "**/Pods", "**/__tests__"]

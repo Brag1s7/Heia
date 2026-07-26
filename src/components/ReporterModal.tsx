@@ -21,10 +21,13 @@ interface ReporterModalProps {
   onCancel: () => void;
 }
 
+// Pause og «andre omgang» åpner aldri modalen (rene av/på-trykk), men Record-en
+// må dekke hele unionen.
 const actionLabels: Record<ReporterActionType, string> = {
   mål_oss: 'Mål for oss',
   mål_dem: 'Mål for motstander',
   pause: 'Pause',
+  andre_omgang: 'Andre omgang',
   slutt: 'Kampslutt',
   melding: 'Kommentar',
 };
