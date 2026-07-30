@@ -2,15 +2,41 @@
 
 _Sist oppdatert: 2026-07-30 (kveld). **Designretningen «A v2 · Stadium Pop
 Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3+4 — skive 4 er den
-samlede native rebuilden, optisk godkjent av bruker).** Nyeste skive er
-**KAMPRAPPORTEN (skive 5)**: migrasjon `00029` deployet, kampchipene i feeden
-bærer nå stilling, kampforløpet har løpende stilling, og en spilt kamp åpner
-med scoreboardet. **KODET, ikke optisk verifisert.** Designarbeidet er ikke
-pushet/merget til `main` ennå. **Neste:** optisk review av skive 5, deretter
-app-ikon/launch screen eller produktkandidatene («🎯 SENERE»). Fase 4–9 fra
-før er merget (PR #16)._
+samlede native rebuilden, optisk godkjent av bruker).** Nyeste skiver er
+**KAMPRAPPORTEN (skive 5)** og **APP-IKON + LAUNCH SCREEN (skive 6)** — begge
+**KODET, ikke optisk verifisert**. Skive 6 krever **rebuild** (ikoner og
+storyboard bakes inn i binæren). **Ikonvalget er LÅST: variant C, figur med
+glød** — bygget i produksjonsversjon 2026-07-30. Designarbeidet er ikke
+pushet/merget til `main` ennå. **Neste:** optisk review av skive 5 + 6, deretter
+produktkandidatene («🎯 SENERE»). Fase 4–9 fra før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
+
+---
+
+## ▶️ NESTE — start her
+
+**1. ✅ Git er ryddet** (2026-07-30 kveld). PR #17 er merget til `main`,
+squash-konflikten er løst med `-s ours` (`474e46c`), alt er pushet, og
+`Brage..origin/main` = 0. **En ny PR fra `Brage` er konfliktfri nå.** Se
+«🔁 Squash-mønsteret» i git-seksjonen for oppskriften neste gang.
+
+**2. Neste skive: sesong- og statistikkflate** (produktkandidat 5).
+**Bruker sa eksplisitt 2026-07-30: «Liker godt ideen med at man kan se sesong
+og statistikk en plass!»** — så denne går foran kandidat 2. «7 kamper, 12 mål»:
+`match_events` har all dataen alt, så det er én lese-RPC + én skjerm. Veldig
+Strava, og den første flaten som viser at appen samler opp noe over tid.
+
+Alternativ, og neste i køen etter den: **kommentarer + heiing synlig i
+kamptidslinja** (kandidat 2). Kandidat 1 er avvist, og dette er det eneste
+gjenværende grepet mot «kampminne» som **ikke** åpner en ny flate for at alle
+skal lage innhold — kommentarene og 👏 finnes allerede, de bor bare på
+feed-poster og er usynlige på kampsiden. Ren synliggjøring av data vi har.
+
+**Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten) og skive 6
+(produksjonsikonet + launch screen). ⚠️ Ikonet bruker så på telefonen
+2026-07-30 var fra bygget 18:52 — altså FØR produksjonsversjonen av variant C.
+Bygg på nytt før du bedømmer det.
 
 ---
 
@@ -1158,19 +1184,36 @@ terminalen med `npm run ios` blir lista stående gammel.
 
 ## 📦 Git-status (2026-07-30)
 
-Alt av Fase 4–9 er **committet, pushet og merget til `main`** (PR #16).
-**Hele designarbeidet (skive 1+2+3 + kommentartråd-forbedringene) er
-committet på `Brage`** etter brukerens optiske OK-er (skive 1+2: `503e07d`).
-Ikke pushet/merget til `main` ennå — husk squash-merge-mønsteret når det
-skjer (merge `origin/main` inn, behold Brage, verifiser supersett).
+Fase 4–9 er merget til `main` (PR #16). **Designarbeidet skive 1–5 er merget
+i PR #17.** Dagens ikon-skive (6) + telefonrettelsene er committet og pushet
+på `Brage`, og `origin/main` er merget inn (`474e46c`), så `Brage` er igjen et
+rent supersett og en ny PR er konfliktfri.
 
-**Merk mønsteret som skaper konflikter hver gang:** GitHub squash-merger PR-en,
-så `main` får ÉN commit mens `Brage` beholder sine egne. Neste gang du merger
-vil git derfor se to historikker som rører samme linjer, og du får konflikter
-selv om innholdet er identisk. Løsningen er alltid den samme: merge
-`origin/main` inn i `Brage` og behold Brage — men verifiser først at Brage
-faktisk er et supersett (`git diff origin/main:<fil> Brage:<fil>`), ikke bare
-anta det.
+### 🔁 Squash-mønsteret — løs det på 30 sekunder, ikke for hånd
+GitHub squash-merger PR-en, så `main` får ÉN commit mens `Brage` beholder sine
+egne. Git ser da to historikker som rører samme linjer, og du får konflikter
+selv om arbeidet er identisk. **Skjedd i #14, #15, #16 og #17.**
+
+**Ikke løs konfliktene manuelt.** Squash-commiten er nesten alltid en kopi av
+`Brage` slik den var ved et tidligere punkt. Bevis det, så forsvinner jobben:
+
+```bash
+git fetch origin
+# 1) Finn commiten Brage sto på da PR-en ble laget (forrige merge-commit).
+# 2) BEVISET: er main byte for byte identisk med den?
+git diff --quiet <den-commiten> origin/main && echo "Brage er et supersett"
+# 3) Behold Brages tre, men registrer main som forelder:
+git merge -s ours origin/main
+# 4) Verifiser at ingenting gikk tapt — hashen skal være uendret:
+git rev-parse HEAD^{tree}
+```
+
+⚠️ **`-s ours` forkaster main-siden fullstendig.** Den er kun trygg ETTER at
+steg 2 slår til. Gjør den ikke det, har noen endret noe direkte på `main`, og
+da må det faktisk inspiseres.
+
+Er filtrehashen lik før og etter, er treet **bevist uendret** — da trengs
+ingen tsc/lint-runde på merge-en (se tsc-regelen øverst).
 
 ## 🎨 DESIGN — «A v2 · Stadium Pop Hybrid» (LÅST 2026-07-30)
 
@@ -1504,6 +1547,212 @@ faktisk møtte. Ikke omdøp den til «Var med» uten ekte oppmøteregistrering.
 5. **Oppmøte på spilt kamp:** kun «Påmeldt (N)», ingen «Ikke svart».
 6. **Trening/kommende kamp:** uendret — infokort med Dato/Tid/Sted øverst.
 
+### ✅ Skive 6 — APP-IKON + LAUNCH SCREEN (KODET 2026-07-30, ikke optisk verifisert)
+
+**⚠️ KREVER REBUILD.** Ikoner og storyboard bakes inn i binæren — Metro-reload
+viser ingenting. Ingen ny pakke, ingen pod install, ingen pbxproj-endring
+(`Images.xcassets` er en `folder.assetcatalog`-referanse, så nye imagesets
+trengs ikke registreres).
+
+**Produksjonsspesifikasjon (siden er oppdatert fra valg til fasit):**
+https://claude.ai/code/artifact/143f2aaf-c2b4-48cd-b86c-0ecb01ef7cf5
+
+#### 🔒 LÅST BESLUTNING (bruker, 2026-07-30): variant **C — figur med glød**
+Begrunnelse fra bruker: virker best i liten størrelse, tydeligst egenart,
+matcher stadionmodus og mint-energien. **Ordmerket skal IKKE brukes som
+app-ikon** — variant D er derfor fjernet fra scriptet, ikke bare fravalgt.
+Brukerens tre justeringer er innarbeidet: helt solid flate, større figur,
+dempet glød.
+
+#### Merkevarekilden — figurmerket, ikke ordmerket
+`Heia logoer/` har fem varianter av **samme lockup** («Heia» + jubelfigur) i
+ulike fargeversjoner. Det finnes **ikke** noe isolert figurmerke. Figuren er
+trukket ut på farge (den er mint `#02FFAB`, ordmerket hvitt/mørkt) fra
+`Logo_1.pdf` rasterisert i 3000 px med `sips`, og ligger nå som
+**`assets/brand/heia-figur.png`** (680×1025, transparent).
+
+**Hvorfor figuren og ikke «Heia»:** ikonet leses i 60 pt på hjemmeskjermen,
+ikke i 1024 px. Ordmerket blir uleselig grøt der. Kandidat D på siden viser
+det — den er med nettopp så valget kan tas på syn, ikke på påstand.
+
+**Gledelig funn:** minten i logofilene er nøyaktig `#02FFAB` — samme verdi som
+A v2 låste. Merkevaren og designsystemet var allerede samstemte.
+
+#### To ekte feil i det gamle ikonet (ikke smak)
+1. **`Icon-1024.png` hadde alfakanal.** App Store Connect **avviser**
+   markedsføringsikoner med gjennomsiktighet — dette ville stoppet en
+   innsending uansett design. Alt genereres nå som RGB.
+2. **Koksgrå flate.** Ikonet var den eneste flaten i hele appen som ikke
+   fulgte «kampen bor alltid på mørk stadionflate».
+
+#### `scripts/build-app-icon.py` (ny) — ikonet er DERIVERT, ikke tegnet
+```
+python3 scripts/build-app-icon.py                # C, standard
+python3 scripts/build-app-icon.py --variant A|B  # de to andre som ble vurdert
+python3 scripts/build-app-icon.py --android      # tar med mipmap-ene
+python3 scripts/build-app-icon.py --preview /tmp/x.png
+```
+Stadionflaten er **portert 1:1 fra `StadiumSurface.tsx`** (linear 165°
+`#0B1912→#143126` stop .78, radial amber cx 18 %, radial mint cx 85 %,
+banesirkelringene). Endrer `theme/tokens.ts` seg, kan ikonet følge etter uten
+at noen åpner Photoshop.
+
+**Hver ikonstørrelse tegnes for seg** (`build_icon(variant, px)`), ikke skalert
+ned fra én 1024-master — gløden må ha egne tall per størrelse
+(`_glow_profile`). Intern oppløsning holdes alltid over ~1024 px, så hårfine
+detaljer ikke forsvinner i supersamplingen på et 40 px-ikon. Merkehøyden er
+`MARK_HEIGHT_FRAC = 0.68`.
+
+Byggingen **kaster** hvis flaten ikke er 100 % dekkende, i stedet for å kaste
+alfakanalen i stillhet. App Store-kravet er dermed håndhevet i koden.
+
+#### ⚠️ FIRE alfa-feller i PIL — alle kostet en runde
+Disse gjelder all bildegenerering i Python, ikke bare dette ikonet:
+
+1. **`ImageDraw.ellipse(outline=MINT+(33,), width=17)`** tegner hvert av de 17
+   pikslene i strekbredden som sitt eget alfa-kompositt. 0.13 lagt oppå seg
+   selv 17 ganger ≈ 0.90 — den «subtile» banesirkelen lyste som en neonring.
+   Tegn strøket **solid på et eget lag** og komposit ÉN gang med riktig alfa.
+2. **`GaussianBlur` på et RGBA-lag blurrer også FARGEN.** Utenfor figuren er
+   fargen gjennomsiktig svart, så gløden falmet mot svart og **dempet flaten
+   sin egen glød** i stedet for å løfte den — den døde innen 15 px uansett hvor
+   høyt tall man skrev. Blur **kun alfakanalen** (`Image.new("L", …)`), og la
+   fargen stå solid.
+3. **Gjentatt kompositt av samme lag ganger ikke opp lineært.** `0.3` tre
+   ganger blir ≈ `0.66`. Da er tallet i koden ikke tallet på skjermen, og
+   uttrykket blir umulig å styre.
+4. **Et bredt blur sprer alfaen tynt, så toppverdien synker med spredningen.**
+   Uten normalisering betyr `strength` noe helt ulikt for et stramt og et bredt
+   lag. Normaliser etter blur — da ER `strength` den faktiske toppdekningen.
+
+**Glødet er derfor to lag med ulik spredning:** en stram bloom tett på figuren
+(`bloom`) og en bred, svak ambient rundt (`ambient`). Det er *kontrasten*
+mellom spredningene som gjør at lyset føles fysisk. Ett jevnt blur-lag er
+nettopp det som leser som gaming.
+
+**Målt fasit (1024 px):** grønnkanalen løftes ~30 nivåer rett ved figurkanten,
+~18 ved 15 px, ~8 ved 40 px, borte ved 150 px. Vil du justere, endre
+`_glow_profile` og mål på nytt — ikke gjett på tallene.
+
+#### Launch screen — stadionflaten, ingen tekst
+Malen fra React Native sto urørt: hvit flate, «Heia2» i systemfont, «Powered
+by React Native». Nå: stadiongradienten i fullskjerm med figurmerket sentrert
+og banesirkelen nede til høyre — **samme flate som `WelcomeIntentScreen` fikk
+i skive 3**, så oppstarten og appens første skjerm er ett og samme bilde.
+
+- **Storyboards kan ikke tegne gradient.** Flaten ligger derfor som et bilde
+  (`LaunchBackground.imageset`, 1170×2532) og strekkes med `scaleAspectFill`.
+  Trygt fordi den er en glatt overgang uten detaljer som kan forvrenges.
+  Bakgrunnen er festet til view-kantene, **ikke** safe area.
+- `LaunchMark.imageset` i @1x/@2x/@3x, der **@1x ER punktstørrelsen**
+  (132×199 pt) — så merket trenger ingen størrelseconstraint, bare sentrering.
+- **Ingen tekst med vilje.** iOS viser allerede «Heia» under ikonet man
+  trykket på; en splash med logo + navn er en webkonvensjon, ikke en iOS-en.
+- `colors.stadium` er satt som view-bakgrunn også, synlig et blunk før bildet
+  dekodes.
+
+#### Verifisert uten å bygge appen
+Storyboarden er håndskrevet XML, så den er sjekket med Apples egne verktøy:
+- `xcrun ibtool --compile` → **0 feil, 0 advarsler, 0 notices.**
+- `xcrun actool --compile` på hele `Images.xcassets` → **`Assets.car` bygget
+  rent**, alle tre imagesets validerte.
+- Alle 8 ikon-PNG-er bekreftet `RGB` (ingen alfa).
+
+Dette er billig og fanger nettopp det en håndskrevet storyboard pleier å ryke
+på. **Gjenta det hvis storyboarden røres igjen** — alternativet er å oppdage
+feilen i en 10-minutters Xcode-build.
+
+#### Test dette (etter rebuild)
+1. **Hjemmeskjermen:** mint jubelfigur på mørk grønn flate. Skal være tydelig
+   gjenkjennelig ved siden av andre apper — ikke en grå rute med småtekst.
+2. **Oppstart:** mørk stadionflate med merket sentrert. Ingen hvit flash,
+   ingen «Powered by React Native».
+3. **Innstillinger → Heia:** ikonet i 29 pt skal fortsatt leses.
+4. **Varsler:** ikonet i 20 pt — figuren skal fortsatt kjennes igjen som en
+   person, ikke bli en grønn flekk. (Kontrollert i generert kontaktark ned til
+   40 px; den tynne hevede armen er det som ryker først.)
+
+#### 🐞 To funn fra første ekte telefontest (rettet 2026-07-30)
+Begge oppdaget av bruker på skjermbilder fra iPhone — ikke av simulatoren.
+
+1. **Grå boks midt på velkomstskjermen.** `WelcomeIntentScreen` brukte
+   `logo-dark.png`, som har **koksgrå bakgrunn bakt inn i rasteret**. På
+   stadionflaten ble det en hard grå firkant. `logo-icon.png` er
+   gjennomsiktig, men har så mye tom luft rundt merket at `resizeMode="contain"`
+   krympet det til en tredjedel av boksen. Løsning: ny **`logo-wordmark.png`**
+   (+@2x/@3x) — lockupen beskåret til sitt eget sideforhold (1983×1025 ≈
+   1.935), generert fra `Logo_3.pdf`. Stilen bruker nå ekte proporsjoner
+   (260×134) i stedet for en kvadratisk boks.
+   ⚠️ **`logo-dark.png` skal aldri brukes på en mørk flate** — den er laget
+   for lyse flater og bærer sin egen bakgrunn. Den er nå ubrukt.
+2. **Håndtegnet tilbake-knapp på Auth.** `AuthScreen` tegnet sin egen
+   «‹ Tilbake» — siste brudd på regelen fra 2026-07-09 («nye skjermer skal
+   bruke stack-headeren, ikke egne tilbake-knapper»). Auth er nå registrert
+   med `authOptions` (`headerShown: true`, **tom tittel**): skjermen bytter
+   selv mellom «Velkommen tilbake» og «Opprett konto» som overskrift, så en
+   fast headertittel ville duplisert eller motsagt den. `navigation` er ute av
+   propsene, og `header`/`backButton`/`backText`-stilene er slettet.
+
+`npx eslint src`: **0 errors, 4 warnings** (samme fire som før).
+
+**Ikke gjort (bevisst):**
+- **Android-mipmapene** står på RN-malen. Ett flagg unna (`--android`), men
+  Android bygges ikke i dag, så diffen holdes ærlig.
+- **iOS 18 mørk/tonet ikonvariant.** Krever det nyere single-size
+  `Contents.json`-formatet; dagens eksplisitte størrelsesformat bygger
+  uendret. Egen liten skive hvis det blir aktuelt.
+
+---
+
+## 📱 Test på fysisk iPhone (etablert 2026-07-30)
+
+Første gang appen kjørte på ekte enhet (iPhone 15). Tre ting kostet tid og er
+verdt å kunne.
+
+### ⚠️ `DEVELOPMENT_TEAM = Q5A6QMRZ4A` er BRUKERENS PERSONLIGE Apple-ID
+Lagt inn av Xcode da bruker logget på for å teste på egen telefon.
+**Den skal IKKE brukes ved publisering** — bytt til firmakontoen når den
+finnes. Team-ID er ingen hemmelighet (den ligger i hver publiserte app), så
+den er committet med vilje: alternativet var en permanent endret
+`project.pbxproj`, og dette repoet har allerede nok merge-støy fra
+squash-mønsteret. Xcode normaliserte samtidig hele fila (omsortering +
+tomme `inputPaths`/`outputPaths` på CocoaPods-fasene) — ufarlig.
+
+### «Bygget lyktes, men appen finnes ikke på telefonen»
+Bygget lå ferdig signert i `Debug-iphoneos/Heia2.app`, men
+`xcrun devicectl device info apps` viste **`Apps installed:` tomt**.
+Installasjonssteget hadde aldri kjørt — typisk **⌘B (Build)** i stedet for
+**⌘R (Run)**. Diagnose og fiks uten å bygge på nytt:
+
+```bash
+xcrun devicectl list devices                       # finn UDID-en
+xcrun devicectl device info apps --device <UDID>   # er den installert i det hele tatt?
+xcrun devicectl device install app --device <UDID> \
+  ~/Library/Developer/Xcode/DerivedData/Heia2-*/Build/Products/Debug-iphoneos/Heia2.app
+xcrun devicectl device process launch --device <UDID> org.reactjs.native.example.Heia2
+```
+
+**Appen heter «Heia» på hjemskjermen, ikke «Heia2»** — `CFBundleDisplayName`
+i `Info.plist` overstyrer `PRODUCT_NAME`. Lett å lete etter feil navn.
+
+### Profilen må godkjennes PÅ telefonen
+`process launch` feilet med «its profile has not been explicitly trusted by
+the user». Med personlig Apple-ID må man selv gjøre:
+**Innstillinger → Generelt → VPN og enhetsadministrering → Utviklerapp →
+Apple-ID-en → «Stol på»**. Kan ikke gjøres fra Mac-en.
+
+⚠️ **Gratis provisioning gir 7 dagers sertifikat.** Appen slutter å starte
+etter en uke og må installeres på nytt. Ikke en feil.
+
+### ⛔ Fri provisioning låser fortsatt opp push
+Personlig Apple-ID gir **ikke** APNs-entitlement. Fase 4 er derfor fremdeles
+parkert på nøyaktig samme sted: ekte push krever **betalt** Apple Developer
+Program. At det nå finnes et DEVELOPMENT_TEAM endrer ingenting der.
+
+### iOS cacher app-ikoner hardt
+Etter en rebuild med nytt ikon kan hjemskjermen bli stående på det gamle.
+Slett appen og installer på nytt — det er den pålitelige veien.
+
 ---
 
 ## 🎯 SENERE — produktkandidater
@@ -1513,11 +1762,11 @@ faktisk møtte. Ikke omdøp den til «Var med» uten ekte oppmøteregistrering.
 etter (resultat, galleri, forløp), og senere en delbar «Kampen på 30 sekunder».
 Anbefalt rekkefølge, med begrunnelse:
 
-1. **Alle medlemmer kan legge bilder på kampen** — største spak mot «minne».
-   I dag kommer ALT innhold fra reporteren, altså den travleste personen;
-   «uten ekstraarbeid» blir først sant når innholdet kommer fra mange.
-   Backend er klar: `createImagePost` tar `eventId` fra hvem som helst, og
-   RLS krever bare lagmedlemskap. **Kun UI mangler.**
+1. ~~**Alle medlemmer kan legge bilder på kampen**~~ — **AVVIST av bruker
+   2026-07-30** («nei, alle skal ikke legge bilder på kampen»). Ikke foreslå
+   den på nytt uten at bruker tar den opp selv. Backend-en ligger der uansett
+   (`createImagePost` tar `eventId` fra hvem som helst, RLS krever bare
+   lagmedlemskap), så kampbilder er fortsatt reporterens jobb — som i dag.
 2. **Kommentarer + heiing synlig i kamptidslinja** — «var der»-følelsen ligger
    i de andres stemmer. De finnes i dag, men bor på feed-poster og er usynlige
    på kampsiden.

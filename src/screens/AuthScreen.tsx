@@ -21,7 +21,8 @@ type Mode = 'login' | 'register';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Auth'>;
 
-export function AuthScreen({navigation, route}: Props) {
+// `navigation` trengs ikke lenger: tilbake-knappen kommer fra stack-headeren.
+export function AuthScreen({route}: Props) {
   const insets = useSafeAreaInsets();
   const {signIn, signUp} = useAuth();
   const [mode, setMode] = useState<Mode>(route.params?.mode ?? 'login');
@@ -59,14 +60,7 @@ export function AuthScreen({navigation, route}: Props) {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.header, {paddingTop: insets.top + spacing.lg}]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          hitSlop={12}
-          style={styles.backButton}>
-          <Text style={styles.backText}>‹ Tilbake</Text>
-        </Pressable>
-      </View>
+      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
       <ScrollView
         style={styles.screen}
         contentContainerStyle={[
@@ -192,18 +186,6 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-  },
-  backText: {
-    ...typography.body,
-    color: colors.textSecondary,
   },
   screen: {
     flex: 1,

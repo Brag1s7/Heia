@@ -76,6 +76,11 @@ const createTeamOptions = {
   headerShown: true,
   title: 'Opprett lag',
 };
+// Auth har ingen tittel i headeren: skjermen bytter selv mellom «Velkommen
+// tilbake» og «Opprett konto» som sin egen overskrift, og en fast headertittel
+// ville enten duplisert den eller motsagt den. Vi vil bare ha den ekte
+// tilbake-knappen — ikke en håndtegnet «‹ Tilbake».
+const authOptions = {...stackScreenOptions, headerShown: true, title: ''};
 
 // ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)
@@ -219,7 +224,11 @@ function OnboardingStackNavigator() {
         name="WelcomeIntent"
         component={WelcomeIntentScreen}
       />
-      <OnboardingNav.Screen name="Auth" component={AuthScreen} />
+      <OnboardingNav.Screen
+        name="Auth"
+        component={AuthScreen}
+        options={authOptions}
+      />
       <OnboardingNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}
