@@ -14,6 +14,33 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
 ---
 
+## ▶️ NESTE — start her
+
+**1. Rydd git først (5 min, ikke en skive).** Målt 2026-07-30:
+`origin/Brage..Brage` = 3 commits (dagens ikonarbeid, kun lokalt),
+og `Brage..origin/main` = **0**. Altså: `main` har ingenting `Brage` mangler,
+så **merge til main er konfliktfri akkurat nå**. Den dokumenterte
+squash-smerten oppstår først etter neste squash-merge. Push + PR nå, mens det
+er gratis. (Verifiser tallene på nytt før du stoler på dem.)
+
+**2. Neste skive: kommentarer + heiing synlig i kamptidslinja**
+(produktkandidat 2). Begrunnelse: kandidat 1 er avvist, og dette er det eneste
+gjenværende grepet mot «kampminne» som **ikke** åpner en ny flate for at alle
+skal lage innhold — kommentarene og 👏 finnes allerede, de bor bare på
+feed-poster og er usynlige på kampsiden. Ren synliggjøring av data vi har.
+Passer identiteten (feed/live/deling er core) og «var der»-følelsen.
+
+Alternativ hvis du heller vil ha noe som viser at appen samler opp:
+**sesong/statistikk-flate** (kandidat 5) — «7 kamper, 12 mål». `match_events`
+har all dataen; én lese-RPC + én skjerm. Veldig Strava.
+
+**Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten) og skive 6
+(produksjonsikonet + launch screen). ⚠️ Ikonet bruker så på telefonen
+2026-07-30 var fra bygget 18:52 — altså FØR produksjonsversjonen av variant C.
+Bygg på nytt før du bedømmer det.
+
+---
+
 ## Hvor vi er
 
 Vi følger en godkjent fase-plan for «Team Activity Loop».
