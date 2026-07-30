@@ -32,14 +32,22 @@ target 'Heia2' do
     )
 
     # Patch fmt consteval for Xcode 26+ (Apple clang reports consteval support but it's broken)
+    # Idempotent: hopp over hvis lappen alt er inne — ellers dobbeltpatches den
+    # OG `pod install` kræsjer med «Permission denied» når base.h er read-only.
+    # Gjør fila skrivbar før skriving, så en fersk (read-only) fmt-kopi også går.
     fmt_base = File.join(installer.sandbox.root, 'fmt/include/fmt/base.h')
     if File.exist?(fmt_base)
       content = File.read(fmt_base)
-      patched = content.gsub(
-        '#if FMT_USE_CONSTEVAL',
-        '#if FMT_USE_CONSTEVAL && !defined(__apple_build_version__)'
-      )
-      File.write(fmt_base, patched) if patched != content
+      unless content.include?('!defined(__apple_build_version__)')
+        File.chmod(0644, fmt_base)
+        File.write(
+          fmt_base,
+          content.gsub(
+            '#if FMT_USE_CONSTEVAL',
+            '#if FMT_USE_CONSTEVAL && !defined(__apple_build_version__)'
+          )
+        )
+      end
     end
   end
 end

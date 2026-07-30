@@ -34,8 +34,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<key>NSCameraUsageDescription</key>
+	<string>Heia trenger tilgang til kameraet for at du skal kunne ta bilder og dele dem med laget.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Heia trenger tilgang til bildene dine for at du skal kunne dele bilder med laget.</string>
 	<key>UILaunchStoryboardName</key>

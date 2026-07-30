@@ -4,7 +4,7 @@ import React_RCTAppDelegate
 import ReactAppDependencyProvider
 
 @main
-class AppDelegate: UIResponder, UIApplicationDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate {
   var window: UIWindow?
 
   var reactNativeDelegate: ReactNativeDelegate?
@@ -29,7 +29,49 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       launchOptions: launchOptions
     )
 
+    // Push: la RN-modulen håndtere forgrunns-visning og trykk på varsler.
+    UNUserNotificationCenter.current().delegate = self
+
     return true
+  }
+
+  // MARK: - Push notifications (APNs → @react-native-community/push-notification-ios)
+  //
+  // De tre RNCPushNotificationIOS-kallene under speiler klassemetodene i
+  // pod'ens RNCPushNotificationIOS.h. Skulle Xcode klage på et navn ved
+  // rebuild: skriv `RNCPushNotificationIOS.` og la autofullfør vise riktig
+  // signatur (Swift-bro-navnene kan variere litt mellom versjoner).
+
+  // 'register'-eventet i JS: APNs ga oss enhetens token.
+  func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    RNCPushNotificationIOS.didRegisterForRemoteNotifications(withDeviceToken: deviceToken)
+  }
+
+  // (Metoden for registreringsfeil er utelatt med vilje: Swift importerer
+  // RNCPushNotificationIOS' `...WithError:`-klassemetode under et navn som
+  // ikke lot seg bygge, og 'registrationError'-eventet er ikke-essensielt —
+  // JS-siden håndterer fraværet stille. Kan legges til igjen senere.)
+
+  // Innkommende remote-varsel (app i bakgrunn/oppe). Må kalle completion.
+  func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    RNCPushNotificationIOS.didReceiveRemoteNotification(userInfo, fetchCompletionHandler: completionHandler)
+  }
+
+  // Varsel levert mens appen er i forgrunn → vis banner + lyd likevel.
+  // (Ren iOS-API, trenger ikke RN-modulen.)
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    completionHandler([.banner, .sound, .badge])
   }
 }
 

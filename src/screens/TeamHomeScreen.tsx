@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import {launchImageLibrary} from 'react-native-image-picker';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
@@ -22,20 +21,65 @@ import {
   Button,
   LiveMatchBanner,
   TeamHeader,
+  MatchPhotoGallery,
 } from '../components';
 import {useActiveTeam, useOnboarding} from '../context';
+import {isTeamAdmin} from '../shared/roles';
 import {getLiveMatch} from '../lib/api/events';
 import {
   getTeamFeed,
   createTextPost,
   createImagePost,
   toggleReaction,
+  unpinPost,
+  subscribeToFeed,
+  type MatchPhoto,
 } from '../lib/api/feed';
-import type {ImagePostInput} from '../lib/api/feed';
+import {pickTeamImage, type PickedImage} from '../lib/media';
 import type {FeedItem, HeiaEvent, HomeStackParamList} from '../shared/types';
 
 /** Valgt bilde i compose-boksen: preview-uri + payload for opplasting. */
-type SelectedImage = ImagePostInput & {uri: string};
+type SelectedImage = PickedImage;
+
+/**
+ * Kampen er hovedobjektet: feeden viser høydepunktene, kampsiden samler hele
+ * historien. Derfor åpner alt som hører til en kamp kampsiden.
+ *
+ * Vanlige meldinger, påminnelser og bilder uten kampkobling fører ingen
+ * steder — de ER innholdet, og et kort som ikke går noe sted skal heller
+ * ikke se trykkbart ut.
+ */
+function openableMatchId(item: FeedItem): string | undefined {
+  const isMatchPost =
+    item.type === 'match_start' ||
+    item.type === 'match_event' ||
+    item.type === 'match_end' ||
+    item.type === 'resultat' ||
+    // Kampbilder er vanlige bildeposter — det er event_id som gjør dem
+    // til kampens egne (se createImagePost).
+    item.type === 'bilde';
+
+  return isMatchPost ? item.eventId : undefined;
+}
+
+/**
+ * Feed-bilde → formen galleriet allerede viser. Galleriet er bygget for
+ * kampbilder, men trenger bare bilde, tekst og hvem som la det ut — og det
+ * har en bildepost også.
+ */
+function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
+  if (!item.imageUrl) return [];
+  return [
+    {
+      id: item.id,
+      imageUrl: item.imageUrl,
+      caption: item.content || undefined,
+      authorName: item.author.name,
+      authorAvatarUrl: item.author.avatarUrl,
+      createdAt: item.createdAt,
+    },
+  ];
+}
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
@@ -46,8 +90,9 @@ export function TeamHomeScreen() {
   const route = useRoute<Route>();
   const composeRef = useRef<TextInput>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const {activeTeamSpace, activeTeamSpaceId} = useActiveTeam();
+  const {activeTeamSpace, activeTeamSpaceId, activeRole} = useActiveTeam();
   const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
+  const canBroadcast = isTeamAdmin(activeRole);
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
@@ -56,6 +101,9 @@ export function TeamHomeScreen() {
   const [composeText, setComposeText] = useState('');
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [posting, setPosting] = useState(false);
+  const [fullscreenItem, setFullscreenItem] = useState<FeedItem | null>(null);
+  // «Varsle hele laget» — festes øverst i feeden + gir alle et varsel.
+  const [broadcast, setBroadcast] = useState(false);
 
   const loadFeed = useCallback(async () => {
     if (!activeTeamSpaceId) return;
@@ -83,6 +131,22 @@ export function TeamHomeScreen() {
     setLoading(true);
     loadFeed();
   }, [loadFeed]);
+
+  // Live feed (00025). Debounce: én burst med 👏 fra flere foreldre skal bli
+  // ÉN refetch, ikke ti. loadFeed setter ikke `loading`, så oppdateringen
+  // skjer uten at spinneren blinker.
+  useEffect(() => {
+    if (!activeTeamSpaceId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const unsubscribe = subscribeToFeed(activeTeamSpaceId, () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(loadFeed, 400);
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [activeTeamSpaceId, loadFeed]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -122,27 +186,12 @@ export function TeamHomeScreen() {
     }
   }, []);
 
+  // Kamerarullen først: hjemme i sofaen ligger bildet som skal deles allerede
+  // der. På sidelinja av en kamp er det motsatt — se `handlePickPhoto` i
+  // EventDetailScreen.
   const handlePickImage = useCallback(async () => {
-    const result = await launchImageLibrary({
-      mediaType: 'photo',
-      includeBase64: true,
-      selectionLimit: 1,
-    });
-    if (result.didCancel) return;
-    const asset = result.assets?.[0];
-    if (!asset?.base64 || !asset.uri) {
-      Alert.alert('Kunne ikke hente bildet', 'Prøv et annet bilde.');
-      return;
-    }
-    setSelectedImage({
-      uri: asset.uri,
-      base64: asset.base64,
-      mimeType: asset.type ?? 'image/jpeg',
-      fileName: asset.fileName ?? 'bilde.jpg',
-      sizeBytes: asset.fileSize ?? asset.base64.length,
-      width: asset.width,
-      height: asset.height,
-    });
+    const picked = await pickTeamImage();
+    if (picked) setSelectedImage(picked);
   }, []);
 
   const handleRemoveImage = useCallback(() => {
@@ -155,24 +204,69 @@ export function TeamHomeScreen() {
     if (!activeTeamSpaceId || !canPost || posting) return;
     setPosting(true);
     try {
+      // Kun trener/lagleder kan varsle — databasen avviser resten (00024),
+      // så vi sender aldri flagget videre fra en som ikke har lov.
+      const pinned = canBroadcast && broadcast;
       if (selectedImage) {
         await createImagePost({
           teamSpaceId: activeTeamSpaceId,
           content: composeText,
           image: selectedImage,
+          pinned,
         });
       } else {
-        await createTextPost(activeTeamSpaceId, composeText);
+        await createTextPost(activeTeamSpaceId, composeText, pinned);
       }
       setComposeText('');
       setSelectedImage(null);
+      setBroadcast(false);
       await loadFeed();
     } catch {
       Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
     } finally {
       setPosting(false);
     }
-  }, [activeTeamSpaceId, canPost, composeText, selectedImage, posting, loadFeed]);
+  }, [
+    activeTeamSpaceId,
+    canPost,
+    composeText,
+    selectedImage,
+    posting,
+    loadFeed,
+    canBroadcast,
+    broadcast,
+  ]);
+
+  // Festede poster blir liggende øverst til noen løsner dem. Spør først —
+  // det finnes ingen «fest igjen»-knapp på en eksisterende post.
+  const handleUnpin = useCallback(
+    (post: FeedItem) => {
+      Alert.alert(
+        'Løsne fra toppen?',
+        'Innlegget blir liggende i feeden, men mister «viktig»-merket og plassen øverst.',
+        [
+          {text: 'Avbryt', style: 'cancel'},
+          {
+            text: 'Løsne',
+            style: 'destructive',
+            onPress: async () => {
+              // Optimistisk: markøren forsvinner med én gang.
+              setFeed(prev =>
+                prev.map(p => (p.id === post.id ? {...p, isPinned: false} : p)),
+              );
+              try {
+                await unpinPost(post.id);
+              } catch {
+                Alert.alert('Kunne ikke løsne', 'Prøv igjen om litt.');
+              }
+              await loadFeed();
+            },
+          },
+        ],
+      );
+    },
+    [loadFeed],
+  );
 
   // «Del med laget» i +-valgarket sender en ny nonce hit for hvert trykk,
   // så compose-boksen får fokus også når vi allerede står på TeamHome.
@@ -197,6 +291,7 @@ export function TeamHomeScreen() {
   if (!activeTeamSpace || !activeTeamSpaceId) return null;
 
   return (
+    <>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
@@ -253,6 +348,26 @@ export function TeamHomeScreen() {
             </Pressable>
           </View>
         )}
+        {/* Kringkasting er trenerens verktøy: vanlige innlegg varsler ikke,
+            så dette er måten å si «dette må alle få med seg». */}
+        {canBroadcast && (
+          <Pressable
+            style={[styles.broadcastRow, broadcast && styles.broadcastRowOn]}
+            onPress={() => setBroadcast(v => !v)}
+            disabled={posting}
+            accessibilityRole="switch"
+            accessibilityState={{checked: broadcast}}>
+            <Text style={[styles.broadcastBox, broadcast && styles.broadcastBoxOn]}>
+              {broadcast ? '✓' : ''}
+            </Text>
+            <View style={styles.broadcastText}>
+              <Text style={styles.broadcastTitle}>🔔 Varsle hele laget</Text>
+              <Text style={styles.broadcastHint}>
+                Festes øverst i feeden og gir alle et varsel
+              </Text>
+            </View>
+          </Pressable>
+        )}
         <View style={styles.composeActions}>
           <Pressable
             style={styles.addImageBtn}
@@ -292,10 +407,21 @@ export function TeamHomeScreen() {
           />
         </View>
       ) : (
-        feed.map(item => (
+        feed.map(item => {
+          const matchId = openableMatchId(item);
+          return (
           <View key={item.id} style={styles.cardWrap}>
             <FeedCard
               item={item}
+              onPress={
+                matchId
+                  ? () =>
+                      navigation.navigate('EventDetail', {eventId: matchId})
+                  : undefined
+              }
+              onExpandImage={
+                item.imageUrl ? () => setFullscreenItem(item) : undefined
+              }
               onHeia={() => handleToggleHeia(item)}
               onComment={() =>
                 navigation.navigate('Comments', {
@@ -303,9 +429,17 @@ export function TeamHomeScreen() {
                   teamSpaceId: activeTeamSpaceId,
                 })
               }
+              // Kun trener/lagleder — RLS («Admins can moderate posts»)
+              // ville uansett avvist andre.
+              onUnpin={
+                canBroadcast && item.isPinned
+                  ? () => handleUnpin(item)
+                  : undefined
+              }
             />
           </View>
-        ))
+          );
+        })
       )}
 
       {/* Støtt laget */}
@@ -324,6 +458,14 @@ export function TeamHomeScreen() {
         />
       </View>
     </ScrollView>
+
+    {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
+    <MatchPhotoGallery
+      photos={fullscreenItem ? toGalleryPhoto(fullscreenItem) : []}
+      initialPhotoId={fullscreenItem?.id ?? null}
+      onClose={() => setFullscreenItem(null)}
+    />
+    </>
   );
 }
 
@@ -360,6 +502,48 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  broadcastRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+  },
+  broadcastRowOn: {
+    backgroundColor: colors.heiaSoft,
+  },
+  broadcastBox: {
+    width: 22,
+    height: 22,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    textAlign: 'center',
+    lineHeight: 20,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.heiaInk,
+    overflow: 'hidden',
+  },
+  broadcastBoxOn: {
+    borderColor: colors.heiaInk,
+  },
+  broadcastText: {
+    flex: 1,
+    gap: 1,
+  },
+  broadcastTitle: {
+    ...typography.body,
+    fontWeight: '600',
+  },
+  broadcastHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
   },
   addImageBtn: {
     paddingVertical: spacing.sm,

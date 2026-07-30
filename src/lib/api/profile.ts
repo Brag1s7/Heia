@@ -34,7 +34,7 @@ export async function getProfile(): Promise<Profile> {
 }
 
 export async function updateProfile(
-  updates: Partial<Pick<Profile, 'displayName' | 'avatarUrl'>>,
+  updates: Partial<Pick<Profile, 'displayName' | 'avatarUrl' | 'phone'>>,
 ): Promise<Profile> {
   const {
     data: {user},
@@ -49,6 +49,10 @@ export async function updateProfile(
   }
   if (updates.avatarUrl !== undefined) {
     dbUpdates.avatar_url = updates.avatarUrl;
+  }
+  // `null` er et gyldig valg her: det er slik du fjerner nummeret ditt igjen.
+  if (updates.phone !== undefined) {
+    dbUpdates.phone = updates.phone;
   }
 
   const {data, error} = await supabase

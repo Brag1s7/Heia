@@ -19,27 +19,45 @@ export function SimulatedPush({
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(-200)).current;
 
+  // `onHide` sendes som regel inn som en pil-funksjon rett i JSX-en, altså en
+  // NY funksjon for hver render. Lå den i dependency-lista, ville enhver
+  // re-render (et refetch, en tikkende kampklokke) startet animasjonen på
+  // nytt. Ref-en gjør at effekten bare avhenger av `visible`.
+  const onHideRef = useRef(onHide);
   useEffect(() => {
-    if (visible) {
-      translateY.setValue(-200);
-      Animated.sequence([
-        Animated.spring(translateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 50,
-          friction: 8,
-        }),
-        Animated.delay(3000),
-        Animated.timing(translateY, {
-          toValue: -200,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        onHide();
-      });
-    }
-  }, [visible, translateY, onHide]);
+    onHideRef.current = onHide;
+  }, [onHide]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    translateY.setValue(-200);
+    const animation = Animated.sequence([
+      Animated.spring(translateY, {
+        toValue: 0,
+        useNativeDriver: true,
+        tension: 50,
+        friction: 8,
+      }),
+      Animated.delay(3000),
+      Animated.timing(translateY, {
+        toValue: -200,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    // `finished` er poenget: en avbrutt animasjon kaller også denne callbacken.
+    // Uten sjekken skjulte banneret seg i det noe avbrøt den — som er hvorfor
+    // det bare så vidt rakk å vises.
+    animation.start(({finished}) => {
+      if (finished) {
+        onHideRef.current();
+      }
+    });
+
+    return () => animation.stop();
+  }, [visible, translateY]);
 
   if (!visible) {
     return null;

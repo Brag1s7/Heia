@@ -15,8 +15,14 @@ import {
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
-import {useAuth, useActiveTeam, useOnboarding} from '../context';
-import {CreateSheet} from '../components';
+import {
+  useAuth,
+  useActiveTeam,
+  useOnboarding,
+  useNotifications,
+} from '../context';
+import {CreateSheet, NotificationBanner} from '../components';
+import {navigationRef, flushPendingDeepLink} from './deepLink';
 import {isTeamAdmin} from '../shared/roles';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
@@ -30,12 +36,14 @@ import {JoinTeamCodeScreen} from '../screens/JoinTeamCodeScreen';
 import {CreateTeamScreen} from '../screens/CreateTeamScreen';
 import {KalenderScreen} from '../screens/KalenderScreen';
 import {ProfilScreen} from '../screens/ProfilScreen';
+import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {InboxScreen} from '../screens/InboxScreen';
 import type {
   RootTabParamList,
   HomeStackParamList,
   OnboardingStackParamList,
   KalenderStackParamList,
+  InboxStackParamList,
   ProfilStackParamList,
 } from '../shared/types';
 
@@ -44,6 +52,7 @@ const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 const OnboardingNav =
   createNativeStackNavigator<OnboardingStackParamList>();
 const KalenderNav = createNativeStackNavigator<KalenderStackParamList>();
+const InboxNav = createNativeStackNavigator<InboxStackParamList>();
 const ProfilNav = createNativeStackNavigator<ProfilStackParamList>();
 
 // ---------------------------------------------------------------------------
@@ -137,6 +146,32 @@ function KalenderStackNavigator() {
 }
 
 // ---------------------------------------------------------------------------
+// Inbox stack (Varsler-tab — et varsel kan åpne hendelsen eller kommentartråden
+// uten å kaste brukeren over i Hjem-fanen)
+// ---------------------------------------------------------------------------
+function InboxStackNavigator() {
+  return (
+    <InboxNav.Navigator screenOptions={stackScreenOptions}>
+      <InboxNav.Screen
+        name="InboxList"
+        component={InboxScreen}
+        options={{headerShown: false}}
+      />
+      <InboxNav.Screen
+        name="EventDetail"
+        component={EventDetailScreen}
+        options={{title: 'Hendelse'}}
+      />
+      <InboxNav.Screen
+        name="Comments"
+        component={CommentsScreen}
+        options={{title: 'Kommentarer'}}
+      />
+    </InboxNav.Navigator>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Profil stack
 // ---------------------------------------------------------------------------
 function ProfilStackNavigator() {
@@ -146,6 +181,11 @@ function ProfilStackNavigator() {
         name="Profil"
         component={ProfilScreen}
         options={{headerShown: false}}
+      />
+      <ProfilNav.Screen
+        name="TeamMembers"
+        component={TeamMembersScreen}
+        options={{title: 'Lagoversikt'}}
       />
       <ProfilNav.Screen
         name="Invite"
@@ -208,7 +248,7 @@ const tabIcons: Record<keyof RootTabParamList, string> = {
   HjemStack: '⌂',
   KalenderStack: '▦',
   Opprett: '+',
-  Inbox: '✉',
+  InboxStack: '✉',
   ProfilStack: '●',
 };
 
@@ -218,7 +258,15 @@ const tabIcons: Record<keyof RootTabParamList, string> = {
 function MainTabs() {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
   const {activeRole} = useActiveTeam();
+  const {unreadCount, refreshUnread} = useNotifications();
   const [sheetVisible, setSheetVisible] = useState(false);
+
+  // Et varsel-trykk ved kaldstart kommer mens onboarding/lasting står fremme,
+  // og da finnes ikke HjemStack ennå. Fanene er første øyeblikk målet faktisk
+  // kan åpnes — derfor et nytt forsøk her.
+  useEffect(() => {
+    flushPendingDeepLink();
+  }, []);
 
   const closeSheet = () => setSheetVisible(false);
 
@@ -239,6 +287,9 @@ function MainTabs() {
   return (
     <>
     <Tab.Navigator
+      // `notifications` er ikke i realtime-publiseringen, så badgen hentes på
+      // nytt hver gang man bytter fane (én HEAD-spørring med count).
+      screenListeners={{focus: () => refreshUnread()}}
       screenOptions={({route}) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.heia,
@@ -279,8 +330,19 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
-        name="Inbox"
-        component={InboxScreen}
+        name="InboxStack"
+        component={InboxStackNavigator}
+        options={{
+          tabBarLabel: 'Varsler',
+          // undefined = ingen badge. 99+ så tallet ikke sprenger prikken.
+          tabBarBadge:
+            unreadCount > 0
+              ? unreadCount > 99
+                ? '99+'
+                : unreadCount
+              : undefined,
+          tabBarBadgeStyle: styles.tabBadge,
+        }}
       />
       <Tab.Screen
         name="ProfilStack"
@@ -296,6 +358,9 @@ function MainTabs() {
       onShare={handleShare}
       onNewEvent={handleNewEvent}
     />
+
+    {/* Over fanene, så varselet følger deg gjennom hele appen. */}
+    <NotificationBanner />
     </>
   );
 }
@@ -343,7 +408,7 @@ export function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef} onReady={flushPendingDeepLink}>
       {session && profile && hasTeam ? (
         <MainTabs />
       ) : (
@@ -371,6 +436,12 @@ const styles = StyleSheet.create({
   },
   tabIcon: {
     fontSize: 22,
+  },
+  tabBadge: {
+    backgroundColor: colors.error,
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
   createButton: {
     width: 44,

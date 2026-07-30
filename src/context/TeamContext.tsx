@@ -40,8 +40,12 @@ export function TeamProvider({children}: PropsWithChildren) {
   >([]);
   const [loading, setLoading] = useState(false);
 
+  // Se kommentaren i UserContext: ID-en er stabil, mens `session.user` får ny
+  // objekt-identitet ved hver token-refresh.
+  const userId = session?.user?.id;
+
   const fetchMemberships = useCallback(async () => {
-    if (!session?.user) {
+    if (!userId) {
       setUserMemberships([]);
       return;
     }
@@ -54,7 +58,7 @@ export function TeamProvider({children}: PropsWithChildren) {
     } finally {
       setLoading(false);
     }
-  }, [session?.user?.id]);
+  }, [userId]);
 
   // Hent memberships når session endres
   useEffect(() => {
@@ -63,17 +67,13 @@ export function TeamProvider({children}: PropsWithChildren) {
 
   // Auto-velg første lag ved innlogging
   useEffect(() => {
-    if (
-      session?.user &&
-      userMemberships.length > 0 &&
-      !activeTeamSpaceId
-    ) {
+    if (userId && userMemberships.length > 0 && !activeTeamSpaceId) {
       setActiveTeamSpaceId(userMemberships[0].teamSpaceId);
     }
-    if (!session?.user) {
+    if (!userId) {
       setActiveTeamSpaceId(null);
     }
-  }, [session?.user, userMemberships, activeTeamSpaceId]);
+  }, [userId, userMemberships, activeTeamSpaceId]);
 
   const activeTeamSpace = useMemo(
     () =>

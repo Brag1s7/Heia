@@ -9,6 +9,7 @@ import React, {
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {getProfile} from '../lib/api/profile';
+import {stopPush} from '../lib/push';
 import type {Profile} from '../lib/types';
 
 interface AuthContextValue {
@@ -22,6 +23,8 @@ interface AuthContextValue {
   ) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Leser profilen på nytt — etter at du har endret navn eller telefon. */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -31,16 +34,21 @@ export function AuthProvider({children}: PropsWithChildren) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Bruker-ID-en, ikke hele user-objektet: identiteten på `session.user` endres
+  // ved hver token-refresh, og effekter som avhenger av den ville kjørt om
+  // igjen uten at brukeren faktisk er en annen.
+  const userId = session?.user?.id;
+
   // Hent profil når session endres
   useEffect(() => {
-    if (session?.user) {
+    if (userId) {
       getProfile()
         .then(setProfile)
         .catch(() => setProfile(null));
     } else {
       setProfile(null);
     }
-  }, [session?.user?.id]);
+  }, [userId]);
 
   // Initial session check + auth state listener
   useEffect(() => {
@@ -85,14 +93,34 @@ export function AuthProvider({children}: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Avregistrer enhets-token FØR session-en tømmes: RPC-en sletter kun
+    // token som tilhører auth.uid(), og etter signOut er den null.
+    await stopPush().catch(() => {});
     setSession(null);
     setProfile(null);
     await supabase.auth.signOut().catch(() => {});
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setProfile(await getProfile());
+    } catch {
+      // Profilen på skjermen er fortsatt gyldig — la den stå.
+    }
+  }, [userId]);
+
   return (
     <AuthContext.Provider
-      value={{session, profile, loading, signUp, signIn, signOut}}>
+      value={{
+        session,
+        profile,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+        refreshProfile,
+      }}>
       {children}
     </AuthContext.Provider>
   );

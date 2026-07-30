@@ -18,23 +18,53 @@ import type {KalenderStackParamList, HeiaEvent} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<KalenderStackParamList, 'KalenderList'>;
 
-function getSectionLabel(date: Date): string {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const eventDay = new Date(
+/** Midnatt samme dag — så en kamp kl. 09:00 er «i dag» hele dagen, ikke «tidligere». */
+function startOfDay(date: Date): number {
+  return new Date(
     date.getFullYear(),
     date.getMonth(),
     date.getDate(),
-  );
-  const diffDays = Math.round(
-    (eventDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  ).getTime();
+}
+
+function isPast(date: Date): boolean {
+  return startOfDay(date) < startOfDay(new Date());
+}
+
+function getSectionLabel(date: Date): string {
+  const today = startOfDay(new Date());
+  const eventDay = startOfDay(date);
+  const diffDays = Math.round((eventDay - today) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) return 'Tidligere';
   if (diffDays === 0) return 'I dag';
   if (diffDays === 1) return 'I morgen';
   if (diffDays <= 7) return 'Denne uken';
   return 'Kommende';
+}
+
+/**
+ * Kalenderen skal åpne på det som kommer, ikke på det som var.
+ *
+ * `getTeamEvents` gir alt stigende etter starttid, og da havner hele lagets
+ * historikk ØVERST — «Tidligere» først, og en ny hendelse du nettopp opprettet
+ * nederst, under alt som har skjedd. Her flyttes fortiden ned og snus, så det
+ * som var sist ligger først i arkivet: det er forrige lørdags kamp man leter
+ * etter, ikke den fra september.
+ *
+ * Fortiden slettes IKKE fra lista — gamle kamper bærer nå kamprapport og
+ * bilder, og er verdt å komme tilbake til.
+ */
+function orderForCalendar(events: HeiaEvent[]): HeiaEvent[] {
+  const upcoming: HeiaEvent[] = [];
+  const past: HeiaEvent[] = [];
+  for (const event of events) {
+    // Samme dag-grense som getSectionLabel, ellers kunne en hendelse tidligere
+    // i dag blitt sortert som fortid men merket «I dag» — og seksjonene ville
+    // dukket opp to ganger.
+    (isPast(event.startTime) ? past : upcoming).push(event);
+  }
+  return [...upcoming, ...past.reverse()];
 }
 
 /** Grupperer en kronologisk liste i sammenhengende seksjoner. */
@@ -93,7 +123,7 @@ export function KalenderScreen() {
 
   if (!activeTeamSpaceId) return null;
 
-  const sections = groupIntoSections(events);
+  const sections = groupIntoSections(orderForCalendar(events));
 
   return (
     <View style={styles.screen}>
