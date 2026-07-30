@@ -16,12 +16,10 @@ Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
 ## ▶️ NESTE — start her
 
-**1. Rydd git først (5 min, ikke en skive).** Målt 2026-07-30:
-`origin/Brage..Brage` = 3 commits (dagens ikonarbeid, kun lokalt),
-og `Brage..origin/main` = **0**. Altså: `main` har ingenting `Brage` mangler,
-så **merge til main er konfliktfri akkurat nå**. Den dokumenterte
-squash-smerten oppstår først etter neste squash-merge. Push + PR nå, mens det
-er gratis. (Verifiser tallene på nytt før du stoler på dem.)
+**1. ✅ Git er ryddet** (2026-07-30 kveld). PR #17 er merget til `main`,
+squash-konflikten er løst med `-s ours` (`474e46c`), alt er pushet, og
+`Brage..origin/main` = 0. **En ny PR fra `Brage` er konfliktfri nå.** Se
+«🔁 Squash-mønsteret» i git-seksjonen for oppskriften neste gang.
 
 **2. Neste skive: sesong- og statistikkflate** (produktkandidat 5).
 **Bruker sa eksplisitt 2026-07-30: «Liker godt ideen med at man kan se sesong
@@ -1186,19 +1184,36 @@ terminalen med `npm run ios` blir lista stående gammel.
 
 ## 📦 Git-status (2026-07-30)
 
-Alt av Fase 4–9 er **committet, pushet og merget til `main`** (PR #16).
-**Hele designarbeidet (skive 1+2+3 + kommentartråd-forbedringene) er
-committet på `Brage`** etter brukerens optiske OK-er (skive 1+2: `503e07d`).
-Ikke pushet/merget til `main` ennå — husk squash-merge-mønsteret når det
-skjer (merge `origin/main` inn, behold Brage, verifiser supersett).
+Fase 4–9 er merget til `main` (PR #16). **Designarbeidet skive 1–5 er merget
+i PR #17.** Dagens ikon-skive (6) + telefonrettelsene er committet og pushet
+på `Brage`, og `origin/main` er merget inn (`474e46c`), så `Brage` er igjen et
+rent supersett og en ny PR er konfliktfri.
 
-**Merk mønsteret som skaper konflikter hver gang:** GitHub squash-merger PR-en,
-så `main` får ÉN commit mens `Brage` beholder sine egne. Neste gang du merger
-vil git derfor se to historikker som rører samme linjer, og du får konflikter
-selv om innholdet er identisk. Løsningen er alltid den samme: merge
-`origin/main` inn i `Brage` og behold Brage — men verifiser først at Brage
-faktisk er et supersett (`git diff origin/main:<fil> Brage:<fil>`), ikke bare
-anta det.
+### 🔁 Squash-mønsteret — løs det på 30 sekunder, ikke for hånd
+GitHub squash-merger PR-en, så `main` får ÉN commit mens `Brage` beholder sine
+egne. Git ser da to historikker som rører samme linjer, og du får konflikter
+selv om arbeidet er identisk. **Skjedd i #14, #15, #16 og #17.**
+
+**Ikke løs konfliktene manuelt.** Squash-commiten er nesten alltid en kopi av
+`Brage` slik den var ved et tidligere punkt. Bevis det, så forsvinner jobben:
+
+```bash
+git fetch origin
+# 1) Finn commiten Brage sto på da PR-en ble laget (forrige merge-commit).
+# 2) BEVISET: er main byte for byte identisk med den?
+git diff --quiet <den-commiten> origin/main && echo "Brage er et supersett"
+# 3) Behold Brages tre, men registrer main som forelder:
+git merge -s ours origin/main
+# 4) Verifiser at ingenting gikk tapt — hashen skal være uendret:
+git rev-parse HEAD^{tree}
+```
+
+⚠️ **`-s ours` forkaster main-siden fullstendig.** Den er kun trygg ETTER at
+steg 2 slår til. Gjør den ikke det, har noen endret noe direkte på `main`, og
+da må det faktisk inspiseres.
+
+Er filtrehashen lik før og etter, er treet **bevist uendret** — da trengs
+ingen tsc/lint-runde på merge-en (se tsc-regelen øverst).
 
 ## 🎨 DESIGN — «A v2 · Stadium Pop Hybrid» (LÅST 2026-07-30)
 
