@@ -2,13 +2,13 @@
 
 _Sist oppdatert: 2026-07-30 (kveld). **Designretningen «A v2 · Stadium Pop
 Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3+4 — skive 4 er den
-samlede native rebuilden, optisk godkjent av bruker).** Nyeste skive er
-**KAMPRAPPORTEN (skive 5)**: migrasjon `00029` deployet, kampchipene i feeden
-bærer nå stilling, kampforløpet har løpende stilling, og en spilt kamp åpner
-med scoreboardet. **KODET, ikke optisk verifisert.** Designarbeidet er ikke
-pushet/merget til `main` ennå. **Neste:** optisk review av skive 5, deretter
-app-ikon/launch screen eller produktkandidatene («🎯 SENERE»). Fase 4–9 fra
-før er merget (PR #16)._
+samlede native rebuilden, optisk godkjent av bruker).** Nyeste skiver er
+**KAMPRAPPORTEN (skive 5)** og **APP-IKON + LAUNCH SCREEN (skive 6)** — begge
+**KODET, ikke optisk verifisert**. Skive 6 krever **rebuild** (ikoner og
+storyboard bakes inn i binæren). Designarbeidet er ikke pushet/merget til
+`main` ennå. **Neste:** optisk review av skive 5 + 6, og **bruker må velge
+ikonvariant** (A er installert, B/C/D er ett kall unna — se skive 6). Deretter
+produktkandidatene («🎯 SENERE»). Fase 4–9 fra før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1503,6 +1503,99 @@ faktisk møtte. Ikke omdøp den til «Var med» uten ekte oppmøteregistrering.
    har ingen chip.
 5. **Oppmøte på spilt kamp:** kun «Påmeldt (N)», ingen «Ikke svart».
 6. **Trening/kommende kamp:** uendret — infokort med Dato/Tid/Sted øverst.
+
+### ✅ Skive 6 — APP-IKON + LAUNCH SCREEN (KODET 2026-07-30, ikke optisk verifisert)
+
+**⚠️ KREVER REBUILD.** Ikoner og storyboard bakes inn i binæren — Metro-reload
+viser ingenting. Ingen ny pakke, ingen pod install, ingen pbxproj-endring
+(`Images.xcassets` er en `folder.assetcatalog`-referanse, så nye imagesets
+trengs ikke registreres).
+
+**Vurderingsside med alle fire kandidater:**
+https://claude.ai/code/artifact/143f2aaf-c2b4-48cd-b86c-0ecb01ef7cf5
+
+#### Merkevarekilden — figurmerket, ikke ordmerket
+`Heia logoer/` har fem varianter av **samme lockup** («Heia» + jubelfigur) i
+ulike fargeversjoner. Det finnes **ikke** noe isolert figurmerke. Figuren er
+trukket ut på farge (den er mint `#02FFAB`, ordmerket hvitt/mørkt) fra
+`Logo_1.pdf` rasterisert i 3000 px med `sips`, og ligger nå som
+**`assets/brand/heia-figur.png`** (680×1025, transparent).
+
+**Hvorfor figuren og ikke «Heia»:** ikonet leses i 60 pt på hjemmeskjermen,
+ikke i 1024 px. Ordmerket blir uleselig grøt der. Kandidat D på siden viser
+det — den er med nettopp så valget kan tas på syn, ikke på påstand.
+
+**Gledelig funn:** minten i logofilene er nøyaktig `#02FFAB` — samme verdi som
+A v2 låste. Merkevaren og designsystemet var allerede samstemte.
+
+#### To ekte feil i det gamle ikonet (ikke smak)
+1. **`Icon-1024.png` hadde alfakanal.** App Store Connect **avviser**
+   markedsføringsikoner med gjennomsiktighet — dette ville stoppet en
+   innsending uansett design. Alt genereres nå som RGB.
+2. **Koksgrå flate.** Ikonet var den eneste flaten i hele appen som ikke
+   fulgte «kampen bor alltid på mørk stadionflate».
+
+#### `scripts/build-app-icon.py` (ny) — ikonet er DERIVERT, ikke tegnet
+```
+python3 scripts/build-app-icon.py --variant A   # A er installert
+python3 scripts/build-app-icon.py --variant B   # bytt når som helst
+python3 scripts/build-app-icon.py --android     # tar med mipmap-ene
+python3 scripts/build-app-icon.py --preview /tmp/x.png --variant C
+```
+Stadionflaten er **portert 1:1 fra `StadiumSurface.tsx`** (linear 165°
+`#0B1912→#143126` stop .78, radial amber cx 18 %, radial mint cx 85 %,
+banesirkelringene). Endrer `theme/tokens.ts` seg, kan ikonet følge etter uten
+at noen åpner Photoshop. Varianter: **A** figur på stadionflate (valgt),
+**B** figur på mint, **C** figur med rasjonert glød, **D** ordmerket.
+
+**⚠️ Fellen som kostet en runde:** `ImageDraw.ellipse(outline=MINT+(33,),
+width=17)` tegner **hvert av de 17 pikslene i strekbredden som sitt eget
+alfa-kompositt**. 0.13 lagt oppå seg selv 17 ganger ≈ 0.90 — den «subtile»
+banesirkelen lyste som en neonring. Ringen må tegnes **solid på et eget lag**
+og komposittes ÉN gang med riktig alfa. Gjelder alle PIL-strøk med alfa.
+
+#### Launch screen — stadionflaten, ingen tekst
+Malen fra React Native sto urørt: hvit flate, «Heia2» i systemfont, «Powered
+by React Native». Nå: stadiongradienten i fullskjerm med figurmerket sentrert
+og banesirkelen nede til høyre — **samme flate som `WelcomeIntentScreen` fikk
+i skive 3**, så oppstarten og appens første skjerm er ett og samme bilde.
+
+- **Storyboards kan ikke tegne gradient.** Flaten ligger derfor som et bilde
+  (`LaunchBackground.imageset`, 1170×2532) og strekkes med `scaleAspectFill`.
+  Trygt fordi den er en glatt overgang uten detaljer som kan forvrenges.
+  Bakgrunnen er festet til view-kantene, **ikke** safe area.
+- `LaunchMark.imageset` i @1x/@2x/@3x, der **@1x ER punktstørrelsen**
+  (132×199 pt) — så merket trenger ingen størrelseconstraint, bare sentrering.
+- **Ingen tekst med vilje.** iOS viser allerede «Heia» under ikonet man
+  trykket på; en splash med logo + navn er en webkonvensjon, ikke en iOS-en.
+- `colors.stadium` er satt som view-bakgrunn også, synlig et blunk før bildet
+  dekodes.
+
+#### Verifisert uten å bygge appen
+Storyboarden er håndskrevet XML, så den er sjekket med Apples egne verktøy:
+- `xcrun ibtool --compile` → **0 feil, 0 advarsler, 0 notices.**
+- `xcrun actool --compile` på hele `Images.xcassets` → **`Assets.car` bygget
+  rent**, alle tre imagesets validerte.
+- Alle 8 ikon-PNG-er bekreftet `RGB` (ingen alfa).
+
+Dette er billig og fanger nettopp det en håndskrevet storyboard pleier å ryke
+på. **Gjenta det hvis storyboarden røres igjen** — alternativet er å oppdage
+feilen i en 10-minutters Xcode-build.
+
+#### Test dette (etter rebuild)
+1. **Hjemmeskjermen:** mint jubelfigur på mørk grønn flate. Skal være tydelig
+   gjenkjennelig ved siden av andre apper — ikke en grå rute med småtekst.
+2. **Oppstart:** mørk stadionflate med merket sentrert. Ingen hvit flash,
+   ingen «Powered by React Native».
+3. **Innstillinger → Heia:** ikonet i 29 pt skal fortsatt leses.
+4. Vil du bytte variant: kjør scriptet med `--variant B|C|D` + rebuild.
+
+**Ikke gjort (bevisst):**
+- **Android-mipmapene** står på RN-malen. Ett flagg unna (`--android`), men
+  Android bygges ikke i dag, så diffen holdes ærlig.
+- **iOS 18 mørk/tonet ikonvariant.** Krever det nyere single-size
+  `Contents.json`-formatet; dagens eksplisitte størrelsesformat bygger
+  uendret. Egen liten skive hvis det blir aktuelt.
 
 ---
 
