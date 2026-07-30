@@ -364,6 +364,13 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# push-fanout kalles server-til-server av trigger'en notify_on_feed_post,
+# ikke av en innlogget bruker. Derfor verify_jwt = false — funksjonen
+# sjekker selv at Bearer-tokenet er service_role_key.
+[functions.push-fanout]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

@@ -10,3 +10,12 @@ const ADMIN_ROLES: readonly UserRole[] = ['trener', 'lagleder', 'admin'];
 export function isTeamAdmin(role: UserRole | null | undefined): boolean {
   return role != null && ADMIN_ROLES.includes(role);
 }
+
+/** Rollenavn slik de vises for brukeren. */
+export const ROLE_LABELS: Record<UserRole, string> = {
+  trener: 'Trener',
+  lagleder: 'Lagleder',
+  admin: 'Admin',
+  forelder: 'Forelder',
+  spiller: 'Spiller',
+};

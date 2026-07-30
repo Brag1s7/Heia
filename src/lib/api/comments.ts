@@ -1,6 +1,7 @@
 import {supabase} from '../supabase';
 import {getTeamMembers, type TeamMember} from './members';
-import type {FeedComment} from '../../shared/types';
+import {FEED_MEDIA_BUCKET} from './feed';
+import type {FeedComment, FeedItem} from '../../shared/types';
 
 // profiles-RLS lar deg kun lese egen profil, så en direkte comments→profiles
 // join gir ikke lagkameraters navn. Vi henter hele laget via get_team_members
@@ -10,6 +11,76 @@ async function getMemberMap(
 ): Promise<Map<string, TeamMember>> {
   const members = await getTeamMembers(teamSpaceId);
   return new Map(members.map(m => [m.id, m]));
+}
+
+/**
+ * Selve innlegget en tråd hører til.
+ *
+ * Trenges fordi et varsel («Kari heiet på …») lander deg her uten kontekst —
+ * og for en reaksjon er tråden gjerne helt tom, så skjermen ville vært en
+ * blindvei uten posten øverst.
+ *
+ * Direkte select (RLS: «Members can view feed»), forfatter via medlems-mappet
+ * som resten av fila. `media_attachments` er polymorf (entity_type/entity_id),
+ * så den kan ikke embeddes av PostgREST — bildet hentes i et eget kall.
+ */
+export async function getFeedPost(
+  teamSpaceId: string,
+  postId: string,
+): Promise<FeedItem | null> {
+  const [memberMap, {data, error}] = await Promise.all([
+    getMemberMap(teamSpaceId),
+    supabase
+      .from('feed_posts')
+      .select('id, author_id, type, content, created_at, event_id, is_pinned')
+      .eq('id', postId)
+      .is('deleted_at', null)
+      .maybeSingle(),
+  ]);
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    return null;
+  }
+
+  const member = data.author_id ? memberMap.get(data.author_id) : undefined;
+  const post: FeedItem = {
+    id: data.id,
+    teamSpaceId,
+    type: data.type as FeedItem['type'],
+    author: {
+      id: data.author_id ?? '',
+      name: member?.name ?? 'Medlem',
+      avatarUrl: member?.avatarUrl,
+      role: member?.role,
+    },
+    createdAt: new Date(data.created_at),
+    content: data.content,
+    eventId: data.event_id ?? undefined,
+    isPinned: data.is_pinned ?? false,
+  };
+
+  const {data: attachments} = await supabase
+    .from('media_attachments')
+    .select('media(storage_path)')
+    .eq('entity_type', 'feed_post')
+    .eq('entity_id', postId)
+    .order('sort_order', {ascending: true})
+    .limit(1);
+
+  const storagePath = (attachments?.[0] as any)?.media?.storage_path as
+    | string
+    | undefined;
+  if (storagePath) {
+    const {data: signed} = await supabase.storage
+      .from(FEED_MEDIA_BUCKET)
+      .createSignedUrl(storagePath, 60 * 60);
+    post.imageUrl = signed?.signedUrl;
+  }
+
+  return post;
 }
 
 /** Kommentarer på en post (eldste først), med forfatter fra medlems-mappet. */

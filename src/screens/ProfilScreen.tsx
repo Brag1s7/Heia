@@ -1,31 +1,116 @@
-import React from 'react';
-import {View, Text, ScrollView, Pressable, StyleSheet, Image} from 'react-native';
+import React, {useCallback, useEffect, useState} from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  Pressable,
+  StyleSheet,
+  Image,
+  Linking,
+  Alert,
+  AppState,
+  Platform,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, CommonActions} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar, ListRow} from '../components';
 import {useAuth, useActiveTeam} from '../context';
-import {isTeamAdmin} from '../shared/roles';
-import type {MemberRole} from '../lib/types';
+import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
+import {
+  isPushAvailable,
+  getPushPermission,
+  enablePush,
+  type PushPermission,
+} from '../lib/push';
+import {updateProfile} from '../lib/api';
 import type {ProfilStackParamList} from '../shared/types';
+
+// Undertekst på «Varslinger»-raden per status.
+const PUSH_SUBTITLE: Record<PushPermission, string> = {
+  authorized: 'På — du får beskjed når laget scorer',
+  denied: 'Av — trykk for å skru på i Innstillinger',
+  undetermined: 'Trykk for å skru på',
+  unavailable: 'Utilgjengelig på denne enheten',
+};
 
 type Nav = NativeStackNavigationProp<ProfilStackParamList, 'Profil'>;
 
-const ROLE_LABELS: Record<MemberRole, string> = {
-  trener: 'Trener',
-  lagleder: 'Lagleder',
-  admin: 'Admin',
-  forelder: 'Forelder',
-  spiller: 'Spiller',
-};
-
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
-  const {profile, signOut} = useAuth();
+  const {profile, signOut, refreshProfile} = useAuth();
   const {activeTeamSpaceId, userMemberships, setActiveTeamSpace} =
     useActiveTeam();
   const navigation = useNavigation<Nav>();
+
+  // Varsel-status. Oppdateres når skjermen mountes og hver gang appen kommer i
+  // forgrunn igjen (bytter du i iOS-Innstillinger og kommer tilbake, stemmer den).
+  const [pushPerm, setPushPerm] = useState<PushPermission>('unavailable');
+  useEffect(() => {
+    let mounted = true;
+    const load = () => {
+      getPushPermission().then(p => mounted && setPushPerm(p));
+    };
+    load();
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active') load();
+    });
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+
+  const handleNotifications = useCallback(async () => {
+    if (pushPerm === 'undetermined') {
+      // Første gang: dette viser systemdialogen.
+      const next = await enablePush();
+      setPushPerm(next);
+      if (next === 'denied') {
+        Alert.alert(
+          'Varsler er avslått',
+          'Du kan skru dem på igjen under Innstillinger → Heia → Varsler.',
+          [
+            {text: 'Ikke nå', style: 'cancel'},
+            {text: 'Åpne Innstillinger', onPress: () => Linking.openSettings()},
+          ],
+        );
+      }
+    } else {
+      // Alt bestemt (på eller av) → iOS lar oss ikke spørre igjen, så vi sender
+      // brukeren til Innstillinger der de kan endre valget.
+      Linking.openSettings();
+    }
+  }, [pushPerm]);
+
+  // Nummeret er hele grunnen til at lagoversikten kan brukes til å nå noen —
+  // uten et sted å skrive det inn står telefonkolonnen tom for alle.
+  // Alert.prompt finnes bare på iOS; Android får en egen flate den dagen.
+  const handlePhone = useCallback(() => {
+    Alert.prompt(
+      'Telefonnummer',
+      'Trenere og lagledere kan nå deg. Resten av laget ser det ikke.',
+      [
+        {text: 'Avbryt', style: 'cancel'},
+        {
+          text: 'Lagre',
+          onPress: async (value?: string) => {
+            const trimmed = (value ?? '').trim();
+            try {
+              await updateProfile({phone: trimmed.length > 0 ? trimmed : null});
+              await refreshProfile();
+            } catch {
+              Alert.alert('Kunne ikke lagre', 'Prøv igjen om litt.');
+            }
+          },
+        },
+      ],
+      'plain-text',
+      profile?.phone ?? '',
+      'phone-pad',
+    );
+  }, [profile?.phone, refreshProfile]);
 
   if (!profile) return null;
 
@@ -117,6 +202,22 @@ export function ProfilScreen() {
 
       {/* Meny */}
       <View style={styles.menuSection}>
+        {Platform.OS === 'ios' && (
+          <ListRow
+            icon={<Text style={styles.menuIcon}>{'  '}</Text>}
+            title="Telefonnummer"
+            subtitle={profile.phone ?? 'Legg til så trenerne når deg'}
+            onPress={handlePhone}
+          />
+        )}
+        {activeMembership && (
+          <ListRow
+            icon={<Text style={styles.menuIcon}>{'  '}</Text>}
+            title="Lagoversikt"
+            subtitle="Se hvem som er med i laget"
+            onPress={() => navigation.navigate('TeamMembers')}
+          />
+        )}
         <ListRow
           icon={<Text style={styles.menuIcon}>{'  '}</Text>}
           title="Bli med i et lag"
@@ -135,6 +236,14 @@ export function ProfilScreen() {
             title="Inviter til laget"
             subtitle="Del invitasjonskoden"
             onPress={() => navigation.navigate('Invite')}
+          />
+        )}
+        {isPushAvailable() && (
+          <ListRow
+            icon={<Text style={styles.menuIcon}>🔔</Text>}
+            title="Varslinger"
+            subtitle={PUSH_SUBTITLE[pushPerm]}
+            onPress={handleNotifications}
           />
         )}
         <ListRow

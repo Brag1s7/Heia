@@ -1,11 +1,15 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
+import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent, MatchEventType} from '../shared/types';
 
 interface MatchEventRowProps {
   event: MatchEvent;
   isLatest?: boolean;
+  /** Bilder som hører til nettopp dette øyeblikket — vises under teksten. */
+  photos?: MatchPhoto[];
+  onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
 const eventIcons: Record<MatchEventType, string> = {
@@ -30,7 +34,12 @@ const eventColors: Record<MatchEventType, string> = {
   melding: colors.textTertiary,
 };
 
-export function MatchEventRow({event, isLatest = false}: MatchEventRowProps) {
+export function MatchEventRow({
+  event,
+  isLatest = false,
+  photos,
+  onPressPhoto,
+}: MatchEventRowProps) {
   const icon = eventIcons[event.type];
   const iconColor = eventColors[event.type];
 
@@ -51,6 +60,22 @@ export function MatchEventRow({event, isLatest = false}: MatchEventRowProps) {
           )}
         </View>
         <Text style={styles.description}>{event.description}</Text>
+
+        {photos?.map(photo => (
+          <Pressable
+            key={photo.id}
+            onPress={onPressPhoto ? () => onPressPhoto(photo) : undefined}
+            style={({pressed}) => [styles.photo, pressed && styles.photoPressed]}>
+            <Image
+              source={{uri: photo.imageUrl}}
+              style={styles.photoImage}
+              resizeMode="cover"
+            />
+            {photo.caption && (
+              <Text style={styles.photoCaption}>{photo.caption}</Text>
+            )}
+          </Pressable>
+        ))}
       </View>
     </View>
   );
@@ -110,5 +135,27 @@ const styles = StyleSheet.create({
   description: {
     ...typography.body,
     lineHeight: 22,
+  },
+  photo: {
+    marginTop: spacing.xs,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  photoPressed: {
+    opacity: 0.8,
+  },
+  photoImage: {
+    width: '100%',
+    height: 180,
+    backgroundColor: colors.background,
+  },
+  photoCaption: {
+    ...typography.bodySmall,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
 });

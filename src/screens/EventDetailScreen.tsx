@@ -19,12 +19,14 @@ import {
   Avatar,
   ListRow,
   ScoreBoard,
-  MatchEventRow,
   ReporterActions,
   ReporterModal,
   ReporterBar,
   ReporterSheet,
-  SimulatedPush,
+  MatchPhotoSheet,
+  MatchPhotoRail,
+  MatchPhotoGallery,
+  MatchTimeline,
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam} from '../context';
@@ -38,6 +40,8 @@ import {
   subscribeToMatch,
   type ReportMatchEventInput,
 } from '../lib/api/events';
+import {createImagePost, getMatchPhotos, type MatchPhoto} from '../lib/api/feed';
+import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
@@ -94,14 +98,6 @@ const ACTION_TO_EVENT: Record<ReporterActionType, ReportMatchEventInput> = {
   melding: {type: 'melding'},
 };
 
-const ACTION_LABELS: Record<ReporterActionType, string> = {
-  mål_oss: 'MÅL!',
-  mål_dem: 'Mål (motstander)',
-  pause: 'Pause',
-  andre_omgang: 'Andre omgang',
-  slutt: 'Kampen er ferdig',
-  melding: 'Melding fra kampen',
-};
 
 /**
  * RPC-ene kaster med engelske meldinger. Oversett de vi kan handle på, og fall
@@ -173,11 +169,10 @@ export function EventDetailScreen({route}: Props) {
   const [selectedActionType, setSelectedActionType] =
     useState<ReporterActionType>('mål_oss');
   const [reporterId, setReporterId] = useState<string | undefined>(undefined);
-  const [pushNotification, setPushNotification] = useState({
-    visible: false,
-    title: '',
-    message: '',
-  });
+  const [pendingPhoto, setPendingPhoto] = useState<PickedImage | null>(null);
+  const [publishingPhoto, setPublishingPhoto] = useState(false);
+  const [matchPhotos, setMatchPhotos] = useState<MatchPhoto[]>([]);
+  const [galleryPhotoId, setGalleryPhotoId] = useState<string | null>(null);
 
   const loadEvent = useCallback(async () => {
     if (!activeTeamSpaceId) {
@@ -221,6 +216,21 @@ export function EventDetailScreen({route}: Props) {
     };
   }, [activeTeamSpaceId, isMatchEvent]);
 
+  // Kampbilder. Feiler kallet lever resten av kampsiden videre — et manglende
+  // bilde skal aldri stå i veien for stillingen.
+  const loadPhotos = useCallback(async () => {
+    if (!isMatchEvent) return;
+    try {
+      setMatchPhotos(await getMatchPhotos(eventId));
+    } catch {
+      // Stille: stripa vises bare når det finnes bilder.
+    }
+  }, [eventId, isMatchEvent]);
+
+  useEffect(() => {
+    loadPhotos();
+  }, [loadPhotos]);
+
   // Kampen er i gang (også i pause — da telles minuttene fortsatt).
   const isUnderway =
     event?.matchStatus === 'live' || event?.matchStatus === 'halfTime';
@@ -228,6 +238,11 @@ export function EventDetailScreen({route}: Props) {
 
   // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
   // ville stillingen stått stille til hun selv dro for å oppdatere.
+  //
+  // Varselet ligger IKKE her lenger: det er `NotificationBanner` over fanene,
+  // matet av `notifications`-kanalen. Databasen bestemmer allerede hvem som
+  // skal varsles (00023: alle aktive medlemmer unntatt forfatteren), og
+  // banneret følger deg gjennom hele appen — ikke bare på denne skjermen.
   useEffect(() => {
     if (!liveMatchSessionId) return;
     return subscribeToMatch(liveMatchSessionId, () => {
@@ -370,12 +385,10 @@ export function EventDetailScreen({route}: Props) {
         ...ACTION_TO_EVENT[type],
         description,
       });
+      // Ingen banner til reporteren: hun trykket nettopp knappen, og ser
+      // stillingen og kampforløpet oppdatere seg. Varselet går til de andre,
+      // via realtime-abonnementet lenger oppe.
       await loadEvent();
-      setPushNotification({
-        visible: true,
-        title: `${teamName} · ${ACTION_LABELS[type]}`,
-        message: description || event.title,
-      });
     } catch (e) {
       Alert.alert(
         'Kunne ikke rapportere',
@@ -416,6 +429,45 @@ export function EventDetailScreen({route}: Props) {
     submitAction(selectedActionType, description);
   };
 
+  // Kamera først: reporteren står på sidelinja, og bildet er som regel tatt
+  // for to sekunder siden — eller så finnes det ikke.
+  const handlePickPhoto = async () => {
+    const picked = await pickTeamImage({preferCamera: true});
+    if (picked) setPendingPhoto(picked);
+  };
+
+  /**
+   * Bildet er en vanlig bildepost som bærer `event_id` — derfor havner det
+   * både i lagets feed og i kampens egen bildestripe. `matchEventId` er det
+   * eneste valgfrie: uten den er det et generelt kampbilde.
+   */
+  const handlePublishPhoto = async (
+    caption: string,
+    matchEventId?: string,
+  ) => {
+    if (!activeTeamSpaceId || !pendingPhoto || publishingPhoto) return;
+
+    setPublishingPhoto(true);
+    try {
+      await createImagePost({
+        teamSpaceId: activeTeamSpaceId,
+        content: caption,
+        image: pendingPhoto,
+        eventId,
+        matchEventId,
+      });
+      setPendingPhoto(null);
+      await loadPhotos();
+    } catch {
+      Alert.alert(
+        'Kunne ikke legge ut bildet',
+        'Sjekk nettforbindelsen og prøv igjen.',
+      );
+    } finally {
+      setPublishingPhoto(false);
+    }
+  };
+
   // Samme mønster som handleRsvp: vis valget med én gang, lagre, refetch.
   // `loadEvent` svelger sine egne feil, så catch-en fyrer kun når selve
   // skrivingen feiler — rollbacken kan ikke bli falsk-positiv.
@@ -430,13 +482,10 @@ export function EventDetailScreen({route}: Props) {
     setSavingReporter(true);
     try {
       await setMatchReporter(event.matchSessionId, userId);
+      // Ingen banner: `setReporterId` over har allerede oppdatert ReporterBar
+      // med det nye navnet. Banneret er for nyheter fra andre, ikke et ekko
+      // av det du selv nettopp gjorde.
       await loadEvent();
-      const selected = teamMembers.find(u => u.id === userId);
-      setPushNotification({
-        visible: true,
-        title: 'Kampreporter byttet',
-        message: `${selected?.name ?? 'Medlemmet'} er nå kampreporter.`,
-      });
     } catch {
       setReporterId(previous);
       Alert.alert(
@@ -506,35 +555,24 @@ export function EventDetailScreen({route}: Props) {
               <ReporterActions
                 onAction={handleReporterAction}
                 isPaused={event.matchStatus === 'halfTime'}
+                onPhoto={handlePickPhoto}
               />
             </View>
           )}
 
-          {/* Kampforløp */}
+          {/* Kampforløp — bildene ligger i forløpet, ikke i en egen seksjon.
+              Under kampen skal ingenting konkurrere med stillingen. */}
           <SectionHeader title="Kampforløp" />
           <View style={styles.timeline}>
-            {matchEvents
-              .slice()
-              .reverse()
-              .map((me, index) => (
-                <MatchEventRow
-                  key={me.id}
-                  event={me}
-                  isLatest={index === 0}
-                />
-              ))}
+            <MatchTimeline
+              matchEvents={matchEvents}
+              photos={matchPhotos}
+              startedAt={event.startedAt}
+              newestFirst
+              onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+            />
           </View>
         </ScrollView>
-
-        {/* Simulert push-varsling */}
-        <SimulatedPush
-          title={pushNotification.title}
-          message={pushNotification.message}
-          visible={pushNotification.visible}
-          onHide={() =>
-            setPushNotification({visible: false, title: '', message: ''})
-          }
-        />
 
         {/* Reporter-modal */}
         <ReporterModal
@@ -551,6 +589,22 @@ export function EventDetailScreen({route}: Props) {
           currentReporterId={reporterId}
           onSelect={handleSelectReporter}
           onClose={() => setReporterSheetVisible(false)}
+        />
+
+        {/* Kampbilde: tekst + hvilket øyeblikk */}
+        <MatchPhotoSheet
+          visible={pendingPhoto !== null}
+          imageUri={pendingPhoto?.uri ?? null}
+          matchEvents={matchEvents}
+          publishing={publishingPhoto}
+          onPublish={handlePublishPhoto}
+          onCancel={() => setPendingPhoto(null)}
+        />
+
+        <MatchPhotoGallery
+          photos={matchPhotos}
+          initialPhotoId={galleryPhotoId}
+          onClose={() => setGalleryPhotoId(null)}
         />
       </View>
     );
@@ -620,16 +674,29 @@ export function EventDetailScreen({route}: Props) {
         </View>
       )}
 
-      {isFinishedMatch && finishedMatchEvents.length > 0 && (
-        <>
-          <SectionHeader title="Kampforløp" />
-          <View style={styles.timeline}>
-            {finishedMatchEvents.map(me => (
-              <MatchEventRow key={me.id} event={me} />
-            ))}
-          </View>
-        </>
+      {/* Etter kampslutt er bildene det man kommer tilbake for — derfor en
+          kompakt inngang øverst. De blir uansett stående i forløpet under. */}
+      {isFinishedMatch && (
+        <MatchPhotoRail
+          photos={matchPhotos}
+          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+        />
       )}
+
+      {isFinishedMatch &&
+        (finishedMatchEvents.length > 0 || matchPhotos.length > 0) && (
+          <>
+            <SectionHeader title="Kampforløp" />
+            <View style={styles.timeline}>
+              <MatchTimeline
+                matchEvents={finishedMatchEvents}
+                photos={matchPhotos}
+                startedAt={event.startedAt}
+                onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+              />
+            </View>
+          </>
+        )}
 
       {/* RSVP — meningsløst på en ferdigspilt kamp. */}
       {!isFinishedMatch && (
@@ -686,6 +753,12 @@ export function EventDetailScreen({route}: Props) {
           onClose={() => setReporterSheetVisible(false)}
         />
       )}
+
+      <MatchPhotoGallery
+        photos={matchPhotos}
+        initialPhotoId={galleryPhotoId}
+        onClose={() => setGalleryPhotoId(null)}
+      />
     </View>
   );
 }

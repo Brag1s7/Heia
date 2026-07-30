@@ -8,6 +8,15 @@ interface FeedCardProps {
   item: FeedItem;
   onHeia?: () => void;
   onComment?: () => void;
+  /** Settes kun for den som kan løsne en festet post (trener/lagleder). */
+  onUnpin?: () => void;
+  /**
+   * Gjør hele kortet trykkbart. Settes kun på poster som faktisk fører et
+   * sted — en vanlig melding skal ikke se ut som en lenke.
+   */
+  onPress?: () => void;
+  /** Forstørr-ikon på bildet. Egen handling, så den ikke stjeler `onPress`. */
+  onExpandImage?: () => void;
 }
 
 function timeAgo(date: Date): string {
@@ -30,6 +39,11 @@ type Marker = {label: string; dot: string};
 // Type-markør + grønn energy-rail vises kun på meningsbærende poster.
 // Vanlig melding/bilde får ingen markør (unngå å badge alt).
 function getMarker(item: FeedItem): Marker | null {
+  // «Varsle hele laget» slår alt annet: dette er posten treneren mente at
+  // ingen skulle gå glipp av, og den ligger allerede øverst i feeden.
+  if (item.isPinned) {
+    return {label: '📌 VIKTIG', dot: colors.warning};
+  }
   switch (item.type) {
     case 'resultat':
       return {label: 'RESULTAT', dot: colors.heiaInk};
@@ -55,15 +69,25 @@ function isMatchType(item: FeedItem): boolean {
   );
 }
 
-export function FeedCard({item, onHeia, onComment}: FeedCardProps) {
+export function FeedCard({
+  item,
+  onHeia,
+  onComment,
+  onUnpin,
+  onPress,
+  onExpandImage,
+}: FeedCardProps) {
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
   const marker = getMarker(item);
-  const showRail = item.type === 'resultat' || isMatchType(item);
+  const showRail =
+    item.type === 'resultat' || isMatchType(item) || item.isPinned === true;
   const heiaCount = item.heiaCount ?? 0;
   const commentCount = item.commentCount ?? 0;
 
-  return (
-    <View style={styles.card}>
+  // Heia, Kommenter, forstørr og «løsne» er egne Pressables inne i kortet.
+  // Den innerste tar trykket i RN, så de utløser aldri kortets onPress.
+  const inner = (
+    <>
       {showRail && <View style={styles.rail} />}
 
       {/* Header */}
@@ -76,12 +100,27 @@ export function FeedCard({item, onHeia, onComment}: FeedCardProps) {
           </View>
           <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
         </View>
-        {marker && (
-          <View style={styles.marker}>
-            <View style={[styles.markerDot, {backgroundColor: marker.dot}]} />
-            <Text style={styles.markerText}>{marker.label}</Text>
-          </View>
-        )}
+        {marker &&
+          (onUnpin ? (
+            // Festede poster ville ellers blitt liggende øverst for alltid.
+            // Selve markøren er knappen — den står der man ser «hvorfor
+            // ligger denne her?», og bare trener/lagleder får den.
+            <Pressable
+              onPress={onUnpin}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Løsne fra toppen"
+              style={({pressed}) => [styles.marker, pressed && styles.markerPressed]}>
+              <View style={[styles.markerDot, {backgroundColor: marker.dot}]} />
+              <Text style={styles.markerText}>{marker.label}</Text>
+              <Text style={styles.markerClose}>✕</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.marker}>
+              <View style={[styles.markerDot, {backgroundColor: marker.dot}]} />
+              <Text style={styles.markerText}>{marker.label}</Text>
+            </View>
+          ))}
       </View>
 
       {/* Innhold */}
@@ -97,6 +136,19 @@ export function FeedCard({item, onHeia, onComment}: FeedCardProps) {
             style={styles.image}
             resizeMode="cover"
           />
+          {onExpandImage && (
+            <Pressable
+              onPress={onExpandImage}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Vis bildet i fullskjerm"
+              style={({pressed}) => [
+                styles.expand,
+                pressed && styles.expandPressed,
+              ]}>
+              <Text style={styles.expandIcon}>⤢</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -125,8 +177,21 @@ export function FeedCard({item, onHeia, onComment}: FeedCardProps) {
           </Text>
         </Pressable>
       </View>
-    </View>
+    </>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        style={({pressed}) => [styles.card, pressed && styles.cardPressed]}>
+        {inner}
+      </Pressable>
+    );
+  }
+
+  return <View style={styles.card}>{inner}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -137,6 +202,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     ...shadows.cardResting,
+  },
+  cardPressed: {
+    backgroundColor: colors.heiaSoft,
   },
   rail: {
     position: 'absolute',
@@ -190,6 +258,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     borderRadius: radius.sm,
   },
+  markerPressed: {
+    backgroundColor: colors.border,
+  },
+  markerClose: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    marginLeft: 2,
+  },
   markerDot: {
     width: 6,
     height: 6,
@@ -216,6 +292,25 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 220,
     borderRadius: radius.lg,
+  },
+  expand: {
+    position: 'absolute',
+    top: spacing.sm,
+    right: spacing.sm,
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  expandPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  expandIcon: {
+    fontSize: 15,
+    color: colors.surface,
+    fontWeight: '700',
   },
   reactions: {
     flexDirection: 'row',

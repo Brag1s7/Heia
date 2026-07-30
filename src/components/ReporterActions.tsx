@@ -20,6 +20,12 @@ interface ReporterActionsProps {
   onAction: (type: ReporterActionType) => void;
   /** I pause bytter «Pause»-knappen til «Fortsett» (andre omgang). */
   isPaused?: boolean;
+  /**
+   * Egen prop, ikke en `ReporterActionType`: et bilde er ikke en kamphendelse
+   * og går aldri gjennom `report_match_event`. Å legge det i unionen ville
+   * gjort typen usann om hva som kan rapporteres.
+   */
+  onPhoto?: () => void;
 }
 
 const goalActions: ActionButton[] = [
@@ -34,7 +40,11 @@ const RESUME_ACTION: ActionButton = {
   icon: '▶️',
 };
 
-export function ReporterActions({onAction, isPaused}: ReporterActionsProps) {
+export function ReporterActions({
+  onAction,
+  isPaused,
+  onPhoto,
+}: ReporterActionsProps) {
   // Pause og «fortsett» er samme plass i griddet — du er aldri i begge på én
   // gang. Slik unngår vi en knapp som er død halvparten av tiden.
   const smallActions: ActionButton[] = [
@@ -74,6 +84,16 @@ export function ReporterActions({onAction, isPaused}: ReporterActionsProps) {
           </Pressable>
         ))}
       </View>
+      {/* Egen, full bredde: bildet publiserer innhold til laget, mens raden
+          over rapporterer kampens tilstand. To ulike ting bør ikke se like ut. */}
+      {onPhoto && (
+        <Pressable
+          onPress={onPhoto}
+          style={({pressed}) => [styles.photoButton, pressed && styles.pressed]}>
+          <Text style={styles.smallIcon}>📷</Text>
+          <Text style={styles.photoLabel}>Legg ut bilde</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -131,6 +151,21 @@ const styles = StyleSheet.create({
   },
   smallLabel: {
     ...typography.bodySmall,
+    fontWeight: '600',
+  },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  photoLabel: {
+    ...typography.body,
     fontWeight: '600',
   },
 });

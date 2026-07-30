@@ -157,6 +157,8 @@ export interface FeedItem {
   imageUrl?: string;
   matchEvent?: MatchEvent;
   eventId?: string;
+  /** «Varsle hele laget» — festet øverst i feeden, varslet alle (00024). */
+  isPinned?: boolean;
   // Engasjement (Fase 2B) — 👏 «Heia»-reaksjoner + kommentarer
   heiaCount?: number;
   iReacted?: boolean;
@@ -180,7 +182,7 @@ export type RootTabParamList = {
   HjemStack: NavigatorScreenParams<HomeStackParamList> | undefined;
   KalenderStack: undefined;
   Opprett: undefined;
-  Inbox: undefined;
+  InboxStack: NavigatorScreenParams<InboxStackParamList> | undefined;
   ProfilStack: undefined;
 };
 
@@ -206,8 +208,17 @@ export type KalenderStackParamList = {
   EventDetail: {eventId: string};
 };
 
+// Varsler får egen stack så et trykk på et varsel kan åpne hendelsen eller
+// kommentartråden UTEN å kaste deg over i Hjem-fanen (tilbake = inboxen).
+export type InboxStackParamList = {
+  InboxList: undefined;
+  EventDetail: {eventId: string};
+  Comments: {postId: string; teamSpaceId: string};
+};
+
 export type ProfilStackParamList = {
   Profil: undefined;
+  TeamMembers: undefined;
   Invite: {firstTime?: boolean} | undefined;
   // Samme skjermer som i onboarding — her for å legge til lag nr. 2.
   JoinTeamCode: {prefillCode?: string} | undefined;

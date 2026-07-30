@@ -2,6 +2,7 @@ import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
+  Image,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -14,8 +15,8 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar, Button} from '../components';
-import {getComments, createComment} from '../lib/api/comments';
-import type {FeedComment, HomeStackParamList} from '../shared/types';
+import {getComments, createComment, getFeedPost} from '../lib/api/comments';
+import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Comments'>;
 
@@ -35,6 +36,7 @@ export function CommentsScreen({route}: Props) {
   const {postId, teamSpaceId} = route.params;
   const insets = useSafeAreaInsets();
 
+  const [post, setPost] = useState<FeedItem | null>(null);
   const [comments, setComments] = useState<FeedComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +46,15 @@ export function CommentsScreen({route}: Props) {
   const load = useCallback(async () => {
     setError(null);
     try {
-      setComments(await getComments(teamSpaceId, postId));
-    } catch (e) {
+      // Posten hentes parallelt: kommer du hit fra et varsel («Kari heiet på
+      // …») er tråden ofte tom, og uten innlegget øverst er skjermen blank.
+      const [postResult, commentResult] = await Promise.all([
+        getFeedPost(teamSpaceId, postId).catch(() => null),
+        getComments(teamSpaceId, postId),
+      ]);
+      setPost(postResult);
+      setComments(commentResult);
+    } catch {
       setError('Kunne ikke laste kommentarer.');
     } finally {
       setLoading(false);
@@ -63,7 +72,7 @@ export function CommentsScreen({route}: Props) {
       await createComment(postId, text);
       setText('');
       await load();
-    } catch (e) {
+    } catch {
       Alert.alert('Kunne ikke sende', 'Prøv igjen om litt.');
     } finally {
       setSending(false);
@@ -78,6 +87,33 @@ export function CommentsScreen({route}: Props) {
       <ScrollView
         style={styles.list}
         contentContainerStyle={styles.listContent}>
+        {/* Innlegget tråden hører til — konteksten et varsel ikke gir. */}
+        {post && (
+          <View style={styles.postCard}>
+            <View style={styles.postHeader}>
+              <Avatar
+                name={post.author.name}
+                size="sm"
+                uri={post.author.avatarUrl}
+              />
+              <View style={styles.postHeaderText}>
+                <Text style={styles.postAuthor}>{post.author.name}</Text>
+                <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
+              </View>
+            </View>
+            {post.content.trim().length > 0 && (
+              <Text style={styles.postContent}>{post.content}</Text>
+            )}
+            {post.imageUrl && (
+              <Image
+                source={{uri: post.imageUrl}}
+                style={styles.postImage}
+                resizeMode="cover"
+              />
+            )}
+          </View>
+        )}
+
         {loading ? (
           <ActivityIndicator style={styles.loader} color={colors.heia} />
         ) : error ? (
@@ -136,6 +172,41 @@ const styles = StyleSheet.create({
   listContent: {
     padding: spacing.lg,
     gap: spacing.lg,
+  },
+  postCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.borderSubtle,
+  },
+  postHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  postHeaderText: {
+    flex: 1,
+    gap: 1,
+  },
+  postAuthor: {
+    ...typography.body,
+    fontWeight: '600',
+  },
+  postTime: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+  postContent: {
+    ...typography.body,
+    lineHeight: 22,
+  },
+  postImage: {
+    width: '100%',
+    height: 180,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
   },
   loader: {
     marginTop: spacing.xl,

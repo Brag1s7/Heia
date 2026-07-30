@@ -1,6 +1,10 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-26 (etter Fase 3D — robust pause/andre omgang)_
+_Sist oppdatert: 2026-07-30 (**Fase 6 FERDIG** — lagoversikt, `00027` deployet,
+tsc grønn. **Fase 7 + 8 KODET, ikke verifisert** — kamera + kampbilder i
+tidslinja (`00028` deployet), og feed-kort som åpner kampen. Lint rent.
+**⚠️ Krever REBUILD** (ny Info.plist-nøkkel for kamera); ikke sett i
+simulator ennå.)_
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -13,20 +17,29 @@ Vi følger en godkjent fase-plan for «Team Activity Loop».
 Fase 3A (ekte events — lesing), Fase 3B (opprett hendelse + RSVP) og
 Fase 3C (hele live-kamp-loopen) er ferdig og verifisert i simulator.**
 **Fase 3D (pause ⇄ andre omgang) er kodet, `00021` er deployet, tsc grønn.**
-Neste store skive er **ekte push** (se «Fortsatt igjen»).
+**Fase 4 (EKTE PUSH): kode + native + backend er ute. `simctl push` viser
+varsler i simulator. Gjenstår vault-seed (din service_role_key) + Apple/APNs
+for at ekte push skal leve (se «Fase 4 — EKTE PUSH»).**
+**Fase 5 (INBOX) er kodet: Varsler-fanen leser `notifications`, har ulest-badge
+og deep-link til hendelse/kommentarer. Siste døde hjørne i appen er borte.**
 
 Branch: `Brage` (pushet til `origin/Brage` t.o.m. 3C). `npx eslint src` har 6
 errors + 5 warnings, alle fra før (ubrukte variabler i `Avatar`/`CommentsScreen`/
 `InviteScreen`, `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
 
-**Tsc-arbeidsmåte (lærdom):** full tsc tar 2–4 min. Kjør den ALLTID i bakgrunn
-(aldri forgrunn-med-timeout, aldri to samtidig), og bruk incremental-cache:
-`npx tsc --noEmit --incremental --tsBuildInfoFile <scratchpad>/heia.tsbuildinfo`.
+**Tsc-arbeidsmåte (LÅST):** Claude skal IKKE kjøre `tsc` (CLI) selv — heller
+ikke i bakgrunn. Det stjeler CPU fra brukerens egne bygg (npm/pod/Xcode/Metro)
+og ødelegger dem. Typefeil sjekkes i editoren (VS Code kjører TS-serveren live).
+Trengs en CLI-sjekk på en stor endring, spør brukeren først og la brukeren kjøre den.
 
 ### Ekte vs. mock akkurat nå
 - **Ekte (Supabase):** onboarding, hele feeden (tekst/bilde-poster, 👏 Heia-reaksjon, kommentarer), events/kalender/event-detalj/live-banner, **opprettelse av hendelser + kamper**, **RSVP-svar**, **medlemslisten**, **kampreporter**, **start av kamp**, **kamphendelser + stilling + feed-post**, **realtime på live kamp**, rollesjekk (fra membership).
-- **Fortsatt uekte:** `SimulatedPush` (lokal banner hos reporteren — ekte push
-  finnes ikke i appen i det hele tatt).
+- **Push:** hele pipelinen er KODET (Fase 4), men lever ikke før du har gjort
+  Apple/APNs-siden + rebuild. `SimulatedPush` består som reporterens lokale ekko
+  (reporteren er forfatter og får ikke ekte push — den går til alle andre).
+- **Inbox (Fase 5):** ekte lesing av `notifications` + ulest-badge + deep-link.
+  Radene skrives av `push-fanout`, som først fyrer når vault er seedet — se
+  «Fase 5» for test-SQL som fyller inboxen uten seed.
 - **All mock-data er borte.** `src/shared/mockData.ts` og `src/data/teamData.ts`
   er slettet — ingenting importerte dem lenger.
 
@@ -35,9 +48,13 @@ errors + 5 warnings, alle fra før (ubrukte variabler i `Avatar`/`CommentsScreen
 ## Backend (Supabase) — tilstand
 
 Prosjektet er linket (ref `sswncdrbsrfieudkdmhj`, config `Heia_Prod`). Migrasjoner
-00001–00021 er alle deployet til remote (00016/00017 var hand-kjørt fra før;
-reconciliert med `migration repair` 2026-07-08). `supabase db push` fungerer
+**00001–00022 er alle deployet** — `db push --dry-run` sier «Remote database is
+up to date» (2026-07-29). (00016/00017 var hand-kjørt fra før; reconciliert med
+`migration repair` 2026-07-08.) `supabase db push` fungerer
 (kjør med sandkasse av — nettverk kreves; `--dry-run` viser ubehandlede).
+**Edge Functions:** `push-fanout` er deployet (`supabase functions deploy
+push-fanout` fungerer også med sandkasse av — Docker trengs ikke, bare en
+warning).
 
 Eksisterende RPC-er: lese — `get_team_feed`, `get_event_with_rsvp`,
 `get_team_members`; skrive — `create_team_from_scratch`, `join_team_space`,
@@ -285,10 +302,7 @@ ferdige. Rettet:
   `MatchEvent` har fått `teamSide`.
 
 ### Fortsatt igjen etter dette
-- **Ekte push.** Dette er den store, og den eneste måten en forelder som *ikke*
-  har appen åpen får vite om målet. Krever native modul + rebuild + APNs +
-  Edge Function som leser `notifications`-tabellen (den finnes, tom). Egen skive.
-  `SimulatedPush` lever fortsatt som lokal bekreftelse til reporteren.
+- ~~Ekte push~~ → **kodet i Fase 4** (under). Venter på Apple/APNs + rebuild.
 - ~~Resume etter pause~~ + ~~`getLiveMatch` i pause~~ → **løst i Fase 3D** (under).
 - **`+`-knappens tredje valg** («Start kamp», beslutning 1) er ikke bygget —
   kampen startes fra kampsiden. Ren snarvei, loopen er hel uten.
@@ -382,6 +396,799 @@ Kodet 2026-07-26. Én migrasjon (`00021`, deployet), ingen native moduler →
    knappen er «Pause» igjen. Forelder på annen enhet ser byttet via realtime.
 4. Prøv å pause to ganger raskt / fortsette en kamp som alt spilles → vennlig
    Alert, ingen rar tilstand.
+
+## Fase 4 — EKTE PUSH — kode + native FERDIG, backend IKKE deployet
+
+Kodet 2026-07-26, native rebuild fullført 2026-07-27, **backend deployet
+2026-07-29**: `00022` ✅ pushet, Edge Function `push-fanout` ✅ deployet, ny
+native modul ✅ installert/bygget/kjører.
+
+### ✅ VERIFISERT 2026-07-29: `simctl push` virker
+`./scripts/push-test.sh` sender et varsel med **nøyaktig samme payload-form som
+`_shared/apns.ts` bygger** (`aps.alert.title/body`, `sound`, `thread-id`, +
+`feed_post_id`/`event_id`/`team_space_id` på toppnivå). Varselet dukket opp på
+begge bootede simulatorer. **Det beviser at AppDelegate + pod'en + forgrunns-
+visning er riktig koblet.** Presets: `maal|start|pause|slutt|melding`.
+
+### ⛔ HVORFOR EKTE PUSH (fra appen) IKKE VIRKER ENNÅ
+Bruker postet i appen og fikk ingenting. **Forventet.** `simctl push` injiserer
+varselet lokalt og **hopper over hele kjeden** — den beviser kun visning.
+Kjeden med status:
+
+```
+feed_posts INSERT                             ✅ skjer
+  → trigger notify_on_feed_post               ✅ deployet (00022)
+    → vault: project_url + service_role_key   ⛔ IKKE SEEDET → no-op, stille
+      → pg_net → push-fanout                  ✅ deployet
+        → notifications-rad (in-app-logg)     ⛔ nås aldri
+          → device_tokens                     ⛔ TOM (se under)
+            → APNs                            ⛔ ingen APNS_KEY/.p8
+```
+
+1. **Vault-secretene er den harde stopperen nå.** Uten dem returnerer
+   `notify_on_feed_post` `NEW` uten å gjøre noe — med vilje, så posten ikke
+   feiler av at push mangler. Seed dem (punkt 11 under) og hele fan-out-
+   logikken kan verifiseres via `notifications`-tabellen, **uten APNs**.
+2. **Simulator får normalt aldri en ekte APNs-device-token**, så
+   `device_tokens` blir stående tom uansett. Ekte push = Apple Developer
+   Program ($99/år) + fysisk iPhone. Ikke noe vi kan kode oss rundt.
+3. **⚠️ Forfatteren er ekskludert fra mottakerne** (`id !== post.author_id` i
+   push-fanout). Tester du med **samme bruker** på to simulatorer, blir
+   `recipients: 0` uansett hvor riktig alt annet er. Bruk to ulike kontoer.
+
+### Hva vi faktisk varsler på
+Ett hook på `feed_posts` INSERT dekker alt. Alle typer unntatt `system`:
+
+| `feed_posts.type` | Utløses av | Kategori |
+|---|---|---|
+| `match_start` | «Start kamp» → ⚽ Kampen er i gang | `match_live` |
+| `match_event` | MÅL, ⏸ Pause, ▶️ Andre omgang | `match_live` |
+| `match_end` | «Slutt» → 🏁 | `match_live` |
+| `melding` | tekstpost i feeden | `new_post` |
+| `bilde` | bildepost | `new_post` |
+| `paaminnelse` / `resultat` | typene finnes, appen lager dem ikke ennå | — |
+
+Mottakere = alle `status='active'` medlemmer i team_space, **minus forfatteren**,
+minus de med `notification_preferences.enabled=false` på kategorien (lag-rad
+slår global rad). Tittel = lagnavn for kamp, forfatternavn ellers.
+
+### Arkitektur — alt henger på ÉN hook
+Hver kamphendelse OG hver feed-post er allerede én rad i `feed_posts` (fra 3C).
+Så i stedet for å røre `report_match_event`/`createTextPost` la vi **én trigger
+på `feed_posts` INSERT**. Den fyrer et async `pg_net`-kall til Edge Function
+`push-fanout`, som regner ut mottakere og sender APNs.
+
+```
+report_match_event / createTextPost / createImagePost
+        │  (INSERT feed_posts — fantes alt)
+        ▼
+ trigger notify_on_feed_post ──pg_net (async)──► Edge Function «push-fanout»
+        │ (vault: project_url + service_role_key)      │
+                                        1. mottakere = aktive lagmedlemmer − forfatter
+                                        2. respekter notification_preferences (opt-out)
+                                        3. INSERT notifications (in-app-logg)
+                                        4. slå opp device_tokens
+                                        5. APNs HTTP/2 (JWT ES256 fra .p8)
+                                           410/BadDeviceToken → slett token
+```
+Ett hook = varsel for mål, avspark, pause, andre omgang, slutt, tekst OG bilde.
+`system`-poster hoppes over. Async pg_net → `report_match_event` blir ikke tregere.
+
+### Filer som er lagt til / endret
+- **`supabase/migrations/00022_push_notifications.sql`** — `device_tokens`-tabell
+  (+ RLS «egne tokens»), RPC-ene `register_device_token` (upsert på token, flytter
+  eier ved re-login) og `unregister_device_token`, og trigger-funksjonen
+  `notify_on_feed_post`. Aktiverer `pg_net` + `supabase_vault` (no-op på hosted).
+- **`supabase/functions/push-fanout/index.ts`** — Deno. Selv-autentiserer
+  (Bearer === service_role_key, `verify_jwt=false`). Mottakere, opt-out-logikk
+  (team-rad slår global), `notifications`-insert, APNs, rydder døde tokens.
+- **`supabase/functions/_shared/apns.ts`** — APNs HTTP/2 + provider-JWT ES256
+  signert med .p8 (Web Crypto, rå r||s = JOSE-format), token cachet ~50 min.
+  `APNS_HOST` defaulter til **sandbox**.
+- **`supabase/config.toml`** — `[functions.push-fanout] verify_jwt=false`.
+- **App:** `src/lib/api/push.ts` (RPC-wrappere), `src/lib/push/index.ts`
+  (permission + token-registrering; **lazy `require` i try/catch** så appen ikke
+  krasjer før native er bygget inn; native-kall også try/catch'et for
+  half-installed-vinduet), `src/components/PushGate.tsx` (koblet i `App.tsx`),
+  avregistrering i `signOut` (UserContext) — kalt FØR session tømmes, ellers er
+  `auth.uid()` null.
+- **`scripts/push-test.sh`** (ny, 2026-07-29) — `simctl push` til alle bootede
+  simulatorer med realistisk payload. `./scripts/push-test.sh maal|start|pause|slutt|melding [UDID]`.
+  Bundle-id overstyres med `HEIA_BUNDLE_ID` når den ekte settes (A1 under).
+- **Native:** `ios/Heia2/AppDelegate.swift` (APNs-delegatene → `RNCPushNotificationIOS`,
+  + forgrunns-visning via `UNUserNotificationCenter`), `ios/Heia2/Heia2-Bridging-Header.h`
+  (eksponerer ObjC-pod'en for Swift). `package.json` +
+  `@react-native-community/push-notification-ios ^1.11.0`.
+
+### ⚠️ DIN SIDE — gjør dette i ett jafs, så lever pushen
+**A. Apple Developer (nettleser):**
+1. Sett en **ekte bundle-id** (nå er den default `org.reactjs.native.example.Heia2`).
+   Velg f.eks. `no.heia.app` i Xcode → target Heia2 → Signing & Capabilities →
+   Bundle Identifier. Bruk SAMME verdi som `APNS_BUNDLE_ID` under.
+2. Registrer App ID-en med **Push Notifications**-capability (Certificates,
+   Identifiers & Profiles → Identifiers).
+3. Lag en **APNs Auth Key (.p8)** (Keys → +, huk av Apple Push Notifications).
+   Noter **Key ID** (10 tegn) og **Team ID** (10 tegn). Last ned .p8 (kun én gang!).
+
+**B. Xcode (native) — ✅ FERDIG 2026-07-27, ikke gjør om igjen:**
+- ✅ `npm install` + `pod install` → `RNCPushNotificationIOS (1.12.0)` installert.
+- ✅ **Bridging header satt** — `SWIFT_OBJC_BRIDGING_HEADER = "Heia2/Heia2-Bridging-Header.h"`
+  er skrevet inn i **begge** build-configs i `project.pbxproj` (linje ~280 og ~307).
+- ✅ **Build Succeeded** — appen kjører i simulator med push-modulen linket.
+- ⬜ **Gjenstår:** «Push Notifications»- + «Background Modes → Remote
+  notifications»-capability er **ikke** lagt til (krever Apple-konto for
+  signering; ikke nødvendig for `simctl push`-testing).
+
+**C. Supabase (kan kjøres av Claude, sandkasse av — men secrets er dine):**
+8. ✅ **GJORT 2026-07-29:** `supabase db push` (deployerte `00022`).
+9. ✅ **GJORT 2026-07-29:** `supabase functions deploy push-fanout`.
+10. ⬜ `supabase secrets set APNS_KEY_ID=xxxx APNS_TEAM_ID=xxxx APNS_BUNDLE_ID=no.heia.app APNS_HOST=api.sandbox.push.apple.com` og
+    `supabase secrets set APNS_KEY="$(cat AuthKey_XXXX.p8)"`.
+11. ⬜ **← NESTE STEG, og det eneste som er gratis.** Seed vault (ÉN gang, i
+    SQL-editoren — service_role_key fra Project Settings → API). Uten dette gjør
+    trigger'en ingenting. Etterpå: post noe i appen som bruker A og kjør
+    `select user_id, category, title, body, sent_at from notifications
+     order by sent_at desc limit 10;` — én rad per *annet* medlem betyr at hele
+    backenden er verifisert, og kun Apple-siden gjenstår.
+    ```sql
+    select vault.create_secret('https://sswncdrbsrfieudkdmhj.supabase.co', 'project_url');
+    select vault.create_secret('<SERVICE_ROLE_KEY>', 'service_role_key');
+    ```
+
+### Endringer i varsel-flyten (gjort 2026-07-26, etter design-diskusjon)
+- **Ingen kald permission-dialog ved innlogging.** iOS lar deg spørre **kun én
+  gang** — sier brukeren nei der, er døra stengt for godt. `PushGate` kaller nå
+  `refreshPushIfGranted()` som registrerer token **stille** hvis brukeren alt
+  har sagt ja, og ellers gjør ingenting.
+- **Ny 🔔 «Varslinger»-rad på ProfilScreen** er stedet man skrur på varsler.
+  Viser status (`PUSH_SUBTITLE`), ber om tillatelse første gang (`enablePush()`),
+  og sender ellers brukeren til iOS-Innstillinger (`Linking.openSettings()`).
+  Statusen refreshes via `AppState`-lytter når appen kommer i forgrunn.
+- `lib/push` eksporterer nå `getPushPermission`, `refreshPushIfGranted`,
+  `enablePush`, `stopPush`, `isPushAvailable` (ikke lenger `startPush`).
+
+### ⚠️ Native-lærdommer fra rebuilden (ikke gjenta)
+- **`didFailToRegisterForRemoteNotifications` er FJERNET fra `AppDelegate.swift`
+  med vilje.** Swift importerer pod'ens `...WithError:`-klassemetode under et
+  navn som ikke lot seg bygge («has no member»). De to andre kallene
+  (`didRegisterForRemoteNotifications(withDeviceToken:)` og
+  `didReceiveRemoteNotification(_:fetchCompletionHandler:)`) er **riktige** og
+  bygger. `registrationError`-eventet er ikke-essensielt. Ikke «fiks» dette ved
+  å gjette navnet på nytt uten å lese `RNCPushNotificationIOS.h`.
+- **fmt-patchen i `Podfile` er gjort idempotent.** Den kræsjet `pod install` med
+  `Permission denied @ rb_sysopen - Pods/fmt/include/fmt/base.h` fordi den
+  prøvde å skrive lappen på nytt i en read-only fil som alt var patchet. Nå
+  hopper den over når lappen finnes (+ `File.chmod(0644)` før skriving).
+- **`pod install` tar 20–60 min på denne maskinen** og ser død ut på
+  `Configuring the target with the New Architecture` / `react-native config`.
+  **Den er som regel bare treg — ikke Ctrl+C.** Avbryter du der, får du en
+  villedende `[!] Invalid Podfile file:` på `use_native_modules!` (linje 18) —
+  Podfilen er da IKKE ødelagt, det er bare den drepte Ruby-tråden.
+- **Maskin-kontensjon er hovedårsaken til all tregheten.** Verstinger, i tur og
+  orden funnet: full disk (98 %), `fseventsd` på 91 %, **Systeminnstillinger →
+  Lagring stående åpen** (`ApplicationsStorageExtension` 94 %), og Metro/Xcode/
+  to simulatorer samtidig. Lukk alt tungt før `pod install`.
+- **`ETIMEDOUT: connection timed out, read` fra metro-file-map** etter at
+  Mac-en har stått på i flere døgn = fastlåst filsystem-tilstand. Omstart
+  fikser det. (Verifisert at det IKKE var iCloud-eviction: 0 dataless-filer.)
+- **Prosjektet ligger i iCloud-synkede `~/Documents`.** Det har nå gitt
+  filsystem-trøbbel to ganger. Vurder å flytte til `~/Developer/` en dag —
+  egen operasjon, krever at Claude restartes i ny mappe.
+
+### ⚠️ Fallgruve å huske (kostet ellers timer)
+**APNs-token er miljøspesifikt.** Debug-build fra Xcode bruker **sandbox**
+(`api.sandbox.push.apple.com`); TestFlight/App Store bruker prod
+(`api.push.apple.com`). Feil `APNS_HOST` → `BadDeviceToken`. Default er sandbox.
+
+### Slik testes det (etter A–C, to enheter/simulatorer)
+1. Logg inn → godta varsel-dialogen. Sjekk i SQL at `device_tokens` fikk en rad.
+2. Enhet 2 (forelder) med appen i **bakgrunn**. Enhet 1 (trener) scorer et mål.
+3. Forelderen skal få en APNs-banner «⚽ MÅL! …» selv med appen lukket.
+4. Åpen app: banneret vises i forgrunn (UNUserNotificationCenter), og feeden
+   oppdateres uansett via realtime.
+5. `select * from notifications;` skal ha én rad per mottaker (in-app-loggen).
+6. Simulator uten push-støtte gir `registrationError` → stille no-op, ingen krasj.
+
+### Kjente v1-begrensninger (akseptert)
+- Ingen retry/kø på APNs-feil utover 410-opprydding (pg_net fire-and-forget).
+- Ingen deep-link ved trykk ennå — `data.feed_post_id/event_id` sendes med for
+  det, men appen navigerer ikke på tap i v1.
+- Android: `device_tokens.platform` finnes, men FCM-utsending er ikke bygget.
+- `notification_preferences` har ingen UI ennå (default = på; opt-out finnes i DB).
+
+---
+
+## Fase 5 — GJORT (Inbox / Varsler-fanen)
+
+Kodet 2026-07-29. **Ingen migrasjon, ingen native modul → kun Metro-reload.**
+Alt backend fantes fra før: `notifications` (00011) + RLS (00014:310–318,
+SELECT + UPDATE på egne rader). Ingen ny RPC.
+
+- **`src/lib/api/notifications.ts` (ny):** `getNotifications(teamSpaceId)`,
+  `getUnreadCount(teamSpaceId)`, `markAsRead(ids)`, `markAllAsRead(teamSpaceId)`.
+  Direkte select — RLS avgrenser til egne rader av seg selv.
+  Team-filteret er `.or('team_space_id.eq.X,team_space_id.is.null')`: uten
+  null-grenen ville en global `system`-melding aldri dukket opp.
+  `markAsRead` har `.is('read_at', null)` så et nytt trykk på en lest rad ikke
+  flytter tidspunktet.
+- **`src/context/NotificationsContext.tsx` (ny):** ulest-telleren må deles av
+  **to** steder — badgen i tab-baren og InboxScreen, som senker den i det du
+  leser en rad. Uten delt tilstand ble badgen stående til neste omstart.
+  `markRead` senker telleren optimistisk og refetcher etterpå.
+  **`getUnreadCount` svelger feil med vilje — en badge skal aldri velte appen.**
+  Refresh skjer ved fanebytte (`screenListeners={{focus}}` på `Tab.Navigator`)
+  og når appen kommer i forgrunn (`AppState`). **`notifications` ligger IKKE i
+  `supabase_realtime`-publiseringen**, så det finnes ingen push-oppdatering av
+  telleren — legg den til der hvis badgen skal tikke live.
+- **`NotificationRow.tsx` (ny):** emoji per `category`, ulest = heiaSoft-flate +
+  grønn prikk + fet tittel, lest = hvit flate + dempet tittel.
+- **`InboxScreen`** skrevet om: pull-to-refresh + `useFocusEffect` (samme
+  mønster som `KalenderScreen`), «Merk alle som lest» i headeren når det finnes
+  uleste (uten den kunne badgen bli stående for alltid), tom-tilstand.
+- **Egen `InboxStack`** (`InboxList` + `EventDetail` + `Comments`).
+  Tab-en het `Inbox`, heter nå `InboxStack` med label **«Varsler»**.
+  Grunn: et trykk på et varsel skal åpne hendelsen/tråden **uten** å kaste deg
+  over i Hjem-fanen — tilbake-knappen fører til inboxen. Samme gjenbruk av
+  `EventDetailScreen`/`CommentsScreen` på tvers av stacker som Kalender gjør.
+- **Deep-link-regelen:** `data.event_id` → `EventDetail` (kamphendelser har den,
+  fordi `report_match_event` stempler `event_id` på feed-posten), ellers
+  `data.feed_post_id` → `Comments`. Uten mål markerer trykket bare som lest.
+  Dette er deep-link-en push mangler i v1 — gjenbrukes den dagen APNs lever.
+
+### ⚠️ Inboxen er tom uten data — og `simctl push` fyller den IKKE
+
+`./scripts/push-test.sh` injiserer varselet lokalt i simulatoren og **rører
+aldri databasen**. Fikk du bannere men tom Varsler-fane: det er forventet, ikke
+en bug. Radene må komme fra én av disse to:
+
+1. **Vault-seeden** (Fase 4, punkt 11) — den permanente fiksen. Etterpå skriver
+   `push-fanout` ekte rader hver gang noen poster. Krever **ingen** Apple-konto.
+   **Men:** forfatteren ekskluderes, så poster du med din egen bruker får DU
+   ingen rad. Test med to kontoer, ellers ser inboxen fortsatt tom ut.
+2. **Test-SQL** (raskest): lager varsler **til deg selv** av de siste
+   feed-postene i lagene dine — uten forfatter-ekskludering, nettopp fordi
+   én-konto-testing ellers gir null rader. Deep-link-ene virker (ekte
+   `feed_post_id`/`event_id`). Bytt ut e-posten med testkontoens:
+
+```sql
+with me as (select id from auth.users where email = '<DIN E-POST>')
+insert into public.notifications
+  (user_id, team_space_id, category, title, body, data,
+   source_entity_type, source_entity_id, sent_at)
+select me.id, p.team_space_id,
+       case when p.type in ('match_start','match_event','match_end') then 'match_live'
+            when p.type = 'paaminnelse' then 'event_reminder'
+            else 'new_post' end,
+       coalesce(pr.display_name, 'Heia'),
+       coalesce(nullif(p.content, ''), 'Ny aktivitet i laget'),
+       jsonb_build_object('feed_post_id', p.id, 'event_id', p.event_id,
+                          'team_space_id', p.team_space_id, 'type', p.type),
+       'feed_post', p.id, now()
+from me
+join public.memberships m on m.user_id = me.id and m.status = 'active'
+join lateral (select * from public.feed_posts fp
+              where fp.team_space_id = m.team_space_id
+              order by fp.created_at desc limit 8) p on true
+left join public.profiles pr on pr.id = p.author_id;
+```
+
+Feilsøking, i denne rekkefølgen:
+```sql
+select count(*) from public.notifications;              -- 0 = ingen data, ikke UI-feil
+select user_id, team_space_id, category, title, read_at -- ser radene riktige ut?
+from public.notifications order by created_at desc limit 10;
+```
+Er `count` > 0 men fanen fortsatt tom: sjekk at `user_id` er den innloggede
+brukeren og at `team_space_id` er det **aktive** laget (skjermen filtrerer på
+aktivt lag + globale rader).
+
+### Test dette (Metro-reload, ingen rebuild)
+1. Kjør test-SQL-en (eller vault-seeden) → ✉-fanen får en rød badge med tallet.
+2. Åpne Varsler → uleste har grønn flate + prikk, leste er hvite og dempet.
+3. Trykk et kampvarsel → hendelsen åpnes, raden blir lest, badgen går ned med 1.
+   Tilbake-knappen fører til inboxen, ikke til Hjem.
+4. Trykk et vanlig innlegg → kommentartråden åpnes.
+5. «Merk alle som lest» → badgen forsvinner umiddelbart, alle radene blir hvite.
+6. Dra ned for å refreshe. Bytt fane frem og tilbake → badgen holder seg riktig.
+
+## Fase 5B — GJORT (inboxen fyller seg selv + kun ekte varsler)
+
+Migrasjon **`00023_inbox_direct_write.sql` ✅ deployet 2026-07-29**,
+`push-fanout` ✅ redeployet. Rettet to feil fra 00022:
+
+### 1. Hele inboxen hang på vault — den gjør den ikke lenger
+`notify_on_feed_post` skrev **ingen** rader selv; den fyrte bare et pg_net-kall
+til Edge-funksjonen, som skrev dem. Uten `project_url` + `service_role_key` i
+vault returnerte den `NEW` og gjorde ingenting — så inboxen var tom for alltid,
+uansett hvor mye man postet. **Nå INSERT-er trigger'en `notifications` selv, i
+samme transaksjon som posten.** Ingen secrets, ingen Edge Function, ingen Apple
+trengs for at Varsler-fanen skal virke. pg_net-kallet står igjen, men gjør nå
+**kun** APNs, og kun hvis vault faktisk er seedet.
+
+**Regel å huske: in-app-funksjonalitet skal aldri gå veien om en Edge Function
+som krever secrets. Legg den i databasen.**
+
+### 2. Varsler var en kopi av Hjem
+Alt i feeden ble et varsel. Nå varsles det kun på det som *er* et varsel:
+
+| Utløser | Kategori | Finnes i feeden? |
+|---|---|---|
+| Mål, avspark, pause, andre omgang, slutt | `match_live` | ja — men dette er «du gikk glipp av det»-øyeblikket |
+| **Kommentar på DITT innlegg** (ny trigger på `comments`) | `new_comment` | **nei — adressert til én person** |
+| **Ny hendelse i kalenderen** (ny trigger på `events`) | `event_reminder` | **nei — `create_event` lager ingen feed-post** |
+| Vanlig melding / bilde i feeden | — | **varsles IKKE lenger. Det ER feeden.** |
+
+Vil du ha vanlige innlegg tilbake i inboxen: legg `WHEN 'melding' THEN 'new_post'`
+tilbake i `CASE`-en i `notify_on_feed_post`. Det er én linje.
+
+### 3. `push-fanout` regner ikke lenger ut mottakere
+Den leser `notifications`-radene trigger'en alt har skrevet
+(`source_entity_type='feed_post'`) og sender APNs til dem. Ellers ville vi fått
+**doble rader** i det vault ble seedet. Én mottakerliste = inbox og push kan
+ikke komme ut av synk. pg_net sender først etter commit, så radene finnes.
+
+### `inbox_enabled(user, team, category)`
+Ny SQL-hjelper: lag-rad i `notification_preferences` slår global rad, ingen rad
+= på. `COALESCE(..., true)` er ikke pynt — uten den blir «ingen rad» NULL, og
+`WHERE NULL` filtrerer bort **alle** mottakerne (samme NULL-felle som i 00020).
+
+### ⚠️ Alle varsler ekskluderer den som utløste dem
+Reporteren får ikke sitt eget mål, treneren ikke sin egen hendelse, og du får
+ikke varsel om din egen kommentar. **Med ÉN konto ser inboxen derfor fortsatt
+tom ut, uansett hvor riktig alt er.** Slik testes det ordentlig:
+
+1. Sim 2: logg inn som en **annen** bruker, bli med i laget med invitasjonskoden.
+2. Sim 1 (trener): opprett en trening → **sim 2 får «Ny trening …» med én gang.**
+3. Sim 2: kommenter på et av sim 1s innlegg → **sim 1 får «… kommenterte
+   innlegget ditt».**
+4. Sim 1: start kamp og trykk MÅL → **sim 2 får «⚽ MÅL! …».**
+
+Alt dette virker **uten vault, uten APNs og uten Apple-konto.**
+
+## Fase 5C — GJORT (👏-varsel + «Varsle hele laget»)
+
+Migrasjon **`00024_reaction_and_broadcast.sql` ✅ deployet 2026-07-29**.
+Ingen native modul → **kun Metro-reload.**
+
+### 1. 👏 «Heia» varsler forfatteren — aggregert
+Kudos-varselet er motoren i innholdsløkka: du poster, noen heier, du får
+beskjed, du poster igjen. Uten det er det ingen belønning for å dele.
+- Ny kategori **`new_reaction`**. CHECK-ene i 00011 er inline på kolonnen med
+  autogenerert navn, så migrasjonen finner dem via `pg_constraint` i stedet for
+  å gjette navnet — **treffer man feil navn blir den gamle CHECK-en stående og
+  hver eneste reaksjon feiler.**
+- **Aggregering:** finnes det alt en ULEST reaksjonsrad for samme innlegg,
+  oppdateres den («Kari og 3 andre heiet på innlegget ditt») i stedet for å lage
+  en ny. `created_at` bumpes så den går øverst. Er raden lest lages en ny.
+  Uten dette ville ti som heier gitt ti rader — akkurat støyen 00023 ryddet bort.
+- Un-heia (DELETE) fjerner ikke varselet. Akseptert v1.
+
+### 2. «Varsle hele laget» — trenerens kringkasting
+Etter 00023 varsler ikke vanlige innlegg. Men noen ganger *er* innlegget
+viktig, og da sier avsenderen det selv:
+- Avkrysning i compose-boksen på TeamHome, **kun synlig for trener/lagleder**.
+  Setter `is_pinned` → varsel i kategorien `admin_message`.
+- `is_pinned` fantes fra 00009, og `get_team_feed` sorterer alt
+  `ORDER BY fp.is_pinned DESC` — så posten går øverst uten ny kode.
+- **`FeedCard` viser «📌 VIKTIG» + rail på pinnede poster.** Uten det trykker
+  treneren «varsle alle» og feeden ser helt lik ut — funksjonen ble usynlig.
+  `FeedItem.isPinned` + `mapFeedRow` hydrerer feltet (RPC-en returnerte det alt).
+- Tittelen i varselet er **forfatterens navn** for `admin_message` (det er
+  treneren som snakker), men **lagnavnet** for kamp (det er laget som spiller).
+
+### ⚠️ Pinning er låst i DATABASEN, ikke bare i UI-et
+INSERT-policyen på `feed_posts` sjekker kun medlemskap, så uten vakt kunne
+hvilken som helst forelder satt `is_pinned` via API-et og varslet hele laget.
+Ny BEFORE INSERT/UPDATE-trigger `enforce_pin_is_admin` kaster
+«Kun trener eller lagleder kan varsle hele laget».
+`COALESCE(is_team_admin(...), false)` — uten den er `IF NOT NULL` usant og
+vakten slipper alle gjennom (NULL-fellen fra 00020 igjen).
+
+### Test dette (Metro-reload, migrasjon alt ute)
+1. Sim 2 heier 👏 på et innlegg fra sim 1 → **sim 1 får «… heiet på innlegget
+   ditt»**. La en tredje bruker heie også → samme rad blir «og 1 annen …».
+2. Les varselet, la noen heie igjen → **ny** rad (den forrige er sett).
+3. Som trener: skriv et innlegg, huk av **🔔 Varsle hele laget** → posten får
+   «📌 VIKTIG» og ligger øverst, og alle andre får et varsel.
+4. Som forelder: avkrysningen finnes ikke. (Prøver man via API-et: exception.)
+
+## Fase 5D — GJORT (live overalt + løsne festet post)
+
+Migrasjon **`00025_realtime_feed.sql` ✅ deployet 2026-07-29**. Ingen native
+modul → **kun Metro-reload.** To hull funnet av bruker under testing.
+
+### 1. Bare kampen var live
+`00020` la KUN `match_sessions` + `match_events` i `supabase_realtime`. Alt
+annet krevde pull-to-refresh: sto du på Hjem mens noen postet eller heiet,
+skjedde ingenting. Nå er `feed_posts`, `reactions`, `comments` **og**
+`notifications` med i publiseringen.
+- **`subscribeToFeed(teamSpaceId, onChange)`** i `feed.ts`. `feed_posts`
+  filtreres på `team_space_id`; `reactions`/`comments` **har ikke** den
+  kolonnen, så de abonneres ufiltrert — trygt, fordi realtime respekterer RLS
+  og du kun mottar rader du uansett kunne lest.
+- **Debounce på 400 ms i `TeamHomeScreen`.** Én burst med 👏 fra flere
+  foreldre skal bli ÉN refetch, ikke ti. `loadFeed` setter ikke `loading`,
+  så oppdateringen skjer uten at spinneren blinker.
+- **Refetch, ikke flett inn payloaden** — samme valg som `subscribeToMatch`:
+  feeden må uansett sorteres (pinnet øverst) og signerte bilde-URL-er hentes
+  på nytt.
+- **Live ulest-badge:** kanalen bor i `NotificationsContext` og teller opp
+  `liveNonce`. `InboxScreen` bruker den som dependency og laster lista på
+  nytt — **én kanal dekker både badgen og skjermen**. Ikke lag en kanal til
+  i InboxScreen.
+
+### 2. Festede poster kunne aldri fjernes
+«Varsle hele laget» festet posten øverst for alltid — det fantes ingen vei ut.
+- **`unpinPost(postId)`** i `feed.ts`. RLS hadde alt det som trengtes:
+  «Authors can update own posts» + **«Admins can moderate posts»** (00014:194),
+  så trener/lagleder kan løsne også andres. `enforce_pin_is_admin` (00024)
+  vokter kun veien INN i festet tilstand, så å sette `false` er alltid lov.
+  `.select('id')` + egen kastet feil, fordi RLS-avslag gir null rader uten error.
+- **Selve «📌 VIKTIG»-markøren er knappen** (med `✕`), kun for trener/lagleder.
+  Den står nettopp der man lurer på «hvorfor ligger denne øverst?».
+- Bekreftelsesdialog, fordi **det finnes ingen «fest igjen»-knapp** på en
+  eksisterende post — vil du feste noe på nytt må det postes på nytt.
+  Naturlig neste utvidelse: `setPinned(id, true/false)` + auto-utløp etter
+  f.eks. 7 dager, så gamle beskjeder rydder seg selv.
+
+### Test dette (Metro-reload, migrasjon alt ute)
+1. To simulatorer på Hjem. Sim 2 poster → **innlegget dukker opp hos sim 1
+   uten pull-to-refresh.** Samme med 👏 (telleren beveger seg) og kommentarer.
+2. Sim 2 heier på sim 1s innlegg → **badgen på Varsler tikker opp live**, og
+   står du på Varsler-fanen dukker raden opp av seg selv.
+3. Som trener: trykk «📌 VIKTIG ✕» på en festet post → bekreft → merket og
+   toppplasseringen forsvinner, hos begge, live.
+4. Som forelder: markøren er ikke trykkbar.
+
+## Fase 5E — GJORT (varselet sier hva det gjelder)
+
+Migrasjon **`00026_notification_context.sql` ✅ deployet 2026-07-29**.
+Ingen native modul → **kun Metro-reload.** Funnet av bruker under testing.
+
+### Problemet
+«Kari heiet på innlegget ditt» sa ikke HVILKET innlegg — og trykket førte til
+kommentarskjermen, som for en **reaksjon** typisk er helt tom. Altså: et varsel
+uten kontekst som leder til en blindvei. Rettet i begge ender.
+
+### 1. Varselet bærer nå et utdrag av posten
+- Ny SQL-hjelper **`post_ref(content, type)`**: siterer og forkorter teksten
+  (`«Husk drakter i morgen»`, 60 tegn + `…`). En bildepost uten tekst har
+  ingenting å sitere og omtales som `bildet ditt`.
+- `notify_on_reaction` → «heiet på «Husk drakter»» / «og 3 andre heiet på …».
+- `notify_on_comment` → «kommenterte på «Husk drakter»: Ja, jeg tar med ekstra».
+  Kommentaren kortes til 60 tegn (var 80) fordi referansen tar plass.
+- **Raden er nå selvforklarende uten å trykke** — det er den viktigste halvdelen.
+
+### 2. Innlegget vises øverst i tråden
+- **`getFeedPost(teamSpaceId, postId)`** i `comments.ts`. Direkte select
+  (RLS «Members can view feed»), forfatter via `getMemberMap` som resten av
+  fila — **profiles-RLS gir ikke lagkameraters navn direkte.**
+- **`media_attachments` er polymorf** (`entity_type`/`entity_id`, ingen FK til
+  feed_posts), så PostgREST kan ikke embedde den fra `feed_posts`. Bildet
+  hentes i et eget kall + signert URL. Ikke prøv å løse det med `select(...)`.
+- `CommentsScreen` laster post + kommentarer parallelt. Posten er
+  `.catch(() => null)` — feiler den skal tråden fortsatt vises.
+- Ryddet samtidig de to gamle `catch (e)`-lint-feilene i fila.
+
+### Test dette
+1. Sim 2 heier på et innlegg fra sim 1 → varselet sier **hvilket** innlegg.
+2. Trykk på det → innlegget står øverst, med bilde hvis det er en bildepost,
+   over (den kanskje tomme) kommentartråden.
+3. Samme for et kommentarvarsel.
+
+## ⏸ Fase 4 (push) er PARKERT — ikke en åpen oppgave
+Kode + native + backend er ferdig og deployet; `simctl push` verifisert. Det
+som gjenstår er **kun** Apple Developer ($99/år) + fysisk iPhone. Uten
+vault-secrets ligger trigger'en trygt i dvale (no-op by design) — ingenting
+i appen ryker. Plukk den opp den dagen Apple-kontoen finnes.
+Bruker-beslutning 2026-07-29: **ikke bruk mer tid på push nå.** Dette samsvarer
+med den låste 3C-beslutningen (realtime nå, ekte push som egen skive senere).
+
+---
+
+## ✅ Fase 6 — Lagoversikt (FERDIG 2026-07-30)
+
+Laget er ikke lenger usynlig: **Profil → Lagoversikt** viser hvem som er med,
+gruppert per rolle, og gir trenere en måte å nå én forelder på.
+
+**Hva som ble bygget**
+- `supabase/migrations/00027_team_roster.sql` — `get_team_members()` gjenskapt
+  (DROP + CREATE, fordi returtypen endret seg) med en ny `phone`-kolonne.
+  **To grenser håndheves i SQL-en, ikke i UI-et:** du ser alltid ditt eget
+  nummer; lagadmin (`is_team_admin`) ser andre voksnes nummer; **spillerkontoer
+  — barna — eksponerer aldri nummeret sitt til noen.** Deployet.
+- `src/lib/api/members.ts` — `TeamMember` utvidet med `status`, `joinedAt`,
+  `childNames[]` og `phone`. Duplikatradene slås nå *sammen* i stedet for at
+  den andre forkastes, så en forelder med to barn blir «Forelder til A og B».
+  Endringen er additiv — `EventDetailScreen` og `comments.ts` er urørt.
+- `src/screens/TeamMembersScreen.tsx` — seksjoner (trenere/lagledere,
+  foreldre, spillere), «deg»-merke, «Invitert»-chip for dem som ikke har åpnet
+  appen ennå, pull-to-refresh, og «Inviter til laget» nederst.
+  Trykk på en rad med nummer → Ring / Send melding via `Linking`.
+- `src/shared/roles.ts` — `ROLE_LABELS` flyttet hit fra `ProfilScreen` og deles
+  nå av begge skjermene.
+- Registrert i `ProfilStack` (`AppNavigator`, `ProfilStackParamList`), med
+  inngang som ListRow i `ProfilScreen`.
+
+**Blokkeren som dukket opp underveis (og ble løst):** `profiles.phone` fantes,
+men *ingenting i appen skrev noen gang til den* — `updateProfile` godtok bare
+`displayName`/`avatarUrl`. Telefonkolonnen ville altså vært tom for alle.
+Derfor: `updateProfile` tar nå `phone` (`null` = fjern nummeret),
+`AuthContext` har fått `refreshProfile()`, og Profil har raden
+«Telefonnummer» som lagrer via `Alert.prompt`. **`Alert.prompt` er
+iOS-only** — raden er derfor `Platform.OS === 'ios'`-gated, og Android trenger
+en egen liten flate den dagen det blir aktuelt.
+
+### Test dette
+1. Profil → **Telefonnummer** → skriv inn ditt nummer → lagre.
+2. Profil → **Lagoversikt**: se seksjonene. Som trener skal 📞 stå på voksne
+   som har lagt inn nummer — aldri på spillere. Som forelder skal du ikke se
+   andres numre i det hele tatt.
+3. Inviter noen uten at de logger inn → de står med «Invitert».
+
+### 🚫 Direktemeldinger — bevisst IKKE bygget (bruker enig 2026-07-29)
+DM mellom voksne og barn i en ungdomsidrettsapp er et sikkerhetsproblem, ikke
+en funksjon: norske klubber har retningslinjer mot lukket én-til-én-kontakt
+mellom voksne og andres barn. Bygges det senere skal det være **voksen-til-
+voksen** (trener ↔ forelder), aldri mot spillerkontoer. DM utløser dessuten
+strengere krav fra Apple (guideline 1.2: blokkering + rapportering blir
+obligatorisk). Behovet bak spørsmålet løses av telefonnummer i lagoversikten.
+
+## ✅ Fase 7 — Kamera + kampbilder (KODET 2026-07-30, ikke verifisert i sim)
+
+**⚠️ KREVER REBUILD** — `Info.plist` har fått `NSCameraUsageDescription`.
+Uten den *avslutter iOS appen* i det kameraet åpnes (den spør ikke, og avslår
+ikke). Metro-reload er ikke nok. Ingen ny pod — `react-native-image-picker`
+var allerede installert, og `launchCamera` ligger i samme pakke.
+
+**Hva som ble bygget**
+- `src/lib/media.ts` — `pickTeamImage({preferCamera})` spør «Ta bilde / Velg fra
+  kamerarullen» og returnerer bildet klart for opplasting. Den viser sine egne
+  feilmeldinger, så kallstedet sjekker bare for `null`. `preferCamera` snur
+  rekkefølgen: kamera først i kamp, kamerarull først i hjem-feeden.
+- `src/lib/api/feed.ts` — opplastingen er trukket ut som `uploadTeamImage()`,
+  så RN-fella (base64 → ArrayBuffer, ALDRI fil-URI i `.upload()`) bor ett sted.
+  `createImagePost` tar nå valgfri `eventId` + `matchEventId`.
+  Ny `getMatchPhotos(eventId)` med signerte URL-er.
+- `supabase/migrations/00028_match_photos.sql` — `get_match_photos(evt_id)`.
+  **Deployet.** Egen RPC fordi `media_attachments (entity_type, entity_id)` er
+  en generisk peker og IKKE en fremmednøkkel — PostgREST kan ikke joine over
+  den, så et nested select fra klienten er umulig.
+- `MatchPhotoSheet` — forhåndsvisning + valgfri tekst + valget «Generelt
+  kampbilde» eller ett bestemt øyeblikk fra kampforløpet (nyeste øverst).
+- `MatchTimeline` — **bildene bor i kampforløpet, ikke i en egen seksjon**
+  (bruker-beslutning 2026-07-30). Et bilde knyttet til en hendelse henger på
+  hendelsen; et generelt kampbilde er sitt eget innslag på minuttet det ble
+  lagt ut. Minuttet regnes ut med SAMME formel som serveren bruker i
+  `report_match_event`, så bilder og hendelser deler minuttskala. Deler de
+  minutt, kommer hendelsen først — bildet er som regel av det som nettopp
+  skjedde. `newestFirst` i live, forfra i rapporten (som før).
+- `MatchPhotoRail` + `MatchPhotoGallery` — kompakt thumbnail-rad **kun på
+  ferdigspilt kamp**, som åpner fullskjerm galleri med sveiping. Under kampen
+  skal ingenting konkurrere med stillingen; etterpå er bildene det man kommer
+  tilbake for. Bildene blir uansett stående i forløpet.
+- `ReporterActions` — «📷 Legg ut bilde» i full bredde under handlingsknappene.
+  Egen `onPhoto`-prop, IKKE en ny `ReporterActionType`: et bilde er ikke en
+  kamphendelse og går aldri gjennom `report_match_event`.
+- `TeamHomeScreen` bruker samme velger — publiseringsflyten er uendret.
+
+**Låst beslutning (bruker, 2026-07-30):** vanlige innlegg fra hjem-feeden får
+**IKKE** automatisk kobling til en pågående kamp. Kampkobling skjer kun via
+reporterens bildeknapp inne på kampen. Ett bilde per innlegg, tekst valgfri.
+
+### ⚠️ Kamera kan IKKE testes i simulator
+iOS-simulatoren har ingen kameramaskinvare og svarer alltid `camera_unavailable`
+— det er ikke noe som kan konfigureres bort. `pickTeamImage` gir da en ærlig
+melding («velg fra kamerarullen i stedet») i stedet for å sende brukeren til
+Innstillinger for et problem som ikke er en tillatelse. **Alt annet er testbart**
+via kamerarullen, som simulatoren har bilder i fra før.
+
+Kamera trenger ingen egen innstilling i appen: iOS lager Innstillinger → Heia
+automatisk så snart appen har spurt én gang. Varslingsraden i `ProfilScreen` er
+unntaket (ingen naturlig spørreøyeblikk + token-registrering), ikke regelen.
+
+### Test dette (etter rebuild)
+1. Hjem → skriv innlegg → bildeknapp → **begge** valg skal dukke opp.
+2. Start en kamp, registrer et mål, trykk «📷 Legg ut bilde» → velg fra
+   kamerarullen → velg målet i lista → bildet vises **under målet** i
+   kampforløpet, ikke i en egen seksjon øverst.
+3. Samme, men «Generelt kampbilde» → eget 📷-innslag i forløpet på det
+   minuttet det ble lagt ut.
+4. Avslutt kampen → kompakt «Kampbilder»-rad øverst, trykk → galleri med
+   sveiping. Bildene skal fortsatt ligge i forløpet.
+5. Bildet skal også ligge i hjem-feeden som en vanlig bildepost.
+
+**Ikke verifisert:** `tsc` er ikke kjørt (låst regel — se under), og ingenting
+er sett i simulator ennå.
+
+---
+
+## ✅ Fase 8 — Feed → kamp-navigasjon (KODET 2026-07-30, ikke verifisert)
+
+Ren TS/TSX. **Ingen migrasjon, ingen rebuild** — men den kom sammen med Fase 7,
+så du trenger uansett rebuilden derfra.
+
+Kampen er hovedobjektet: feeden viser høydepunktene, kampsiden samler hele
+historien. Derfor åpner alt som hører til en kamp kampsiden.
+
+- `FeedCard` — ny `onPress` (hele kortet) + `onExpandImage` (lite ⤢-ikon oppå
+  bildet). `onPress` settes KUN på poster som fører et sted; en vanlig melding
+  skal ikke se trykkbar ut. Heia/Kommenter/løsne/forstørr er egne `Pressable`-er
+  inni kortet — den innerste tar trykket i RN, så de utløser aldri navigasjon.
+- `TeamHomeScreen` — `openableMatchId(item)` avgjør målet. **NB på navnet:**
+  den returnerer en `event_id`, ikke en `match_event_id`. Kodebasen har begge,
+  og de er lette å blande.
+- Fullskjermbilde gjenbruker `MatchPhotoGallery` med ett element.
+
+**Navigerer:** `match_start`, `match_event`, `match_end`, `resultat`, og
+`bilde` **med** `event_id` (kampbilder) → `EventDetail` med eksisterende
+`eventId`. **Navigerer ikke:** vanlige meldinger, påminnelser, og bilder uten
+kampkobling.
+
+**Bevisst utsatt (bruker-beslutning 2026-07-30):** ingen rulling til eller
+fremheving av en konkret kamphendelse. Derfor ingen `focusMatchEventId`,
+ingen layout-register, ingen endring i `MatchTimeline`. Bygges hvis behovet
+faktisk viser seg.
+
+**Kjent, urørt:** `get_team_feed` returnerer `match_event_id` (00015:306, 328),
+men `mapFeedRow` i `feed.ts` mapper det ikke. Derfor er `FeedItem.matchEvent`
+alltid `undefined`, og kampkortenes markør sier alltid «KAMP» og aldri
+«34′ KAMP». Å fikse minuttet krever at RPC-en også returnerer minuttet — altså
+en migrasjon. Ligger her som en kjent, liten kosmetisk mangel.
+
+---
+
+## ✅ Fase 9 — Push → riktig kamp (KODET 2026-07-30, ikke verifisert)
+
+Ren TS. Ingen migrasjon, ingen rebuild, ingen ny pakke. **Kan testes UTEN
+Apple Developer** — `simctl push` er allerede verifisert, og et trykk på
+varselet i simulatoren utløser nøyaktig samme handlere som ekte push.
+
+Push, hjem-feed og kampside peker nå på samme sted: `EventDetail` med `event_id`.
+
+- `src/navigation/deepLink.ts` (ny) — `navigationRef` +  `openEvent(eventId)` +
+  `flushPendingDeepLink()`. Push-lytteren bor utenfor React-treet og har ingen
+  `useNavigation`; den trenger en referanse som virker fra en callback som kan
+  fyre når som helst. Målet **parkeres** hvis navigatoren ikke er klar, eller
+  hvis onboarding står fremme (da finnes ikke `HjemStack`).
+- `AppNavigator` — `ref={navigationRef}` + `onReady={flushPendingDeepLink}`,
+  og et nytt forsøk når `MainTabs` monteres (første øyeblikk et mål faktisk
+  kan åpnes etter innlogging).
+- `lib/push/index.ts` — `notification`-lytteren sjekker nå `userInteraction`
+  (TRYKK, ikke levering) og åpner kampen. Ny `consumeInitialNotification()`
+  for kaldstart, kalt fra `PushGate` når det finnes en innlogget bruker.
+
+**Verifisert mot koden, ikke gjettet:** `sendApns` sprer `payload.data` på
+TOPPNIVÅ i APNs-JSON-en (`_shared/apns.ts:125`), og biblioteket legger alle
+nøkler utenom `aps` i `_data`. Derfor ligger `event_id` FLATT i `getData()` —
+ikke nøstet under `data`. Hadde den vært nøstet, ville navigasjonen aldri
+fyrt, helt stille. `userInteraction` settes til tallet `1` av native-siden
+(`RCTConvert+Notification.m:299`).
+
+**Ikke bygget (bruker-beslutning 2026-07-30):** ingen `match_event_id`, ingen
+rulling til eller fremheving av en konkret hendelse. Kun push → riktig kamp.
+
+### Test dette
+1. `xcrun simctl push <device> <bundleId>` med en payload som har `event_id`
+   på toppnivå ved siden av `aps`.
+2. Trykk varselet med appen **åpen**, i **bakgrunnen**, og **helt lukket** —
+   alle tre skal ende på samme EventDetail.
+3. Lukket app + utlogget bruker: målet skal parkeres og åpne seg først når
+   fanene er montert etter innlogging.
+
+---
+
+## 🐞 Rettelser 2026-07-30 (KODET, ikke verifisert)
+
+**Kalenderen åpnet på fortiden.** `getTeamEvents` henter ALT stigende på
+starttid uten tidsfilter, så «Tidligere» lå øverst og nye hendelser havnet
+nederst, bak hele historikken. `KalenderScreen` har fått `orderForCalendar()`:
+kommende først, fortid nederst og **snudd** (forrige lørdags kamp før den fra
+september). Fortiden slettes IKKE — gamle kamper bærer nå kamprapport og
+bilder. Sorteringen bruker samme midnatt-grense som `getSectionLabel`; med
+`now` ville en kamp kl. 09:00 blitt sortert som fortid, men merket «I dag»,
+og seksjonen ville dukket opp to steder.
+
+**Kampvarselet gikk til feil person, og forsvant på et halvsekund.**
+`SimulatedPush` var reporterens lokale ekko fra `submitAction` — den som
+trykket fikk beskjed om det hun selv nettopp gjorde, mens foreldrene ikke
+fikk noe. To feil, to fikser:
+
+*1. Banneret rakk knapt å vises.* `SimulatedPush` hadde `onHide` i
+dependency-lista, og `onHide` sendes inn som en pil-funksjon rett i JSX-en —
+altså ny identitet hver render. Hver re-render (refetch, tikkende kampklokke)
+startet animasjonen på nytt, og `.start(cb)` kaller callbacken **også når
+animasjonen avbrytes** → `onHide()` → borte. Nå ligger `onHide` i en ref, og
+callbacken sjekker `finished`.
+
+*2. Banneret bor nå over fanene, ikke på kampsiden.* Ny `NotificationBanner`
+rendres én gang i `MainTabs` og mates av `notifications`-kanalen som allerede
+fantes i `NotificationsContext`. **Dette er et bedre feste enn kampskjermen:**
+triggeren i 00023 skriver rader til alle aktive lagmedlemmer UNNTATT
+forfatteren, og radene har ferdig `title`/`body`. Mottakerlisten er altså
+avgjort i SQL — klienten har ingen «er dette til meg?»-logikk å ta feil av,
+og teksten er den samme som ekte push vil sende.
+Kanalen lytter på `'*'`, så banneret filtrerer på `eventType === 'INSERT'`
+(en UPDATE er «markert som lest»).
+
+Ryddet bort i samme slengen: `InsertedMatchEvent` og
+`describeInsertedMatchEvent` i `events.ts` (fra første, dårligere forsøk),
+og `SimulatedPush`-bruken i `EventDetailScreen`. `subscribeToMatch` er
+tilbake til `onChange: () => void`.
+
+---
+
+## 🧹 Teknisk gjeld — Jest kjører ikke (oppdaget 2026-07-30)
+
+`npx jest` **feiler før én eneste test kjører** (`Tests: 0 total`), og har
+gjort det lenge — dette er ikke noe dagens arbeid innførte.
+
+```
+node_modules/@react-navigation/native/lib/module/index.js:3
+export { createStaticNavigation } from "./createStaticNavigation.js";
+SyntaxError: Unexpected token 'export'
+```
+
+`@react-navigation/native` distribueres som ESM, og `transformIgnorePatterns`
+i Jest-oppsettet transformerer den ikke. Kjeden er
+`__tests__/App.test.tsx` → `App.tsx` → `AppNavigator.tsx` → `@react-navigation`,
+altså har testen vært ødelagt siden navigasjonen kom inn. Ingen merket det,
+fordi suiten aldri kjøres.
+
+Fiks: legg `@react-navigation` (og trolig flere RN-pakker) i
+`transformIgnorePatterns` i Jest-konfigurasjonen. Merk at kjøringen tok
+**451 sekunder** — regn med at det trengs mer enn én runde.
+
+Egen liten skive. Ikke gjør den sammen med produktarbeid.
+
+**Kjent støy som IKKE er et problem:** Xcode viser ~500 «Issues», men alle
+kommer fra `node_modules/` og `ios/Pods/` — ingen fra `src/` eller
+`ios/Heia2/`. Under target `Heia2` står det bare to, og begge er iboende i
+React Native (duplikat `-lc++` fra CocoaPods, og bundle-scriptet som ikke kan
+deklarere outputs). `inhibit_all_warnings!` i Podfile ville skjult
+bibliotekstøyen — **bevisst IKKE gjort** (bruker, 2026-07-30). Merk også at
+Xcodes issue-panel kun oppdateres når Xcode selv bygger; bygger du fra
+terminalen med `npm run ios` blir lista stående gammel.
+
+---
+
+## 🎯 NESTE SLICE — fritt valg
+
+**Visjonen (bruker, 2026-07-30):** hver kamp skal bli et automatisk *kampminne*
+— før kamp (bane, oppvarming), under (mål, bilder, reaksjoner kronologisk),
+etter (resultat, galleri, forløp), og senere en delbar «Kampen på 30 sekunder».
+Anbefalt rekkefølge, med begrunnelse:
+
+1. **Alle medlemmer kan legge bilder på kampen** — største spak mot «minne».
+   I dag kommer ALT innhold fra reporteren, altså den travleste personen;
+   «uten ekstraarbeid» blir først sant når innholdet kommer fra mange.
+   Backend er klar: `createImagePost` tar `eventId` fra hvem som helst, og
+   RLS krever bare lagmedlemskap. **Kun UI mangler.**
+2. **Kommentarer + heiing synlig i kamptidslinja** — «var der»-følelsen ligger
+   i de andres stemmer. De finnes i dag, men bor på feed-poster og er usynlige
+   på kampsiden.
+3. **Før kamp-innhold** — nesten gratis når 1 finnes: samme knapp, bare ikke
+   låst til live-grenen.
+4. **«Kampen på 30 sekunder»** — SIST. Kvaliteten er en direkte funksjon av
+   hvor mye innhold kampen samlet; bygges den før 1–3 oppsummerer den fire
+   måltidspunkter og ingenting annet.
+   ⚠️ **Avklar før den bygges:** en *delbar* oppsummering bryter med at bildene
+   ligger i privat bucket med signerte URL-er nettopp fordi de er av barn.
+   Norske klubber har samtykkeregler for billedbruk. Deling til foreldregruppa
+   er noe helt annet enn en offentlig lenke — lettere å designe riktig nå enn
+   å trekke tilbake senere.
+
+Andre kandidater:
+5. **Sesong/statistikk-flate** — «hittil i sesongen: 7 kamper, 12 mål».
+   `match_events` har alt dataen; ny lese-RPC + én skjerm.
+6. **Varslingsinnstillinger-UI** — `notification_preferences` + `inbox_enabled()`
+   (00023) finnes i DB, men har ingen skjerm. Påbygg på 🔔-raden i `ProfilScreen`.
+7. **`+`-knappens «Start kamp»-snarvei** (låst beslutning 1, siste rest).
+8. **Rydd `NSLocationWhenInUseUsageDescription`** — står med tom streng i
+   Info.plist og posisjon brukes ingen steder. Tomme begrunnelser er en kjent
+   grunn til avslag i App Store-review.
+
+---
 
 ## Arbeidsmåte (for å spare tokens + beholde kontekst)
 

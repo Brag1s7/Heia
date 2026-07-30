@@ -14,8 +14,18 @@ export {
   createTextPost,
   createImagePost,
   toggleReaction,
+  getMatchPhotos,
+  type MatchPhoto,
 } from './feed';
 export {getComments, createComment} from './comments';
+export {
+  getNotifications,
+  getUnreadCount,
+  markAsRead,
+  markAllAsRead,
+  type HeiaNotification,
+  type NotificationCategory,
+} from './notifications';
 export {getTeamMembers, type TeamMember} from './members';
 export {
   getTeamEvents,
