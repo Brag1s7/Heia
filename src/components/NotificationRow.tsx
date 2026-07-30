@@ -21,6 +21,11 @@ interface NotificationRowProps {
   showBorder?: boolean;
 }
 
+// MÅ stå FØR CATEGORY_ICON — JSX-en under evalueres i det modulen lastes.
+const emojiStyles = StyleSheet.create({
+  emoji: {fontSize: 17},
+});
+
 // Ikon per kategori (Lucide, blekket i flatens ink-farge). 👏 består som
 // emoji — det er merkevare-gesten, og Lucide har ingen applaus.
 const CATEGORY_ICON: Record<NotificationCategory, React.ReactNode> = {
@@ -33,11 +38,6 @@ const CATEGORY_ICON: Record<NotificationCategory, React.ReactNode> = {
   admin_message: <Megaphone size={18} color={colors.goldInk} />,
   system: <Info size={18} color={colors.textSecondary} />,
 };
-
-// Egen liten StyleSheet fordi CATEGORY_ICON evalueres før hoved-`styles`.
-const emojiStyles = StyleSheet.create({
-  emoji: {fontSize: 17},
-});
 
 // Ikonflate per kategori — A v2s låste fargesemantikk: coral = live, blå =
 // info/kalender, lilla = påminnelse, sol = trenerbeskjed, mint = Heia-øyeblikk.

@@ -13,6 +13,11 @@ interface MatchEventRowProps {
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
+// MÅ stå FØR eventIcons — JSX-en under evalueres i det modulen lastes.
+const glyphStyles = StyleSheet.create({
+  glyph: {fontSize: 14},
+});
+
 // Lucide-ikoner, blekket i flatens ink-farge. `bytte`/`kort` lages ikke av
 // appen ennå og beholder tegn-glyfene sine til de får et ordentlig øyeblikk.
 const eventIcons: Record<MatchEventType, React.ReactNode> = {
@@ -25,10 +30,6 @@ const eventIcons: Record<MatchEventType, React.ReactNode> = {
   kort: <Text style={glyphStyles.glyph}>🟨</Text>,
   melding: <MessageCircle size={15} color={colors.textSecondary} />,
 };
-
-const glyphStyles = StyleSheet.create({
-  glyph: {fontSize: 14},
-});
 
 // A v2: mål/avspark/fortsettelse feires på mint-tint (grønt = feiring, aldri
 // coral), kort på solskinnsflate, resten dempet. Myke flater bak ikonet leses
