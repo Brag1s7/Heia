@@ -1,5 +1,6 @@
 import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
+import {MATCH_STATUS_MAP} from './events';
 import type {FeedItem, UserRole} from '../../shared/types';
 
 // Merkevare-reaksjonen: 👏 «Heia». Én emoji nå (utvides senere ved behov).
@@ -90,7 +91,6 @@ async function uploadTeamImage(
 
 // get_team_feed() returnerer flate rader med author-info + aggregater.
 // Vi mapper til eksisterende FeedItem så FeedCard er uendret.
-// Media/matchEvent er utenfor scope for tekst-slicen (Fase 2b/3).
 function mapFeedRow(row: any): FeedItem {
   const counts = (row.reaction_counts ?? {}) as Record<string, number>;
   return {
@@ -107,6 +107,16 @@ function mapFeedRow(row: any): FeedItem {
     },
     createdAt: new Date(row.created_at),
     content: row.content,
+    // Kampkontekst (00029): status/stilling for kampen posten hører til,
+    // + minuttet når posten er en konkret kamphendelse.
+    match: row.match_status
+      ? {
+          minute: row.match_minute ?? undefined,
+          status: MATCH_STATUS_MAP[row.match_status as string] ?? 'upcoming',
+          home: Number(row.match_home ?? 0),
+          away: Number(row.match_away ?? 0),
+        }
+      : undefined,
     eventId: row.event_id ?? undefined,
     isPinned: row.is_pinned ?? false,
     heiaCount: counts[HEIA_EMOJI] ?? 0,

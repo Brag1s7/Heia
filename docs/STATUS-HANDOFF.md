@@ -1,13 +1,14 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (ettermiddag). **Designretningen «A v2 · Stadium
-Pop Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3, optisk
-godkjent), og den SAMLEDE NATIVE REBUILDEN (skive 4: Lucide-ikoner, ekte
-gradienter, Nunito-displayfont) er KODET — se «Skive 4» under. Optisk review
-av skive 4 gjenstår.** Designarbeidet er ikke pushet/merget til `main` ennå.
-**Neste:** optisk review av skive 4, deretter produktkandidatene («🎯 SENERE»,
-anbefalt: alle medlemmer kan legge bilder på kampen). Fase 4–9 fra før er
-merget (PR #16)._
+_Sist oppdatert: 2026-07-30 (kveld). **Designretningen «A v2 · Stadium Pop
+Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3+4 — skive 4 er den
+samlede native rebuilden, optisk godkjent av bruker).** Nyeste skive er
+**KAMPRAPPORTEN (skive 5)**: migrasjon `00029` deployet, kampchipene i feeden
+bærer nå stilling, kampforløpet har løpende stilling, og en spilt kamp åpner
+med scoreboardet. **KODET, ikke optisk verifisert.** Designarbeidet er ikke
+pushet/merget til `main` ennå. **Neste:** optisk review av skive 5, deretter
+app-ikon/launch screen eller produktkandidatene («🎯 SENERE»). Fase 4–9 fra
+før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1033,11 +1034,11 @@ fremheving av en konkret kamphendelse. Derfor ingen `focusMatchEventId`,
 ingen layout-register, ingen endring i `MatchTimeline`. Bygges hvis behovet
 faktisk viser seg.
 
-**Kjent, urørt:** `get_team_feed` returnerer `match_event_id` (00015:306, 328),
-men `mapFeedRow` i `feed.ts` mapper det ikke. Derfor er `FeedItem.matchEvent`
-alltid `undefined`, og kampkortenes markør sier alltid «KAMP» og aldri
-«34′ KAMP». Å fikse minuttet krever at RPC-en også returnerer minuttet — altså
-en migrasjon. Ligger her som en kjent, liten kosmetisk mangel.
+**~~Kjent, urørt~~ → LØST i skive 5 (00029):** `get_team_feed` returnerte
+`match_event_id`, men ikke minuttet/stillingen, så kampchipen sto uten tall.
+RPC-en returnerer nå `match_minute`/`match_status`/`match_home`/`match_away`.
+(`FeedItem.matchEvent` er fortsatt `undefined` — `FeedItem.match` erstatter
+behovet, og ingen leser `matchEvent` lenger.)
 
 ---
 
@@ -1208,9 +1209,8 @@ Ren TS/TSX — **kun Metro-reload.** ESLint: 0 nye feil.
   `AppNavigator` (aktiv fane = mint-pille + mørk tekst — fikser kontrastfeil
   der aktiv farge var #02FFAB på hvitt; +-knapp squircle m/ glød; badge i
   coral).
-- **Kjente hull (bevisste):** feed-kampchip viser «Kamp»/«Resultat» uten
-  stilling — `get_team_feed` hydrerer ikke matchEvent (krever migrasjon,
-  kjent fra Fase 8). Tekstglyf-ikoner består til samlet rebuild.
+- **~~Kjente hull~~ — begge lukket senere samme dag:** feed-kampchipen uten
+  stilling ble løst i skive 5 (`00029`); tekstglyf-ikonene i skive 4.
 
 ### ✅ Optisk review gjennomført 2026-07-30 (alle 4 tilstander sett)
 Bruker viste skjermbilder; funn og fikser samme dag:
@@ -1433,6 +1433,76 @@ er det den GAMLE binæren som kjører — bygg på nytt før du bedømmer noe.
 9. **Logg ut:** velkomstskjermen er gradient-stadion i fullskjerm med
    banesirkel nede til høyre.
 10. **Støtt laget:** prisene runde, fordels-hakene er strek-ikoner.
+
+### ✅ Skive 5 — KAMPRAPPORTEN (KODET 2026-07-30, ikke optisk verifisert)
+
+Bruker: «dette er det viktigste i hele appen». Tre grep, én migrasjon.
+
+#### 1. Migrasjon `00029_feed_match_context.sql` (✅ deployet)
+`get_team_feed` returnerte `match_event_id`, men aldri minuttet eller
+stillingen — derfor sto kampchipen i feeden tom for tall siden Fase 8.
+RPC-en joiner nå `match_events` (minutt for posten) og `match_sessions`
+(status + stilling for kampen) og returnerer fire nye kolonner:
+`match_minute`, `match_status`, `match_home`, `match_away`.
+- `match_sessions.event_id` er **UNIQUE** (00009), så joinen er 1:1 — ingen
+  radmultiplisering. LEFT JOIN, så poster uten kamp er upåvirket.
+- Returtypen endret seg → **DROP + CREATE** (samme mønster som 00027).
+  Originalen i 00015 hadde ingen eksplisitte GRANTs, så ingen å gjenskape.
+
+#### 2. Kampchipen i feeden er statusdrevet, ikke posttype-drevet
+`FeedItem.match {minute, status, home, away}` + mapping i `feed.ts`
+(`MATCH_STATUS_MAP` er nå eksportert fra `events.ts` — én sannhet for
+norsk DB-status → appens union). `FeedCard.Marker`:
+
+| Post | Chip |
+|---|---|
+| `match_end` | «Slutt 4–5» |
+| `match_event` (mål/pause/…) | «12′», coral **kun mens kampen faktisk pågår** |
+| `match_start` mens live/pause | «Live 2–1» / «Pause 2–1» — lagets levende resultatkort |
+| `match_start` etterpå | «Kamp» **uten** stilling |
+
+To bevisste valg: (a) en gammel målpost skal ikke rope coral «live» for
+alltid — derfor styrer `match.status`, ikke posttypen. (b) avsparkposten får
+IKKE sluttresultatet, fordi teksten sier «Kampen er i gang» og tallet ville
+motsagt sin egen post.
+
+#### 3. Kampforløpet har løpende stilling
+`MatchTimeline` teller mål-radene i serverens rekkefølge (`ORDER BY
+sequence`) og stempler hver målrad med stillingen ETTER øyeblikket; slutt-
+raden får sluttresultatet. `MatchEventRow` viser den som en mørk `ScoreChip`
+skjøvet til høyremargen — tallkolonnen leses vertikalt nedover forløpet.
+- Regnes **klientside**, ikke i DB: `match_events` lagrer ikke stillingen per
+  hendelse, og å legge den til ville krevd backfill av gamle kamper.
+- Mål uten `teamSide` teller ikke (skal ikke skje etter 00020) — bedre å
+  mangle et tall enn å vise feil stilling.
+- `ScoreChip.label` er nå **valgfri** (ren stilling-chip uten etikett).
+
+#### 4. En spilt kamp åpner med resultatet
+`EventDetailScreen` åpnet med et administrativt infokort (Dato/Tid/Sted), og
+scoreboardet lå under. På en spilt kamp ER resultatet historien. Ny
+`showReport`-gren: **ScoreBoard først**, så tittel, så «hvor og når» som én
+dempet linje (`Torsdag 30. juli · 18:00 · Kunstgresset`), så bilder, så
+forløp. Infokortet består uendret for trening/sosialt/kommende kamp.
+Oppmøtelisten på en spilt kamp: «Ikke svart» og «Kan ikke» skjules (ren støy
+i etterkant), og «Kommer» heter **«Påmeldt»** — fortid, ikke fremtid.
+**NB på ærligheten:** listen sier hvem som meldte seg på, ikke hvem som
+faktisk møtte. Ikke omdøp den til «Var med» uten ekte oppmøteregistrering.
+
+`npx eslint src`: **0 errors, 4 warnings** (samme fire). tsc ikke kjørt.
+
+### Test dette (Metro-reload — migrasjonen er alt ute)
+1. **Feed etter en spilt kamp:** «🏁 Slutt!»-posten har chip **«Slutt 4–5»**;
+   målpostene har minutt-chip i dempet grå (ikke coral); avsparkposten har
+   «Kamp» uten tall.
+2. **Under en live kamp:** avsparkposten viser «Live 2–1» og oppdaterer seg
+   via realtime; målpostene har coral minutt.
+3. **Åpne en ferdig kamp:** scoreboardet møter deg **først**, tittel og
+   «dato · tid · sted» under, deretter Kampbilder og Kampforløp.
+4. **Kampforløpet:** hver målrad har en mørk stilling-chip til høyre
+   (1–0, 1–1, 2–1 …) og slutt-raden sluttresultatet. Pause/kommentar-rader
+   har ingen chip.
+5. **Oppmøte på spilt kamp:** kun «Påmeldt (N)», ingen «Ikke svart».
+6. **Trening/kommende kamp:** uendret — infokort med Dato/Tid/Sted øverst.
 
 ---
 

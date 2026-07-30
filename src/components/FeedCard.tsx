@@ -66,23 +66,44 @@ function Marker({item, onUnpin}: {item: FeedItem; onUnpin?: () => void}) {
       />
     );
   }
+
+  // Kampkontekst fra 00029: chipen er statusdrevet, ikke posttype-drevet.
+  // Coral = kampen pågår NÅ — en gammel målpost skal ikke rope live for alltid.
+  const match = item.match;
+  const score = match ? `${match.home}–${match.away}` : undefined;
+  const liveNow = match?.status === 'live';
+
   if (item.type === 'resultat') {
-    return <ScoreChip label="Resultat" />;
+    return <ScoreChip label="Resultat" score={score} />;
   }
   if (isMatchType(item)) {
-    const finished = item.type === 'match_end';
-    return (
-      <ScoreChip
-        label={
-          finished
-            ? 'Slutt'
-            : item.matchEvent
-              ? `${item.matchEvent.minute}′`
-              : 'Kamp'
-        }
-        live={!finished}
-      />
-    );
+    if (item.type === 'match_end') {
+      return <ScoreChip label="Slutt" score={score} />;
+    }
+    if (item.type === 'match_event') {
+      // Minuttet er øyeblikkets identitet; stillingen i øyeblikket bor i
+      // teksten. Kampens NÅ-stilling ville motsagt den på historiske mål.
+      const minute = match?.minute ?? item.matchEvent?.minute;
+      return (
+        <ScoreChip
+          label={minute !== undefined ? `${minute}′` : 'Kamp'}
+          live={liveNow}
+        />
+      );
+    }
+    // match_start: mens kampen pågår er avsparkposten lagets levende
+    // resultatkort i feeden. Etterpå bærer den ingen stilling — posten sier
+    // «Kampen er i gang», og sluttresultatet ville motsagt sin egen tekst.
+    if (liveNow || match?.status === 'halfTime') {
+      return (
+        <ScoreChip
+          label={liveNow ? 'Live' : 'Pause'}
+          live={liveNow}
+          score={score}
+        />
+      );
+    }
+    return <ScoreChip label="Kamp" />;
   }
   if (item.type === 'paaminnelse') {
     return <StatusPill kind="remind" label="Påminnelse" />;

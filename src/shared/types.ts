@@ -156,6 +156,17 @@ export interface FeedItem {
   content: string;
   imageUrl?: string;
   matchEvent?: MatchEvent;
+  /**
+   * Kampkontekst fra `get_team_feed` (00029). Satt på poster som hører til en
+   * kamp. `home`/`away` er kampens stilling NÅ (ferdig kamp: sluttresultatet);
+   * `minute` er minuttet for akkurat denne kamphendelsen.
+   */
+  match?: {
+    minute?: number;
+    status: MatchStatus;
+    home: number;
+    away: number;
+  };
   eventId?: string;
   /** «Varsle hele laget» — festet øverst i feeden, varslet alle (00024). */
   isPinned?: boolean;

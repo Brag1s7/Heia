@@ -2,6 +2,7 @@ import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
 import {Ball, Flag, MessageCircle, Pause, Play} from './icons';
+import {ScoreChip} from './ScoreChip';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent, MatchEventType} from '../shared/types';
 
@@ -10,6 +11,8 @@ interface MatchEventRowProps {
   isLatest?: boolean;
   /** Bilder som hører til nettopp dette øyeblikket — vises under teksten. */
   photos?: MatchPhoto[];
+  /** Stillingen etter øyeblikket («2–1») — settes på mål og slutt. */
+  score?: string;
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
@@ -49,6 +52,7 @@ export function MatchEventRow({
   event,
   isLatest = false,
   photos,
+  score,
   onPressPhoto,
 }: MatchEventRowProps) {
   const icon = eventIcons[event.type];
@@ -68,6 +72,13 @@ export function MatchEventRow({
           <Text style={styles.minute}>{event.minute}'</Text>
           {event.player && (
             <Text style={styles.player}>{event.player}</Text>
+          )}
+          {/* Stillingen etter øyeblikket — kampens dramaturgi leses i
+              høyremargen. Mørk chip: kampen bor alltid på mørk flate. */}
+          {score && (
+            <View style={styles.scoreWrap}>
+              <ScoreChip score={score} />
+            </View>
           )}
         </View>
         <Text style={styles.description}>{event.description}</Text>
@@ -139,6 +150,11 @@ const styles = StyleSheet.create({
   player: {
     ...typography.bodySmall,
     color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  // Stillingen skyves til høyremargen — kolonnen med tall leses vertikalt.
+  scoreWrap: {
+    marginLeft: 'auto',
   },
   description: {
     ...typography.body,

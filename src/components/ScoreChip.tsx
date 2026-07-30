@@ -9,20 +9,25 @@ import {StadiumSurface} from './StadiumSurface';
  * hvor liten flaten er.
  */
 interface ScoreChipProps {
-  /** Liten caps-etikett: «Live», «Slutt», «Kamp», «41′» … */
-  label: string;
+  /**
+   * Liten caps-etikett: «Live», «Slutt», «Kamp», «41′» … Utelates når chipen
+   * kun skal bære stillingen (kampforløpet, der minuttet står ved siden av).
+   */
+  label?: string;
   /** Coral etikettfarge for pågående kamp. */
   live?: boolean;
-  /** «2–1». Utelates når kilden ikke bærer stillingen (f.eks. feed-poster). */
+  /** «2–1». Utelates når kilden ikke bærer stillingen. */
   score?: string;
 }
 
 export function ScoreChip({label, live = false, score}: ScoreChipProps) {
   return (
     <StadiumSurface style={styles.chip} flood={false} arc={false} bordered={false}>
-      <Text style={[styles.label, live && styles.labelLive]} numberOfLines={1}>
-        {label}
-      </Text>
+      {label ? (
+        <Text style={[styles.label, live && styles.labelLive]} numberOfLines={1}>
+          {label}
+        </Text>
+      ) : null}
       {score ? (
         <Text style={styles.score} numberOfLines={1}>
           {score}
