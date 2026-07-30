@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,11 @@ import type {NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
 import {Button} from '../components';
 import {useActiveTeam} from '../context';
-import {createEvent} from '../lib/api/events';
+import {
+  createEvent,
+  getTournaments,
+  type TournamentOption,
+} from '../lib/api/events';
 import type {
   EventType,
   HomeStackParamList,
@@ -28,6 +32,9 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'NewEvent'>;
 const DAYS_AHEAD = 30;
 const DEFAULT_TIME = '18:00';
 
+// «Turnering» er bevisst IKKE et valg her — turneringer opprettes fra
+// sesongsiden («+ Ny turnering»), som åpner denne modalen med presetType.
+// Ett sted å lage dem = ingen tvil om hvor de bor.
 const TYPE_OPTIONS: {value: EventType; label: string}[] = [
   {value: 'trening', label: 'Trening'},
   {value: 'kamp', label: 'Kamp'},
@@ -92,6 +99,8 @@ function defaultTitle(type: EventType, opponent: string): string {
       return 'Trening';
     case 'kamp':
       return opponent.trim() ? `Kamp mot ${opponent.trim()}` : 'Kamp';
+    case 'turnering':
+      return 'Turnering';
     case 'sosialt':
       return 'Sosialt';
     default:
@@ -99,11 +108,45 @@ function defaultTitle(type: EventType, opponent: string): string {
   }
 }
 
-export function NewEventScreen({navigation}: Props) {
+export function NewEventScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const {activeTeamSpaceId} = useActiveTeam();
 
-  const [type, setType] = useState<EventType>('trening');
+  // Tre innganger til modalen:
+  //  - vanlig «Ny hendelse» (+): fri typevelger
+  //  - «Ny kamp» fra en turneringsside: type låst til kamp + stemplet
+  //  - «+ Ny turnering» fra sesongsiden: type låst til turnering
+  // Låst type = typevelgeren skjules; en rad med døde chips skaper bare tvil.
+  const parentEventId = route.params?.parentEventId;
+  const parentTitle = route.params?.parentTitle;
+  const inTournament = !!parentEventId;
+  const isNewTournament = route.params?.presetType === 'turnering';
+
+  const [type, setType] = useState<EventType>(
+    isNewTournament ? 'turnering' : inTournament ? 'kamp' : 'trening',
+  );
+  // «Turnering»-feltet på en vanlig kamp: velges kun når det finnes noe å
+  // velge i. null = vanlig seriekamp.
+  const [tournaments, setTournaments] = useState<TournamentOption[]>([]);
+  const [selectedTournament, setSelectedTournament] = useState<string | null>(
+    null,
+  );
+
+  useEffect(() => {
+    // Kun den frie flyten trenger listen — de låste inngangene vet alt.
+    if (inTournament || isNewTournament || !activeTeamSpaceId) return;
+    let cancelled = false;
+    getTournaments(activeTeamSpaceId)
+      .then(list => {
+        if (!cancelled) setTournaments(list);
+      })
+      .catch(() => {
+        // Stille: uten liste vises ikke feltet, og kampen blir en vanlig kamp.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [inTournament, isNewTournament, activeTeamSpaceId]);
   const [dayOffset, setDayOffset] = useState(0);
   const [time, setTime] = useState(DEFAULT_TIME);
   const [durationMinutes, setDurationMinutes] = useState<number | null>(90);
@@ -153,13 +196,19 @@ export function NewEventScreen({navigation}: Props) {
         description: description.trim() || undefined,
         opponent: isMatch ? opponent.trim() : undefined,
         isHome,
+        parentEventId:
+          parentEventId ?? (isMatch ? (selectedTournament ?? undefined) : undefined),
       });
-      // Lukk modalen og vis kalenderen — den refetcher ved fokus, så brukeren
-      // ser hendelsen sin i stedet for at skjermen bare forsvinner.
+      // Lukk modalen. Frittstående hendelser: vis kalenderen (den refetcher
+      // ved fokus). Fra turneringsside/sesongside: bli stående der brukeren
+      // kom fra — det er der resultatet av handlingen vises (en turnering
+      // ligger ikke i kalenderen i det hele tatt).
       navigation.goBack();
-      navigation.getParent<NavigationProp<RootTabParamList>>()?.navigate(
-        'KalenderStack',
-      );
+      if (!inTournament && !isNewTournament) {
+        navigation.getParent<NavigationProp<RootTabParamList>>()?.navigate(
+          'KalenderStack',
+        );
+      }
     } catch {
       Alert.alert('Kunne ikke lagre', 'Prøv igjen om litt.');
     } finally {
@@ -179,6 +228,10 @@ export function NewEventScreen({navigation}: Props) {
     description,
     isMatch,
     isHome,
+    parentEventId,
+    inTournament,
+    isNewTournament,
+    selectedTournament,
     navigation,
   ]);
 
@@ -189,18 +242,53 @@ export function NewEventScreen({navigation}: Props) {
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
         keyboardShouldPersistTaps="handled">
-        <Field label="Hva skjer?">
-          <View style={styles.chipRow}>
-            {TYPE_OPTIONS.map(option => (
+        {inTournament || isNewTournament ? (
+          <Field label="Hva skjer?">
+            <View style={styles.tournamentBanner}>
+              <Text style={styles.tournamentBannerText}>
+                {isNewTournament
+                  ? 'Turnering'
+                  : `Kamp i ${parentTitle ?? 'turneringen'}`}
+              </Text>
+            </View>
+          </Field>
+        ) : (
+          <Field label="Hva skjer?">
+            <View style={styles.chipRow}>
+              {TYPE_OPTIONS.map(option => (
+                <SelectChip
+                  key={option.value}
+                  label={option.label}
+                  selected={type === option.value}
+                  onPress={() => setType(option.value)}
+                />
+              ))}
+            </View>
+          </Field>
+        )}
+
+        {/* Kampen kan høre til en turnering — HVIS laget har en aktuell.
+            Ingen turneringer = feltet finnes ikke, og kampen er en vanlig
+            seriekamp (brukerens modell, 2026-07-30). */}
+        {isMatch && !inTournament && tournaments.length > 0 && (
+          <Field label="Turnering">
+            <View style={styles.chipRow}>
               <SelectChip
-                key={option.value}
-                label={option.label}
-                selected={type === option.value}
-                onPress={() => setType(option.value)}
+                label="Ingen"
+                selected={selectedTournament === null}
+                onPress={() => setSelectedTournament(null)}
               />
-            ))}
-          </View>
-        </Field>
+              {tournaments.map(tournament => (
+                <SelectChip
+                  key={tournament.id}
+                  label={tournament.title}
+                  selected={selectedTournament === tournament.id}
+                  onPress={() => setSelectedTournament(tournament.id)}
+                />
+              ))}
+            </View>
+          </Field>
+        )}
 
         {isMatch && (
           <>
@@ -313,7 +401,9 @@ export function NewEventScreen({navigation}: Props) {
 
         <View style={styles.saveRow}>
           <Button
-            title="Legg til i kalenderen"
+            title={
+              isNewTournament ? 'Opprett turnering' : 'Legg til i kalenderen'
+            }
             onPress={handleSave}
             disabled={!canSave}
             loading={saving}
@@ -453,5 +543,20 @@ const styles = StyleSheet.create({
   saveRow: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing['2xl'],
+  },
+  // Låst kontekst («Kamp i Hamar Cup») — turneringens myke gulflate.
+  tournamentBanner: {
+    backgroundColor: colors.sun,
+    borderWidth: 1,
+    borderColor: colors.sunBorder,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  tournamentBannerText: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.goldInk,
   },
 });

@@ -10,7 +10,7 @@ export type SportType =
   | 'ishockey'
   | 'annet';
 
-export type EventType = 'trening' | 'kamp' | 'sosialt' | 'annet';
+export type EventType = 'trening' | 'kamp' | 'turnering' | 'sosialt' | 'annet';
 
 export type RSVPStatus = 'kommer' | 'kan_ikke' | 'venter';
 
@@ -201,10 +201,19 @@ export type HomeStackParamList = {
   /** composeNonce settes av «Del med laget» for å fokusere compose-boksen. */
   TeamHome: {composeNonce?: number} | undefined;
   EventDetail: {eventId: string};
-  NewEvent: undefined;
+  /** parentEventId settes av «Ny kamp» på en turneringsside. */
+  NewEvent:
+    | {
+        parentEventId?: string;
+        parentTitle?: string;
+        /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
+        presetType?: 'turnering';
+      }
+    | undefined;
   Support: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};
+  Season: undefined;
 };
 
 export type OnboardingStackParamList = {
@@ -217,6 +226,16 @@ export type OnboardingStackParamList = {
 export type KalenderStackParamList = {
   KalenderList: undefined;
   EventDetail: {eventId: string};
+  // Samme modal som i Hjem — «Ny kamp» på en turneringsside skal virke
+  // uansett hvilken fane turneringen ble åpnet fra.
+  NewEvent:
+    | {
+        parentEventId?: string;
+        parentTitle?: string;
+        /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
+        presetType?: 'turnering';
+      }
+    | undefined;
 };
 
 // Varsler får egen stack så et trykk på et varsel kan åpne hendelsen eller
@@ -225,6 +244,14 @@ export type InboxStackParamList = {
   InboxList: undefined;
   EventDetail: {eventId: string};
   Comments: {postId: string; teamSpaceId: string};
+  NewEvent:
+    | {
+        parentEventId?: string;
+        parentTitle?: string;
+        /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
+        presetType?: 'turnering';
+      }
+    | undefined;
 };
 
 export type ProfilStackParamList = {

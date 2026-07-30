@@ -134,7 +134,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   input: {
-    ...typography.body,
+    // typography.input, ikke body: lineHeight i et TextInput trigger
+    // iOS-buggen der teksten rendres feil mens man skriver (RN #41240).
+    ...typography.input,
     backgroundColor: colors.background,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,

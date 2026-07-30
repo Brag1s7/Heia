@@ -44,6 +44,7 @@ import {KalenderScreen} from '../screens/KalenderScreen';
 import {ProfilScreen} from '../screens/ProfilScreen';
 import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {InboxScreen} from '../screens/InboxScreen';
+import {SeasonScreen} from '../screens/SeasonScreen';
 import type {
   RootTabParamList,
   HomeStackParamList,
@@ -107,6 +108,26 @@ const stackScreenOptions: NativeStackNavigationOptions = {
 };
 
 // ---------------------------------------------------------------------------
+// «Ny hendelse»-modalen — registrert i alle tre stackene som har EventDetail,
+// slik at «Ny kamp» på en turneringsside virker uansett hvilken fane
+// turneringen ble åpnet fra.
+// ---------------------------------------------------------------------------
+const newEventOptions = ({navigation}: any): NativeStackNavigationOptions => ({
+  title: 'Ny hendelse',
+  presentation: 'modal',
+  // Modalen beholder native header og vertikal systemanimasjon —
+  // `simple_push` fra fellesinnstillingene ville gjort den horisontal.
+  headerShown: true,
+  animation: 'default',
+  // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
+  headerLeft: () => (
+    <Pressable onPress={navigation.goBack} hitSlop={8}>
+      <Text style={styles.headerAction}>Avbryt</Text>
+    </Pressable>
+  ),
+});
+
+// ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)
 // ---------------------------------------------------------------------------
 function HomeStackNavigator() {
@@ -117,24 +138,12 @@ function HomeStackNavigator() {
       <HomeStack.Screen
         name="NewEvent"
         component={NewEventScreen}
-        options={({navigation}) => ({
-          title: 'Ny hendelse',
-          presentation: 'modal',
-          // Modalen beholder native header og vertikal systemanimasjon —
-          // `simple_push` fra fellesinnstillingene ville gjort den horisontal.
-          headerShown: true,
-          animation: 'default',
-          // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
-          headerLeft: () => (
-            <Pressable onPress={navigation.goBack} hitSlop={8}>
-              <Text style={styles.headerAction}>Avbryt</Text>
-            </Pressable>
-          ),
-        })}
+        options={newEventOptions}
       />
       <HomeStack.Screen name="Support" component={SupportScreen} />
       <HomeStack.Screen name="Invite" component={InviteScreen} />
       <HomeStack.Screen name="Comments" component={CommentsScreen} />
+      <HomeStack.Screen name="Season" component={SeasonScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -147,6 +156,11 @@ function KalenderStackNavigator() {
     <KalenderNav.Navigator screenOptions={stackScreenOptions}>
       <KalenderNav.Screen name="KalenderList" component={KalenderScreen} />
       <KalenderNav.Screen name="EventDetail" component={EventDetailScreen} />
+      <KalenderNav.Screen
+        name="NewEvent"
+        component={NewEventScreen}
+        options={newEventOptions}
+      />
     </KalenderNav.Navigator>
   );
 }
@@ -161,6 +175,11 @@ function InboxStackNavigator() {
       <InboxNav.Screen name="InboxList" component={InboxScreen} />
       <InboxNav.Screen name="EventDetail" component={EventDetailScreen} />
       <InboxNav.Screen name="Comments" component={CommentsScreen} />
+      <InboxNav.Screen
+        name="NewEvent"
+        component={NewEventScreen}
+        options={newEventOptions}
+      />
     </InboxNav.Navigator>
   );
 }

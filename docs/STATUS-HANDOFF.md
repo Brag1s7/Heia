@@ -1,14 +1,18 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (kveld). **Designretningen «A v2 · Stadium Pop
-Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3+4 — skive 4 er den
-samlede native rebuilden, optisk godkjent av bruker).** Nyeste skiver er
-**KAMPRAPPORTEN (skive 5)** og **APP-IKON + LAUNCH SCREEN (skive 6)** — begge
-**KODET, ikke optisk verifisert**. Skive 6 krever **rebuild** (ikoner og
-storyboard bakes inn i binæren). **Ikonvalget er LÅST: variant C, figur med
-glød** — bygget i produksjonsversjon 2026-07-30. Designarbeidet er ikke
-pushet/merget til `main` ennå. **Neste:** optisk review av skive 5 + 6, deretter
-produktkandidatene («🎯 SENERE»). Fase 4–9 fra før er merget (PR #16)._
+_Sist oppdatert: 2026-07-30 (natt). **Nyeste skiver: SESONGFLATEN +
+TURNERINGER + VÅR/HØST-SESONGER — KODET, migrasjoner `00030`–`00033`
+deployet. Turneringsflyten OMLAGT etter første brukertest: turneringer bor
+nå i sesongsidens velger, kalenderen viser kampene, kampskjemaet velger
+turnering. Bruker godkjente flyten → committet og pushet på `Brage`.** LÅST
+underveis: ingen toppscorer/spillerstatistikk før strukturert spillerstall;
+sesong = vår/høst-halvår; turnering = enkel kampsamling (event +
+parent_event_id). Kveldens telefonfikser (BackBar m.m.) er committet
+(`ed5d897`). Fortsatt uverifisert fra før: **KAMPRAPPORTEN (skive 5)** og
+**APP-IKON + LAUNCH SCREEN (skive 6)** — skive 6 krever **rebuild**
+(ikonvalget er LÅST: variant C). **Neste:** brukertest av kveldens skiver →
+commit, deretter kandidat 2. Design skive 1–5 er merget (PR #17), Fase 4–9
+fra før (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -21,22 +25,27 @@ squash-konflikten er løst med `-s ours` (`474e46c`), alt er pushet, og
 `Brage..origin/main` = 0. **En ny PR fra `Brage` er konfliktfri nå.** Se
 «🔁 Squash-mønsteret» i git-seksjonen for oppskriften neste gang.
 
-**2. Neste skive: sesong- og statistikkflate** (produktkandidat 5).
-**Bruker sa eksplisitt 2026-07-30: «Liker godt ideen med at man kan se sesong
-og statistikk en plass!»** — så denne går foran kandidat 2. «7 kamper, 12 mål»:
-`match_events` har all dataen alt, så det er én lese-RPC + én skjerm. Veldig
-Strava, og den første flaten som viser at appen samler opp noe over tid.
+**2. ✅ Sesongflaten er KODET og sett på telefon** (produktkandidat 5).
+Migrasjonene `00030`+`00031` er deployet. Bruker fant at toppscorerlisten
+viste fritekst → **LÅST beslutning: ingen spillerstatistikk før strukturert
+spillerstall finnes; toppscorerne er fjernet** (detaljer i seksjonen
+«✅ SESONGFLATEN» under). Gjenstår kun: reload og se at flaten står riktig
+uten scorer-seksjonen.
 
-Alternativ, og neste i køen etter den: **kommentarer + heiing synlig i
-kamptidslinja** (kandidat 2). Kandidat 1 er avvist, og dette er det eneste
-gjenværende grepet mot «kampminne» som **ikke** åpner en ny flate for at alle
-skal lage innhold — kommentarene og 👏 finnes allerede, de bor bare på
-feed-poster og er usynlige på kampsiden. Ren synliggjøring av data vi har.
+**3. ✅ TURNERINGER + VÅR/HØST-SESONGER er KODET og OMLAGT etter første
+brukertest** (migrasjoner `00032`+`00033` deployet). Brukeren likte ikke
+turneringen som kalenderkort — nå bor turneringene i sesongsidens velger
+(«Vår 2026 · Høst 2026 · 🏆 Hamar Cup» + «+ Ny turnering»), kalenderen viser
+kampene, og kampskjemaet har et «Turnering»-felt når det finnes turneringer.
+Se seksjonen «✅ TURNERINGER + VÅR/HØST-SESONGER» for modellen og testlisten.
+**Bruker godkjente flyten 2026-07-30 (natt) → alt er committet og pushet.**
+
+Deretter: kandidat 2 (kommentarer + heiing synlig i kamptidslinja).
 
 **Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten) og skive 6
-(produksjonsikonet + launch screen). ⚠️ Ikonet bruker så på telefonen
-2026-07-30 var fra bygget 18:52 — altså FØR produksjonsversjonen av variant C.
-Bygg på nytt før du bedømmer det.
+(produksjonsikonet + launch screen). ⚠️ Ikonet du så på telefonen 2026-07-30
+var fra bygget 18:52 — altså FØR produksjonsversjonen av variant C. Bygg på
+nytt før du bedømmer det.
 
 **Telefontest-funn 2026-07-30 (kveld), fikset i JS (kun reload — ingen
 rebuild):**
@@ -1224,7 +1233,9 @@ terminalen med `npm run ios` blir lista stående gammel.
 Fase 4–9 er merget til `main` (PR #16). **Designarbeidet skive 1–5 er merget
 i PR #17.** Dagens ikon-skive (6) + telefonrettelsene er committet og pushet
 på `Brage`, og `origin/main` er merget inn (`474e46c`), så `Brage` er igjen et
-rent supersett og en ny PR er konfliktfri.
+rent supersett og en ny PR er konfliktfri. Sen kveld kom i tillegg
+telefonfiks-commiten (`ed5d897`) og deretter én samlet commit med
+sesongflaten + turneringer/vår-høst (00030–00033) — begge pushet.
 
 ### 🔁 Squash-mønsteret — løs det på 30 sekunder, ikke for hånd
 GitHub squash-merger PR-en, så `main` får ÉN commit mens `Brage` beholder sine
@@ -1741,6 +1752,194 @@ Begge oppdaget av bruker på skjermbilder fra iPhone — ikke av simulatoren.
 
 ---
 
+## ✅ SESONGFLATEN — produktkandidat 5 (KODET 2026-07-30 sen kveld, delvis sett på telefon)
+
+«Hittil i sesongen: 9 kamper, 35 mål» — den første flaten som viser at appen
+samler opp noe over tid. Én lese-RPC + én skjerm, som planlagt.
+**Kun Metro-reload** — migrasjonene er deployet, ingen native endring.
+
+**Bruker så flaten på telefon samme kveld:** hero-en (KPI-rad + dempet
+uavgjort/tap-linje) og inngangen sto riktig. Funnet som ble rettet med én
+gang: toppscorerlisten viste fritekst fra mål-dialogen («1-0, latterlig bra
+mål», «Fuuuuuukkk») — feltet var aldri et navnefelt. Det utløste beslutningen
+under.
+
+#### 🔒 LÅST BESLUTNING (bruker, 2026-07-30): INGEN toppscorer/spillerstatistikk
+**Ingen spillerstatistikk før laget har en strukturert spillerstall, og
+målscorere skal ikke registreres som fritekst.** Toppscorerlisten er fjernet
+fra RPC, API og skjerm (`00031`). I tillegg til datakvaliteten: en rangering
+av barna i foreldrenes app er verdimessig feil for ungdomsidrett — samme etos
+som «ingen TAP-roping». Scorernavn-idéen kan gjenoppstå den dagen en
+spillerstall finnes — ikke foreslå fritekst-varianten igjen.
+
+#### Migrasjoner `00030` + `00031` + `00032` (✅ alle deployet)
+`get_season_stats(space_id, p_year, p_half)` → jsonb med totaler
+(`played/wins/draws/losses/goals_for/goals_against`), `matches[]` (nyeste
+først, med `tournament`-navn), `seasons[]` (velgerlisten) og
+`season_year/half/label`. Historikk: 00030 første versjon (med toppscorere),
+00031 fjernet toppscorerne, 00032 innførte vår/høst + turneringer (se egen
+seksjon under). Valg som er verdt å kjenne:
+- **Kun kamper med status `ferdig` teller.** En live kamp flytter ikke
+  tallene før «Slutt».
+- **Sesong = halvår: vår (jan–jun) / høst (jul–des)** — bruker-beslutning
+  2026-07-30, se turneringsseksjonen. Grensen leses i servertid/UTC.
+- `COALESCE(is_team_member(...), false)`-vakt (NULL-fellen fra 00020).
+
+#### App
+- **`src/lib/api/stats.ts` (ny):** `getSeasonStats(teamSpaceId)` + typene
+  `SeasonStats`/`SeasonMatch`. Eksportert fra `lib/api`.
+- **`src/screens/SeasonScreen.tsx` (ny):** formen er bevisst IKKE et diagram —
+  en KPI-rad med store tall og én liste:
+  - **Stadion-hero:** Kamper / Seiere / Mål i Nunito-mint på `StadiumSurface`
+    (kampdata bor på mørk flate — låst signatur), med dempet linje
+    «2 uavgjort · 2 tap · 12–9 i målforskjell» under. Uavgjort/tap er
+    informasjon, ikke en feil — ingen «TAP»-roping (låst regel).
+  - **Kampene:** ferdigspilte kamper, nyeste først — «mot Lyn · 12. juli ·
+    Hjemme» + Seier-pill (kun ved seier) + mørk `ScoreChip`. **Raden åpner
+    EventDetail — altså kamprapporten fra skive 5.** Flatene forsterker
+    hverandre: sesongen er indeksen, rapporten er historien.
+  - Tom-tilstand («Sesongen starter her …») når ingen kamper er spilt.
+    Lasting/feil/pull-to-refresh/`useFocusEffect` — samme mønster som
+    KalenderScreen.
+- **Inngang: `TeamHeader` fikk valgfri `onSeasonPress`** → «Sesongen»-chip til
+  høyre (mørk stadion-chip med mint trofé). **Kun Hjem sender prop-en** —
+  Kalender/Varsler bruker samme header uten chip, og har heller ikke
+  `Season`-skjermen i stacken sin. Registrert i HomeStack + `Season: undefined`
+  i `HomeStackParamList`.
+
+`npx eslint src`: **0 errors, 4 warnings (samme fire som før).** tsc ikke
+kjørt (låst regel — sjekk i editoren).
+
+### Test dette (Metro-reload — migrasjonene er alt ute)
+1. Hjem → «Sesongen»-chipen står til høyre i lagheaderen → trykk: skjermen
+   åpner med store tall for kamper/seiere/mål og dempet uavgjort/tap-linje.
+   ✅ Sett på telefon 2026-07-30 — sjekk kun at toppscorer-seksjonen nå er
+   borte etter reload.
+2. Tallene skal stemme med kampene laget faktisk har spilt i år (kun
+   ferdigspilte; en live kamp teller ikke før «Slutt»).
+3. Kampene: nyeste først, Seier-pill kun når vi vant, ingen pill ved tap.
+   Trykk en rad → kamprapporten (scoreboard først, forløp, bilder).
+4. Avslutt en live kamp → gå til sesongen → dra ned for å refreshe →
+   kampen står i listen og tallene har flyttet seg.
+5. Lag uten spilte kamper (nytt lag): tom-tilstanden, ingen krasj.
+
+### Kjente v1-begrensninger (akseptert)
+- Halvårsgrensen leses i servertid (UTC) — en kamp rett rundt nyttår/1. juli
+  sent på kvelden kan teoretisk havne i feil halvår. Uinteressant i praksis.
+- Ingen inngang fra Kalender/Profil — kun Hjem-headeren. Legg `Season` inn i
+  flere stacker hvis behovet viser seg.
+
+**Drive-by-fiks i samme commit:** `ReporterModal` og `MatchPhotoSheet` sto
+igjen med `typography.body` i skrivefeltene sine — samme RN #41240-bug
+(lineHeight i TextInput) som kveldens telefonfunn rettet i alle andre felt.
+Begge bruker nå `typography.input`.
+
+---
+
+## ✅ TURNERINGER + VÅR/HØST-SESONGER (KODET 2026-07-30 natt, omlagt etter brukertest)
+
+Bruker-beslutning samme kveld: «Jeg vil ha støtte for turneringer — en enkel
+samling av kamper innenfor den aktive sesongen, ikke et avansert
+cupadministrasjonssystem» + «Kan sikkert skille mellom vår og høstsesong?
+Dette blir jo som egne turneringer på en måte.» Flere idretter, enklest
+mulig, ingen forvirring.
+
+**⚠️ Flyten ble LAGT OM etter brukertest av første versjon** (00032-flyten
+med turneringen som kalenderkort + «Ny kamp» kun fra turneringssiden falt
+ikke i smak): «på sesongsiden kan man switche mellom sesonger/turneringer —
+kanskje det er inne der man legger til en ny turnering? Ved vanlig
+kampopprettelse kan man velge turnering HVIS det finnes en, ellers blir det
+en vanlig kamp i sesongen.» Det er dét som nå er bygget (00033).
+
+#### Modellen (den mentale: sesong og turnering er begge «samlinger av kamper»)
+- **Sesong = halvår.** Vår (jan–jun) / høst (jul–des). Sport-nøytralt uten
+  noe oppsett: fotball teller kalenderåret som vår + høst, hallidrettenes
+  26/27-sesong ER en høstdel + en vårdel. (`seasons`-tabellen fra 00002 står
+  fortsatt urørt/ubrukt.)
+- **Turneringer BOR PÅ SESONGSIDEN, ikke i kalenderen.** Velgeren øverst
+  sidestiller halvår og turneringer («Vår 2026 · Høst 2026 · 🏆 Hamar Cup»),
+  og «+ Ny turnering» er siste chip i velgeren (kun trener). En valgt
+  turnering er sin egen visning: egne tall + egen kampliste.
+- **Kalenderen viser KAMPENE** — vanlige kampkort, det er dem foreldrene
+  møter opp på. Turnerings-containeren er filtrert bort fra kalenderen.
+- **Kampskjemaet har et «Turnering»-felt** (chips: «Ingen» + navn) som kun
+  vises når laget har aktuelle turneringer (siste 60 dager + kommende).
+  «Ingen» = vanlig seriekamp. Turnering-typen er FJERNET fra «Hva
+  skjer?»-chipsene — turneringer opprettes ett sted (sesongsiden).
+- **I databasen er modellen uendret fra 00032:** turnering = event av type
+  `turnering`, kamper peker med `parent_event_id`. Hele kamp-løypa (live,
+  rapport, bilder, feed, push) er urørt og vet ingenting om turneringer.
+
+#### Migrasjoner `00032` + `00033` (✅ begge deployet)
+- **00032:** `events.parent_event_id` (FK → events, **ON DELETE SET NULL** —
+  kampene overlever hvis turneringen slettes) + partial index.
+  `create_event` **DROP + CREATE** (ny param `p_parent_event_id` = ny
+  signatur; OR REPLACE ville skapt en tvetydig overload). Vakter: forelder
+  må være `turnering` i samme lagrom, kun `kamp` kan legges i den, ett nivå.
+- **00033:** `get_season_stats` **DROP + CREATE** igjen:
+  `(space_id, p_year, p_half, p_tournament)`. Med `p_tournament` viser den
+  ÉN turnering (samme svarform, `season_label` = navnet); ellers
+  halvårsvinduet. Returnerer alltid `seasons[]` (halvår med spilte kamper +
+  inneværende) og `tournaments[]` (alle, nyeste først — også uten kamper, så
+  en nyopprettet kan velges). Kun `ferdig`-kamper teller i begge modi.
+- **00033 også:** `notify_on_event_created` hopper over rader med
+  `parent_event_id` — fire kamper lagt inn i en cup skal ikke gi fire «Ny
+  hendelse»-varsler (turneringen varslet da den ble opprettet).
+
+#### App
+- `EVENT_TYPE_MAP`: `turnering` er egen type (var `annet`). Ny verdi i
+  `EventType`-unionen — alle tre `typePill`-tabellene (EventCard,
+  NextEventHero, EventDetail) + `StatusPill` fikk `turnering` (myk gul
+  `sun`/`goldInk` — solid gull er fortsatt reservert VIKTIG).
+- **`getTeamEvents` filtrerer bort `type='turnering'`** (containeren), men
+  turneringsKAMPENE vises i kalenderen som vanlige kamper. Ny lett
+  `getTournaments(teamSpaceId)` (siste 60 dager + kommende) til
+  kampskjemaets velger; `getTournamentMatches` består (turneringssiden).
+- **`NewEventScreen` har tre innganger:** fri (+-knappen; typevelger UTEN
+  turnering), «Ny kamp» fra turneringsside (`parentEventId` → låst til kamp,
+  gul «Kamp i {navn}»-banner), og «+ Ny turnering» fra sesongsiden
+  (`presetType: 'turnering'` → låst, knappen heter «Opprett turnering», og
+  man returneres til sesongsiden — ikke kalenderen). Fri kampopprettelse
+  viser «Turnering»-feltet (chips «Ingen» + navn) kun når det finnes
+  aktuelle turneringer.
+- **`SeasonScreen`:** velgeren = halvår-chips + turnerings-chips (med trofé)
+  + «+ Ny turnering» (kun trener). Turneringsvisning: trofé + navn som
+  hero-etikett, egne tall, kampliste uten mellomtitler. Halvårsvisning har
+  turneringsnavn som gule mellomtitler i listen. Valgt chip markeres
+  umiddelbart (lokal state) mens serversvaret laster.
+- **`EventDetailScreen`s turneringsside består** (kampliste + «Ny kamp i
+  turneringen» for admin) — den nås via «Ny turnering»-varselet i inboxen.
+  `NewEvent`-modalen er registrert i alle tre stackene (delte
+  `newEventOptions`) så den flyten virker overalt. (Netto én lint-warning
+  mindre; 3 igjen.)
+
+### Test dette (Metro-reload — migrasjonene er alt ute)
+1. **Sesongen → «+ Ny turnering»** (siste chip i velgeren, kun som trener)
+   → skjema med gul «Turnering»-banner, «Opprett turnering» → tilbake på
+   sesongsiden, og 🏆-chipen for turneringen står i velgeren.
+2. Turneringen skal **IKKE** ligge i kalenderen.
+3. `+` → Ny hendelse → **Kamp** → «Turnering»-feltet viser «Ingen» +
+   turneringsnavnet. Velg turneringen → lagre → kampen ligger i kalenderen
+   som et vanlig kampkort.
+4. Lag en kamp til med «Ingen» → vanlig seriekamp.
+5. Spill turneringskampen (start → mål → slutt — helt vanlig kampside).
+   Sesongsiden: kampen står under gul «HAMAR CUP»-mellomtittel i
+   halvårsvisningen, og 🏆-chipen viser turneringens egne tall + kampliste.
+6. Kun ETT «Ny hendelse»-varsel (for turneringen) — turneringskamper varsles
+   ikke enkeltvis.
+7. Som forelder: ingen «+ Ny turnering»-chip, ingen «Turnering»-felt-endring
+   ellers; alt annet ser likt ut.
+
+### Kjente v1-begrensninger (akseptert)
+- Ingen redigering/flytting av en kamp inn/ut av en turnering i etterkant.
+- Turneringsvisningen viser kun SPILTE kamper (kjøreplanen bor i
+  kalenderen) — før første kamp er spilt viser den 0-er + forklaring.
+- Kampkortet i kalenderen røper ikke hvilken turnering kampen hører til —
+  det bor på sesongsiden.
+- `mote`-typen mapper fortsatt til `annet` (uendret).
+
+---
+
 ## 📱 Test på fysisk iPhone (etablert 2026-07-30)
 
 Første gang appen kjørte på ekte enhet (iPhone 15). Tre ting kostet tid og er
@@ -1819,8 +2018,8 @@ Anbefalt rekkefølge, med begrunnelse:
    å trekke tilbake senere.
 
 Andre kandidater:
-5. **Sesong/statistikk-flate** — «hittil i sesongen: 7 kamper, 12 mål».
-   `match_events` har alt dataen; ny lese-RPC + én skjerm.
+5. ~~**Sesong/statistikk-flate**~~ — ✅ **BYGGET 2026-07-30** (se seksjonen
+   «✅ SESONGFLATEN» over). Venter kun på optisk review.
 6. **Varslingsinnstillinger-UI** — `notification_preferences` + `inbox_enabled()`
    (00023) finnes i DB, men har ingen skjerm. Påbygg på 🔔-raden i `ProfilScreen`.
 7. **`+`-knappens «Start kamp»-snarvei** (låst beslutning 1, siste rest).

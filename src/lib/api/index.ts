@@ -28,9 +28,21 @@ export {
 } from './notifications';
 export {getTeamMembers, type TeamMember} from './members';
 export {
+  getSeasonStats,
+  type SeasonStats,
+  type SeasonMatch,
+  type SeasonRef,
+  type SeasonHalf,
+  type SeasonView,
+  type TournamentRef,
+} from './stats';
+export {
   getTeamEvents,
   getLiveMatch,
   getEventDetail,
+  getTournamentMatches,
+  getTournaments,
+  type TournamentOption,
   createEvent,
   setRsvp,
   setMatchReporter,

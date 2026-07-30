@@ -11,6 +11,7 @@ export type PillKind =
   | 'live'
   | 'kamp'
   | 'trening'
+  | 'turnering'
   | 'sosialt'
   | 'remind'
   | 'viktig'
@@ -32,6 +33,8 @@ const kindStyles: Record<PillKind, {bg: string; fg: string}> = {
   live: {bg: colors.live, fg: '#FFFFFF'},
   kamp: {bg: colors.liveSoft, fg: colors.liveInk},
   trening: {bg: colors.infoSoft, fg: colors.infoInk},
+  // Myk gul — turneringsdagen er en festdag (solid gull er reservert VIKTIG).
+  turnering: {bg: colors.sun, fg: colors.goldInk},
   sosialt: {bg: colors.remindSoft, fg: colors.remindInk},
   remind: {bg: colors.remindSoft, fg: colors.remindInk},
   viktig: {bg: colors.gold, fg: colors.goldInk},
