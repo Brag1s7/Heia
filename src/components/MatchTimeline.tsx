@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, fonts} from '../theme';
+import {Camera} from './icons';
 import {MatchEventRow} from './MatchEventRow';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent} from '../shared/types';
@@ -16,7 +17,14 @@ interface MatchTimelineProps {
 }
 
 type Entry =
-  | {kind: 'event'; key: string; event: MatchEvent; photos: MatchPhoto[]}
+  | {
+      kind: 'event';
+      key: string;
+      event: MatchEvent;
+      photos: MatchPhoto[];
+      /** Stillingen ETTER dette øyeblikket — satt på mål og slutt. */
+      score?: string;
+    }
   | {kind: 'photo'; key: string; photo: MatchPhoto; minute: number};
 
 /**
@@ -48,6 +56,26 @@ export function MatchTimeline({
   onPressPhoto,
 }: MatchTimelineProps) {
   const entries = useMemo<Entry[]>(() => {
+    // Løpende stilling — kampens dramaturgi. Regnes klientside ved å telle
+    // mål-radene i serverens kronologiske rekkefølge (ORDER BY sequence);
+    // slutt-raden stemples med sluttresultatet. Mål uten teamSide (skal ikke
+    // skje etter 00020) teller ikke — bedre å mangle et tall enn å lyve.
+    const scoreByEventId = new Map<string, string>();
+    let home = 0;
+    let away = 0;
+    for (const ev of matchEvents) {
+      if (ev.type === 'mål' && ev.teamSide) {
+        if (ev.teamSide === 'home') {
+          home += 1;
+        } else {
+          away += 1;
+        }
+        scoreByEventId.set(ev.id, `${home}–${away}`);
+      } else if (ev.type === 'slutt') {
+        scoreByEventId.set(ev.id, `${home}–${away}`);
+      }
+    }
+
     const photosByEvent = new Map<string, MatchPhoto[]>();
     const general: MatchPhoto[] = [];
 
@@ -77,6 +105,7 @@ export function MatchTimeline({
         key: event.id,
         event,
         photos: photosByEvent.get(event.id) ?? [],
+        score: scoreByEventId.get(event.id),
       },
     }));
 
@@ -110,13 +139,14 @@ export function MatchTimeline({
             event={entry.event}
             isLatest={newestFirst && index === 0}
             photos={entry.photos}
+            score={entry.score}
             onPressPhoto={onPressPhoto}
           />
         ) : (
           <View key={entry.key} style={styles.photoRow}>
             <View style={styles.timeline}>
               <View style={styles.iconCircle}>
-                <Text style={styles.icon}>📷</Text>
+                <Camera size={15} color={colors.textSecondary} />
               </View>
               <View style={styles.line} />
             </View>
@@ -171,9 +201,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceMuted,
   },
-  icon: {
-    fontSize: 14,
-  },
   line: {
     flex: 1,
     width: 2,
@@ -186,8 +213,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   minute: {
-    ...typography.body,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: fonts.display,
+    color: colors.textPrimary,
   },
   photo: {
     borderRadius: radius.md,

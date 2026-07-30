@@ -162,6 +162,9 @@ export function KalenderScreen() {
           sections.map(section => (
             <View key={section.label}>
               <View style={styles.sectionHeader}>
+                {/* Mint-streken er seksjonsetikettens merkevaredetalj (A v2) —
+                    samme uttrykk som SectionHeader, men med plass til LiveBadge. */}
+                <View style={styles.sectionDash} />
                 <Text style={styles.sectionLabel}>{section.label}</Text>
                 {section.label === 'I dag' &&
                   section.events.some(e => e.matchStatus === 'live') && (
@@ -212,7 +215,9 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     padding: spacing.xl,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     gap: spacing.sm,
     alignItems: 'center',
   },
@@ -229,11 +234,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.md,
     gap: spacing.sm,
   },
+  sectionDash: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.heia,
+  },
   sectionLabel: {
-    ...typography.label,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
   },
   cardWrap: {
     paddingHorizontal: spacing.lg,

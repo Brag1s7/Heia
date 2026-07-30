@@ -53,10 +53,12 @@ export function InviteCodeCard({teamName, inviteCode}: InviteCodeCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.md,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     ...shadows.card,
   },
   label: {
@@ -87,18 +89,20 @@ const styles = StyleSheet.create({
   shareButton: {
     alignSelf: 'stretch',
     height: 48,
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
     backgroundColor: colors.heia,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.xs,
+    ...shadows.glow,
   },
   shareButtonPressed: {
     backgroundColor: colors.heiaPressed,
   },
+  // A v2-knapperegel: mintfyll bærer heiaDeep-tekst.
   shareButtonText: {
     ...typography.body,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontWeight: '700',
+    color: colors.heiaDeep,
   },
 });

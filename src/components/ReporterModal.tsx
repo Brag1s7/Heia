@@ -116,9 +116,11 @@ const styles = StyleSheet.create({
   },
   modal: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing['2xl'],
     gap: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
   },
   title: {
     ...typography.heading2,

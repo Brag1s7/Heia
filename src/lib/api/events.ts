@@ -23,7 +23,8 @@ const EVENT_TYPE_MAP: Record<string, EventType> = {
 };
 
 // match_sessions.status (norsk, DB) → MatchStatus (appens union).
-const MATCH_STATUS_MAP: Record<string, MatchStatus> = {
+// Eksportert: feed.ts bruker samme mapping på kampkonteksten fra 00029.
+export const MATCH_STATUS_MAP: Record<string, MatchStatus> = {
   planlagt: 'upcoming',
   live: 'live',
   pause: 'halfTime',

@@ -1,8 +1,9 @@
 import React, {useState} from 'react';
 import {View, Text, ScrollView, Pressable, StyleSheet, Image} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
 import {Button} from '../components';
+import {Check} from '../components/icons';
 import {useActiveTeam} from '../context';
 
 type Plan = 'monthly' | 'yearly';
@@ -75,7 +76,7 @@ export function SupportScreen() {
         <Text style={styles.sectionTitle}>Hvorfor støtte?</Text>
         {benefits.map((b, i) => (
           <View key={i} style={styles.benefitRow}>
-            <Text style={styles.checkmark}>✓</Text>
+            <Check size={17} color={colors.heiaInk} strokeWidth={2.4} />
             <Text style={styles.benefitText}>{b}</Text>
           </View>
         ))}
@@ -224,10 +225,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A v2-regel: mintfyll bærer heiaDeep-tekst.
   splitTeamText: {
     ...typography.bodySmall,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontWeight: '700',
+    color: colors.heiaDeep,
   },
   splitHeia: {
     flex: 20,
@@ -251,12 +253,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md,
   },
-  checkmark: {
-    ...typography.body,
-    color: colors.heia,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
   benefitText: {
     ...typography.body,
     flex: 1,
@@ -270,9 +266,9 @@ const styles = StyleSheet.create({
   planCard: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.borderSubtle,
     padding: spacing.xl,
     alignItems: 'center',
     ...shadows.card,
@@ -290,7 +286,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
     fontWeight: '700',
   },
   planLabel: {
@@ -301,8 +297,11 @@ const styles = StyleSheet.create({
   planLabelSelected: {
     color: colors.textPrimary,
   },
+  // Prisen er et display-tall (A v2): Nunito, vekten ligger i fontfila.
   planPrice: {
-    ...typography.heading2,
+    fontSize: 22,
+    letterSpacing: -0.3,
+    fontFamily: fonts.display,
     color: colors.textPrimary,
   },
   planPriceSelected: {

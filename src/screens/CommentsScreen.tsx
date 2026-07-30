@@ -1,8 +1,9 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
   Image,
+  Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -16,6 +17,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar, Button} from '../components';
 import {getComments, createComment, getFeedPost} from '../lib/api/comments';
+import {toggleReaction} from '../lib/api/feed';
 import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Comments'>;
@@ -42,6 +44,8 @@ export function CommentsScreen({route}: Props) {
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Ref, ikke state: to raske trykk skal ikke rekke å sende to inserts.
+  const heiaBusy = useRef(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -64,6 +68,28 @@ export function CommentsScreen({route}: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Samme optimistiske mønster som feeden: vis med én gang, rull tilbake ved
+  // feil. `toggleReaction` er retningsstyrt, så busy-vakta hindrer dobbel-insert.
+  const handleHeia = useCallback(async () => {
+    if (!post || heiaBusy.current) return;
+    heiaBusy.current = true;
+
+    const previous = post;
+    const wasReacted = !!post.iReacted;
+    setPost({
+      ...post,
+      iReacted: !wasReacted,
+      heiaCount: Math.max(0, (post.heiaCount ?? 0) + (wasReacted ? -1 : 1)),
+    });
+    try {
+      await toggleReaction(post.id, wasReacted);
+    } catch {
+      setPost(previous);
+    } finally {
+      heiaBusy.current = false;
+    }
+  }, [post]);
 
   const handleSend = useCallback(async () => {
     if (text.trim().length === 0 || sending) return;
@@ -111,6 +137,31 @@ export function CommentsScreen({route}: Props) {
                 resizeMode="cover"
               />
             )}
+            {/* Du står PÅ innlegget — da skal du også kunne heie på det.
+                Samme pill-språk som FeedCard; aktiv 👏 er et Heia-øyeblikk. */}
+            <View style={styles.reactionRow}>
+              <Pressable
+                onPress={handleHeia}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Heia"
+                style={({pressed}) => [
+                  styles.reactPill,
+                  post.iReacted && styles.reactPillOn,
+                  pressed && styles.reactPillPressed,
+                ]}>
+                <Text
+                  style={[
+                    styles.reactText,
+                    post.iReacted && styles.reactTextOn,
+                  ]}>
+                  👏{' '}
+                  {(post.heiaCount ?? 0) > 0
+                    ? `${post.heiaCount} heier`
+                    : 'Heia'}
+                </Text>
+              </Pressable>
+            </View>
           </View>
         )}
 
@@ -126,7 +177,9 @@ export function CommentsScreen({route}: Props) {
           comments.map(c => (
             <View key={c.id} style={styles.comment}>
               <Avatar name={c.author.name} size="sm" uri={c.author.avatarUrl} />
-              <View style={styles.commentBody}>
+              {/* Boble per kommentar — uten flate fløt kommentarene rett på
+                  kremen og så uferdige ut ved siden av innleggskortet. */}
+              <View style={styles.commentBubble}>
                 <View style={styles.commentHeader}>
                   <Text style={styles.commentName}>{c.author.name}</Text>
                   <Text style={styles.commentTime}>
@@ -175,10 +228,10 @@ const styles = StyleSheet.create({
   },
   postCard: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     gap: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderColor: colors.borderSubtle,
   },
   postHeader: {
@@ -192,7 +245,7 @@ const styles = StyleSheet.create({
   },
   postAuthor: {
     ...typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   postTime: {
     ...typography.caption,
@@ -208,6 +261,31 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     backgroundColor: colors.surfaceMuted,
   },
+  reactionRow: {
+    flexDirection: 'row',
+    marginTop: spacing.xs,
+  },
+  // Samme pill-språk som FeedCard — aktiv 👏 = heiaTint + heiaInk.
+  reactPill: {
+    paddingHorizontal: spacing.md + 1,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(17, 36, 27, 0.06)',
+  },
+  reactPillOn: {
+    backgroundColor: colors.heiaTint,
+  },
+  reactPillPressed: {
+    opacity: 0.7,
+  },
+  reactText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  reactTextOn: {
+    color: colors.heiaInk,
+  },
   loader: {
     marginTop: spacing.xl,
   },
@@ -219,10 +297,20 @@ const styles = StyleSheet.create({
   },
   comment: {
     flexDirection: 'row',
-    gap: spacing.md,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
-  commentBody: {
+  // Chat-hjørnet (lite radius oppe til venstre, mot avataren) gjør boblen til
+  // en replikk, ikke et kort til.
+  commentBubble: {
     flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderTopLeftRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     gap: 2,
   },
   commentHeader: {
@@ -232,7 +320,7 @@ const styles = StyleSheet.create({
   },
   commentName: {
     ...typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   commentTime: {
     ...typography.caption,

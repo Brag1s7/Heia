@@ -1,9 +1,11 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Chip} from './Chip';
+import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
+import {Clock, MapPin} from './icons';
+import {StadiumSurface} from './StadiumSurface';
+import {StatusPill, type PillKind} from './StatusPill';
 import {RSVPBar} from './RSVPBar';
-import type {HeiaEvent} from '../shared/types';
+import type {HeiaEvent, EventType} from '../shared/types';
 
 interface EventCardProps {
   event: HeiaEvent;
@@ -16,6 +18,13 @@ const monthNames = [
   'JAN', 'FEB', 'MAR', 'APR', 'MAI', 'JUN',
   'JUL', 'AUG', 'SEP', 'OKT', 'NOV', 'DES',
 ];
+
+const typePill: Record<EventType, {kind: PillKind; label: string}> = {
+  trening: {kind: 'trening', label: 'Trening'},
+  kamp: {kind: 'kamp', label: 'Kamp'},
+  sosialt: {kind: 'sosialt', label: 'Sosialt'},
+  annet: {kind: 'neutral', label: 'Hendelse'},
+};
 
 function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -46,6 +55,16 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
   const dateNum = start.getDate();
   const monthName = monthNames[start.getMonth()];
   const result = resultLabel(event);
+  const pill = typePill[event.type] ?? typePill.annet;
+
+  const isLive = event.matchStatus === 'live';
+  const isPaused = event.matchStatus === 'halfTime';
+  // home/away tolkes alltid som oss/dem (kartlagt i events.ts) — SEIER-pill
+  // finnes, tap-pill finnes ikke (låst designregel: ingen «TAP»-roping).
+  const isWin =
+    event.matchStatus === 'finished' &&
+    !!event.score &&
+    event.score.home > event.score.away;
 
   return (
     <Pressable
@@ -64,28 +83,51 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
           <Text style={styles.dateMonth}>{monthName}</Text>
         </View>
         <View style={styles.content}>
-          <Chip type={event.type} />
+          <StatusPill kind={pill.kind} label={pill.label} />
           <Text style={styles.title}>{event.title}</Text>
           {event.location && (
             <View style={styles.metaRow}>
-              <Text style={styles.meta}>{event.location}</Text>
+              <MapPin size={13} color={colors.textSecondary} />
+              <Text style={styles.meta} numberOfLines={1}>
+                {event.location}
+              </Text>
             </View>
           )}
-          <Text style={styles.meta}>
-            {formatTime(event.startTime)}
-            {event.endTime ? ` – ${formatTime(event.endTime)}` : ''}
-          </Text>
+          <View style={styles.metaRow}>
+            <Clock size={13} color={colors.textSecondary} />
+            <Text style={styles.meta}>
+              {formatTime(event.startTime)}
+              {event.endTime ? ` – ${formatTime(event.endTime)}` : ''}
+            </Text>
+          </View>
         </View>
       </View>
 
-      {/* Resultat for kamper som er i gang eller spilt, ellers oppmøte. */}
+      {/* Kampen bor alltid på mørk stadionflate — også som resultatstripe her.
+          Coral = kun pågående; pause = gul; ferdig = dempet + evt. SEIER. */}
       {result && event.score ? (
-        <View style={styles.resultWrap}>
-          <Text style={styles.resultLabel}>{result}</Text>
-          <Text style={styles.resultScore}>
-            {event.score.home}–{event.score.away}
+        <StadiumSurface
+          style={styles.stadiumStrip}
+          flood={false}
+          arc={false}
+          bordered={false}>
+          {isLive && <View style={styles.liveDot} />}
+          <Text
+            style={[
+              styles.stripLabel,
+              isLive && styles.stripLabelLive,
+              isPaused && styles.stripLabelPaused,
+            ]}
+            numberOfLines={1}>
+            {result}
           </Text>
-        </View>
+          <View style={styles.stripRight}>
+            {isWin && <StatusPill kind="seier" label="Seier" />}
+            <Text style={styles.stripScore}>
+              {event.score.home}–{event.score.away}
+            </Text>
+          </View>
+        </StadiumSurface>
       ) : (
         <View style={styles.rsvpWrap}>
           <RSVPBar rsvp={event.rsvp} />
@@ -98,16 +140,18 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     ...shadows.card,
   },
+  // Coral eier live-status — en tynn kant er nok, stadionstripa bærer resten.
   featured: {
-    borderLeftWidth: 3,
-    borderLeftColor: colors.heia,
+    borderColor: colors.live,
   },
   pressed: {
-    backgroundColor: '#FAFAFA',
+    backgroundColor: colors.surfaceMuted,
   },
   row: {
     flexDirection: 'row',
@@ -124,9 +168,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   dateNum: {
-    ...typography.heading1,
     fontSize: 24,
     lineHeight: 28,
+    letterSpacing: -0.4,
+    fontFamily: fonts.display,
+    color: colors.textPrimary,
   },
   dateMonth: {
     ...typography.caption,
@@ -153,23 +199,43 @@ const styles = StyleSheet.create({
   rsvpWrap: {
     marginTop: spacing.lg,
   },
-  resultWrap: {
+  stadiumStrip: {
     marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: spacing.sm,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
   },
-  resultLabel: {
-    ...typography.caption,
-    color: colors.textTertiary,
+  liveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: colors.live,
+  },
+  stripLabel: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: colors.stadiumDim,
   },
-  resultScore: {
-    ...typography.heading3,
-    fontVariant: ['tabular-nums'],
+  stripLabelLive: {
+    color: '#FF8A8D',
+  },
+  stripLabelPaused: {
+    color: colors.gold,
+  },
+  stripRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  stripScore: {
+    ...typography.scoreSmall,
+    fontSize: 18,
+    color: colors.heia,
   },
 });

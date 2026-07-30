@@ -1,7 +1,10 @@
 import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {Maximize2, MessageCircle} from './icons';
 import {Avatar} from './Avatar';
+import {StatusPill} from './StatusPill';
+import {ScoreChip} from './ScoreChip';
 import type {FeedItem} from '../shared/types';
 
 interface FeedCardProps {
@@ -34,39 +37,78 @@ function timeAgo(date: Date): string {
   return date.toLocaleDateString('nb-NO', {day: 'numeric', month: 'short'});
 }
 
-type Marker = {label: string; dot: string};
-
-// Type-markør + grønn energy-rail vises kun på meningsbærende poster.
-// Vanlig melding/bilde får ingen markør (unngå å badge alt).
-function getMarker(item: FeedItem): Marker | null {
-  // «Varsle hele laget» slår alt annet: dette er posten treneren mente at
-  // ingen skulle gå glipp av, og den ligger allerede øverst i feeden.
-  if (item.isPinned) {
-    return {label: '📌 VIKTIG', dot: colors.warning};
-  }
-  switch (item.type) {
-    case 'resultat':
-      return {label: 'RESULTAT', dot: colors.heiaInk};
-    case 'match_event':
-    case 'match_start':
-    case 'match_end':
-      return {
-        label: item.matchEvent ? `${item.matchEvent.minute}′ KAMP` : 'KAMP',
-        dot: colors.heiaInk,
-      };
-    case 'paaminnelse':
-      return {label: 'PÅMINNELSE', dot: colors.warning};
-    default:
-      return null;
-  }
-}
-
 function isMatchType(item: FeedItem): boolean {
   return (
     item.type === 'match_event' ||
     item.type === 'match_start' ||
     item.type === 'match_end'
   );
+}
+
+/**
+ * Kortmarkør (A v2). Tre varianter, tre budskap:
+ * - VIKTIG-pill på solskinnsflate — treneren snakker.
+ * - Mørk score-chip — kampen bor alltid på mørk flate, også i feeden.
+ *   (Stilling/minutt mangler til `get_team_feed` også hydrerer matchEvent —
+ *   kjent hull; chipen bærer signaturen, `content` bærer tallene.)
+ * - Påminnelse-pill i lilla.
+ * Vanlig melding/bilde får ingen markør — unngå pill-inflasjon.
+ */
+function Marker({item, onUnpin}: {item: FeedItem; onUnpin?: () => void}) {
+  if (item.isPinned) {
+    return (
+      <StatusPill
+        kind="viktig"
+        label="Viktig"
+        onPress={onUnpin}
+        suffix="✕"
+        accessibilityLabel="Løsne fra toppen"
+      />
+    );
+  }
+
+  // Kampkontekst fra 00029: chipen er statusdrevet, ikke posttype-drevet.
+  // Coral = kampen pågår NÅ — en gammel målpost skal ikke rope live for alltid.
+  const match = item.match;
+  const score = match ? `${match.home}–${match.away}` : undefined;
+  const liveNow = match?.status === 'live';
+
+  if (item.type === 'resultat') {
+    return <ScoreChip label="Resultat" score={score} />;
+  }
+  if (isMatchType(item)) {
+    if (item.type === 'match_end') {
+      return <ScoreChip label="Slutt" score={score} />;
+    }
+    if (item.type === 'match_event') {
+      // Minuttet er øyeblikkets identitet; stillingen i øyeblikket bor i
+      // teksten. Kampens NÅ-stilling ville motsagt den på historiske mål.
+      const minute = match?.minute ?? item.matchEvent?.minute;
+      return (
+        <ScoreChip
+          label={minute !== undefined ? `${minute}′` : 'Kamp'}
+          live={liveNow}
+        />
+      );
+    }
+    // match_start: mens kampen pågår er avsparkposten lagets levende
+    // resultatkort i feeden. Etterpå bærer den ingen stilling — posten sier
+    // «Kampen er i gang», og sluttresultatet ville motsagt sin egen tekst.
+    if (liveNow || match?.status === 'halfTime') {
+      return (
+        <ScoreChip
+          label={liveNow ? 'Live' : 'Pause'}
+          live={liveNow}
+          score={score}
+        />
+      );
+    }
+    return <ScoreChip label="Kamp" />;
+  }
+  if (item.type === 'paaminnelse') {
+    return <StatusPill kind="remind" label="Påminnelse" />;
+  }
+  return null;
 }
 
 export function FeedCard({
@@ -78,9 +120,7 @@ export function FeedCard({
   onExpandImage,
 }: FeedCardProps) {
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
-  const marker = getMarker(item);
-  const showRail =
-    item.type === 'resultat' || isMatchType(item) || item.isPinned === true;
+  const strong = item.isPinned || isMatchType(item) || item.type === 'resultat';
   const heiaCount = item.heiaCount ?? 0;
   const commentCount = item.commentCount ?? 0;
 
@@ -88,45 +128,27 @@ export function FeedCard({
   // Den innerste tar trykket i RN, så de utløser aldri kortets onPress.
   const inner = (
     <>
-      {showRail && <View style={styles.rail} />}
-
       {/* Header */}
       <View style={styles.header}>
         <Avatar name={item.author.name} size="md" uri={item.author.avatarUrl} />
         <View style={styles.headerText}>
           <View style={styles.nameRow}>
-            <Text style={styles.name}>{item.author.name}</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.author.name}
+            </Text>
             {roleLabel && <Text style={styles.role}>{roleLabel}</Text>}
           </View>
           <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
         </View>
-        {marker &&
-          (onUnpin ? (
-            // Festede poster ville ellers blitt liggende øverst for alltid.
-            // Selve markøren er knappen — den står der man ser «hvorfor
-            // ligger denne her?», og bare trener/lagleder får den.
-            <Pressable
-              onPress={onUnpin}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Løsne fra toppen"
-              style={({pressed}) => [styles.marker, pressed && styles.markerPressed]}>
-              <View style={[styles.markerDot, {backgroundColor: marker.dot}]} />
-              <Text style={styles.markerText}>{marker.label}</Text>
-              <Text style={styles.markerClose}>✕</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.marker}>
-              <View style={[styles.markerDot, {backgroundColor: marker.dot}]} />
-              <Text style={styles.markerText}>{marker.label}</Text>
-            </View>
-          ))}
+        <Marker item={item} onUnpin={onUnpin} />
       </View>
 
       {/* Innhold */}
-      <Text style={[styles.content, showRail && styles.contentStrong]}>
-        {item.content}
-      </Text>
+      {item.content ? (
+        <Text style={[styles.content, strong && styles.contentStrong]}>
+          {item.content}
+        </Text>
+      ) : null}
 
       {/* Bilde */}
       {item.imageUrl && (
@@ -146,52 +168,61 @@ export function FeedCard({
                 styles.expand,
                 pressed && styles.expandPressed,
               ]}>
-              <Text style={styles.expandIcon}>⤢</Text>
+              <Maximize2 size={14} color={colors.surface} strokeWidth={2.2} />
             </Pressable>
           )}
         </View>
       )}
 
-      {/* Reaksjoner — lettvekt, merkevare-drevet */}
+      {/* Reaksjoner — designede pills, aktiv 👏 er et Heia-øyeblikk */}
       <View style={styles.reactions}>
         <Pressable
-          style={styles.reactionBtn}
           onPress={onHeia}
-          hitSlop={8}>
-          <Text style={styles.reactionEmoji}>👏</Text>
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Heia"
+          style={({pressed}) => [
+            styles.reactPill,
+            item.iReacted && styles.reactPillOn,
+            pressed && styles.reactPillPressed,
+          ]}>
           <Text
-            style={[
-              styles.reactionLabel,
-              item.iReacted && styles.reactionLabelActive,
-            ]}>
-            {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
+            style={[styles.reactText, item.iReacted && styles.reactTextOn]}>
+            👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
           </Text>
         </Pressable>
         <Pressable
-          style={styles.reactionBtn}
           onPress={onComment}
-          hitSlop={8}>
-          <Text style={styles.reactionEmoji}>💬</Text>
-          <Text style={styles.reactionLabel}>
-            {commentCount > 0 ? `${commentCount} kommentarer` : 'Kommenter'}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Kommenter"
+          style={({pressed}) => [
+            styles.reactPill,
+            pressed && styles.reactPillPressed,
+          ]}>
+          <MessageCircle size={14} color={colors.textSecondary} />
+          <Text style={styles.reactText}>
+            {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
           </Text>
         </Pressable>
       </View>
     </>
   );
 
+  const surfaceStyle = [styles.card, item.isPinned && styles.cardSun];
+
   if (onPress) {
     return (
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        style={({pressed}) => [styles.card, pressed && styles.cardPressed]}>
+        style={({pressed}) => [...surfaceStyle, pressed && styles.cardPressed]}>
         {inner}
       </Pressable>
     );
   }
 
-  return <View style={styles.card}>{inner}</View>;
+  return <View style={surfaceStyle}>{inner}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -203,17 +234,13 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     ...shadows.cardResting,
   },
+  // Solskinnsflate: treneren har merket dette som viktig for alle
+  cardSun: {
+    backgroundColor: colors.sun,
+    borderColor: colors.sunBorder,
+  },
   cardPressed: {
     backgroundColor: colors.heiaSoft,
-  },
-  rail: {
-    position: 'absolute',
-    left: 6,
-    top: spacing.lg,
-    bottom: spacing.lg,
-    width: 4,
-    borderRadius: radius.full,
-    backgroundColor: colors.heia,
   },
   header: {
     flexDirection: 'row',
@@ -231,7 +258,8 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
+    flexShrink: 1,
   },
   role: {
     ...typography.caption,
@@ -242,46 +270,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     overflow: 'hidden',
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   time: {
     ...typography.caption,
     color: colors.textTertiary,
     marginTop: 1,
   },
-  marker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  markerPressed: {
-    backgroundColor: colors.border,
-  },
-  markerClose: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginLeft: 2,
-  },
-  markerDot: {
-    width: 6,
-    height: 6,
-    borderRadius: radius.full,
-  },
-  markerText: {
-    ...typography.label,
-    fontSize: 11,
-  },
   content: {
     ...typography.body,
     lineHeight: 22,
   },
   contentStrong: {
-    fontWeight: '600',
-    fontSize: 17,
+    fontWeight: '700',
+    fontSize: 16,
   },
   imageWrap: {
     marginTop: spacing.md,
@@ -290,8 +292,9 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 220,
+    height: 210,
     borderRadius: radius.lg,
+    backgroundColor: colors.surfaceMuted,
   },
   expand: {
     position: 'absolute',
@@ -307,34 +310,33 @@ const styles = StyleSheet.create({
   expandPressed: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
-  expandIcon: {
-    fontSize: 15,
-    color: colors.surface,
-    fontWeight: '700',
-  },
   reactions: {
     flexDirection: 'row',
-    gap: spacing.xl,
+    gap: spacing.sm,
     marginTop: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
   },
-  reactionBtn: {
+  reactPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: 5,
+    paddingHorizontal: spacing.md + 1,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+    // Nøytral gjennomskinnelig — leselig på både hvit og solskinnsflate
+    backgroundColor: 'rgba(17, 36, 27, 0.06)',
   },
-  reactionEmoji: {
-    fontSize: 15,
+  reactPillOn: {
+    backgroundColor: colors.heiaTint,
   },
-  reactionLabel: {
-    fontSize: 13,
-    fontWeight: '500',
+  reactPillPressed: {
+    opacity: 0.7,
+  },
+  reactText: {
+    fontSize: 12.5,
+    fontWeight: '700',
     color: colors.textSecondary,
   },
-  reactionLabelActive: {
+  reactTextOn: {
     color: colors.heiaInk,
-    fontWeight: '700',
   },
 });

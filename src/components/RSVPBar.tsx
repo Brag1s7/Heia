@@ -7,6 +7,11 @@ interface RSVPBarProps {
   rsvp: RSVPSummary;
 }
 
+/**
+ * Oppmøtestripe (A v2): mint = de som kommer, resten er dempet. Samme språk
+ * som NextEventHero. «Kan ikke» roper ikke i rødt — fravær er informasjon,
+ * ikke en feil.
+ */
 export function RSVPBar({rsvp}: RSVPBarProps) {
   const total = rsvp.coming + rsvp.notComing + rsvp.pending;
   if (total === 0) {
@@ -40,11 +45,11 @@ export function RSVPBar({rsvp}: RSVPBarProps) {
         )}
       </View>
       <View style={styles.labels}>
-        <Text style={[styles.label, {color: colors.success}]}>
+        <Text style={[styles.label, styles.labelComing]}>
           {rsvp.coming} kommer
         </Text>
         {rsvp.notComing > 0 && (
-          <Text style={[styles.label, {color: colors.error}]}>
+          <Text style={[styles.label, {color: colors.textSecondary}]}>
             {rsvp.notComing} kan ikke
           </Text>
         )}
@@ -60,12 +65,12 @@ export function RSVPBar({rsvp}: RSVPBarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
   barTrack: {
-    height: 6,
+    height: 8,
     borderRadius: radius.full,
-    backgroundColor: colors.border,
+    backgroundColor: 'rgba(8, 57, 46, 0.10)',
     flexDirection: 'row',
     overflow: 'hidden',
   },
@@ -73,10 +78,11 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   barComing: {
-    backgroundColor: colors.success,
+    backgroundColor: colors.heia,
+    borderRadius: radius.full,
   },
   barNotComing: {
-    backgroundColor: colors.error,
+    backgroundColor: colors.border,
   },
   labels: {
     flexDirection: 'row',
@@ -84,5 +90,10 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.caption,
+    fontWeight: '600',
+  },
+  labelComing: {
+    color: colors.heiaDeep,
+    fontWeight: '700',
   },
 });

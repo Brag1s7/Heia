@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
 import {Button} from './Button';
+import {Check} from './icons';
 import type {MatchEvent, MatchEventType} from '../shared/types';
 
 interface MatchPhotoSheetProps {
@@ -129,7 +130,7 @@ export function MatchPhotoSheet({
                   📸 Generelt kampbilde
                 </Text>
                 {selectedEventId === undefined && (
-                  <Text style={styles.check}>✓</Text>
+                  <Check size={17} color={colors.heiaInk} strokeWidth={2.4} />
                 )}
               </Pressable>
 
@@ -147,7 +148,9 @@ export function MatchPhotoSheet({
                     <Text style={styles.optionText} numberOfLines={1}>
                       {eventLabel(me)}
                     </Text>
-                    {selected && <Text style={styles.check}>✓</Text>}
+                    {selected && (
+                      <Check size={17} color={colors.heiaInk} strokeWidth={2.4} />
+                    )}
                   </Pressable>
                 );
               })}
@@ -194,8 +197,8 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing['2xl'],
@@ -262,11 +265,6 @@ const styles = StyleSheet.create({
   optionText: {
     ...typography.body,
     flex: 1,
-  },
-  check: {
-    ...typography.body,
-    fontWeight: '700',
-    color: colors.heiaInk,
   },
   actions: {
     flexDirection: 'row',

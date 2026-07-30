@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
+import {Check} from './icons';
 import {Avatar} from './Avatar';
 import type {User} from '../shared/types';
 
@@ -90,7 +91,9 @@ export function ReporterSheet({
                     <Text style={styles.rowRole}>Trener</Text>
                   )}
                 </View>
-                {isCurrent && <Text style={styles.checkmark}>✓</Text>}
+                {isCurrent && (
+                  <Check size={18} color={colors.heiaInk} strokeWidth={2.4} />
+                )}
               </Pressable>
             );
           }}
@@ -167,11 +170,6 @@ const styles = StyleSheet.create({
   rowRole: {
     ...typography.caption,
     color: colors.textTertiary,
-  },
-  checkmark: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.heia,
   },
   empty: {
     ...typography.body,

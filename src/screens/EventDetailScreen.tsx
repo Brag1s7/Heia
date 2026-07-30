@@ -12,7 +12,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
 import {
   Card,
-  Chip,
+  StatusPill,
   Button,
   RSVPBar,
   SectionHeader,
@@ -29,6 +29,7 @@ import {
   MatchTimeline,
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
+import type {PillKind} from '../components/StatusPill';
 import {useAuth, useActiveTeam} from '../context';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
 import {
@@ -45,6 +46,7 @@ import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
+  EventType,
   HeiaEventDetail,
   HomeStackParamList,
   RSVPStatus,
@@ -80,6 +82,14 @@ const monthNamesLong = [
 function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
+
+// Samme type→pill-språk som NextEventHero/EventCard (A v2).
+const typePill: Record<EventType, {kind: PillKind; label: string}> = {
+  trening: {kind: 'trening', label: 'Trening'},
+  kamp: {kind: 'kamp', label: 'Kamp'},
+  sosialt: {kind: 'sosialt', label: 'Sosialt'},
+  annet: {kind: 'neutral', label: 'Hendelse'},
+};
 
 function formatDateLong(date: Date): string {
   const day = dayNamesLong[date.getDay()];
@@ -611,32 +621,65 @@ export function EventDetailScreen({route}: Props) {
   }
 
   // -----------------------------------------------------------------------
-  // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp)
+  // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp) + KAMPRAPPORT
   // -----------------------------------------------------------------------
+  // Kamprapporten snur rekkefølgen: resultatet ER historien på en spilt kamp,
+  // så scoreboardet møter deg først og «hvor og når» demoteres til én linje.
+  // Før åpnet siden med et administrativt infokort, og selve kampen lå under.
+  const showReport = isFinishedMatch && !!event.score && !!event.opponent;
+
+  const whenWhere = [
+    formatDateLong(event.startTime),
+    formatTime(event.startTime),
+    event.location,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
-      {/* Event-info */}
-      <Card style={styles.infoCard}>
-        <Chip type={event.type} />
-        <Text style={styles.title}>{event.title}</Text>
-        <View style={styles.metaList}>
-          <MetaRow label="Dato" value={formatDateLong(event.startTime)} />
-          <MetaRow
-            label="Tid"
-            value={
-              event.endTime
-                ? `${formatTime(event.startTime)} – ${formatTime(event.endTime)}`
-                : formatTime(event.startTime)
-            }
+      {showReport ? (
+        <View style={styles.report}>
+          <ScoreBoard
+            homeTeam={teamName}
+            awayTeam={event.opponent!}
+            homeScore={event.score!.home}
+            awayScore={event.score!.away}
+            matchStatus={event.matchStatus!}
           />
-          {event.location && <MetaRow label="Sted" value={event.location} />}
+          <Text style={styles.reportTitle}>{event.title}</Text>
+          <Text style={styles.reportMeta}>{whenWhere}</Text>
+          {event.description && (
+            <Text style={styles.description}>{event.description}</Text>
+          )}
         </View>
-        {event.description && (
-          <Text style={styles.description}>{event.description}</Text>
-        )}
-      </Card>
+      ) : (
+        /* Event-info */
+        <Card style={styles.infoCard}>
+          <StatusPill
+            kind={(typePill[event.type] ?? typePill.annet).kind}
+            label={(typePill[event.type] ?? typePill.annet).label}
+          />
+          <Text style={styles.title}>{event.title}</Text>
+          <View style={styles.metaList}>
+            <MetaRow label="Dato" value={formatDateLong(event.startTime)} />
+            <MetaRow
+              label="Tid"
+              value={
+                event.endTime
+                  ? `${formatTime(event.startTime)} – ${formatTime(event.endTime)}`
+                  : formatTime(event.startTime)
+              }
+            />
+            {event.location && <MetaRow label="Sted" value={event.location} />}
+          </View>
+          {event.description && (
+            <Text style={styles.description}>{event.description}</Text>
+          )}
+        </Card>
+      )}
 
       {/* Kommende kamp: her utnevnes reporteren, og herfra startes kampen.
           Uten dette kunne ingen bli reporter (ReporterBar fantes kun i
@@ -658,19 +701,6 @@ export function EventDetailScreen({route}: Props) {
               disabled={startingMatch}
             />
           )}
-        </View>
-      )}
-
-      {/* Kamprapporten — sluttresultat + alt reporteren meldte inn. */}
-      {isFinishedMatch && event.score && event.opponent && (
-        <View style={styles.matchSection}>
-          <ScoreBoard
-            homeTeam={teamName}
-            awayTeam={event.opponent}
-            homeScore={event.score.home}
-            awayScore={event.score.away}
-            matchStatus={event.matchStatus!}
-          />
         </View>
       )}
 
@@ -723,19 +753,26 @@ export function EventDetailScreen({route}: Props) {
         </View>
       )}
 
-      {/* Oppmøteliste */}
-      <AttendanceSection
-        title={`Kommer (${attendees.coming.length})`}
-        users={attendees.coming}
-        emptyText="Ingen har svart ennå"
-      />
-      {attendees.notComing.length > 0 && (
+      {/* Oppmøteliste. På en spilt kamp er «Kommer» fortid, og «Ikke svart»
+          er ren støy — påmeldingen blir en enkel deltakerliste i stedet. */}
+      {(!showReport || attendees.coming.length > 0) && (
+        <AttendanceSection
+          title={
+            showReport
+              ? `Påmeldt (${attendees.coming.length})`
+              : `Kommer (${attendees.coming.length})`
+          }
+          users={attendees.coming}
+          emptyText="Ingen har svart ennå"
+        />
+      )}
+      {attendees.notComing.length > 0 && !showReport && (
         <AttendanceSection
           title={`Kan ikke (${attendees.notComing.length})`}
           users={attendees.notComing}
         />
       )}
-      {attendees.pending.length > 0 && (
+      {attendees.pending.length > 0 && !showReport && (
         <AttendanceSection
           title={`Ikke svart (${attendees.pending.length})`}
           users={attendees.pending}
@@ -848,6 +885,20 @@ const styles = StyleSheet.create({
   infoCard: {
     margin: spacing.lg,
     gap: spacing.sm,
+  },
+  // Kamprapportens topp: resultatet først, «hvor og når» som undertekst.
+  report: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.xs,
+  },
+  reportTitle: {
+    ...typography.heading2,
+    marginTop: spacing.lg,
+  },
+  reportMeta: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   title: {
     ...typography.heading2,

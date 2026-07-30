@@ -13,7 +13,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, fonts} from '../theme';
 import {Button} from '../components';
 import {useActiveTeam} from '../context';
 import {createEvent} from '../lib/api/events';
@@ -384,8 +384,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.sm,
   },
+  // Samme caps-uttrykk som seksjonsetikettene (A v2).
   fieldLabel: {
-    ...typography.label,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
     color: colors.textSecondary,
   },
   chipRow: {
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
   },
   selectChipTextSelected: {
     color: colors.heiaInk,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   input: {
     ...typography.body,
@@ -430,10 +434,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
+  // Klokkeslettet er skjermens tall — stort og stolt i displayfonten (A v2).
   timeInput: {
     alignSelf: 'flex-start',
     minWidth: 108,
     textAlign: 'center',
+    fontSize: 20,
+    fontFamily: fonts.display,
   },
   multiline: {
     minHeight: 96,

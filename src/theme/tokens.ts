@@ -1,45 +1,72 @@
 import {Platform, type TextStyle, type ViewStyle} from 'react-native';
 
 // ---------------------------------------------------------------------------
-// Farger
+// Farger — A v2 «Stadium Pop Hybrid» (låst designretning 2026-07-30)
+// Varm mintkrem til hverdags; kampen bor alltid på mørk stadionflate.
 // ---------------------------------------------------------------------------
 export const colors = {
   // Brand
-  heia: '#02ffab',
+  heia: '#02FFAB',
   heiaPressed: '#00D492',
-  heiaSoft: 'rgba(2, 255, 171, 0.10)',
-  // Mørk, WCAG-trygg grønn til TEKST/IKON på lyst (#02ffab er kun fyll — feiler kontrast som tekst)
-  heiaInk: '#047857',
+  heiaSoft: 'rgba(2, 255, 171, 0.12)',
+  // Mørk, WCAG-trygg grønn til TEKST/IKON på lyst (#02ffab er kun fyll — den
+  // får bare være tekst på stadionmørk flate, der den måler ≈13:1)
+  heiaInk: '#087A5A',
+  // Dyp merkevaregrønn — tekst på mintfylte flater (knapper, pills)
+  heiaDeep: '#08392E',
+  // Valgt/feiring-flate (aktiv 👏, SEIER)
+  heiaTint: '#C6FFE9',
 
-  // Flater
-  background: '#F7F7F8',
+  // Flater (varm mintkrem — ikke kald systemgrå)
+  background: '#F6F8F0',
   surface: '#FFFFFF',
-  // Nøytral, dempet flate til chips o.l. (erstatter pastell-fyll)
-  surfaceMuted: '#F1F2F4',
+  surfaceMuted: '#F1F4EA',
+  // Solskinnsflate — trenerbeskjeder/VIKTIG
+  sun: '#FFF9E7',
+  sunBorder: '#F2E4BC',
+
+  // Stadionmodus — kampens flate, i alle størrelser (hero → score-chip)
+  stadium: '#0E211A',
+  stadiumEdge: '#1E4033',
+  stadiumText: '#EAFFF6',
+  stadiumDim: '#A9CCBC',
 
   // Tekst
-  textPrimary: '#1A1D26',
-  textSecondary: '#6B7280',
-  textTertiary: '#9CA3AF',
+  textPrimary: '#11241B',
+  textSecondary: '#5F7265',
+  textTertiary: '#93A195',
 
-  // Grenser
-  border: '#E5E7EB',
-  // Rolig 1px kort-kant på lyst (premium-separasjon sammen med cardResting)
-  borderSubtle: '#EDEEF0',
+  // Grenser (varmtonede)
+  border: '#DFE7D8',
+  borderSubtle: '#E9EEE1',
 
-  // Semantisk
+  // Semantisk (system)
   error: '#EF4444',
   success: '#22C55E',
   warning: '#F59E0B',
 
-  // Event-type aksentfarger (brukes som prikk på nøytrale chips)
-  treningText: '#4F46E5',
-  kampText: '#EA580C',
-  sosialtText: '#9333EA',
+  // Fargesemantikk (låst): coral = live-status, blå = kalender/info,
+  // lilla = påminnelse, gul = feiring. Mål feires i grønt/gult — aldri coral.
+  live: '#FF5A5F',
+  liveSoft: '#FFEDEA',
+  liveInk: '#E04A44',
+  info: '#3D7BF5',
+  infoSoft: '#EAF1FF',
+  infoInk: '#2F66DB',
+  remind: '#8B5CF6',
+  remindSoft: '#F1EAFE',
+  remindInk: '#7A4DE8',
+  gold: '#FFC53D',
+  goldInk: '#5C4A00',
+
+  // Event-type aksentfarger (speiler semantikken over)
+  treningText: '#2F66DB',
+  kampText: '#E04A44',
+  sosialtText: '#7A4DE8',
 } as const;
 
 // ---------------------------------------------------------------------------
-// Typografi
+// Typografi — titler med pondus, store rounded tall (Nunito, bundlet).
 // ---------------------------------------------------------------------------
 const fontFamily = Platform.select({
   ios: 'System',
@@ -47,11 +74,22 @@ const fontFamily = Platform.select({
   default: 'System',
 });
 
+// Displayfont for STORE TALL (score, klokkeslett, datotall, minutter) — aldri
+// brødtekst/titler. Nunito = SF Rounded-erstatteren fra artifacten (`ui-rounded`).
+// Strengen er både PostScript-navnet (iOS) og filnavnet (Android), så samme
+// verdi virker begge steder. Sifrene er like brede i fonten, så tabular-nums
+// trengs ikke. Sett ALDRI fontWeight sammen med disse — fila ER vekten, og
+// en fontWeight får iOS til å lete etter vekter familien ikke har.
+export const fonts = {
+  display: 'Nunito-ExtraBold',
+  displayBold: 'Nunito-Bold',
+} as const;
+
 export const typography = {
   heading1: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.6,
     fontFamily,
     color: colors.textPrimary,
   } satisfies TextStyle,
@@ -59,13 +97,15 @@ export const typography = {
   heading2: {
     fontSize: 22,
     fontWeight: '700',
+    letterSpacing: -0.3,
     fontFamily,
     color: colors.textPrimary,
   } satisfies TextStyle,
 
   heading3: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: -0.2,
     fontFamily,
     color: colors.textPrimary,
   } satisfies TextStyle,
@@ -101,6 +141,28 @@ export const typography = {
     letterSpacing: 0.8,
     color: colors.textSecondary,
   } satisfies TextStyle,
+
+  // Store, stolte tall — rounded 800 (vekten ligger i fontfila, se `fonts`)
+  scoreLarge: {
+    fontSize: 40,
+    letterSpacing: -0.5,
+    fontFamily: fonts.display,
+    color: colors.textPrimary,
+  } satisfies TextStyle,
+
+  scoreSmall: {
+    fontSize: 16,
+    letterSpacing: 0.2,
+    fontFamily: fonts.display,
+    color: colors.textPrimary,
+  } satisfies TextStyle,
+
+  displayTime: {
+    fontSize: 22,
+    letterSpacing: -0.3,
+    fontFamily: fonts.display,
+    color: colors.heiaDeep,
+  } satisfies TextStyle,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -130,31 +192,40 @@ export const radius = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Shadows
+// Skygger — grønntonede og tilbakeholdne. Kort skal føles skarpe, ikke ligge
+// i grønn tåke. Glød er reservert: live-score, aktiv hovedhandling, 👏.
 // ---------------------------------------------------------------------------
 export const shadows = {
   card: {
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowColor: '#0B3B2A',
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
     elevation: 2,
   } satisfies ViewStyle,
 
   elevated: {
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowColor: '#0B3B2A',
+    shadowOffset: {width: 0, height: 6},
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
     elevation: 6,
   } satisfies ViewStyle,
 
-  // Mykt ambient-løft for feed-kort på nær-hvit bakgrunn (premium light)
   cardResting: {
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 6},
-    shadowOpacity: 0.07,
-    shadowRadius: 20,
+    shadowColor: '#0B3B2A',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     elevation: 3,
+  } satisfies ViewStyle,
+
+  // Mint-glød — KUN hovedhandling (primærknapp, +-knappen) og live-score
+  glow: {
+    shadowColor: '#02FFAB',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
   } satisfies ViewStyle,
 } as const;

@@ -1,10 +1,14 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (**Fase 6 FERDIG** — lagoversikt, `00027` deployet,
-tsc grønn. **Fase 7 + 8 KODET, ikke verifisert** — kamera + kampbilder i
-tidslinja (`00028` deployet), og feed-kort som åpner kampen. Lint rent.
-**⚠️ Krever REBUILD** (ny Info.plist-nøkkel for kamera); ikke sett i
-simulator ennå.)_
+_Sist oppdatert: 2026-07-30 (kveld). **Designretningen «A v2 · Stadium Pop
+Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3+4 — skive 4 er den
+samlede native rebuilden, optisk godkjent av bruker).** Nyeste skive er
+**KAMPRAPPORTEN (skive 5)**: migrasjon `00029` deployet, kampchipene i feeden
+bærer nå stilling, kampforløpet har løpende stilling, og en spilt kamp åpner
+med scoreboardet. **KODET, ikke optisk verifisert.** Designarbeidet er ikke
+pushet/merget til `main` ennå. **Neste:** optisk review av skive 5, deretter
+app-ikon/launch screen eller produktkandidatene («🎯 SENERE»). Fase 4–9 fra
+før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1030,11 +1034,11 @@ fremheving av en konkret kamphendelse. Derfor ingen `focusMatchEventId`,
 ingen layout-register, ingen endring i `MatchTimeline`. Bygges hvis behovet
 faktisk viser seg.
 
-**Kjent, urørt:** `get_team_feed` returnerer `match_event_id` (00015:306, 328),
-men `mapFeedRow` i `feed.ts` mapper det ikke. Derfor er `FeedItem.matchEvent`
-alltid `undefined`, og kampkortenes markør sier alltid «KAMP» og aldri
-«34′ KAMP». Å fikse minuttet krever at RPC-en også returnerer minuttet — altså
-en migrasjon. Ligger her som en kjent, liten kosmetisk mangel.
+**~~Kjent, urørt~~ → LØST i skive 5 (00029):** `get_team_feed` returnerte
+`match_event_id`, men ikke minuttet/stillingen, så kampchipen sto uten tall.
+RPC-en returnerer nå `match_minute`/`match_status`/`match_home`/`match_away`.
+(`FeedItem.matchEvent` er fortsatt `undefined` — `FeedItem.match` erstatter
+behovet, og ingen leser `matchEvent` lenger.)
 
 ---
 
@@ -1152,7 +1156,357 @@ terminalen med `npm run ios` blir lista stående gammel.
 
 ---
 
-## 🎯 NESTE SLICE — fritt valg
+## 📦 Git-status (2026-07-30)
+
+Alt av Fase 4–9 er **committet, pushet og merget til `main`** (PR #16).
+**Hele designarbeidet (skive 1+2+3 + kommentartråd-forbedringene) er
+committet på `Brage`** etter brukerens optiske OK-er (skive 1+2: `503e07d`).
+Ikke pushet/merget til `main` ennå — husk squash-merge-mønsteret når det
+skjer (merge `origin/main` inn, behold Brage, verifiser supersett).
+
+**Merk mønsteret som skaper konflikter hver gang:** GitHub squash-merger PR-en,
+så `main` får ÉN commit mens `Brage` beholder sine egne. Neste gang du merger
+vil git derfor se to historikker som rører samme linjer, og du får konflikter
+selv om innholdet er identisk. Løsningen er alltid den samme: merge
+`origin/main` inn i `Brage` og behold Brage — men verifiser først at Brage
+faktisk er et supersett (`git diff origin/main:<fil> Brage:<fil>`), ikke bare
+anta det.
+
+## 🎨 DESIGN — «A v2 · Stadium Pop Hybrid» (LÅST 2026-07-30)
+
+Prosess: 3 HTML-konsepter (artifact) → bruker valgte A → A v2-iterasjon →
+**låst**. Artifacts (designintensjon, IKKE piksel-spesifikasjon):
+- Konsepter A/B/C: https://claude.ai/code/artifact/51dd852d-7ac7-4b98-b756-f97797538505
+- A v2 (den låste): https://claude.ai/code/artifact/cefe92dd-a148-4202-a9b9-71bf8cd28431
+
+**Låste identitetsgrep:** varm mintkrem-hverdag (#F6F8F0); #02FFAB = Heia/
+handling/energi; **kampen bor ALLTID på mørk stadionflate** (fra fullt
+scoreboard ned til liten score-chip — dette er signaturen); banesirkelmotiv
+subtilt, maks ett sted per skjerm; coral = KUN live-status; grønt/gult = mål/
+feiring (aldri coral på mål); lagfarge kontrollert (ring/stripe/«oss»-side);
+store tabulære 800-tall. Regler: aldri mint tekst på lyst; gradient-disiplin;
+ingen «TAP»-roping (SEIER-pill finnes, tap-pill finnes ikke); glød KUN på
+live-score, hovedhandling og enkelte Heia-øyeblikk.
+
+### ✅ Skive 1 — hjem (KODET 2026-07-30, IKKE optisk verifisert)
+Ren TS/TSX — **kun Metro-reload.** ESLint: 0 nye feil.
+- `theme/tokens.ts` — v2-palett (alle gamle tokennavn beholdt + nye:
+  heiaDeep/heiaTint/sun/stadium/live/info/remind/gold …), typografi
+  (heading1 30/800, scoreLarge/scoreSmall/displayTime m/ tabular-nums),
+  grønntonede restriktive skygger + `shadows.glow` (rasjonert).
+- Nye: `StatusPill` (semantiske pills, m/ onPress+suffix for «Viktig ✕»),
+  `ScoreChip` (mørk kamp-chip), `NextEventHero` (vanlig hero; hele kortet
+  åpner EventDetail — bevisst ingen inline-RSVP).
+- Endret: `Button` (radius 16, primær = mintfyll + heiaDeep-tekst + glød kun
+  aktiv), `Card`, `SectionHeader` (mint-strek + caps), `LiveBadge` (solid
+  coral/gul), `TeamHeader` (lagmerke m/ ring + stripe, bg=background),
+  `LiveMatchBanner` (stadion-hero: mørk flate, flomlys/banesirkel som
+  View-sirkler, glødende mint-score m/ textShadow, minutt fra startedAt),
+  `FeedCard` (rail FJERNET; sun-flate for pinned, ScoreChip på kamp-poster,
+  reaksjons-pills), `TeamHomeScreen` (hero-prioritet live>neste hendelse via
+  `pickNextEvent` på eksisterende `getTeamEvents`; composer m/ avatar+felt+
+  kamerachip; Publiser/varsle-rad vises først når noe skal publiseres),
+  `AppNavigator` (aktiv fane = mint-pille + mørk tekst — fikser kontrastfeil
+  der aktiv farge var #02FFAB på hvitt; +-knapp squircle m/ glød; badge i
+  coral).
+- **~~Kjente hull~~ — begge lukket senere samme dag:** feed-kampchipen uten
+  stilling ble løst i skive 5 (`00029`); tekstglyf-ikonene i skive 4.
+
+### ✅ Optisk review gjennomført 2026-07-30 (alle 4 tilstander sett)
+Bruker viste skjermbilder; funn og fikser samme dag:
+- **Tab-bar-glyfene ble klippet til strimler** — ikon-slotten i bottom-tabs
+  er ~30 px bred; pillens `paddingHorizontal` spiste hele bredden. Fiks:
+  `tabBarIconStyle` (64×32) + fast pillebredde (56×30). Verifisert OK.
+- **Flomlys-/kremsirklene var for harde** (synlige skivekanter — Views har
+  ingen blur). Gjort større + svakere; ekte radial-glød kommer med
+  gradient-modulen i rebuilden.
+- **Ferdigspilt kamp sto som «neste hendelse»** når avsparket lå frem i tid
+  (test-case: kamp spilt før planlagt start). `pickNextEvent` hopper nå over
+  `finished` i tillegg til `cancelled`.
+- **Slutt-poster i feeden** fikk chip «Slutt» (dempet) i stedet for «KAMP»
+  (coral). Coral = kun pågående.
+Stadion-hero, sun-kort, bildepost, composer og seksjonsheadere satt som
+tegnet. Brukeren åpnet ny samtale med «fortsett» → tolket som OK, skive 2
+startet.
+
+### ✅ Skive 2 — kalender, varsler og kampdetalj (KODET + optisk OK 2026-07-30)
+Ren TS/TSX — **kun Metro-reload.** `npx eslint src`: **0 errors**, 4 warnings
+(alle fra før). tsc ikke kjørt (låst regel — sjekk i editoren).
+
+- **`ScoreBoard` skrevet om til stadionflate** — det låste signaturgrepet
+  («kampen bor ALLTID på mørk flate») gjaldt fra fullt scoreboard og ned, men
+  ScoreBoard var fortsatt et hvitt kort. Nå: samme motiv som `LiveMatchBanner`
+  (flomlys-/banesirkel-Views, lagmerke med ring + «oss»-stripe i lagfarge,
+  48 pt tabulær mint-score). **Glød KUN når kampen pågår** (live/pause);
+  ferdig = rolig flate med «Slutt»-pill + **SEIER-pill ved seier** (home >
+  away — home/away er alltid oss/dem, se Fase 3A). Ingen tap-pill (låst
+  regel). Props uendret; henter lagfarge selv via `useActiveTeam`, akkurat
+  som `LiveMatchBanner`.
+- **`EventCard`:** `Chip` → `StatusPill` (samme type→pill-språk som
+  `NextEventHero`); resultatfeltet er nå en **mørk stadionstripe** (coral
+  label kun live, gul i pause, dempet «Sluttresultat» + SEIER-pill);
+  `featured` (live) = tynn coral kant i stedet for mint-rail (coral eier
+  live-status); kortflate på Card-språket (radius.xl + borderSubtle);
+  datotall 800 tabulær.
+- **`KalenderScreen`:** seksjonsetikettene fikk mint-streken (samme uttrykk
+  som `SectionHeader`, men beholdt plassen til `LiveBadge` ved «I dag»);
+  tomkort på Card-språket.
+- **`RSVPBar`:** mint fylling på mørkgrønn-tonet track — samme språk som
+  oppmøtestripa i `NextEventHero`. «Kan ikke» roper ikke lenger i rødt
+  (fravær er informasjon, ikke en feil); «kan ikke»-segmentet er dempet grått.
+- **`ReporterActions`:** «Mål oss» = mintfyll + heiaDeep-tekst + **glød**
+  (reporterens hovedhandling — ett av de rasjonerte glød-stedene; mål feires
+  i grønt, aldri coral). «Mål dem» = nøytral hvit flate. Radius-harmonisert.
+- **`ReporterBar`:** «Velg» følger knapperegelen (heiaDeep på mint — var
+  svart-på-mint); borderSubtle + radius.lg.
+- **`MatchEventRow` + `MatchTimeline`:** mål/avspark/fortsettelse på
+  heiaTint-sirkler (grønt = feiring), kort på sun, resten dempet — myke
+  flater bak emoji i stedet for solide sirkler. Minutter 800 tabulær.
+- **`NotificationRow`:** semantisk ikonflate per kategori (match_live=
+  liveSoft, new_comment=infoSoft, event_reminder=remindSoft (lilla =
+  påminnelse), admin_message=sun, new_reaction=heiaTint, ellers dempet);
+  ulest tittel 700.
+- **`InboxScreen`:** liste + tomkort på Card-språket.
+- **`EventDetailScreen`:** `Chip` → `StatusPill` i infokortet — eneste
+  endring; all logikk urørt.
+- **`Chip.tsx` SLETTET** (+ ut av `components/index.ts`) — ingen brukere
+  igjen etter EventCard/EventDetail.
+
+### Test dette (Metro-reload — optisk review, samme øvelse som skive 1)
+1. **Kalender:** pill per type på kortene; mint-strek på seksjonsetikettene.
+   Live kamp = coral kant + mørk stripe «PÅGÅR NÅ» med mint-score; pause =
+   gul label; ferdig = «SLUTTRESULTAT» + grønn «Seier»-pill når vi vant —
+   og INGEN pill når vi tapte.
+2. **Kampdetalj live:** mørkt scoreboard med lagmerker, glødende mint-score
+   og minutt-pill; som reporter er «Mål oss» mint med glød, «Mål dem» hvit.
+3. **Kampdetalj pause:** gul «PAUSE»-badge, stillestående, «Pause — kampen
+   fortsetter» under.
+4. **Ferdig kamp:** samme mørke flate uten glød, «Slutt»- (+ evt. «Seier»-)
+   pill; kampforløpet har mint-sirkler på mål.
+5. **Varsler:** fargede ikonsirkler per kategori (coral kamp, blå kommentar,
+   lilla påminnelse, gul trenerbeskjed, mint 👏); ulest = grønn flate + prikk
+   som før.
+6. **Oppmøtestripa** (kalenderkort + hendelse): mint fylling, ingen rød.
+
+### ✅ Skive 3 — resten av flatene (KODET + optisk OK 2026-07-30)
+Ren TS/TSX — **kun Metro-reload.** `npx eslint src`: 0 errors, 4 warnings
+(samme fire som før). Nå snakker HELE appen A v2 — ingen skjerm står igjen
+på det gamle uttrykket.
+
+**Regelbrudd som ble funnet og lukket (mint-tekst/svart-på-mint):**
+- `SimulatedPush` (varselbanneret): mint appLabel på hvitt + mint venstre-rail
+  → mint-strek + heiaInk, kortflate med borderSubtle (railene er døde i A v2).
+- `ReporterSheet`: ✓-haken var `colors.heia` på hvitt → heiaInk.
+- `CreateTeamScreen`: «+ Opprett klubb» var heiaPressed på hvitt → heiaInk.
+- `SupportScreen`: ✓-fordeler i mint på lyst → heiaInk; «80% til laget» og
+  «Spar 33%» hadde svart tekst på mintfyll → heiaDeep.
+- `InviteCodeCard`/`ReporterBar`/`AuthScreen`-tab/`WelcomeIntent`: svart tekst
+  på mintfylte knapper → heiaDeep (+ glød på Del-knappen og velkomst-CTA-en).
+- Verifisert med grep: alle gjenværende `color: colors.heia` er på mørk
+  stadionflate (ScoreChip/ScoreBoard/EventCard-stripe/LiveMatchBanner) — riktig.
+
+**Øvrig samkjøring:**
+- **`WelcomeIntentScreen` bor nå på stadionflaten** (`colors.stadium`, var
+  `textPrimary`-svart) — appens første møte bærer kamp-signaturen.
+- **`CreateSheet`:** semantiske ikonsirkler (mint «Del med laget», blå «Ny
+  hendelse») — samme språk som varselradene.
+- **`ProfilScreen`:** lagvelgeren følger «valgt skifter FLATE»-regelen
+  (heiaSoft + mint-ramme, var kun ramme); menyen er et avrundet kort med
+  marger (var kant-til-kant); «Dine lag» har mint-strek.
+- **`TeamMembersScreen`:** mint-strek på seksjonene, kort på Card-språket.
+- **`NewEventScreen`:** feltetiketter i A v2-caps, klokkeslett 20 pt tabulær
+  800, valgt chip-tekst 700.
+- **`JoinTeamCodeScreen`:** kodefeltet 800 m/ letterSpacing 4, kort/rollekort
+  på Card-språket, «Din rolle»-etikett i A v2-caps.
+- **`AuthScreen`:** feltetiketter i A v2-caps.
+- **`CommentsScreen`/`ListRow`/`ReporterModal`/`MatchPhotoSheet`:** radius-
+  og borderSubtle-samkjøring, navn/titler 600–700.
+- InviteScreen trengte ingenting (arver fra `InviteCodeCard`).
+
+**Tillegg (bruker-funn under review av skive 3): kommentartråden**
+1. **Kommentarbobler.** Kommentarene fløt rett på kremflaten uten avgrensning.
+   Nå: hvit boble per kommentar (chat-hjørne oppe til venstre mot avataren),
+   navn/tid inne i boblen.
+2. **👏 Heia på innlegget inne i tråden.** Man sto PÅ innlegget uten å kunne
+   se eller gi applaus — brudd på innholdsløkka. `getFeedPost` (comments.ts)
+   hydrerer nå `heiaCount` + `iReacted` (én ekstra reactions-select + lokal
+   session i samme `Promise.all`), og `CommentsScreen` har samme reaksjons-
+   pill som `FeedCard` med optimistisk toggle + rollback og busy-ref mot
+   dobbelttrykk (`toggleReaction` er retningsstyrt — to raske trykk ville
+   ellers gitt dobbel insert).
+
+### Test dette (Metro-reload — optisk review av skive 3)
+1. Logg ut → velkomstskjermen er mørk stadion med mint CTA (grønn tekst på
+   mint, ikke svart). Auth: aktiv fane har mørkegrønn tekst på mint.
+2. `+` → valgarket har fargede ikonsirkler.
+3. Profil → aktivt lag har mint flate + ramme; menyen er et avrundet kort.
+4. Lagoversikt → mint-strek på «Trenere og lagledere» osv.
+5. Ny hendelse → CAPS-etiketter, stort tabulært klokkeslett.
+6. Under kamp: la et varsel komme → banneret har mint-strek + «HEIA» i
+   mørkegrønt, ingen mint-rail.
+7. Støtt laget → «80% til laget» i mørkegrønn på mint, hakene i mørkegrønt.
+8. Kommentartråd → kommentarene ligger i hvite bobler; innlegget øverst har
+   👏-pill med teller. Trykk → teller opp og pillen blir mint; trykk igjen →
+   av. Heia i tråden skal også synes i feeden etterpå (samme data).
+
+### ✅ Skive 4 — den samlede «native rebuilden» (KODET 2026-07-30, IKKE optisk verifisert)
+
+Viste seg å være mye mindre native enn fryktet: **react-native-svg 15.15.3 lå
+allerede i Podfile.lock** (bygget inn fra før). Dermed:
+- **lucide-react-native ^1.28.0** er ren JS oppå svg → kun `npm install`,
+  ingen pod install.
+- **react-native-linear-gradient er BEVISST IKKE installert.** Artifactens
+  flomlys er *radiale* gløder, og linear-gradient kan ikke radial — svg kan.
+  Alle gradienter tegnes med react-native-svg. Ikke installer linear-gradient
+  senere «for ordens skyld».
+- **Eneste native endring: bundlede fonter** (Nunito-Bold/-ExtraBold i
+  `assets/fonts/`, linket med `npx react-native-asset` → `UIAppFonts` i
+  Info.plist + Resources i pbxproj + android/assets). Krevde bare en vanlig
+  `npm run ios`-rebuild — **ingen pod install, ingen 20–60 min**.
+
+**Font (A v2 «tall med autoritet»):**
+- Artifacten bruker `ui-rounded` (SF Rounded) — finnes ikke i RN, og Apple-
+  lisensen gjør bundling av SF utrygt. **Nunito ExtraBold** (OFL) er
+  erstatteren. KUN store tall (score, minutter, klokkeslett, datotall, pris) —
+  aldri brødtekst/titler/CAPS-etiketter.
+- `fonts.display`/`fonts.displayBold` i `theme/tokens.ts`. Strengen
+  «Nunito-ExtraBold» er både PostScript-navnet (iOS) og filnavnet (Android).
+- **Sett ALDRI fontWeight sammen med displayfonten** — fila ER vekten; en
+  fontWeight får iOS til å lete etter vekter familien ikke har.
+- **Sifrene i Nunito er like brede** (verifisert i hmtx-tabellen), så
+  `tabular-nums` trengs ikke — klokka tikker uten hopp.
+- ⚠️ **TTF-ene fra google-webfonts-helper hadde ØDELAGTE navnetabeller**
+  («NunitoExtraLight-Bold»). Fikset med fontTools (name-tabell + usWeightClass
+  + fsSelection omskrevet) før kopiering til `assets/fonts/`. Gjenta prosessen
+  hvis flere vekter skal inn — ikke bruk zip-filene rått.
+
+**Gradienter — ny delt komponent `StadiumSurface.tsx`:**
+- base linear 165° `#0B1912→#143126` + radial amber-flomlys (18%, −20%) +
+  radial mint-glød (85%, −10%), pluss banesirkel-ringene. Props: `flood`,
+  `arc`, `bordered` (av for chips/striper).
+- Brukes av: `LiveMatchBanner`, `ScoreBoard` (erstattet de identiske
+  sirkel-View-blokkene), `ScoreChip`, `EventCard`-resultatstripa,
+  `WelcomeIntentScreen` (fullskjerm, radius 0).
+- `NextEventHero` fikk sin egen mint→krem-linear (140°, `#DFFBEA→#F4F9E6→
+  #FAF4DC`) inline — den er hverdag, ikke stadion.
+- Gradient-id-er i svg er trygt gjenbrukbare per `<Svg>`-rot (egen scope).
+
+**Ikoner — `src/components/icons.tsx` (eneste lucide-importsted):**
+- Re-eksporterer Lucide (stroke 2) + egen **`Ball`** (fotball finnes ikke i
+  Lucide — tegnet fra artifactens path med react-native-svg).
+- Byttet: tab bar (House/Calendar/Plus/Bell/User — pillen og squirclen
+  består), composer-kamerachip, CreateSheet-sirklene, FeedCards kommentar-
+  pill + forstørr-knapp (Maximize2), NotificationRow-kategoriene (Ball/
+  MessageCircle/Calendar/Megaphone/Check/Info, blekket i flatens ink-farge),
+  ReporterActions (alle seks + kamera), MatchEventRow/MatchTimeline-sirklene,
+  hakene i ReporterSheet/MatchPhotoSheet/SupportScreen/TeamHome-avkrysningen
+  (Check), lukkekrysset i MatchPhotoGallery (X), chevron+MapPin i
+  NextEventHero, MapPin+Clock på EventCard-meta.
+- **👏 består som emoji overalt** — det er merkevare-gesten, Lucide har ingen
+  applaus. `bytte`/`kort` i kampforløpet beholder tegn-glyfene (lages ikke av
+  appen ennå). JoinTeamCode-kodefeltet beholder systemfont (kode er ikke et
+  display-tall). StatusPill-suffikset «✕» består som tegn (piksel-lite).
+
+`npx eslint src`: **0 errors, 4 warnings (samme fire som før).** tsc ikke
+kjørt (låst regel — sjekk i editoren).
+
+### Test dette (optisk review av skive 4 — KREVER rebuilden fra i dag)
+Rebuild + fontlinking ble gjort i samtalen 2026-07-30 (npm install +
+`npx react-native-asset` + `npm run ios`). Ser talltypografien tynn/vanlig ut
+er det den GAMLE binæren som kjører — bygg på nytt før du bedømmer noe.
+1. **Tab bar:** strek-ikoner (hus/kalender/bjelle/person), aktiv fane = mint
+   pille med mørkegrønt ikon, «+» = mint squircle med mørkegrønt pluss + glød.
+2. **Hjem:** hero har ekte mint→krem-gradient med kremdrag nede til høyre;
+   composer-kameraet er strek-ikon på mintchip; kommentar-pillen har boble-
+   ikon; 👏-pillen er uendret.
+3. **Live kamp (hero + scoreboard):** flomlysene er nå myke radiale gløder
+   (amber oppe-venstre, mint oppe-høyre) — INGEN synlige sirkelkanter; scoren
+   er rund og tung (Nunito). Minutt-pillen likeså.
+4. **Kalender:** datotallene på kortene er runde 800; resultatstripa på
+   kampkort har gradient.
+5. **Varsler:** kategorisirkler med strek-ikoner — fotball (coral), boble
+   (blå), kalender (lilla), megafon (gul), 👏 (mint).
+6. **Kampforløp:** mål = fotball på mintsirkel, foto = kamera, minuttene runde.
+7. **Reporter:** «Mål oss» = fotball-ikon i mørkegrønt på mint m/ glød;
+   Pause/Fortsett/Slutt/Kommentar/kamera = strek-ikoner.
+8. **Ny hendelse:** klokkeslettet i rund 800.
+9. **Logg ut:** velkomstskjermen er gradient-stadion i fullskjerm med
+   banesirkel nede til høyre.
+10. **Støtt laget:** prisene runde, fordels-hakene er strek-ikoner.
+
+### ✅ Skive 5 — KAMPRAPPORTEN (KODET 2026-07-30, ikke optisk verifisert)
+
+Bruker: «dette er det viktigste i hele appen». Tre grep, én migrasjon.
+
+#### 1. Migrasjon `00029_feed_match_context.sql` (✅ deployet)
+`get_team_feed` returnerte `match_event_id`, men aldri minuttet eller
+stillingen — derfor sto kampchipen i feeden tom for tall siden Fase 8.
+RPC-en joiner nå `match_events` (minutt for posten) og `match_sessions`
+(status + stilling for kampen) og returnerer fire nye kolonner:
+`match_minute`, `match_status`, `match_home`, `match_away`.
+- `match_sessions.event_id` er **UNIQUE** (00009), så joinen er 1:1 — ingen
+  radmultiplisering. LEFT JOIN, så poster uten kamp er upåvirket.
+- Returtypen endret seg → **DROP + CREATE** (samme mønster som 00027).
+  Originalen i 00015 hadde ingen eksplisitte GRANTs, så ingen å gjenskape.
+
+#### 2. Kampchipen i feeden er statusdrevet, ikke posttype-drevet
+`FeedItem.match {minute, status, home, away}` + mapping i `feed.ts`
+(`MATCH_STATUS_MAP` er nå eksportert fra `events.ts` — én sannhet for
+norsk DB-status → appens union). `FeedCard.Marker`:
+
+| Post | Chip |
+|---|---|
+| `match_end` | «Slutt 4–5» |
+| `match_event` (mål/pause/…) | «12′», coral **kun mens kampen faktisk pågår** |
+| `match_start` mens live/pause | «Live 2–1» / «Pause 2–1» — lagets levende resultatkort |
+| `match_start` etterpå | «Kamp» **uten** stilling |
+
+To bevisste valg: (a) en gammel målpost skal ikke rope coral «live» for
+alltid — derfor styrer `match.status`, ikke posttypen. (b) avsparkposten får
+IKKE sluttresultatet, fordi teksten sier «Kampen er i gang» og tallet ville
+motsagt sin egen post.
+
+#### 3. Kampforløpet har løpende stilling
+`MatchTimeline` teller mål-radene i serverens rekkefølge (`ORDER BY
+sequence`) og stempler hver målrad med stillingen ETTER øyeblikket; slutt-
+raden får sluttresultatet. `MatchEventRow` viser den som en mørk `ScoreChip`
+skjøvet til høyremargen — tallkolonnen leses vertikalt nedover forløpet.
+- Regnes **klientside**, ikke i DB: `match_events` lagrer ikke stillingen per
+  hendelse, og å legge den til ville krevd backfill av gamle kamper.
+- Mål uten `teamSide` teller ikke (skal ikke skje etter 00020) — bedre å
+  mangle et tall enn å vise feil stilling.
+- `ScoreChip.label` er nå **valgfri** (ren stilling-chip uten etikett).
+
+#### 4. En spilt kamp åpner med resultatet
+`EventDetailScreen` åpnet med et administrativt infokort (Dato/Tid/Sted), og
+scoreboardet lå under. På en spilt kamp ER resultatet historien. Ny
+`showReport`-gren: **ScoreBoard først**, så tittel, så «hvor og når» som én
+dempet linje (`Torsdag 30. juli · 18:00 · Kunstgresset`), så bilder, så
+forløp. Infokortet består uendret for trening/sosialt/kommende kamp.
+Oppmøtelisten på en spilt kamp: «Ikke svart» og «Kan ikke» skjules (ren støy
+i etterkant), og «Kommer» heter **«Påmeldt»** — fortid, ikke fremtid.
+**NB på ærligheten:** listen sier hvem som meldte seg på, ikke hvem som
+faktisk møtte. Ikke omdøp den til «Var med» uten ekte oppmøteregistrering.
+
+`npx eslint src`: **0 errors, 4 warnings** (samme fire). tsc ikke kjørt.
+
+### Test dette (Metro-reload — migrasjonen er alt ute)
+1. **Feed etter en spilt kamp:** «🏁 Slutt!»-posten har chip **«Slutt 4–5»**;
+   målpostene har minutt-chip i dempet grå (ikke coral); avsparkposten har
+   «Kamp» uten tall.
+2. **Under en live kamp:** avsparkposten viser «Live 2–1» og oppdaterer seg
+   via realtime; målpostene har coral minutt.
+3. **Åpne en ferdig kamp:** scoreboardet møter deg **først**, tittel og
+   «dato · tid · sted» under, deretter Kampbilder og Kampforløp.
+4. **Kampforløpet:** hver målrad har en mørk stilling-chip til høyre
+   (1–0, 1–1, 2–1 …) og slutt-raden sluttresultatet. Pause/kommentar-rader
+   har ingen chip.
+5. **Oppmøte på spilt kamp:** kun «Påmeldt (N)», ingen «Ikke svart».
+6. **Trening/kommende kamp:** uendret — infokort med Dato/Tid/Sted øverst.
+
+---
+
+## 🎯 SENERE — produktkandidater
 
 **Visjonen (bruker, 2026-07-30):** hver kamp skal bli et automatisk *kampminne*
 — før kamp (bane, oppvarming), under (mål, bilder, reaksjoner kronologisk),

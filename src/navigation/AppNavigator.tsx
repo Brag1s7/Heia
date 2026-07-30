@@ -14,7 +14,7 @@ import {
 } from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {colors, typography, spacing} from '../theme';
+import {colors, typography, spacing, shadows} from '../theme';
 import {
   useAuth,
   useActiveTeam,
@@ -22,6 +22,7 @@ import {
   useNotifications,
 } from '../context';
 import {CreateSheet, NotificationBanner} from '../components';
+import {Bell, Calendar, House, Plus, User} from '../components/icons';
 import {navigationRef, flushPendingDeepLink} from './deepLink';
 import {isTeamAdmin} from '../shared/roles';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
@@ -242,14 +243,17 @@ function OpprettScreen() {
 }
 
 // ---------------------------------------------------------------------------
-// Tab-ikon (enkel tekst-basert — byttes til ikon-bibliotek senere)
+// Tab-ikoner — Lucide (stroke 2, som artifacten)
 // ---------------------------------------------------------------------------
-const tabIcons: Record<keyof RootTabParamList, string> = {
-  HjemStack: '⌂',
-  KalenderStack: '▦',
-  Opprett: '+',
-  InboxStack: '✉',
-  ProfilStack: '●',
+const tabIcons: Record<
+  keyof RootTabParamList,
+  React.ComponentType<{size?: number; color?: string; strokeWidth?: number}>
+> = {
+  HjemStack: House,
+  KalenderStack: Calendar,
+  Opprett: Plus,
+  InboxStack: Bell,
+  ProfilStack: User,
 };
 
 // ---------------------------------------------------------------------------
@@ -292,20 +296,33 @@ function MainTabs() {
       screenListeners={{focus: () => refreshUnread()}}
       screenOptions={({route}) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.heia,
+        // A v2: aktiv fane = mørk tekst + mint-pille bak ikonet.
+        // (#02FFAB som tekstfarge på lyst brøt kontrastkravet.)
+        tabBarActiveTintColor: colors.textPrimary,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
-        tabBarIcon: ({color}) => {
-          const icon = tabIcons[route.name];
+        // Standard-slotten er ~30 px bred og klipper alt bredere — pillen
+        // trenger hele bredden sin, ellers kuttes glyfen til en strimmel.
+        tabBarIconStyle: styles.tabIconSlot,
+        tabBarIcon: ({color, focused}) => {
+          const IconGlyph = tabIcons[route.name];
           if (route.name === 'Opprett') {
             return (
               <View style={styles.createButton}>
-                <Text style={styles.createIcon}>{icon}</Text>
+                <Plus size={24} color={colors.heiaDeep} strokeWidth={2.4} />
               </View>
             );
           }
-          return <Text style={[styles.tabIcon, {color}]}>{icon}</Text>;
+          return (
+            <View style={[styles.iconWrap, focused && styles.iconWrapOn]}>
+              <IconGlyph
+                size={21}
+                color={focused ? colors.heiaDeep : color}
+                strokeWidth={focused ? 2.2 : 2}
+              />
+            </View>
+          );
         },
       })}>
       <Tab.Screen
@@ -423,40 +440,47 @@ export function AppNavigator() {
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: colors.surface,
-    borderTopColor: colors.border,
+    backgroundColor: '#FCFDF8',
+    borderTopColor: colors.borderSubtle,
     borderTopWidth: StyleSheet.hairlineWidth,
     height: 88,
     paddingTop: spacing.sm,
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '700',
     marginTop: 2,
   },
-  tabIcon: {
-    fontSize: 22,
+  tabIconSlot: {
+    width: 64,
+    height: 32,
+  },
+  iconWrap: {
+    width: 56,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapOn: {
+    backgroundColor: colors.heia,
   },
   tabBadge: {
-    backgroundColor: colors.error,
+    backgroundColor: colors.live,
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
+  // Squircle med mint-glød — +-knappen er appens hovedhandling
   createButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 46,
+    height: 46,
+    borderRadius: 16,
     backgroundColor: colors.heia,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -8,
-  },
-  createIcon: {
-    fontSize: 26,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    lineHeight: 28,
+    ...shadows.glow,
   },
   placeholder: {
     flex: 1,

@@ -1,6 +1,6 @@
 import {supabase} from '../supabase';
 import {getTeamMembers, type TeamMember} from './members';
-import {FEED_MEDIA_BUCKET} from './feed';
+import {FEED_MEDIA_BUCKET, HEIA_EMOJI} from './feed';
 import type {FeedComment, FeedItem} from '../../shared/types';
 
 // profiles-RLS lar deg kun lese egen profil, så en direkte comments→profiles
@@ -28,15 +28,24 @@ export async function getFeedPost(
   teamSpaceId: string,
   postId: string,
 ): Promise<FeedItem | null> {
-  const [memberMap, {data, error}] = await Promise.all([
-    getMemberMap(teamSpaceId),
-    supabase
-      .from('feed_posts')
-      .select('id, author_id, type, content, created_at, event_id, is_pinned')
-      .eq('id', postId)
-      .is('deleted_at', null)
-      .maybeSingle(),
-  ]);
+  const [memberMap, {data, error}, reactionsResult, sessionResult] =
+    await Promise.all([
+      getMemberMap(teamSpaceId),
+      supabase
+        .from('feed_posts')
+        .select('id, author_id, type, content, created_at, event_id, is_pinned')
+        .eq('id', postId)
+        .is('deleted_at', null)
+        .maybeSingle(),
+      // 👏-ene hydreres her fordi tråden VISER innlegget — uten dem kunne man
+      // stå på posten uten å se applausen eller delta i den.
+      supabase
+        .from('reactions')
+        .select('user_id')
+        .eq('feed_post_id', postId)
+        .eq('emoji', HEIA_EMOJI),
+      supabase.auth.getSession(),
+    ]);
 
   if (error) {
     throw error;
@@ -44,6 +53,9 @@ export async function getFeedPost(
   if (!data) {
     return null;
   }
+
+  const reactions = reactionsResult.data ?? [];
+  const myId = sessionResult.data.session?.user.id;
 
   const member = data.author_id ? memberMap.get(data.author_id) : undefined;
   const post: FeedItem = {
@@ -60,6 +72,8 @@ export async function getFeedPost(
     content: data.content,
     eventId: data.event_id ?? undefined,
     isPinned: data.is_pinned ?? false,
+    heiaCount: reactions.length,
+    iReacted: myId ? reactions.some(r => r.user_id === myId) : false,
   };
 
   const {data: attachments} = await supabase

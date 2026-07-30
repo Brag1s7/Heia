@@ -1,6 +1,8 @@
 import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, fonts} from '../theme';
+import {Ball, Flag, MessageCircle, Pause, Play} from './icons';
+import {ScoreChip} from './ScoreChip';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent, MatchEventType} from '../shared/types';
 
@@ -9,35 +11,48 @@ interface MatchEventRowProps {
   isLatest?: boolean;
   /** Bilder som hører til nettopp dette øyeblikket — vises under teksten. */
   photos?: MatchPhoto[];
+  /** Stillingen etter øyeblikket («2–1») — settes på mål og slutt. */
+  score?: string;
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
-const eventIcons: Record<MatchEventType, string> = {
-  avspark: '⚽',
-  mål: '⚽',
-  pause: '⏸',
-  andre_omgang: '▶',
-  slutt: '🏁',
-  bytte: '↔',
-  kort: '🟨',
-  melding: '💬',
+// MÅ stå FØR eventIcons — JSX-en under evalueres i det modulen lastes.
+const glyphStyles = StyleSheet.create({
+  glyph: {fontSize: 14},
+});
+
+// Lucide-ikoner, blekket i flatens ink-farge. `bytte`/`kort` lages ikke av
+// appen ennå og beholder tegn-glyfene sine til de får et ordentlig øyeblikk.
+const eventIcons: Record<MatchEventType, React.ReactNode> = {
+  avspark: <Ball size={16} color={colors.heiaInk} />,
+  mål: <Ball size={16} color={colors.heiaInk} />,
+  pause: <Pause size={15} color={colors.textSecondary} />,
+  andre_omgang: <Play size={15} color={colors.heiaInk} />,
+  slutt: <Flag size={15} color={colors.textSecondary} />,
+  bytte: <Text style={glyphStyles.glyph}>↔</Text>,
+  kort: <Text style={glyphStyles.glyph}>🟨</Text>,
+  melding: <MessageCircle size={15} color={colors.textSecondary} />,
 };
 
+// A v2: mål/avspark/fortsettelse feires på mint-tint (grønt = feiring, aldri
+// coral), kort på solskinnsflate, resten dempet. Myke flater bak ikonet leses
+// bedre enn solide sirkler.
 const eventColors: Record<MatchEventType, string> = {
-  avspark: colors.heia,
-  mål: colors.heia,
-  pause: colors.textTertiary,
-  andre_omgang: colors.success,
-  slutt: colors.textSecondary,
-  bytte: colors.textSecondary,
-  kort: colors.warning,
-  melding: colors.textTertiary,
+  avspark: colors.heiaTint,
+  mål: colors.heiaTint,
+  pause: colors.surfaceMuted,
+  andre_omgang: colors.heiaTint,
+  slutt: colors.surfaceMuted,
+  bytte: colors.surfaceMuted,
+  kort: colors.sun,
+  melding: colors.surfaceMuted,
 };
 
 export function MatchEventRow({
   event,
   isLatest = false,
   photos,
+  score,
   onPressPhoto,
 }: MatchEventRowProps) {
   const icon = eventIcons[event.type];
@@ -47,7 +62,7 @@ export function MatchEventRow({
     <View style={[styles.container, isLatest && styles.latest]}>
       <View style={styles.timeline}>
         <View style={[styles.iconCircle, {backgroundColor: iconColor}]}>
-          <Text style={styles.icon}>{icon}</Text>
+          {icon}
         </View>
         <View style={styles.line} />
       </View>
@@ -57,6 +72,13 @@ export function MatchEventRow({
           <Text style={styles.minute}>{event.minute}'</Text>
           {event.player && (
             <Text style={styles.player}>{event.player}</Text>
+          )}
+          {/* Stillingen etter øyeblikket — kampens dramaturgi leses i
+              høyremargen. Mørk chip: kampen bor alltid på mørk flate. */}
+          {score && (
+            <View style={styles.scoreWrap}>
+              <ScoreChip score={score} />
+            </View>
           )}
         </View>
         <Text style={styles.description}>{event.description}</Text>
@@ -104,9 +126,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: {
-    fontSize: 14,
-  },
   line: {
     flex: 1,
     width: 2,
@@ -124,13 +143,18 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   minute: {
-    ...typography.body,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: fonts.display,
     color: colors.textPrimary,
   },
   player: {
     ...typography.bodySmall,
     color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  // Stillingen skyves til høyremargen — kolonnen med tall leses vertikalt.
+  scoreWrap: {
+    marginLeft: 'auto',
   },
   description: {
     ...typography.body,

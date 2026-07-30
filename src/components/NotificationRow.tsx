@@ -1,6 +1,15 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
+import {
+  Ball,
+  Bell,
+  Calendar,
+  Check,
+  Info,
+  Megaphone,
+  MessageCircle,
+} from './icons';
 import type {
   HeiaNotification,
   NotificationCategory,
@@ -12,16 +21,35 @@ interface NotificationRowProps {
   showBorder?: boolean;
 }
 
-// Ikon per kategori. Samme språk som feeden/kalenderen bruker ellers.
-const CATEGORY_ICON: Record<NotificationCategory, string> = {
-  match_live: '⚽',
-  new_post: '📣',
-  new_comment: '💬',
-  new_reaction: '👏',
-  event_reminder: '📅',
-  rsvp_update: '✅',
-  admin_message: '📌',
-  system: 'ℹ️',
+// MÅ stå FØR CATEGORY_ICON — JSX-en under evalueres i det modulen lastes.
+const emojiStyles = StyleSheet.create({
+  emoji: {fontSize: 17},
+});
+
+// Ikon per kategori (Lucide, blekket i flatens ink-farge). 👏 består som
+// emoji — det er merkevare-gesten, og Lucide har ingen applaus.
+const CATEGORY_ICON: Record<NotificationCategory, React.ReactNode> = {
+  match_live: <Ball size={18} color={colors.liveInk} strokeWidth={2} />,
+  new_post: <Megaphone size={18} color={colors.textSecondary} />,
+  new_comment: <MessageCircle size={18} color={colors.infoInk} />,
+  new_reaction: <Text style={emojiStyles.emoji}>👏</Text>,
+  event_reminder: <Calendar size={18} color={colors.remindInk} />,
+  rsvp_update: <Check size={18} color={colors.heiaInk} />,
+  admin_message: <Megaphone size={18} color={colors.goldInk} />,
+  system: <Info size={18} color={colors.textSecondary} />,
+};
+
+// Ikonflate per kategori — A v2s låste fargesemantikk: coral = live, blå =
+// info/kalender, lilla = påminnelse, sol = trenerbeskjed, mint = Heia-øyeblikk.
+const CATEGORY_SURFACE: Record<NotificationCategory, string> = {
+  match_live: colors.liveSoft,
+  new_post: colors.surfaceMuted,
+  new_comment: colors.infoSoft,
+  new_reaction: colors.heiaTint,
+  event_reminder: colors.remindSoft,
+  rsvp_update: colors.heiaSoft,
+  admin_message: colors.sun,
+  system: colors.surfaceMuted,
 };
 
 function timeAgo(date: Date): string {
@@ -52,10 +80,17 @@ export function NotificationRow({
         unread && styles.unread,
         pressed && styles.pressed,
       ]}>
-      <View style={[styles.iconWrap, unread && styles.iconWrapUnread]}>
-        <Text style={styles.icon}>
-          {CATEGORY_ICON[item.category] ?? '🔔'}
-        </Text>
+      <View
+        style={[
+          styles.iconWrap,
+          {
+            backgroundColor:
+              CATEGORY_SURFACE[item.category] ?? colors.surfaceMuted,
+          },
+        ]}>
+        {CATEGORY_ICON[item.category] ?? (
+          <Bell size={18} color={colors.textSecondary} />
+        )}
       </View>
 
       <View style={styles.body}>
@@ -101,15 +136,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconWrapUnread: {
-    backgroundColor: colors.surface,
-  },
-  icon: {
-    fontSize: 18,
   },
   body: {
     flex: 1,
@@ -126,7 +154,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   titleUnread: {
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   time: {

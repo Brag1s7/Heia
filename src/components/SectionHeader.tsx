@@ -11,7 +11,11 @@ interface SectionHeaderProps {
 export function SectionHeader({title, actionLabel, onAction}: SectionHeaderProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{title}</Text>
+      <View style={styles.titleRow}>
+        {/* Mint-streken er seksjonsetikettens merkevaredetalj (A v2). */}
+        <View style={styles.dash} />
+        <Text style={styles.title}>{title}</Text>
+      </View>
       {actionLabel && onAction && (
         <Pressable onPress={onAction} hitSlop={spacing.sm}>
           <Text style={styles.action}>{actionLabel}</Text>
@@ -30,11 +34,28 @@ const styles = StyleSheet.create({
     paddingTop: spacing['2xl'],
     paddingBottom: spacing.md,
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 1,
+  },
+  dash: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.heia,
+  },
   title: {
-    ...typography.heading3,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
   },
   action: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    fontWeight: '600',
+    color: colors.heiaInk,
   },
 });
