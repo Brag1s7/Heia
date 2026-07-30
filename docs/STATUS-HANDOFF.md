@@ -1606,11 +1606,11 @@ feilen i en 10-minutters Xcode-build.
 etter (resultat, galleri, forløp), og senere en delbar «Kampen på 30 sekunder».
 Anbefalt rekkefølge, med begrunnelse:
 
-1. **Alle medlemmer kan legge bilder på kampen** — største spak mot «minne».
-   I dag kommer ALT innhold fra reporteren, altså den travleste personen;
-   «uten ekstraarbeid» blir først sant når innholdet kommer fra mange.
-   Backend er klar: `createImagePost` tar `eventId` fra hvem som helst, og
-   RLS krever bare lagmedlemskap. **Kun UI mangler.**
+1. ~~**Alle medlemmer kan legge bilder på kampen**~~ — **AVVIST av bruker
+   2026-07-30** («nei, alle skal ikke legge bilder på kampen»). Ikke foreslå
+   den på nytt uten at bruker tar den opp selv. Backend-en ligger der uansett
+   (`createImagePost` tar `eventId` fra hvem som helst, RLS krever bare
+   lagmedlemskap), så kampbilder er fortsatt reporterens jobb — som i dag.
 2. **Kommentarer + heiing synlig i kamptidslinja** — «var der»-følelsen ligger
    i de andres stemmer. De finnes i dag, men bor på feed-poster og er usynlige
    på kampsiden.
