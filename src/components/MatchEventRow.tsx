@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, fonts} from '../theme';
+import {Ball, Flag, MessageCircle, Pause, Play} from './icons';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent, MatchEventType} from '../shared/types';
 
@@ -12,19 +13,25 @@ interface MatchEventRowProps {
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
-const eventIcons: Record<MatchEventType, string> = {
-  avspark: '⚽',
-  mål: '⚽',
-  pause: '⏸',
-  andre_omgang: '▶',
-  slutt: '🏁',
-  bytte: '↔',
-  kort: '🟨',
-  melding: '💬',
+// Lucide-ikoner, blekket i flatens ink-farge. `bytte`/`kort` lages ikke av
+// appen ennå og beholder tegn-glyfene sine til de får et ordentlig øyeblikk.
+const eventIcons: Record<MatchEventType, React.ReactNode> = {
+  avspark: <Ball size={16} color={colors.heiaInk} />,
+  mål: <Ball size={16} color={colors.heiaInk} />,
+  pause: <Pause size={15} color={colors.textSecondary} />,
+  andre_omgang: <Play size={15} color={colors.heiaInk} />,
+  slutt: <Flag size={15} color={colors.textSecondary} />,
+  bytte: <Text style={glyphStyles.glyph}>↔</Text>,
+  kort: <Text style={glyphStyles.glyph}>🟨</Text>,
+  melding: <MessageCircle size={15} color={colors.textSecondary} />,
 };
 
+const glyphStyles = StyleSheet.create({
+  glyph: {fontSize: 14},
+});
+
 // A v2: mål/avspark/fortsettelse feires på mint-tint (grønt = feiring, aldri
-// coral), kort på solskinnsflate, resten dempet. Myke flater bak emoji leses
+// coral), kort på solskinnsflate, resten dempet. Myke flater bak ikonet leses
 // bedre enn solide sirkler.
 const eventColors: Record<MatchEventType, string> = {
   avspark: colors.heiaTint,
@@ -50,7 +57,7 @@ export function MatchEventRow({
     <View style={[styles.container, isLatest && styles.latest]}>
       <View style={styles.timeline}>
         <View style={[styles.iconCircle, {backgroundColor: iconColor}]}>
-          <Text style={styles.icon}>{icon}</Text>
+          {icon}
         </View>
         <View style={styles.line} />
       </View>
@@ -107,9 +114,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  icon: {
-    fontSize: 14,
-  },
   line: {
     flex: 1,
     width: 2,
@@ -127,9 +131,8 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   minute: {
-    ...typography.body,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
+    fontSize: 16,
+    fontFamily: fonts.display,
     color: colors.textPrimary,
   },
   player: {

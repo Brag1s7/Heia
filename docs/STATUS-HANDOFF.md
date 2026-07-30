@@ -1,12 +1,13 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (natt). **Designretningen «A v2 · Stadium Pop
-Hybrid» er LÅST og GJENNOMFØRT på ALLE flater — skive 1+2+3 er optisk
-godkjent av bruker og committet på `Brage`.** Designarbeidet er ikke pushet/
-merget til `main` ennå. **Neste skive velges fritt:** produktkandidatene
-(«🎯 SENERE», anbefalt: alle medlemmer kan legge bilder på kampen) eller den
-samlede native rebuilden (ikoner/gradienter/font — det største gjenstående
-premium-løftet). Fase 4–9 fra før er merget (PR #16)._
+_Sist oppdatert: 2026-07-30 (ettermiddag). **Designretningen «A v2 · Stadium
+Pop Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3, optisk
+godkjent), og den SAMLEDE NATIVE REBUILDEN (skive 4: Lucide-ikoner, ekte
+gradienter, Nunito-displayfont) er KODET — se «Skive 4» under. Optisk review
+av skive 4 gjenstår.** Designarbeidet er ikke pushet/merget til `main` ennå.
+**Neste:** optisk review av skive 4, deretter produktkandidatene («🎯 SENERE»,
+anbefalt: alle medlemmer kan legge bilder på kampen). Fase 4–9 fra før er
+merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1348,13 +1349,90 @@ på det gamle uttrykket.
    👏-pill med teller. Trykk → teller opp og pillen blir mint; trykk igjen →
    av. Heia i tråden skal også synes i feeden etterpå (samme data).
 
-### Til den SAMLEDE native rebuilden (én gang, senere)
-- **Lucide React Native** (+ react-native-svg) — ikoner i tab bar/kontroller.
-- **react-native-linear-gradient** — ekte gradienter (hero/stadion bruker
-  nå lagdelte sirkel-Views som erstatning).
-- **Rounded displayfont** til score-tall: SF Rounded er IKKE tilgjengelig i
-  RN uten bundlet font/native oppsett (artifact-notatet «gratis» gjaldt web).
-  Frem til da: systemfont 800 + tabular-nums.
+### ✅ Skive 4 — den samlede «native rebuilden» (KODET 2026-07-30, IKKE optisk verifisert)
+
+Viste seg å være mye mindre native enn fryktet: **react-native-svg 15.15.3 lå
+allerede i Podfile.lock** (bygget inn fra før). Dermed:
+- **lucide-react-native ^1.28.0** er ren JS oppå svg → kun `npm install`,
+  ingen pod install.
+- **react-native-linear-gradient er BEVISST IKKE installert.** Artifactens
+  flomlys er *radiale* gløder, og linear-gradient kan ikke radial — svg kan.
+  Alle gradienter tegnes med react-native-svg. Ikke installer linear-gradient
+  senere «for ordens skyld».
+- **Eneste native endring: bundlede fonter** (Nunito-Bold/-ExtraBold i
+  `assets/fonts/`, linket med `npx react-native-asset` → `UIAppFonts` i
+  Info.plist + Resources i pbxproj + android/assets). Krevde bare en vanlig
+  `npm run ios`-rebuild — **ingen pod install, ingen 20–60 min**.
+
+**Font (A v2 «tall med autoritet»):**
+- Artifacten bruker `ui-rounded` (SF Rounded) — finnes ikke i RN, og Apple-
+  lisensen gjør bundling av SF utrygt. **Nunito ExtraBold** (OFL) er
+  erstatteren. KUN store tall (score, minutter, klokkeslett, datotall, pris) —
+  aldri brødtekst/titler/CAPS-etiketter.
+- `fonts.display`/`fonts.displayBold` i `theme/tokens.ts`. Strengen
+  «Nunito-ExtraBold» er både PostScript-navnet (iOS) og filnavnet (Android).
+- **Sett ALDRI fontWeight sammen med displayfonten** — fila ER vekten; en
+  fontWeight får iOS til å lete etter vekter familien ikke har.
+- **Sifrene i Nunito er like brede** (verifisert i hmtx-tabellen), så
+  `tabular-nums` trengs ikke — klokka tikker uten hopp.
+- ⚠️ **TTF-ene fra google-webfonts-helper hadde ØDELAGTE navnetabeller**
+  («NunitoExtraLight-Bold»). Fikset med fontTools (name-tabell + usWeightClass
+  + fsSelection omskrevet) før kopiering til `assets/fonts/`. Gjenta prosessen
+  hvis flere vekter skal inn — ikke bruk zip-filene rått.
+
+**Gradienter — ny delt komponent `StadiumSurface.tsx`:**
+- base linear 165° `#0B1912→#143126` + radial amber-flomlys (18%, −20%) +
+  radial mint-glød (85%, −10%), pluss banesirkel-ringene. Props: `flood`,
+  `arc`, `bordered` (av for chips/striper).
+- Brukes av: `LiveMatchBanner`, `ScoreBoard` (erstattet de identiske
+  sirkel-View-blokkene), `ScoreChip`, `EventCard`-resultatstripa,
+  `WelcomeIntentScreen` (fullskjerm, radius 0).
+- `NextEventHero` fikk sin egen mint→krem-linear (140°, `#DFFBEA→#F4F9E6→
+  #FAF4DC`) inline — den er hverdag, ikke stadion.
+- Gradient-id-er i svg er trygt gjenbrukbare per `<Svg>`-rot (egen scope).
+
+**Ikoner — `src/components/icons.tsx` (eneste lucide-importsted):**
+- Re-eksporterer Lucide (stroke 2) + egen **`Ball`** (fotball finnes ikke i
+  Lucide — tegnet fra artifactens path med react-native-svg).
+- Byttet: tab bar (House/Calendar/Plus/Bell/User — pillen og squirclen
+  består), composer-kamerachip, CreateSheet-sirklene, FeedCards kommentar-
+  pill + forstørr-knapp (Maximize2), NotificationRow-kategoriene (Ball/
+  MessageCircle/Calendar/Megaphone/Check/Info, blekket i flatens ink-farge),
+  ReporterActions (alle seks + kamera), MatchEventRow/MatchTimeline-sirklene,
+  hakene i ReporterSheet/MatchPhotoSheet/SupportScreen/TeamHome-avkrysningen
+  (Check), lukkekrysset i MatchPhotoGallery (X), chevron+MapPin i
+  NextEventHero, MapPin+Clock på EventCard-meta.
+- **👏 består som emoji overalt** — det er merkevare-gesten, Lucide har ingen
+  applaus. `bytte`/`kort` i kampforløpet beholder tegn-glyfene (lages ikke av
+  appen ennå). JoinTeamCode-kodefeltet beholder systemfont (kode er ikke et
+  display-tall). StatusPill-suffikset «✕» består som tegn (piksel-lite).
+
+`npx eslint src`: **0 errors, 4 warnings (samme fire som før).** tsc ikke
+kjørt (låst regel — sjekk i editoren).
+
+### Test dette (optisk review av skive 4 — KREVER rebuilden fra i dag)
+Rebuild + fontlinking ble gjort i samtalen 2026-07-30 (npm install +
+`npx react-native-asset` + `npm run ios`). Ser talltypografien tynn/vanlig ut
+er det den GAMLE binæren som kjører — bygg på nytt før du bedømmer noe.
+1. **Tab bar:** strek-ikoner (hus/kalender/bjelle/person), aktiv fane = mint
+   pille med mørkegrønt ikon, «+» = mint squircle med mørkegrønt pluss + glød.
+2. **Hjem:** hero har ekte mint→krem-gradient med kremdrag nede til høyre;
+   composer-kameraet er strek-ikon på mintchip; kommentar-pillen har boble-
+   ikon; 👏-pillen er uendret.
+3. **Live kamp (hero + scoreboard):** flomlysene er nå myke radiale gløder
+   (amber oppe-venstre, mint oppe-høyre) — INGEN synlige sirkelkanter; scoren
+   er rund og tung (Nunito). Minutt-pillen likeså.
+4. **Kalender:** datotallene på kortene er runde 800; resultatstripa på
+   kampkort har gradient.
+5. **Varsler:** kategorisirkler med strek-ikoner — fotball (coral), boble
+   (blå), kalender (lilla), megafon (gul), 👏 (mint).
+6. **Kampforløp:** mål = fotball på mintsirkel, foto = kamera, minuttene runde.
+7. **Reporter:** «Mål oss» = fotball-ikon i mørkegrønt på mint m/ glød;
+   Pause/Fortsett/Slutt/Kommentar/kamera = strek-ikoner.
+8. **Ny hendelse:** klokkeslettet i rund 800.
+9. **Logg ut:** velkomstskjermen er gradient-stadion i fullskjerm med
+   banesirkel nede til høyre.
+10. **Støtt laget:** prisene runde, fordels-hakene er strek-ikoner.
 
 ---
 

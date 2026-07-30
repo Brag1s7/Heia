@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, fonts} from '../theme';
+import {Camera} from './icons';
 import {MatchEventRow} from './MatchEventRow';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent} from '../shared/types';
@@ -116,7 +117,7 @@ export function MatchTimeline({
           <View key={entry.key} style={styles.photoRow}>
             <View style={styles.timeline}>
               <View style={styles.iconCircle}>
-                <Text style={styles.icon}>📷</Text>
+                <Camera size={15} color={colors.textSecondary} />
               </View>
               <View style={styles.line} />
             </View>
@@ -171,9 +172,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surfaceMuted,
   },
-  icon: {
-    fontSize: 14,
-  },
   line: {
     flex: 1,
     width: 2,
@@ -186,9 +184,9 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   minute: {
-    ...typography.body,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
+    fontSize: 16,
+    fontFamily: fonts.display,
+    color: colors.textPrimary,
   },
   photo: {
     borderRadius: radius.md,

@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {X} from './icons';
 import {colors, typography, spacing} from '../theme';
 import type {MatchPhoto} from '../lib/api/feed';
 
@@ -80,7 +81,7 @@ export function MatchPhotoGallery({
           onPress={onClose}
           hitSlop={12}
           style={[styles.close, {top: insets.top + spacing.md}]}>
-          <Text style={styles.closeText}>✕</Text>
+          <X size={18} color={colors.surface} strokeWidth={2.4} />
         </Pressable>
 
         {current && (
@@ -122,11 +123,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  closeText: {
-    ...typography.body,
-    color: colors.surface,
-    fontWeight: '700',
   },
   footer: {
     position: 'absolute',

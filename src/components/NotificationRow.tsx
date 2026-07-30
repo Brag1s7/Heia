@@ -1,6 +1,15 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
+import {
+  Ball,
+  Bell,
+  Calendar,
+  Check,
+  Info,
+  Megaphone,
+  MessageCircle,
+} from './icons';
 import type {
   HeiaNotification,
   NotificationCategory,
@@ -12,17 +21,23 @@ interface NotificationRowProps {
   showBorder?: boolean;
 }
 
-// Ikon per kategori. Samme språk som feeden/kalenderen bruker ellers.
-const CATEGORY_ICON: Record<NotificationCategory, string> = {
-  match_live: '⚽',
-  new_post: '📣',
-  new_comment: '💬',
-  new_reaction: '👏',
-  event_reminder: '📅',
-  rsvp_update: '✅',
-  admin_message: '📌',
-  system: 'ℹ️',
+// Ikon per kategori (Lucide, blekket i flatens ink-farge). 👏 består som
+// emoji — det er merkevare-gesten, og Lucide har ingen applaus.
+const CATEGORY_ICON: Record<NotificationCategory, React.ReactNode> = {
+  match_live: <Ball size={18} color={colors.liveInk} strokeWidth={2} />,
+  new_post: <Megaphone size={18} color={colors.textSecondary} />,
+  new_comment: <MessageCircle size={18} color={colors.infoInk} />,
+  new_reaction: <Text style={emojiStyles.emoji}>👏</Text>,
+  event_reminder: <Calendar size={18} color={colors.remindInk} />,
+  rsvp_update: <Check size={18} color={colors.heiaInk} />,
+  admin_message: <Megaphone size={18} color={colors.goldInk} />,
+  system: <Info size={18} color={colors.textSecondary} />,
 };
+
+// Egen liten StyleSheet fordi CATEGORY_ICON evalueres før hoved-`styles`.
+const emojiStyles = StyleSheet.create({
+  emoji: {fontSize: 17},
+});
 
 // Ikonflate per kategori — A v2s låste fargesemantikk: coral = live, blå =
 // info/kalender, lilla = påminnelse, sol = trenerbeskjed, mint = Heia-øyeblikk.
@@ -73,9 +88,9 @@ export function NotificationRow({
               CATEGORY_SURFACE[item.category] ?? colors.surfaceMuted,
           },
         ]}>
-        <Text style={styles.icon}>
-          {CATEGORY_ICON[item.category] ?? '🔔'}
-        </Text>
+        {CATEGORY_ICON[item.category] ?? (
+          <Bell size={18} color={colors.textSecondary} />
+        )}
       </View>
 
       <View style={styles.body}>
@@ -123,9 +138,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  icon: {
-    fontSize: 18,
   },
   body: {
     flex: 1,

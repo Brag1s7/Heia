@@ -2,6 +2,7 @@ import React from 'react';
 import {View, Text, Modal, Pressable, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
+import {Calendar, MessageCircle} from './icons';
 
 interface CreateSheetProps {
   visible: boolean;
@@ -37,7 +38,7 @@ export function CreateSheet({
         <View style={styles.handle} />
 
         <SheetRow
-          icon="💬"
+          icon={<MessageCircle size={20} color={colors.heiaInk} />}
           iconBg={colors.heiaTint}
           title="Del med laget"
           subtitle="Skriv en melding eller legg ut et bilde"
@@ -46,7 +47,7 @@ export function CreateSheet({
 
         {canCreateEvent && (
           <SheetRow
-            icon="📅"
+            icon={<Calendar size={20} color={colors.infoInk} />}
             iconBg={colors.infoSoft}
             title="Ny hendelse"
             subtitle="Trening, kamp eller sosialt"
@@ -65,7 +66,7 @@ function SheetRow({
   subtitle,
   onPress,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   iconBg: string;
   title: string;
   subtitle: string;
@@ -76,9 +77,7 @@ function SheetRow({
       style={({pressed}) => [styles.row, pressed && styles.rowPressed]}
       onPress={onPress}>
       {/* Semantisk ikonflate — samme språk som varselradene (A v2). */}
-      <View style={[styles.iconWrap, {backgroundColor: iconBg}]}>
-        <Text style={styles.rowIcon}>{icon}</Text>
-      </View>
+      <View style={[styles.iconWrap, {backgroundColor: iconBg}]}>{icon}</View>
       <View style={styles.rowInfo}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowSubtitle}>{subtitle}</Text>
@@ -125,9 +124,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  rowIcon: {
-    fontSize: 20,
   },
   rowInfo: {
     flex: 1,

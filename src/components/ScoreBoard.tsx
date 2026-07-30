@@ -2,6 +2,7 @@ import React from 'react';
 import {View, Text, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
+import {StadiumSurface} from './StadiumSurface';
 import {StatusPill} from './StatusPill';
 import {useActiveTeam} from '../context';
 import type {MatchStatus} from '../shared/types';
@@ -46,13 +47,7 @@ export function ScoreBoard({
   const isWin = matchStatus === 'finished' && homeScore > awayScore;
 
   return (
-    <View style={styles.container}>
-      {/* Stemning: varmt flomlys øverst, banesirkel nede til høyre */}
-      <View style={styles.floodAmber} pointerEvents="none" />
-      <View style={styles.floodMint} pointerEvents="none" />
-      <View style={styles.arcOuter} pointerEvents="none" />
-      <View style={styles.arcInner} pointerEvents="none" />
-
+    <StadiumSurface style={styles.container}>
       <View style={styles.topRow}>
         {isUnderway ? (
           <>
@@ -108,59 +103,15 @@ export function ScoreBoard({
       {matchStatus === 'cancelled' && (
         <Text style={styles.status}>Kampen er avlyst</Text>
       )}
-    </View>
+    </StadiumSurface>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.stadium,
-    borderRadius: radius.xl,
     padding: spacing['2xl'],
     gap: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.stadiumEdge,
-    overflow: 'hidden',
     ...shadows.elevated,
-  },
-  // Store og svake — en hard sirkelkant leses som en flekk, ikke som lys.
-  floodAmber: {
-    position: 'absolute',
-    top: -190,
-    left: -120,
-    width: 340,
-    height: 340,
-    borderRadius: 170,
-    backgroundColor: 'rgba(255, 197, 61, 0.04)',
-  },
-  floodMint: {
-    position: 'absolute',
-    top: -210,
-    right: -110,
-    width: 380,
-    height: 380,
-    borderRadius: 190,
-    backgroundColor: 'rgba(2, 255, 171, 0.05)',
-  },
-  arcOuter: {
-    position: 'absolute',
-    right: -70,
-    bottom: -90,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 1.5,
-    borderColor: 'rgba(2, 255, 171, 0.13)',
-  },
-  arcInner: {
-    position: 'absolute',
-    right: -38,
-    bottom: -58,
-    width: 136,
-    height: 136,
-    borderRadius: 68,
-    borderWidth: 1.5,
-    borderColor: 'rgba(2, 255, 171, 0.09)',
   },
   topRow: {
     flexDirection: 'row',

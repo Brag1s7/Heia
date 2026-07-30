@@ -1,6 +1,7 @@
 import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {Text, StyleSheet} from 'react-native';
 import {colors, spacing, radius, typography} from '../theme';
+import {StadiumSurface} from './StadiumSurface';
 
 /**
  * Score-chip (A v2): kampen bor alltid på mørk flate — fra fullt scoreboard
@@ -18,7 +19,7 @@ interface ScoreChipProps {
 
 export function ScoreChip({label, live = false, score}: ScoreChipProps) {
   return (
-    <View style={styles.chip}>
+    <StadiumSurface style={styles.chip} flood={false} arc={false} bordered={false}>
       <Text style={[styles.label, live && styles.labelLive]} numberOfLines={1}>
         {label}
       </Text>
@@ -27,7 +28,7 @@ export function ScoreChip({label, live = false, score}: ScoreChipProps) {
           {score}
         </Text>
       ) : null}
-    </View>
+    </StadiumSurface>
   );
 }
 
@@ -36,7 +37,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.stadium,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 6,

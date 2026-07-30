@@ -1,6 +1,8 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
+import {Clock, MapPin} from './icons';
+import {StadiumSurface} from './StadiumSurface';
 import {StatusPill, type PillKind} from './StatusPill';
 import {RSVPBar} from './RSVPBar';
 import type {HeiaEvent, EventType} from '../shared/types';
@@ -85,20 +87,30 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
           <Text style={styles.title}>{event.title}</Text>
           {event.location && (
             <View style={styles.metaRow}>
-              <Text style={styles.meta}>{event.location}</Text>
+              <MapPin size={13} color={colors.textSecondary} />
+              <Text style={styles.meta} numberOfLines={1}>
+                {event.location}
+              </Text>
             </View>
           )}
-          <Text style={styles.meta}>
-            {formatTime(event.startTime)}
-            {event.endTime ? ` – ${formatTime(event.endTime)}` : ''}
-          </Text>
+          <View style={styles.metaRow}>
+            <Clock size={13} color={colors.textSecondary} />
+            <Text style={styles.meta}>
+              {formatTime(event.startTime)}
+              {event.endTime ? ` – ${formatTime(event.endTime)}` : ''}
+            </Text>
+          </View>
         </View>
       </View>
 
       {/* Kampen bor alltid på mørk stadionflate — også som resultatstripe her.
           Coral = kun pågående; pause = gul; ferdig = dempet + evt. SEIER. */}
       {result && event.score ? (
-        <View style={styles.stadiumStrip}>
+        <StadiumSurface
+          style={styles.stadiumStrip}
+          flood={false}
+          arc={false}
+          bordered={false}>
           {isLive && <View style={styles.liveDot} />}
           <Text
             style={[
@@ -115,7 +127,7 @@ export function EventCard({event, onPress, featured = false}: EventCardProps) {
               {event.score.home}–{event.score.away}
             </Text>
           </View>
-        </View>
+        </StadiumSurface>
       ) : (
         <View style={styles.rsvpWrap}>
           <RSVPBar rsvp={event.rsvp} />
@@ -158,9 +170,8 @@ const styles = StyleSheet.create({
   dateNum: {
     fontSize: 24,
     lineHeight: 28,
-    fontWeight: '800',
     letterSpacing: -0.4,
-    fontVariant: ['tabular-nums'],
+    fontFamily: fonts.display,
     color: colors.textPrimary,
   },
   dateMonth: {
@@ -193,7 +204,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.stadium,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,

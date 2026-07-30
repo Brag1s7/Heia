@@ -1,6 +1,8 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
+import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {ChevronRight, MapPin} from './icons';
 import {StatusPill, type PillKind} from './StatusPill';
 import type {HeiaEvent, EventType} from '../shared/types';
 
@@ -54,7 +56,19 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
       accessibilityRole="button"
       accessibilityLabel={`${event.title}, ${dayLabel(event.startTime)} ${formatTime(event.startTime)}`}
       style={({pressed}) => [styles.hero, pressed && styles.pressed]}>
-      <View style={styles.cream} pointerEvents="none" />
+      {/* Ekte mint→krem-gradient (140°) — varmt kremdrag nede til høyre. */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="hero" x1="0%" y1="0%" x2="78%" y2="94%">
+              <Stop offset="0" stopColor="#DFFBEA" />
+              <Stop offset="0.7" stopColor="#F4F9E6" />
+              <Stop offset="1" stopColor="#FAF4DC" />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#hero)" />
+        </Svg>
+      </View>
       <View style={styles.arcOuter} pointerEvents="none" />
       <View style={styles.arcInner} pointerEvents="none" />
 
@@ -70,13 +84,16 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
         <Text style={styles.title} numberOfLines={2}>
           {event.title}
         </Text>
-        <Text style={styles.chevron}>›</Text>
+        <ChevronRight size={22} color="#41604F" strokeWidth={2.2} />
       </View>
 
       {event.location && (
-        <Text style={styles.meta} numberOfLines={1}>
-          {event.location}
-        </Text>
+        <View style={styles.metaRow}>
+          <MapPin size={13} color="#41604F" />
+          <Text style={styles.meta} numberOfLines={1}>
+            {event.location}
+          </Text>
+        </View>
       )}
 
       {total > 0 && (
@@ -97,23 +114,12 @@ const styles = StyleSheet.create({
     borderRadius: radius.xl,
     padding: spacing.xl,
     borderWidth: 1,
-    borderColor: '#CDEBDA',
+    borderColor: '#CDEEDA',
     overflow: 'hidden',
     ...shadows.cardResting,
   },
   pressed: {
-    backgroundColor: '#DCF1E2',
-  },
-  // Varmt kremdrag nede til høyre — hverdagens «flomlys».
-  // Stor og svak: en hard sirkelkant leses som en flekk, ikke som varme.
-  cream: {
-    position: 'absolute',
-    right: -140,
-    bottom: -180,
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    backgroundColor: 'rgba(255, 226, 150, 0.15)',
+    opacity: 0.93,
   },
   arcOuter: {
     position: 'absolute',
@@ -169,15 +175,16 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     lineHeight: 29,
   },
-  chevron: {
-    fontSize: 26,
-    color: '#41604F',
-    fontWeight: '400',
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: spacing.xs,
   },
   meta: {
+    flex: 1,
     fontSize: 12.5,
     color: '#41604F',
-    marginTop: spacing.xs,
   },
   rsvpRow: {
     flexDirection: 'row',

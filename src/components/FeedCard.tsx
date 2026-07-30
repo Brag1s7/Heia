@@ -1,6 +1,7 @@
 import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {Maximize2, MessageCircle} from './icons';
 import {Avatar} from './Avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
@@ -146,7 +147,7 @@ export function FeedCard({
                 styles.expand,
                 pressed && styles.expandPressed,
               ]}>
-              <Text style={styles.expandIcon}>⤢</Text>
+              <Maximize2 size={14} color={colors.surface} strokeWidth={2.2} />
             </Pressable>
           )}
         </View>
@@ -178,8 +179,9 @@ export function FeedCard({
             styles.reactPill,
             pressed && styles.reactPillPressed,
           ]}>
+          <MessageCircle size={14} color={colors.textSecondary} />
           <Text style={styles.reactText}>
-            💬 {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
+            {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
           </Text>
         </Pressable>
       </View>
@@ -287,17 +289,15 @@ const styles = StyleSheet.create({
   expandPressed: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
-  expandIcon: {
-    fontSize: 15,
-    color: colors.surface,
-    fontWeight: '700',
-  },
   reactions: {
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
   reactPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingHorizontal: spacing.md + 1,
     paddingVertical: 7,
     borderRadius: radius.full,

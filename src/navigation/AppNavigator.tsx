@@ -22,6 +22,7 @@ import {
   useNotifications,
 } from '../context';
 import {CreateSheet, NotificationBanner} from '../components';
+import {Bell, Calendar, House, Plus, User} from '../components/icons';
 import {navigationRef, flushPendingDeepLink} from './deepLink';
 import {isTeamAdmin} from '../shared/roles';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
@@ -242,14 +243,17 @@ function OpprettScreen() {
 }
 
 // ---------------------------------------------------------------------------
-// Tab-ikon (enkel tekst-basert — byttes til ikon-bibliotek senere)
+// Tab-ikoner — Lucide (stroke 2, som artifacten)
 // ---------------------------------------------------------------------------
-const tabIcons: Record<keyof RootTabParamList, string> = {
-  HjemStack: '⌂',
-  KalenderStack: '▦',
-  Opprett: '+',
-  InboxStack: '✉',
-  ProfilStack: '●',
+const tabIcons: Record<
+  keyof RootTabParamList,
+  React.ComponentType<{size?: number; color?: string; strokeWidth?: number}>
+> = {
+  HjemStack: House,
+  KalenderStack: Calendar,
+  Opprett: Plus,
+  InboxStack: Bell,
+  ProfilStack: User,
 };
 
 // ---------------------------------------------------------------------------
@@ -302,23 +306,21 @@ function MainTabs() {
         // trenger hele bredden sin, ellers kuttes glyfen til en strimmel.
         tabBarIconStyle: styles.tabIconSlot,
         tabBarIcon: ({color, focused}) => {
-          const icon = tabIcons[route.name];
+          const IconGlyph = tabIcons[route.name];
           if (route.name === 'Opprett') {
             return (
               <View style={styles.createButton}>
-                <Text style={styles.createIcon}>{icon}</Text>
+                <Plus size={24} color={colors.heiaDeep} strokeWidth={2.4} />
               </View>
             );
           }
           return (
             <View style={[styles.iconWrap, focused && styles.iconWrapOn]}>
-              <Text
-                style={[
-                  styles.tabIcon,
-                  {color: focused ? colors.heiaDeep : color},
-                ]}>
-                {icon}
-              </Text>
+              <IconGlyph
+                size={21}
+                color={focused ? colors.heiaDeep : color}
+                strokeWidth={focused ? 2.2 : 2}
+              />
             </View>
           );
         },
@@ -449,9 +451,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: 2,
   },
-  tabIcon: {
-    fontSize: 20,
-  },
   tabIconSlot: {
     width: 64,
     height: 32,
@@ -482,12 +481,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: -8,
     ...shadows.glow,
-  },
-  createIcon: {
-    fontSize: 26,
-    fontWeight: '600',
-    color: colors.heiaDeep,
-    lineHeight: 28,
   },
   placeholder: {
     flex: 1,

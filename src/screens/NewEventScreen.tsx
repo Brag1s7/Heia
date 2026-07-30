@@ -13,7 +13,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, fonts} from '../theme';
 import {Button} from '../components';
 import {useActiveTeam} from '../context';
 import {createEvent} from '../lib/api/events';
@@ -434,14 +434,13 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
-  // Klokkeslettet er skjermens tall — store, stolte, tabulære (A v2).
+  // Klokkeslettet er skjermens tall — stort og stolt i displayfonten (A v2).
   timeInput: {
     alignSelf: 'flex-start',
     minWidth: 108,
     textAlign: 'center',
     fontSize: 20,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
+    fontFamily: fonts.display,
   },
   multiline: {
     minHeight: 96,

@@ -2,6 +2,7 @@ import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
+import {StadiumSurface} from './StadiumSurface';
 import {useActiveTeam} from '../context';
 import type {HeiaEvent} from '../shared/types';
 
@@ -45,13 +46,8 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`Følg kampen mot ${event.opponent}`}
-      style={({pressed}) => [styles.banner, pressed && styles.pressed]}>
-      {/* Stemning: varmt flomlys øverst, banesirkel nede til høyre */}
-      <View style={styles.floodAmber} pointerEvents="none" />
-      <View style={styles.floodMint} pointerEvents="none" />
-      <View style={styles.arcOuter} pointerEvents="none" />
-      <View style={styles.arcInner} pointerEvents="none" />
-
+      style={({pressed}) => [styles.wrap, pressed && styles.pressed]}>
+      <StadiumSurface style={styles.banner}>
       <View style={styles.topRow}>
         <LiveBadge paused={isPaused} />
         {minute !== null && (
@@ -95,61 +91,22 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
       <View style={styles.cta}>
         <Text style={styles.ctaText}>Følg kampen</Text>
       </View>
+      </StadiumSurface>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  banner: {
-    backgroundColor: colors.stadium,
+  wrap: {
     borderRadius: radius.xl,
-    padding: spacing.xl,
-    gap: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.stadiumEdge,
-    overflow: 'hidden',
     ...shadows.elevated,
   },
+  banner: {
+    padding: spacing.xl,
+    gap: spacing.lg,
+  },
   pressed: {
-    backgroundColor: '#132A21',
-  },
-  floodAmber: {
-    position: 'absolute',
-    top: -190,
-    left: -120,
-    width: 340,
-    height: 340,
-    borderRadius: 170,
-    backgroundColor: 'rgba(255, 197, 61, 0.04)',
-  },
-  floodMint: {
-    position: 'absolute',
-    top: -210,
-    right: -110,
-    width: 380,
-    height: 380,
-    borderRadius: 190,
-    backgroundColor: 'rgba(2, 255, 171, 0.05)',
-  },
-  arcOuter: {
-    position: 'absolute',
-    right: -70,
-    bottom: -90,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 1.5,
-    borderColor: 'rgba(2, 255, 171, 0.13)',
-  },
-  arcInner: {
-    position: 'absolute',
-    right: -38,
-    bottom: -58,
-    width: 136,
-    height: 136,
-    borderRadius: 68,
-    borderWidth: 1.5,
-    borderColor: 'rgba(2, 255, 171, 0.09)',
+    opacity: 0.92,
   },
   topRow: {
     flexDirection: 'row',

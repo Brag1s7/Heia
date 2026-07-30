@@ -25,6 +25,7 @@ import {
   MatchPhotoGallery,
   Avatar,
 } from '../components';
+import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {getLiveMatch, getTeamEvents} from '../lib/api/events';
@@ -385,7 +386,7 @@ export function TeamHomeScreen() {
             disabled={posting}
             accessibilityRole="button"
             accessibilityLabel="Legg til bilde">
-            <Text style={styles.cameraChipText}>📷</Text>
+            <Camera size={19} color={colors.heiaInk} />
           </Pressable>
         </View>
         {selectedImage && (
@@ -414,9 +415,11 @@ export function TeamHomeScreen() {
             disabled={posting}
             accessibilityRole="switch"
             accessibilityState={{checked: broadcast}}>
-            <Text style={[styles.broadcastBox, broadcast && styles.broadcastBoxOn]}>
-              {broadcast ? '✓' : ''}
-            </Text>
+            <View style={[styles.broadcastBox, broadcast && styles.broadcastBoxOn]}>
+              {broadcast && (
+                <Check size={14} color={colors.heiaInk} strokeWidth={3} />
+              )}
+            </View>
             <View style={styles.broadcastText}>
               <Text style={styles.broadcastTitle}>🔔 Varsle hele laget</Text>
               <Text style={styles.broadcastHint}>
@@ -576,9 +579,6 @@ const styles = StyleSheet.create({
   cameraChipPressed: {
     opacity: 0.7,
   },
-  cameraChipText: {
-    fontSize: 18,
-  },
   composeActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -604,11 +604,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    textAlign: 'center',
-    lineHeight: 20,
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.heiaInk,
+    alignItems: 'center',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
   broadcastBoxOn: {

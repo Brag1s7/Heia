@@ -66,14 +66,24 @@ export const colors = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Typografi — titler med pondus, store tabulære tall.
-// (Rounded display-tall venter på den samlede native rebuilden.)
+// Typografi — titler med pondus, store rounded tall (Nunito, bundlet).
 // ---------------------------------------------------------------------------
 const fontFamily = Platform.select({
   ios: 'System',
   android: 'Roboto',
   default: 'System',
 });
+
+// Displayfont for STORE TALL (score, klokkeslett, datotall, minutter) — aldri
+// brødtekst/titler. Nunito = SF Rounded-erstatteren fra artifacten (`ui-rounded`).
+// Strengen er både PostScript-navnet (iOS) og filnavnet (Android), så samme
+// verdi virker begge steder. Sifrene er like brede i fonten, så tabular-nums
+// trengs ikke. Sett ALDRI fontWeight sammen med disse — fila ER vekten, og
+// en fontWeight får iOS til å lete etter vekter familien ikke har.
+export const fonts = {
+  display: 'Nunito-ExtraBold',
+  displayBold: 'Nunito-Bold',
+} as const;
 
 export const typography = {
   heading1: {
@@ -132,31 +142,25 @@ export const typography = {
     color: colors.textSecondary,
   } satisfies TextStyle,
 
-  // Store, stolte tall — alltid 800 + tabulære siffer
+  // Store, stolte tall — rounded 800 (vekten ligger i fontfila, se `fonts`)
   scoreLarge: {
     fontSize: 40,
-    fontWeight: '800',
     letterSpacing: -0.5,
-    fontFamily,
-    fontVariant: ['tabular-nums'],
+    fontFamily: fonts.display,
     color: colors.textPrimary,
   } satisfies TextStyle,
 
   scoreSmall: {
     fontSize: 16,
-    fontWeight: '800',
     letterSpacing: 0.2,
-    fontFamily,
-    fontVariant: ['tabular-nums'],
+    fontFamily: fonts.display,
     color: colors.textPrimary,
   } satisfies TextStyle,
 
   displayTime: {
     fontSize: 22,
-    fontWeight: '800',
     letterSpacing: -0.3,
-    fontFamily,
-    fontVariant: ['tabular-nums'],
+    fontFamily: fonts.display,
     color: colors.heiaDeep,
   } satisfies TextStyle,
 } as const;

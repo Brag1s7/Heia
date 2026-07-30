@@ -3,6 +3,7 @@ import {View, Text, Pressable, StyleSheet, Image} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
+import {StadiumSurface} from '../components';
 import {useAuth, useOnboarding} from '../context';
 import {getSports} from '../lib/api/teams';
 import type {OnboardingStackParamList} from '../shared/types';
@@ -25,7 +26,7 @@ export function WelcomeIntentScreen({navigation}: Props) {
   };
 
   return (
-    <View style={styles.screen}>
+    <StadiumSurface style={styles.screen} bordered={false}>
       <View style={[styles.content, {paddingTop: insets.top + spacing['5xl']}]}>
         <Image
           source={require('../assets/images/logo-dark.png')}
@@ -74,15 +75,16 @@ export function WelcomeIntentScreen({navigation}: Props) {
           </Pressable>
         )}
       </View>
-    </View>
+    </StadiumSurface>
   );
 }
 
 const styles = StyleSheet.create({
-  // Stadionflaten (A v2) — appens første møte bærer kamp-signaturen.
+  // Stadionflaten (A v2) — appens første møte bærer kamp-signaturen,
+  // nå med ekte flomlys-gradienter i full skjerm.
   screen: {
     flex: 1,
-    backgroundColor: colors.stadium,
+    borderRadius: 0,
   },
   content: {
     flex: 1,

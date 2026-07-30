@@ -23,6 +23,7 @@ export {TeamHeader} from './TeamHeader';
 export {InviteCodeCard} from './InviteCodeCard';
 export {NotificationRow} from './NotificationRow';
 export {NotificationBanner} from './NotificationBanner';
+export {StadiumSurface} from './StadiumSurface';
 export {MatchPhotoSheet} from './MatchPhotoSheet';
 export {MatchPhotoRail} from './MatchPhotoRail';
 export {MatchPhotoGallery} from './MatchPhotoGallery';
