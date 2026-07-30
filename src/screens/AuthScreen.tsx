@@ -244,8 +244,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
+  // A v2-knapperegel: mintfyll bærer heiaDeep-tekst.
   tabTextActive: {
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
+    fontWeight: '700',
   },
   form: {
     gap: spacing.lg,
@@ -254,7 +256,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   label: {
-    ...typography.label,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
   },
   input: {
     ...typography.body,

@@ -168,10 +168,11 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
   },
+  // heiaInk, ikke #02FFAB — mint er kun fyll på lys flate (A v2-regel).
   checkmark: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.heia,
+    color: colors.heiaInk,
   },
   empty: {
     ...typography.body,

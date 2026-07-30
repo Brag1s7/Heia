@@ -167,7 +167,10 @@ export function ProfilScreen() {
       {/* Dine lag */}
       {userMemberships.length > 0 && (
         <View style={styles.teamsSection}>
-          <Text style={styles.sectionTitle}>Dine lag</Text>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionDash} />
+            <Text style={styles.sectionTitle}>Dine lag</Text>
+          </View>
           {userMemberships.map(m => {
             const isActive = m.teamSpaceId === activeTeamSpaceId;
             return (
@@ -319,21 +322,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  sectionTitle: {
-    ...typography.label,
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.xs,
+  },
+  sectionDash: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.heia,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
   },
   teamCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     ...shadows.card,
   },
+  // Valgt skifter FLATE, ikke bare ramme (A v2-regelen fra RSVP-knappene).
   teamCardActive: {
-    borderWidth: 2,
+    backgroundColor: colors.heiaSoft,
     borderColor: colors.heia,
   },
   teamCardPressed: {
@@ -355,14 +376,20 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
   },
+  // heiaInk — mint er kun fyll på lys flate (A v2-regel).
   activeCheck: {
     fontSize: 18,
-    color: colors.heiaPressed,
+    color: colors.heiaInk,
     fontWeight: '700',
   },
   menuSection: {
     backgroundColor: colors.surface,
     marginTop: spacing.lg,
+    marginHorizontal: spacing.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    overflow: 'hidden',
     ...shadows.card,
   },
   menuIcon: {

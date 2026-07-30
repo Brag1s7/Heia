@@ -1,10 +1,12 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (sen kveld). **Designretningen «A v2 · Stadium Pop
-Hybrid» er LÅST. Skive 1 (hjem) OG skive 2 (kalender/varsler/kampdetalj) er
-kodet, optisk godkjent av bruker og COMMITTET på `Brage`.** Neste: velg neste
-skive — design på resten av flatene (profil/onboarding/sheets) eller
-produktkandidatene (se «🎯 SENERE»). Fase 4–9 fra før er merget (PR #16)._
+_Sist oppdatert: 2026-07-30 (natt). **Designretningen «A v2 · Stadium Pop
+Hybrid» er LÅST og GJENNOMFØRT på ALLE flater — skive 1+2+3 er optisk
+godkjent av bruker og committet på `Brage`.** Designarbeidet er ikke pushet/
+merget til `main` ennå. **Neste skive velges fritt:** produktkandidatene
+(«🎯 SENERE», anbefalt: alle medlemmer kan legge bilder på kampen) eller den
+samlede native rebuilden (ikoner/gradienter/font — det største gjenstående
+premium-løftet). Fase 4–9 fra før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1155,9 +1157,10 @@ terminalen med `npm run ios` blir lista stående gammel.
 ## 📦 Git-status (2026-07-30)
 
 Alt av Fase 4–9 er **committet, pushet og merget til `main`** (PR #16).
-**Designskive 1 + 2 er committet på `Brage`** (2026-07-30, etter brukerens
-optiske OK). Ikke pushet/merget til `main` ennå — husk squash-merge-mønsteret
-når det skjer.
+**Hele designarbeidet (skive 1+2+3 + kommentartråd-forbedringene) er
+committet på `Brage`** etter brukerens optiske OK-er (skive 1+2: `503e07d`).
+Ikke pushet/merget til `main` ennå — husk squash-merge-mønsteret når det
+skjer (merge `origin/main` inn, behold Brage, verifiser supersett).
 
 **Merk mønsteret som skaper konflikter hver gang:** GitHub squash-merger PR-en,
 så `main` får ÉN commit mens `Brage` beholder sine egne. Neste gang du merger
@@ -1283,6 +1286,67 @@ Ren TS/TSX — **kun Metro-reload.** `npx eslint src`: **0 errors**, 4 warnings
    lilla påminnelse, gul trenerbeskjed, mint 👏); ulest = grønn flate + prikk
    som før.
 6. **Oppmøtestripa** (kalenderkort + hendelse): mint fylling, ingen rød.
+
+### ✅ Skive 3 — resten av flatene (KODET + optisk OK 2026-07-30)
+Ren TS/TSX — **kun Metro-reload.** `npx eslint src`: 0 errors, 4 warnings
+(samme fire som før). Nå snakker HELE appen A v2 — ingen skjerm står igjen
+på det gamle uttrykket.
+
+**Regelbrudd som ble funnet og lukket (mint-tekst/svart-på-mint):**
+- `SimulatedPush` (varselbanneret): mint appLabel på hvitt + mint venstre-rail
+  → mint-strek + heiaInk, kortflate med borderSubtle (railene er døde i A v2).
+- `ReporterSheet`: ✓-haken var `colors.heia` på hvitt → heiaInk.
+- `CreateTeamScreen`: «+ Opprett klubb» var heiaPressed på hvitt → heiaInk.
+- `SupportScreen`: ✓-fordeler i mint på lyst → heiaInk; «80% til laget» og
+  «Spar 33%» hadde svart tekst på mintfyll → heiaDeep.
+- `InviteCodeCard`/`ReporterBar`/`AuthScreen`-tab/`WelcomeIntent`: svart tekst
+  på mintfylte knapper → heiaDeep (+ glød på Del-knappen og velkomst-CTA-en).
+- Verifisert med grep: alle gjenværende `color: colors.heia` er på mørk
+  stadionflate (ScoreChip/ScoreBoard/EventCard-stripe/LiveMatchBanner) — riktig.
+
+**Øvrig samkjøring:**
+- **`WelcomeIntentScreen` bor nå på stadionflaten** (`colors.stadium`, var
+  `textPrimary`-svart) — appens første møte bærer kamp-signaturen.
+- **`CreateSheet`:** semantiske ikonsirkler (mint «Del med laget», blå «Ny
+  hendelse») — samme språk som varselradene.
+- **`ProfilScreen`:** lagvelgeren følger «valgt skifter FLATE»-regelen
+  (heiaSoft + mint-ramme, var kun ramme); menyen er et avrundet kort med
+  marger (var kant-til-kant); «Dine lag» har mint-strek.
+- **`TeamMembersScreen`:** mint-strek på seksjonene, kort på Card-språket.
+- **`NewEventScreen`:** feltetiketter i A v2-caps, klokkeslett 20 pt tabulær
+  800, valgt chip-tekst 700.
+- **`JoinTeamCodeScreen`:** kodefeltet 800 m/ letterSpacing 4, kort/rollekort
+  på Card-språket, «Din rolle»-etikett i A v2-caps.
+- **`AuthScreen`:** feltetiketter i A v2-caps.
+- **`CommentsScreen`/`ListRow`/`ReporterModal`/`MatchPhotoSheet`:** radius-
+  og borderSubtle-samkjøring, navn/titler 600–700.
+- InviteScreen trengte ingenting (arver fra `InviteCodeCard`).
+
+**Tillegg (bruker-funn under review av skive 3): kommentartråden**
+1. **Kommentarbobler.** Kommentarene fløt rett på kremflaten uten avgrensning.
+   Nå: hvit boble per kommentar (chat-hjørne oppe til venstre mot avataren),
+   navn/tid inne i boblen.
+2. **👏 Heia på innlegget inne i tråden.** Man sto PÅ innlegget uten å kunne
+   se eller gi applaus — brudd på innholdsløkka. `getFeedPost` (comments.ts)
+   hydrerer nå `heiaCount` + `iReacted` (én ekstra reactions-select + lokal
+   session i samme `Promise.all`), og `CommentsScreen` har samme reaksjons-
+   pill som `FeedCard` med optimistisk toggle + rollback og busy-ref mot
+   dobbelttrykk (`toggleReaction` er retningsstyrt — to raske trykk ville
+   ellers gitt dobbel insert).
+
+### Test dette (Metro-reload — optisk review av skive 3)
+1. Logg ut → velkomstskjermen er mørk stadion med mint CTA (grønn tekst på
+   mint, ikke svart). Auth: aktiv fane har mørkegrønn tekst på mint.
+2. `+` → valgarket har fargede ikonsirkler.
+3. Profil → aktivt lag har mint flate + ramme; menyen er et avrundet kort.
+4. Lagoversikt → mint-strek på «Trenere og lagledere» osv.
+5. Ny hendelse → CAPS-etiketter, stort tabulært klokkeslett.
+6. Under kamp: la et varsel komme → banneret har mint-strek + «HEIA» i
+   mørkegrønt, ingen mint-rail.
+7. Støtt laget → «80% til laget» i mørkegrønn på mint, hakene i mørkegrønt.
+8. Kommentartråd → kommentarene ligger i hvite bobler; innlegget øverst har
+   👏-pill med teller. Trykk → teller opp og pillen blir mint; trykk igjen →
+   av. Heia i tråden skal også synes i feeden etterpå (samme data).
 
 ### Til den SAMLEDE native rebuilden (én gang, senere)
 - **Lucide React Native** (+ react-native-svg) — ikoner i tab bar/kontroller.

@@ -142,7 +142,10 @@ export function TeamMembersScreen() {
 
       {sections.map(section => (
         <View key={section.title} style={styles.section}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <View style={styles.sectionTitleRow}>
+            <View style={styles.sectionDash} />
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+          </View>
           <View style={styles.card}>
             {section.data.map((member, i) => {
               const isMe = member.id === myId;
@@ -243,12 +246,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sectionDash: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.heia,
+  },
   sectionTitle: {
-    ...typography.label,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
   },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     overflow: 'hidden',
     ...shadows.card,
   },
@@ -262,7 +282,7 @@ const styles = StyleSheet.create({
   },
   rowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderSubtle,
   },
   rowPressed: {
     backgroundColor: colors.heiaSoft,
@@ -306,7 +326,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     gap: spacing.md,

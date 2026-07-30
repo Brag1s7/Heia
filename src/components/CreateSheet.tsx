@@ -38,6 +38,7 @@ export function CreateSheet({
 
         <SheetRow
           icon="💬"
+          iconBg={colors.heiaTint}
           title="Del med laget"
           subtitle="Skriv en melding eller legg ut et bilde"
           onPress={onShare}
@@ -46,6 +47,7 @@ export function CreateSheet({
         {canCreateEvent && (
           <SheetRow
             icon="📅"
+            iconBg={colors.infoSoft}
             title="Ny hendelse"
             subtitle="Trening, kamp eller sosialt"
             onPress={onNewEvent}
@@ -58,11 +60,13 @@ export function CreateSheet({
 
 function SheetRow({
   icon,
+  iconBg,
   title,
   subtitle,
   onPress,
 }: {
   icon: string;
+  iconBg: string;
   title: string;
   subtitle: string;
   onPress: () => void;
@@ -71,7 +75,10 @@ function SheetRow({
     <Pressable
       style={({pressed}) => [styles.row, pressed && styles.rowPressed]}
       onPress={onPress}>
-      <Text style={styles.rowIcon}>{icon}</Text>
+      {/* Semantisk ikonflate — samme språk som varselradene (A v2). */}
+      <View style={[styles.iconWrap, {backgroundColor: iconBg}]}>
+        <Text style={styles.rowIcon}>{icon}</Text>
+      </View>
       <View style={styles.rowInfo}>
         <Text style={styles.rowTitle}>{title}</Text>
         <Text style={styles.rowSubtitle}>{subtitle}</Text>
@@ -110,10 +117,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   rowPressed: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowIcon: {
-    fontSize: 24,
+    fontSize: 20,
   },
   rowInfo: {
     flex: 1,
@@ -121,7 +135,7 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     ...typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   rowSubtitle: {
     ...typography.bodySmall,

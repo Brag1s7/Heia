@@ -358,7 +358,11 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   label: {
-    ...typography.label,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.textSecondary,
   },
   input: {
     ...typography.body,
@@ -413,9 +417,10 @@ const styles = StyleSheet.create({
   dropdownText: {
     ...typography.body,
   },
+  // heiaInk — mint-toner er kun fyll på lys flate (A v2-regel).
   dropdownCreate: {
     ...typography.body,
-    color: colors.heiaPressed,
+    color: colors.heiaInk,
     fontWeight: '600',
   },
   sportRow: {
@@ -440,8 +445,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   sportPillTextSelected: {
-    color: colors.textPrimary,
-    fontWeight: '600',
+    color: colors.heiaInk,
+    fontWeight: '700',
   },
   error: {
     ...typography.bodySmall,

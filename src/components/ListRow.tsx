@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   border: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.borderSubtle,
   },
   iconWrap: {
     marginRight: spacing.md,
@@ -71,6 +71,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.body,
+    fontWeight: '600',
   },
   subtitle: {
     ...typography.bodySmall,

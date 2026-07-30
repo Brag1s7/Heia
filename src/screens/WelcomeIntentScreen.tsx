@@ -79,9 +79,10 @@ export function WelcomeIntentScreen({navigation}: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Stadionflaten (A v2) — appens første møte bærer kamp-signaturen.
   screen: {
     flex: 1,
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.stadium,
   },
   content: {
     flex: 1,
@@ -95,8 +96,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     ...typography.heading3,
-    color: colors.surface,
-    opacity: 0.6,
+    color: colors.stadiumDim,
     marginTop: spacing.sm,
   },
   actions: {
@@ -124,12 +124,13 @@ const styles = StyleSheet.create({
   buttonPressed: {
     opacity: 0.85,
   },
+  // Hovedhandlingen — mintfyll + heiaDeep-tekst (A v2-knapperegelen).
   buttonPrimary: {
     backgroundColor: colors.heia,
   },
   buttonPrimaryText: {
     ...typography.heading3,
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
   },
   buttonSecondary: {
     backgroundColor: colors.surface,

@@ -224,10 +224,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A v2-regel: mintfyll bærer heiaDeep-tekst.
   splitTeamText: {
     ...typography.bodySmall,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontWeight: '700',
+    color: colors.heiaDeep,
   },
   splitHeia: {
     flex: 20,
@@ -251,9 +252,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.md,
   },
+  // heiaInk — mint er kun fyll på lys flate (A v2-regel).
   checkmark: {
     ...typography.body,
-    color: colors.heia,
+    color: colors.heiaInk,
     fontWeight: '700',
     lineHeight: 24,
   },
@@ -270,9 +272,9 @@ const styles = StyleSheet.create({
   planCard: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 2,
-    borderColor: colors.border,
+    borderColor: colors.borderSubtle,
     padding: spacing.xl,
     alignItems: 'center',
     ...shadows.card,
@@ -290,7 +292,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...typography.caption,
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
     fontWeight: '700',
   },
   planLabel: {
@@ -303,6 +305,8 @@ const styles = StyleSheet.create({
   },
   planPrice: {
     ...typography.heading2,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
   planPriceSelected: {

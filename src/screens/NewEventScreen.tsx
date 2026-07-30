@@ -384,8 +384,12 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.sm,
   },
+  // Samme caps-uttrykk som seksjonsetikettene (A v2).
   fieldLabel: {
-    ...typography.label,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
     color: colors.textSecondary,
   },
   chipRow: {
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
   },
   selectChipTextSelected: {
     color: colors.heiaInk,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   input: {
     ...typography.body,
@@ -430,10 +434,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
+  // Klokkeslettet er skjermens tall — store, stolte, tabulære (A v2).
   timeInput: {
     alignSelf: 'flex-start',
     minWidth: 108,
     textAlign: 'center',
+    fontSize: 20,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   multiline: {
     minHeight: 96,

@@ -72,7 +72,11 @@ export function SimulatedPush({
           transform: [{translateY}],
         },
       ]}>
-      <Text style={styles.appLabel}>Heia</Text>
+      {/* Mint-strek + heiaInk (A v2) — #02FFAB er kun fyll, aldri tekst på lyst. */}
+      <Animated.View style={styles.appRow}>
+        <Animated.View style={styles.appDash} />
+        <Text style={styles.appLabel}>Heia</Text>
+      </Animated.View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message} numberOfLines={2}>
         {message}
@@ -88,17 +92,28 @@ const styles = StyleSheet.create({
     right: spacing.lg,
     zIndex: 9999,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.xs,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.heia,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     ...shadows.elevated,
+  },
+  appRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  appDash: {
+    width: 14,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.heia,
   },
   appLabel: {
     ...typography.caption,
-    color: colors.heia,
-    fontWeight: '700',
+    color: colors.heiaInk,
+    fontWeight: '800',
     textTransform: 'uppercase',
     letterSpacing: 0.8,
   },
