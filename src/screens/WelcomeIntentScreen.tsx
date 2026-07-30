@@ -28,8 +28,12 @@ export function WelcomeIntentScreen({navigation}: Props) {
   return (
     <StadiumSurface style={styles.screen} bordered={false}>
       <View style={[styles.content, {paddingTop: insets.top + spacing['5xl']}]}>
+        {/* Beskåret, gjennomsiktig lockup. `logo-dark.png` har koksgrå
+            bakgrunn bakt inn i rasteret og tegnet en hard grå boks midt på
+            stadionflaten. `logo-icon.png` er gjennomsiktig, men har så mye tom
+            luft rundt merket at `contain` krymper det til en tredjedel. */}
         <Image
-          source={require('../assets/images/logo-dark.png')}
+          source={require('../assets/images/logo-wordmark.png')}
           style={styles.logo}
           resizeMode="contain"
         />
@@ -93,8 +97,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing['3xl'],
   },
   logo: {
-    width: 240,
-    height: 240,
+    // Merkets eget sideforhold (1983×1025 ≈ 1.935) — ingen tom luft å fylle.
+    width: 260,
+    height: 134,
   },
   tagline: {
     ...typography.heading3,

@@ -23,16 +23,17 @@ så **merge til main er konfliktfri akkurat nå**. Den dokumenterte
 squash-smerten oppstår først etter neste squash-merge. Push + PR nå, mens det
 er gratis. (Verifiser tallene på nytt før du stoler på dem.)
 
-**2. Neste skive: kommentarer + heiing synlig i kamptidslinja**
-(produktkandidat 2). Begrunnelse: kandidat 1 er avvist, og dette er det eneste
+**2. Neste skive: sesong- og statistikkflate** (produktkandidat 5).
+**Bruker sa eksplisitt 2026-07-30: «Liker godt ideen med at man kan se sesong
+og statistikk en plass!»** — så denne går foran kandidat 2. «7 kamper, 12 mål»:
+`match_events` har all dataen alt, så det er én lese-RPC + én skjerm. Veldig
+Strava, og den første flaten som viser at appen samler opp noe over tid.
+
+Alternativ, og neste i køen etter den: **kommentarer + heiing synlig i
+kamptidslinja** (kandidat 2). Kandidat 1 er avvist, og dette er det eneste
 gjenværende grepet mot «kampminne» som **ikke** åpner en ny flate for at alle
 skal lage innhold — kommentarene og 👏 finnes allerede, de bor bare på
 feed-poster og er usynlige på kampsiden. Ren synliggjøring av data vi har.
-Passer identiteten (feed/live/deling er core) og «var der»-følelsen.
-
-Alternativ hvis du heller vil ha noe som viser at appen samler opp:
-**sesong/statistikk-flate** (kandidat 5) — «7 kamper, 12 mål». `match_events`
-har all dataen; én lese-RPC + én skjerm. Veldig Strava.
 
 **Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten) og skive 6
 (produksjonsikonet + launch screen). ⚠️ Ikonet bruker så på telefonen
@@ -1655,6 +1656,29 @@ feilen i en 10-minutters Xcode-build.
 4. **Varsler:** ikonet i 20 pt — figuren skal fortsatt kjennes igjen som en
    person, ikke bli en grønn flekk. (Kontrollert i generert kontaktark ned til
    40 px; den tynne hevede armen er det som ryker først.)
+
+#### 🐞 To funn fra første ekte telefontest (rettet 2026-07-30)
+Begge oppdaget av bruker på skjermbilder fra iPhone — ikke av simulatoren.
+
+1. **Grå boks midt på velkomstskjermen.** `WelcomeIntentScreen` brukte
+   `logo-dark.png`, som har **koksgrå bakgrunn bakt inn i rasteret**. På
+   stadionflaten ble det en hard grå firkant. `logo-icon.png` er
+   gjennomsiktig, men har så mye tom luft rundt merket at `resizeMode="contain"`
+   krympet det til en tredjedel av boksen. Løsning: ny **`logo-wordmark.png`**
+   (+@2x/@3x) — lockupen beskåret til sitt eget sideforhold (1983×1025 ≈
+   1.935), generert fra `Logo_3.pdf`. Stilen bruker nå ekte proporsjoner
+   (260×134) i stedet for en kvadratisk boks.
+   ⚠️ **`logo-dark.png` skal aldri brukes på en mørk flate** — den er laget
+   for lyse flater og bærer sin egen bakgrunn. Den er nå ubrukt.
+2. **Håndtegnet tilbake-knapp på Auth.** `AuthScreen` tegnet sin egen
+   «‹ Tilbake» — siste brudd på regelen fra 2026-07-09 («nye skjermer skal
+   bruke stack-headeren, ikke egne tilbake-knapper»). Auth er nå registrert
+   med `authOptions` (`headerShown: true`, **tom tittel**): skjermen bytter
+   selv mellom «Velkommen tilbake» og «Opprett konto» som overskrift, så en
+   fast headertittel ville duplisert eller motsagt den. `navigation` er ute av
+   propsene, og `header`/`backButton`/`backText`-stilene er slettet.
+
+`npx eslint src`: **0 errors, 4 warnings** (samme fire som før).
 
 **Ikke gjort (bevisst):**
 - **Android-mipmapene** står på RN-malen. Ett flagg unna (`--android`), men
