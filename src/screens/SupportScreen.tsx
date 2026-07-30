@@ -2,7 +2,7 @@ import React, {useState} from 'react';
 import {View, Text, ScrollView, Pressable, StyleSheet, Image} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
-import {Button} from '../components';
+import {BackBar, Button} from '../components';
 import {Check} from '../components/icons';
 import {useActiveTeam} from '../context';
 
@@ -36,10 +36,11 @@ export function SupportScreen() {
   const plan = plans[selectedPlan];
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
-    >
+    <View style={styles.screen}>
+      <BackBar title="Støtt laget" />
+      <ScrollView
+        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+      >
       {/* Illustrasjon */}
       <View style={styles.hero}>
         <View style={styles.iconCircle}>
@@ -118,7 +119,8 @@ export function SupportScreen() {
           Avslutt når som helst. Ingen binding.
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

@@ -8,9 +8,11 @@ import {
   Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
 import {
+  BackBar,
   Card,
   StatusPill,
   Button,
@@ -18,6 +20,7 @@ import {
   SectionHeader,
   Avatar,
   ListRow,
+  EventCard,
   ScoreBoard,
   ReporterActions,
   ReporterModal,
@@ -34,6 +37,7 @@ import {useAuth, useActiveTeam} from '../context';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
 import {
   getEventDetail,
+  getTournamentMatches,
   setRsvp,
   setMatchReporter,
   startMatch,
@@ -47,6 +51,7 @@ import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
   EventType,
+  HeiaEvent,
   HeiaEventDetail,
   HomeStackParamList,
   RSVPStatus,
@@ -87,6 +92,7 @@ function formatTime(date: Date): string {
 const typePill: Record<EventType, {kind: PillKind; label: string}> = {
   trening: {kind: 'trening', label: 'Trening'},
   kamp: {kind: 'kamp', label: 'Kamp'},
+  turnering: {kind: 'turnering', label: 'Turnering'},
   sosialt: {kind: 'sosialt', label: 'Sosialt'},
   annet: {kind: 'neutral', label: 'Hendelse'},
 };
@@ -155,7 +161,7 @@ function applyMyStatus(base: RSVPSummary, myStatus: RSVPStatus): RSVPSummary {
   return next;
 }
 
-export function EventDetailScreen({route}: Props) {
+export function EventDetailScreen({route, navigation}: Props) {
   const insets = useSafeAreaInsets();
   const {profile: currentUser} = useAuth();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
@@ -206,6 +212,28 @@ export function EventDetailScreen({route}: Props) {
     loadEvent();
   }, [loadEvent]);
 
+  // Turnering: kampene lastes for seg og refetches ved fokus — «Ny kamp»
+  // lukker modalen tilbake hit, og å komme tilbake fra en kamp skal vise
+  // ferske stillinger. Feiler kallet lever resten av siden videre.
+  const isTournament = event?.type === 'turnering';
+  const [tournamentMatches, setTournamentMatches] = useState<HeiaEvent[]>([]);
+  const loadTournamentMatches = useCallback(async () => {
+    if (!activeTeamSpaceId) return;
+    try {
+      setTournamentMatches(
+        await getTournamentMatches(eventId, activeTeamSpaceId),
+      );
+    } catch {
+      // Stille — kamplisten er tom til neste fokus.
+    }
+  }, [eventId, activeTeamSpaceId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isTournament) loadTournamentMatches();
+    }, [isTournament, loadTournamentMatches]),
+  );
+
   // Medlemslisten brukes kun av kampreporter-UI-et, så vi henter den først når
   // vi vet at hendelsen er en kamp — en trening skal ikke koste et RPC-kall.
   // Feiler den, lever resten av skjermen videre: `reporter` faller tilbake på
@@ -255,10 +283,12 @@ export function EventDetailScreen({route}: Props) {
   // banneret følger deg gjennom hele appen — ikke bare på denne skjermen.
   useEffect(() => {
     if (!liveMatchSessionId) return;
-    return subscribeToMatch(liveMatchSessionId, () => {
+    return subscribeToMatch(liveMatchSessionId, eventId, () => {
       loadEvent();
+      // Bilder bor i feed_posts, ikke i event-payloaden — egen refetch.
+      loadPhotos();
     });
-  }, [liveMatchSessionId, loadEvent]);
+  }, [liveMatchSessionId, eventId, loadEvent, loadPhotos]);
 
   // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
   // mellom hendelsene — uten denne ville minuttet frosset til neste mål.
@@ -270,16 +300,24 @@ export function EventDetailScreen({route}: Props) {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.heia} />
+      <View style={styles.screen}>
+        <BackBar title="Hendelse" />
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.heia} />
+        </View>
       </View>
     );
   }
 
   if (error || !event) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>{error ?? 'Fant ikke hendelsen.'}</Text>
+      <View style={styles.screen}>
+        <BackBar title="Hendelse" />
+        <View style={styles.centered}>
+          <Text style={styles.emptyText}>
+            {error ?? 'Fant ikke hendelsen.'}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -515,6 +553,7 @@ export function EventDetailScreen({route}: Props) {
 
     return (
       <View style={styles.screen}>
+        <BackBar title="Hendelse" />
         <ScrollView
           contentContainerStyle={{
             paddingBottom: insets.bottom + spacing['3xl'],
@@ -638,6 +677,7 @@ export function EventDetailScreen({route}: Props) {
 
   return (
     <View style={styles.screen}>
+      <BackBar title="Hendelse" />
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
       {showReport ? (
@@ -679,6 +719,54 @@ export function EventDetailScreen({route}: Props) {
             <Text style={styles.description}>{event.description}</Text>
           )}
         </Card>
+      )}
+
+      {/* Turnering: dagens kjøreplan. Kampene bor HER — kalenderen viser
+          turneringen som ett kort. Hver kamp er en helt vanlig kampside
+          (live-rapportering, kamprapport, bilder). */}
+      {isTournament && (
+        <>
+          <SectionHeader
+            title={
+              tournamentMatches.length > 0
+                ? `Kamper (${tournamentMatches.length})`
+                : 'Kamper'
+            }
+          />
+          <View style={styles.tournamentList}>
+            {tournamentMatches.length === 0 && (
+              <Card style={styles.tournamentEmpty}>
+                <Text style={styles.tournamentEmptyText}>
+                  {isCurrentUserAdmin
+                    ? 'Ingen kamper ennå — legg dem inn når kampoppsettet er klart.'
+                    : 'Kampene dukker opp her når treneren legger dem inn.'}
+                </Text>
+              </Card>
+            )}
+            {tournamentMatches.map(match => (
+              <EventCard
+                key={match.id}
+                event={match}
+                featured={match.matchStatus === 'live'}
+                onPress={() =>
+                  navigation.push('EventDetail', {eventId: match.id})
+                }
+              />
+            ))}
+            {isCurrentUserAdmin && (
+              <Button
+                title="Ny kamp i turneringen"
+                variant="secondary"
+                onPress={() =>
+                  navigation.navigate('NewEvent', {
+                    parentEventId: eventId,
+                    parentTitle: event.title,
+                  })
+                }
+              />
+            )}
+          </View>
+        </>
       )}
 
       {/* Kommende kamp: her utnevnes reporteren, og herfra startes kampen.
@@ -931,6 +1019,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
     marginBottom: spacing.lg,
+  },
+  tournamentList: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  tournamentEmpty: {
+    padding: spacing.xl,
+  },
+  tournamentEmptyText: {
+    ...typography.body,
+    color: colors.textSecondary,
   },
   rsvpSection: {
     paddingHorizontal: spacing.lg,

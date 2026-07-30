@@ -14,7 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar} from '../components';
+import {Avatar, BackBar} from '../components';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
@@ -112,15 +112,19 @@ export function TeamMembersScreen() {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.heiaPressed} />
+      <View style={styles.screen}>
+        <BackBar title="Lagoversikt" />
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.heiaPressed} />
+        </View>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
+    <View style={styles.screen}>
+      <BackBar title="Lagoversikt" />
+      <ScrollView
       contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
       refreshControl={
         <RefreshControl
@@ -208,7 +212,8 @@ export function TeamMembersScreen() {
           {ROLE_LABELS[activeRole].toLowerCase()}. Andre i laget ser dem ikke.
         </Text>
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

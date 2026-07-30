@@ -14,7 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {Button} from '../components';
+import {BackBar, Button} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
 import type {Sport, ClubSearchResult, CreateTeamPayload} from '../lib/types';
@@ -185,7 +185,7 @@ export function CreateTeamScreen() {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
+      <BackBar />
       <ScrollView
         style={styles.screen}
         contentContainerStyle={[
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   input: {
-    ...typography.body,
+    ...typography.input,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,

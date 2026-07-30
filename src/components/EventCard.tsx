@@ -22,6 +22,7 @@ const monthNames = [
 const typePill: Record<EventType, {kind: PillKind; label: string}> = {
   trening: {kind: 'trening', label: 'Trening'},
   kamp: {kind: 'kamp', label: 'Kamp'},
+  turnering: {kind: 'turnering', label: 'Turnering'},
   sosialt: {kind: 'sosialt', label: 'Sosialt'},
   annet: {kind: 'neutral', label: 'Hendelse'},
 };

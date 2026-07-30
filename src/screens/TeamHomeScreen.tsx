@@ -329,8 +329,8 @@ export function TeamHomeScreen() {
           tintColor={colors.heia}
         />
       }>
-      {/* Team-header (kompakt) */}
-      <TeamHeader />
+      {/* Team-header (kompakt) — med inngangen til sesongflaten */}
+      <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
 
       {/* HERO — dagens hovedøyeblikk: live kamp slår neste aktivitet */}
       {liveMatch ? (
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   composeInput: {
-    ...typography.body,
+    ...typography.input,
     color: colors.textPrimary,
     minHeight: 24,
     maxHeight: 120,

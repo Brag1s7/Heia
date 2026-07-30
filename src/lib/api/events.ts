@@ -11,14 +11,14 @@ import type {
   RSVPSummary,
 } from '../../shared/types';
 
-// Databasen har flere event-typer enn appen viser chip for. `mote` og
-// `turnering` faller ned i `annet` til vi har egne chips for dem.
+// Databasen har flere event-typer enn appen viser chip for. `mote` faller
+// ned i `annet` til den får en egen chip.
 const EVENT_TYPE_MAP: Record<string, EventType> = {
   trening: 'trening',
   kamp: 'kamp',
+  turnering: 'turnering',
   sosialt: 'sosialt',
   mote: 'annet',
-  turnering: 'annet',
   annet: 'annet',
 };
 
@@ -146,13 +146,20 @@ async function getRsvpSummaries(
   return summaries;
 }
 
-/** Alle hendelser for et lagrom, kronologisk (tidligste først). */
+/**
+ * Alle hendelser for et lagrom, kronologisk (tidligste først).
+ *
+ * Turnerings-CONTAINEREN holdes utenfor: turneringer bor på sesongsiden
+ * (brukertest 2026-07-30), mens kampene deres er helt vanlige kamper og
+ * vises i kalenderen som alle andre — det er dem foreldrene skal møte opp på.
+ */
 export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
   const {data, error} = await supabase
     .from('events')
     .select(EVENT_COLUMNS)
     .eq('team_space_id', teamSpaceId)
     .is('deleted_at', null)
+    .neq('type', 'turnering')
     .order('start_time', {ascending: true});
 
   if (error) {
@@ -209,6 +216,8 @@ export interface CreateEventInput {
   description?: string;
   opponent?: string;
   isHome?: boolean;
+  /** Turneringen kampen hører til. RPC-en krever da type 'kamp'. */
+  parentEventId?: string;
 }
 
 /**
@@ -230,6 +239,7 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
     p_description: input.description ?? null,
     p_opponent: isMatch ? (input.opponent ?? null) : null,
     p_is_home: isMatch ? (input.isHome ?? true) : true,
+    p_parent_event_id: input.parentEventId ?? null,
   });
 
   if (error) {
@@ -237,6 +247,65 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
   }
 
   return (data as any).event_id as string;
+}
+
+/** En turnering i kampskjemaets velger. */
+export interface TournamentOption {
+  id: string;
+  title: string;
+}
+
+/**
+ * Aktuelle turneringer til «Turnering»-feltet i kampskjemaet: nylige (siste
+ * 60 dager) og kommende. En cup fra i fjor skal ikke stå og støye i skjemaet
+ * — historikken bor på sesongsiden.
+ */
+export async function getTournaments(
+  teamSpaceId: string,
+): Promise<TournamentOption[]> {
+  const cutoff = new Date(Date.now() - 60 * 24 * 3600 * 1000).toISOString();
+  const {data, error} = await supabase
+    .from('events')
+    .select('id, title, start_time')
+    .eq('team_space_id', teamSpaceId)
+    .eq('type', 'turnering')
+    .is('deleted_at', null)
+    .gte('start_time', cutoff)
+    .order('start_time', {ascending: false});
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as any[]).map(row => ({
+    id: row.id as string,
+    title: row.title as string,
+  }));
+}
+
+/**
+ * Kampene i en turnering, i avsparksrekkefølge (dagens kjøreplan).
+ * Direkte select — RLS «members can view» dekker, samme som getTeamEvents.
+ * RSVP hentes ikke: man melder seg på turneringsDAGEN, ikke enkeltkamper.
+ */
+export async function getTournamentMatches(
+  tournamentEventId: string,
+  teamSpaceId: string,
+): Promise<HeiaEvent[]> {
+  const {data, error} = await supabase
+    .from('events')
+    .select(EVENT_COLUMNS)
+    .eq('parent_event_id', tournamentEventId)
+    .is('deleted_at', null)
+    .order('start_time', {ascending: true});
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as any[]).map(row =>
+    mapEventRow(row, teamSpaceId, emptyRsvp()),
+  );
 }
 
 /**
@@ -359,6 +428,7 @@ export async function reportMatchEvent(
  */
 export function subscribeToMatch(
   matchSessionId: string,
+  eventId: string,
   onChange: () => void,
 ): () => void {
   const channel = supabase
@@ -380,6 +450,19 @@ export function subscribeToMatch(
         schema: 'public',
         table: 'match_sessions',
         filter: `id=eq.${matchSessionId}`,
+      },
+      () => onChange(),
+    )
+    // Kampbilder er feed_posts med event_id (00028) — de rører verken
+    // match_events eller match_sessions, så uten denne dukket reporterens
+    // bilde først opp hos andre etter en manuell refresh.
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'feed_posts',
+        filter: `event_id=eq.${eventId}`,
       },
       () => onChange(),
     )
