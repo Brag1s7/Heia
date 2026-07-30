@@ -9,11 +9,16 @@ import {
 } from 'react-native';
 import {
   NavigationContainer,
+  DefaultTheme,
   useNavigation,
   type NavigationProp,
+  type Theme,
 } from '@react-navigation/native';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import {
+  createNativeStackNavigator,
+  type NativeStackNavigationOptions,
+} from '@react-navigation/native-stack';
 import {colors, typography, spacing, shadows} from '../theme';
 import {
   useAuth,
@@ -57,30 +62,49 @@ const InboxNav = createNativeStackNavigator<InboxStackParamList>();
 const ProfilNav = createNativeStackNavigator<ProfilStackParamList>();
 
 // ---------------------------------------------------------------------------
-// Felles stack-innstillinger
+// Navigasjonstema — React Navigations DefaultTheme er hvit, og det er den
+// flaten som blottlegges i kantene når iOS-overgangen fjærer forbi målet.
+// Container-bakgrunnen må derfor være appens egen bunnfarge.
 // ---------------------------------------------------------------------------
-const stackScreenOptions = {
-  headerStyle: {backgroundColor: colors.surface},
+const navTheme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    background: colors.background,
+    card: colors.surface,
+    text: colors.textPrimary,
+    primary: colors.heiaInk,
+    border: colors.borderSubtle,
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Felles stack-innstillinger
+//
+// iOS 26 animerer UINavigationBar som en egen plate i eget tempo under
+// push/pop — toppen «henger løs» fra siden uansett farge, og systemovergangen
+// maskerer i tillegg hjørnene og blottlegger det hvite vinduet bak stacken
+// (synlig som hvite hjørneblink mot mørke flater; ingen JS-flate når dit).
+// Derfor: ingen native header på push-skjermer — de tegner sin egen
+// tilbakelinje (BackBar) som glir med innholdet — og react-native-screens sin
+// klassiske slide (`simple_push`) i stedet for systemovergangen, også for
+// swipe-tilbake (animationMatchesGesture). Header-stilene under gjelder
+// modaler (Ny hendelse), som beholder native header: vertikal presentasjon
+// har ingen delt topp-animasjon.
+// ---------------------------------------------------------------------------
+const stackScreenOptions: NativeStackNavigationOptions = {
+  headerShown: false,
+  animation: 'simple_push',
+  animationMatchesGesture: true,
+  headerStyle: {backgroundColor: colors.background},
   headerTintColor: colors.textPrimary,
   headerTitleStyle: typography.heading3,
   headerShadowVisible: false,
   headerBackTitle: 'Tilbake',
+  // Kortet bak hver skjerm er hvitt til JS-innholdet har malt seg — det er
+  // dét som blinker i kantene under push/pop. Mal det i appens bunnfarge.
+  contentStyle: {backgroundColor: colors.background},
 };
-
-// Bli med / Opprett lag ligger i to stacker. Onboarding-stacken skjuler
-// headeren globalt, så begge steder må slå den på eksplisitt for å få den
-// samme tilbake-knappen og topplinjen som Inviter, Kommentarer og Hendelse.
-const joinTeamOptions = {...stackScreenOptions, headerShown: true, title: 'Bli med'};
-const createTeamOptions = {
-  ...stackScreenOptions,
-  headerShown: true,
-  title: 'Opprett lag',
-};
-// Auth har ingen tittel i headeren: skjermen bytter selv mellom «Velkommen
-// tilbake» og «Opprett konto» som sin egen overskrift, og en fast headertittel
-// ville enten duplisert den eller motsagt den. Vi vil bare ha den ekte
-// tilbake-knappen — ikke en håndtegnet «‹ Tilbake».
-const authOptions = {...stackScreenOptions, headerShown: true, title: ''};
 
 // ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)
@@ -88,22 +112,18 @@ const authOptions = {...stackScreenOptions, headerShown: true, title: ''};
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={stackScreenOptions}>
-      <HomeStack.Screen
-        name="TeamHome"
-        component={TeamHomeScreen}
-        options={{headerShown: false}}
-      />
-      <HomeStack.Screen
-        name="EventDetail"
-        component={EventDetailScreen}
-        options={{title: 'Hendelse'}}
-      />
+      <HomeStack.Screen name="TeamHome" component={TeamHomeScreen} />
+      <HomeStack.Screen name="EventDetail" component={EventDetailScreen} />
       <HomeStack.Screen
         name="NewEvent"
         component={NewEventScreen}
         options={({navigation}) => ({
           title: 'Ny hendelse',
           presentation: 'modal',
+          // Modalen beholder native header og vertikal systemanimasjon —
+          // `simple_push` fra fellesinnstillingene ville gjort den horisontal.
+          headerShown: true,
+          animation: 'default',
           // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
           headerLeft: () => (
             <Pressable onPress={navigation.goBack} hitSlop={8}>
@@ -112,21 +132,9 @@ function HomeStackNavigator() {
           ),
         })}
       />
-      <HomeStack.Screen
-        name="Support"
-        component={SupportScreen}
-        options={{title: 'Støtt laget'}}
-      />
-      <HomeStack.Screen
-        name="Invite"
-        component={InviteScreen}
-        options={{title: 'Inviter'}}
-      />
-      <HomeStack.Screen
-        name="Comments"
-        component={CommentsScreen}
-        options={{title: 'Kommentarer'}}
-      />
+      <HomeStack.Screen name="Support" component={SupportScreen} />
+      <HomeStack.Screen name="Invite" component={InviteScreen} />
+      <HomeStack.Screen name="Comments" component={CommentsScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -137,16 +145,8 @@ function HomeStackNavigator() {
 function KalenderStackNavigator() {
   return (
     <KalenderNav.Navigator screenOptions={stackScreenOptions}>
-      <KalenderNav.Screen
-        name="KalenderList"
-        component={KalenderScreen}
-        options={{headerShown: false}}
-      />
-      <KalenderNav.Screen
-        name="EventDetail"
-        component={EventDetailScreen}
-        options={{title: 'Hendelse'}}
-      />
+      <KalenderNav.Screen name="KalenderList" component={KalenderScreen} />
+      <KalenderNav.Screen name="EventDetail" component={EventDetailScreen} />
     </KalenderNav.Navigator>
   );
 }
@@ -158,21 +158,9 @@ function KalenderStackNavigator() {
 function InboxStackNavigator() {
   return (
     <InboxNav.Navigator screenOptions={stackScreenOptions}>
-      <InboxNav.Screen
-        name="InboxList"
-        component={InboxScreen}
-        options={{headerShown: false}}
-      />
-      <InboxNav.Screen
-        name="EventDetail"
-        component={EventDetailScreen}
-        options={{title: 'Hendelse'}}
-      />
-      <InboxNav.Screen
-        name="Comments"
-        component={CommentsScreen}
-        options={{title: 'Kommentarer'}}
-      />
+      <InboxNav.Screen name="InboxList" component={InboxScreen} />
+      <InboxNav.Screen name="EventDetail" component={EventDetailScreen} />
+      <InboxNav.Screen name="Comments" component={CommentsScreen} />
     </InboxNav.Navigator>
   );
 }
@@ -183,31 +171,11 @@ function InboxStackNavigator() {
 function ProfilStackNavigator() {
   return (
     <ProfilNav.Navigator screenOptions={stackScreenOptions}>
-      <ProfilNav.Screen
-        name="Profil"
-        component={ProfilScreen}
-        options={{headerShown: false}}
-      />
-      <ProfilNav.Screen
-        name="TeamMembers"
-        component={TeamMembersScreen}
-        options={{title: 'Lagoversikt'}}
-      />
-      <ProfilNav.Screen
-        name="Invite"
-        component={InviteScreen}
-        options={{title: 'Inviter'}}
-      />
-      <ProfilNav.Screen
-        name="JoinTeamCode"
-        component={JoinTeamCodeScreen}
-        options={joinTeamOptions}
-      />
-      <ProfilNav.Screen
-        name="CreateTeam"
-        component={CreateTeamScreen}
-        options={createTeamOptions}
-      />
+      <ProfilNav.Screen name="Profil" component={ProfilScreen} />
+      <ProfilNav.Screen name="TeamMembers" component={TeamMembersScreen} />
+      <ProfilNav.Screen name="Invite" component={InviteScreen} />
+      <ProfilNav.Screen name="JoinTeamCode" component={JoinTeamCodeScreen} />
+      <ProfilNav.Screen name="CreateTeam" component={CreateTeamScreen} />
     </ProfilNav.Navigator>
   );
 }
@@ -219,26 +187,21 @@ function OnboardingStackNavigator() {
   return (
     <OnboardingNav.Navigator
       initialRouteName="WelcomeIntent"
-      screenOptions={{headerShown: false}}>
+      screenOptions={stackScreenOptions}>
       <OnboardingNav.Screen
         name="WelcomeIntent"
         component={WelcomeIntentScreen}
+        // Mørk stadionflate: kortet bak må matche, ellers lyser den lyse
+        // standardbakgrunnen i kantene rundt den mørke skjermen under
+        // overgangen.
+        options={{contentStyle: {backgroundColor: colors.stadium}}}
       />
-      <OnboardingNav.Screen
-        name="Auth"
-        component={AuthScreen}
-        options={authOptions}
-      />
+      <OnboardingNav.Screen name="Auth" component={AuthScreen} />
       <OnboardingNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}
-        options={joinTeamOptions}
       />
-      <OnboardingNav.Screen
-        name="CreateTeam"
-        component={CreateTeamScreen}
-        options={createTeamOptions}
-      />
+      <OnboardingNav.Screen name="CreateTeam" component={CreateTeamScreen} />
     </OnboardingNav.Navigator>
   );
 }
@@ -434,7 +397,10 @@ export function AppNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} onReady={flushPendingDeepLink}>
+    <NavigationContainer
+      ref={navigationRef}
+      theme={navTheme}
+      onReady={flushPendingDeepLink}>
       {session && profile && hasTeam ? (
         <MainTabs />
       ) : (

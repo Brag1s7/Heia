@@ -13,7 +13,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Button} from '../components';
+import {BackBar, Button} from '../components';
 import {useAuth} from '../context';
 import type {OnboardingStackParamList} from '../shared/types';
 
@@ -21,7 +21,6 @@ type Mode = 'login' | 'register';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Auth'>;
 
-// `navigation` trengs ikke lenger: tilbake-knappen kommer fra stack-headeren.
 export function AuthScreen({route}: Props) {
   const insets = useSafeAreaInsets();
   const {signIn, signUp} = useAuth();
@@ -60,7 +59,7 @@ export function AuthScreen({route}: Props) {
     <KeyboardAvoidingView
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
+      <BackBar />
       <ScrollView
         style={styles.screen}
         contentContainerStyle={[
@@ -245,7 +244,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   input: {
-    ...typography.body,
+    ...typography.input,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,

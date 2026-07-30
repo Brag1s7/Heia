@@ -12,7 +12,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Button} from '../components';
+import {BackBar, Button} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {lookupInviteCode} from '../lib/api/teams';
 import type {InviteCodeResult, MemberRole} from '../lib/types';
@@ -118,7 +118,7 @@ export function JoinTeamCodeScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* Tilbake-knappen kommer fra stack-headeren, som overalt ellers. */}
+      <BackBar />
       <ScrollView
         contentContainerStyle={[
           styles.content,

@@ -15,7 +15,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {Avatar, Button} from '../components';
+import {Avatar, BackBar, Button} from '../components';
 import {getComments, createComment, getFeedPost} from '../lib/api/comments';
 import {toggleReaction} from '../lib/api/feed';
 import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
@@ -108,8 +108,8 @@ export function CommentsScreen({route}: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={100}>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <BackBar title="Kommentarer" />
       <ScrollView
         style={styles.list}
         contentContainerStyle={styles.listContent}>
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.borderSubtle,
   },
   input: {
-    ...typography.body,
+    ...typography.input,
     flex: 1,
     color: colors.textPrimary,
     maxHeight: 120,

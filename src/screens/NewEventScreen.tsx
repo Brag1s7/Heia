@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   input: {
-    ...typography.body,
+    ...typography.input,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,

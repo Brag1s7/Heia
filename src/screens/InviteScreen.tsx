@@ -1,9 +1,9 @@
 import React from 'react';
-import {Text, ScrollView, StyleSheet} from 'react-native';
+import {Text, ScrollView, StyleSheet, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRoute, type RouteProp} from '@react-navigation/native';
 import {colors, typography, spacing} from '../theme';
-import {InviteCodeCard} from '../components';
+import {BackBar, InviteCodeCard} from '../components';
 import {useActiveTeam} from '../context';
 import type {HomeStackParamList} from '../shared/types';
 
@@ -18,12 +18,13 @@ export function InviteScreen() {
   if (!activeTeamSpace) return null;
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[
-        styles.content,
-        {paddingBottom: insets.bottom + spacing['3xl']},
-      ]}>
+    <View style={styles.screen}>
+      <BackBar title="Inviter" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {paddingBottom: insets.bottom + spacing['3xl']},
+        ]}>
       <Text style={styles.title}>
         {firstTime ? 'Laget er klart! 🎉' : 'Inviter til laget'}
       </Text>
@@ -37,7 +38,8 @@ export function InviteScreen() {
         teamName={activeTeamSpace.displayName}
         inviteCode={activeTeamSpace.inviteCode}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 

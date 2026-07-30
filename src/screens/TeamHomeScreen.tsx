@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   composeInput: {
-    ...typography.body,
+    ...typography.input,
     color: colors.textPrimary,
     minHeight: 24,
     maxHeight: 120,

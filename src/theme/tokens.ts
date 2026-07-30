@@ -118,6 +118,17 @@ export const typography = {
     color: colors.textPrimary,
   } satisfies TextStyle,
 
+  // Til TextInput — som body, men uten lineHeight. iOS rendrer felt med
+  // lineHeight feil MENS man skriver (teksten klippes/forskyves og faller
+  // først på plass når feltet mister fokus — RN-issue #41240/#28012).
+  // Bruk denne på alle skrivefelt; lineHeight gjør uansett ingen nytte der.
+  input: {
+    fontSize: 16,
+    fontWeight: '400',
+    fontFamily,
+    color: colors.textPrimary,
+  } satisfies TextStyle,
+
   bodySmall: {
     fontSize: 14,
     fontWeight: '400',

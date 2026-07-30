@@ -11,6 +11,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
 import {
+  BackBar,
   Card,
   StatusPill,
   Button,
@@ -255,10 +256,12 @@ export function EventDetailScreen({route}: Props) {
   // banneret følger deg gjennom hele appen — ikke bare på denne skjermen.
   useEffect(() => {
     if (!liveMatchSessionId) return;
-    return subscribeToMatch(liveMatchSessionId, () => {
+    return subscribeToMatch(liveMatchSessionId, eventId, () => {
       loadEvent();
+      // Bilder bor i feed_posts, ikke i event-payloaden — egen refetch.
+      loadPhotos();
     });
-  }, [liveMatchSessionId, loadEvent]);
+  }, [liveMatchSessionId, eventId, loadEvent, loadPhotos]);
 
   // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
   // mellom hendelsene — uten denne ville minuttet frosset til neste mål.
@@ -270,16 +273,24 @@ export function EventDetailScreen({route}: Props) {
 
   if (loading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator color={colors.heia} />
+      <View style={styles.screen}>
+        <BackBar title="Hendelse" />
+        <View style={styles.centered}>
+          <ActivityIndicator color={colors.heia} />
+        </View>
       </View>
     );
   }
 
   if (error || !event) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.emptyText}>{error ?? 'Fant ikke hendelsen.'}</Text>
+      <View style={styles.screen}>
+        <BackBar title="Hendelse" />
+        <View style={styles.centered}>
+          <Text style={styles.emptyText}>
+            {error ?? 'Fant ikke hendelsen.'}
+          </Text>
+        </View>
       </View>
     );
   }
@@ -515,6 +526,7 @@ export function EventDetailScreen({route}: Props) {
 
     return (
       <View style={styles.screen}>
+        <BackBar title="Hendelse" />
         <ScrollView
           contentContainerStyle={{
             paddingBottom: insets.bottom + spacing['3xl'],
@@ -638,6 +650,7 @@ export function EventDetailScreen({route}: Props) {
 
   return (
     <View style={styles.screen}>
+      <BackBar title="Hendelse" />
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
       {showReport ? (

@@ -38,6 +38,43 @@ feed-poster og er usynlige på kampsiden. Ren synliggjøring av data vi har.
 2026-07-30 var fra bygget 18:52 — altså FØR produksjonsversjonen av variant C.
 Bygg på nytt før du bedømmer det.
 
+**Telefontest-funn 2026-07-30 (kveld), fikset i JS (kun reload — ingen
+rebuild):**
+- **Onboarding-overganger:** iOS 26 sin nye push/pop-animasjon blinket hvitt i
+  hjørnene mot den mørke velkomstskjermen (vinduet bak stacken er hvitt, ingen
+  JS-flate når dit). Onboarding-stacken kjører nå `simple_push` +
+  `animationMatchesGesture`, og fordi native header ikke blir med i
+  egendefinert animasjon («toppen deler seg»), er headeren AV i hele
+  onboarding-stacken — skjermene tegner egen tilbakelinje (`BackBar`,
+  native metrikk). I Profil-stacken har Bli med/Opprett lag fortsatt native
+  header. **Bekreftet fikset på telefon.** NavigationContainer fikk også eget
+  tema + `contentStyle` på alle stacker (fjernet hvite kort-blink generelt).
+- **Skrivefelt:** tekst rendret feil/utsatt mens man skrev (falt først på
+  plass ved blur) — kjent iOS-bug når `TextInput` har `lineHeight` (RN #41240).
+  Nytt token `typography.input` (= body uten lineHeight) brukes nå i alle
+  skrivefelt (Auth, CreateTeam, NewEvent, Comments, TeamHome-compose).
+  **Bekreftet fikset på telefon.**
+- **«Løs topp» ved swipe-back i hovedappen** (Hendelse, Kommentarer, Inviter
+  m.fl.): iOS 26 animerer UINavigationBar som egen plate i eget tempo —
+  fargematch var ikke nok (verifisert på telefon). Endelig løsning = samme som
+  onboarding, nå på ALLE stackene via `stackScreenOptions`: native header AV +
+  `simple_push`/`animationMatchesGesture`, og skjermene tegner `BackBar`
+  (valgfri sentrert tittel). Berørt: EventDetail («Hendelse», alle 4 grener),
+  Comments («Kommentarer», + `keyboardVerticalOffset` 100→fjernet siden
+  headeren er borte), Invite («Inviter»), Support («Støtt laget»),
+  TeamMembers («Lagoversikt»), JoinTeamCode/CreateTeam (alltid BackBar nå,
+  `inOnboarding`-sjekken fjernet). Unntak: NewEvent-modalen beholder native
+  header + vertikal animasjon (`headerShown: true`, `animation: 'default'`) —
+  modaler har ikke problemet. **Bekreftet fikset på telefon.**
+- **Kampbilder kom ikke i realtime hos andre:** `subscribeToMatch` lyttet kun
+  på `match_events`/`match_sessions`, men bilder er `feed_posts` med
+  `event_id` (00028) og rører ingen av dem. Ny tredje lytter på
+  `feed_posts` INSERT (filter `event_id`; tabellen er alt i publiseringen via
+  00025) + callbacken i EventDetail kaller nå `loadPhotos()` i tillegg til
+  `loadEvent()`. Gjelder mens kampen er live (abonnementet lever bare da) —
+  som resten av kampoppdateringene. Ingen migrasjon nødvendig. **Bruker
+  meldte «det funker nå» 2026-07-30 (samlet bekreftelse for kveldens fikser).**
+
 ---
 
 ## Hvor vi er

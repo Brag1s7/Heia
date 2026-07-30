@@ -359,6 +359,7 @@ export async function reportMatchEvent(
  */
 export function subscribeToMatch(
   matchSessionId: string,
+  eventId: string,
   onChange: () => void,
 ): () => void {
   const channel = supabase
@@ -380,6 +381,19 @@ export function subscribeToMatch(
         schema: 'public',
         table: 'match_sessions',
         filter: `id=eq.${matchSessionId}`,
+      },
+      () => onChange(),
+    )
+    // Kampbilder er feed_posts med event_id (00028) — de rører verken
+    // match_events eller match_sessions, så uten denne dukket reporterens
+    // bilde først opp hos andre etter en manuell refresh.
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'feed_posts',
+        filter: `event_id=eq.${eventId}`,
       },
       () => onChange(),
     )
