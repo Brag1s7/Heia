@@ -20,12 +20,14 @@ import {
   FeedCard,
   Button,
   LiveMatchBanner,
+  NextEventHero,
   TeamHeader,
   MatchPhotoGallery,
+  Avatar,
 } from '../components';
-import {useActiveTeam, useOnboarding} from '../context';
+import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
-import {getLiveMatch} from '../lib/api/events';
+import {getLiveMatch, getTeamEvents} from '../lib/api/events';
 import {
   getTeamFeed,
   createTextPost,
@@ -81,6 +83,23 @@ function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
   ];
 }
 
+/**
+ * Dagens hovedøyeblikk til heroen: første hendelse som ikke er over.
+ * `getTeamEvents` leverer stigende på starttid; en hendelse uten sluttid
+ * regnes som ferdig 2 t etter start. Live kamp håndteres separat og vinner.
+ */
+function pickNextEvent(events: HeiaEvent[]): HeiaEvent | null {
+  const now = Date.now();
+  for (const e of events) {
+    // Avlyst er ikke et hovedøyeblikk — og en kamp som alt er SPILT skal
+    // ikke stå som «neste» selv om det planlagte avsparket er frem i tid.
+    if (e.matchStatus === 'cancelled' || e.matchStatus === 'finished') continue;
+    const end = e.endTime ?? new Date(e.startTime.getTime() + 2 * 3600000);
+    if (end.getTime() >= now) return e;
+  }
+  return null;
+}
+
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
 
@@ -91,11 +110,13 @@ export function TeamHomeScreen() {
   const composeRef = useRef<TextInput>(null);
   const [refreshing, setRefreshing] = useState(false);
   const {activeTeamSpace, activeTeamSpaceId, activeRole} = useActiveTeam();
+  const {profile} = useAuth();
   const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
   const canBroadcast = isTeamAdmin(activeRole);
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
+  const [nextEvent, setNextEvent] = useState<HeiaEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composeText, setComposeText] = useState('');
@@ -108,16 +129,21 @@ export function TeamHomeScreen() {
   const loadFeed = useCallback(async () => {
     if (!activeTeamSpaceId) return;
     setError(null);
-    // Banneret er sekundært: feiler kampoppslaget skjuler vi det heller enn
-    // å blokkere feeden.
+    // Heroene er sekundære: feiler kamp-/kalenderoppslaget skjuler vi dem
+    // heller enn å blokkere feeden.
     const livePromise = getLiveMatch(activeTeamSpaceId).catch(() => null);
+    const eventsPromise = getTeamEvents(activeTeamSpaceId).catch(
+      () => [] as HeiaEvent[],
+    );
     try {
-      const [items, live] = await Promise.all([
+      const [items, live, events] = await Promise.all([
         getTeamFeed(activeTeamSpaceId),
         livePromise,
+        eventsPromise,
       ]);
       setFeed(items);
       setLiveMatch(live);
+      setNextEvent(pickNextEvent(events));
     } catch {
       setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
     } finally {
@@ -305,8 +331,8 @@ export function TeamHomeScreen() {
       {/* Team-header (kompakt) */}
       <TeamHeader />
 
-      {/* Live kamp-banner — HERO */}
-      {liveMatch && (
+      {/* HERO — dagens hovedøyeblikk: live kamp slår neste aktivitet */}
+      {liveMatch ? (
         <View style={styles.section}>
           <LiveMatchBanner
             event={liveMatch}
@@ -315,23 +341,53 @@ export function TeamHomeScreen() {
             }
           />
         </View>
-      )}
+      ) : nextEvent ? (
+        <View style={styles.section}>
+          <NextEventHero
+            event={nextEvent}
+            onPress={() =>
+              navigation.navigate('EventDetail', {eventId: nextEvent.id})
+            }
+          />
+        </View>
+      ) : null}
 
       {/* Feed — hovedinnhold */}
       <SectionHeader title="Siste fra laget" />
 
-      {/* Compose — skriv en enkel tekstpost */}
+      {/* Compose — avsender + rundt felt + bildeknapp (A v2) */}
       <View style={styles.composeCard}>
-        <TextInput
-          ref={composeRef}
-          style={styles.composeInput}
-          value={composeText}
-          onChangeText={setComposeText}
-          placeholder="Del noe med laget…"
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          editable={!posting}
-        />
+        <View style={styles.composeRow}>
+          <Avatar
+            name={profile?.displayName ?? 'Du'}
+            uri={profile?.avatarUrl ?? undefined}
+            size="md"
+          />
+          <View style={styles.composeField}>
+            <TextInput
+              ref={composeRef}
+              style={styles.composeInput}
+              value={composeText}
+              onChangeText={setComposeText}
+              placeholder="Del noe med laget …"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              editable={!posting}
+            />
+          </View>
+          <Pressable
+            style={({pressed}) => [
+              styles.cameraChip,
+              pressed && styles.cameraChipPressed,
+            ]}
+            onPress={handlePickImage}
+            hitSlop={8}
+            disabled={posting}
+            accessibilityRole="button"
+            accessibilityLabel="Legg til bilde">
+            <Text style={styles.cameraChipText}>📷</Text>
+          </Pressable>
+        </View>
         {selectedImage && (
           <View style={styles.imagePreview}>
             <Image
@@ -349,8 +405,9 @@ export function TeamHomeScreen() {
           </View>
         )}
         {/* Kringkasting er trenerens verktøy: vanlige innlegg varsler ikke,
-            så dette er måten å si «dette må alle få med seg». */}
-        {canBroadcast && (
+            så dette er måten å si «dette må alle få med seg».
+            Vises først når noe er i ferd med å publiseres — rolig composer. */}
+        {canBroadcast && (canPost || posting) && (
           <Pressable
             style={[styles.broadcastRow, broadcast && styles.broadcastRowOn]}
             onPress={() => setBroadcast(v => !v)}
@@ -368,21 +425,16 @@ export function TeamHomeScreen() {
             </View>
           </Pressable>
         )}
-        <View style={styles.composeActions}>
-          <Pressable
-            style={styles.addImageBtn}
-            onPress={handlePickImage}
-            hitSlop={8}
-            disabled={posting}>
-            <Text style={styles.addImageText}>📷 Legg til bilde</Text>
-          </Pressable>
-          <Button
-            title="Publiser"
-            onPress={handlePost}
-            disabled={!canPost}
-            loading={posting}
-          />
-        </View>
+        {(canPost || posting) && (
+          <View style={styles.composeActions}>
+            <Button
+              title="Publiser"
+              onPress={handlePost}
+              disabled={!canPost}
+              loading={posting}
+            />
+          </View>
+        )}
       </View>
 
       {loading ? (
@@ -492,15 +544,44 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     gap: spacing.md,
   },
+  composeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  composeField: {
+    flex: 1,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    justifyContent: 'center',
+  },
   composeInput: {
     ...typography.body,
     color: colors.textPrimary,
-    minHeight: 44,
+    minHeight: 24,
+    maxHeight: 120,
+    padding: 0,
     textAlignVertical: 'top',
+  },
+  cameraChip: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.heiaTint,
+  },
+  cameraChipPressed: {
+    opacity: 0.7,
+  },
+  cameraChipText: {
+    fontSize: 18,
   },
   composeActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
   broadcastRow: {
@@ -545,15 +626,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
   },
-  addImageBtn: {
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.sm,
-  },
-  addImageText: {
-    ...typography.body,
-    color: colors.heiaInk,
-    fontWeight: '600',
-  },
   imagePreview: {
     gap: spacing.sm,
     alignItems: 'flex-start',
@@ -580,7 +652,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     padding: spacing.xl,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     gap: spacing.sm,
     alignItems: 'center',
   },
@@ -598,7 +672,9 @@ const styles = StyleSheet.create({
     marginTop: spacing['2xl'],
     padding: spacing.xl,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
     gap: spacing.md,
   },
   supportTitle: {

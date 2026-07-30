@@ -12,7 +12,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing} from '../theme';
 import {
   Card,
-  Chip,
+  StatusPill,
   Button,
   RSVPBar,
   SectionHeader,
@@ -29,6 +29,7 @@ import {
   MatchTimeline,
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
+import type {PillKind} from '../components/StatusPill';
 import {useAuth, useActiveTeam} from '../context';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
 import {
@@ -45,6 +46,7 @@ import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
 import type {
   EventAttendee,
+  EventType,
   HeiaEventDetail,
   HomeStackParamList,
   RSVPStatus,
@@ -80,6 +82,14 @@ const monthNamesLong = [
 function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
+
+// Samme type→pill-språk som NextEventHero/EventCard (A v2).
+const typePill: Record<EventType, {kind: PillKind; label: string}> = {
+  trening: {kind: 'trening', label: 'Trening'},
+  kamp: {kind: 'kamp', label: 'Kamp'},
+  sosialt: {kind: 'sosialt', label: 'Sosialt'},
+  annet: {kind: 'neutral', label: 'Hendelse'},
+};
 
 function formatDateLong(date: Date): string {
   const day = dayNamesLong[date.getDay()];
@@ -619,7 +629,10 @@ export function EventDetailScreen({route}: Props) {
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
       {/* Event-info */}
       <Card style={styles.infoCard}>
-        <Chip type={event.type} />
+        <StatusPill
+          kind={(typePill[event.type] ?? typePill.annet).kind}
+          label={(typePill[event.type] ?? typePill.annet).label}
+        />
         <Text style={styles.title}>{event.title}</Text>
         <View style={styles.metaList}>
           <MetaRow label="Dato" value={formatDateLong(event.startTime)} />

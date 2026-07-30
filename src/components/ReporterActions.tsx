@@ -1,6 +1,6 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, shadows} from '../theme';
 
 export type ReporterActionType =
   | 'mål_oss'
@@ -56,19 +56,24 @@ export function ReporterActions({
   return (
     <View style={styles.container}>
       <View style={styles.goalRow}>
-        {goalActions.map(action => (
-          <Pressable
-            key={action.type}
-            onPress={() => onAction(action.type)}
-            style={({pressed}) => [
-              styles.goalButton,
-              action.type === 'mål_dem' && styles.goalButtonAway,
-              pressed && styles.pressed,
-            ]}>
-            <Text style={styles.goalIcon}>{action.icon}</Text>
-            <Text style={styles.goalLabel}>{action.label}</Text>
-          </Pressable>
-        ))}
+        {goalActions.map(action => {
+          const isUs = action.type === 'mål_oss';
+          return (
+            <Pressable
+              key={action.type}
+              onPress={() => onAction(action.type)}
+              style={({pressed}) => [
+                styles.goalButton,
+                isUs ? styles.goalButtonUs : styles.goalButtonAway,
+                pressed && (isUs ? styles.pressedUs : styles.pressed),
+              ]}>
+              <Text style={styles.goalIcon}>{action.icon}</Text>
+              <Text style={[styles.goalLabel, isUs && styles.goalLabelUs]}>
+                {action.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
       <View style={styles.row}>
         {smallActions.map(action => (
@@ -109,20 +114,28 @@ const styles = StyleSheet.create({
   goalButton: {
     flex: 1,
     paddingVertical: spacing.xl,
-    backgroundColor: colors.surface,
     borderRadius: radius.lg,
-    borderWidth: 2,
-    borderColor: colors.heia,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
   },
+  // «Mål oss» er reporterens hovedhandling — mintfyll + glød (ett av de
+  // rasjonerte glød-stedene). Mål feires i grønt, aldri coral.
+  goalButtonUs: {
+    backgroundColor: colors.heia,
+    ...shadows.glow,
+  },
   goalButtonAway: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
     borderColor: colors.border,
   },
   pressed: {
     backgroundColor: colors.heiaSoft,
     borderColor: colors.heia,
+  },
+  pressedUs: {
+    backgroundColor: colors.heiaPressed,
   },
   goalIcon: {
     fontSize: 28,
@@ -130,6 +143,10 @@ const styles = StyleSheet.create({
   goalLabel: {
     ...typography.body,
     fontWeight: '700',
+  },
+  goalLabelUs: {
+    color: colors.heiaDeep,
+    fontWeight: '800',
   },
   row: {
     flexDirection: 'row',
@@ -139,7 +156,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
@@ -160,7 +177,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.lg,
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
   },

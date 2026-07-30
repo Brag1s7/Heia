@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from 'react';
 import {View, Text, StyleSheet, Animated} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, spacing, radius} from '../theme';
 
 interface LiveBadgeProps {
   /** I pause slutter prikken å pulsere og merket sier «PAUSE» i gult. */
@@ -50,6 +50,8 @@ export function LiveBadge({paused}: LiveBadgeProps) {
   );
 }
 
+// A v2: coral eier live-status — solid fylt pill som leses på både lys og
+// mørk (stadion) flate. Pause = gul, stillestående.
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
@@ -57,30 +59,30 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: radius.full,
+    backgroundColor: colors.live,
     alignSelf: 'flex-start',
   },
   containerPaused: {
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    backgroundColor: colors.gold,
   },
   dot: {
-    width: 8,
-    height: 8,
+    width: 7,
+    height: 7,
     borderRadius: 4,
-    backgroundColor: colors.error,
+    backgroundColor: '#FFFFFF',
   },
   dotPaused: {
-    backgroundColor: colors.warning,
+    backgroundColor: colors.goldInk,
   },
   text: {
-    ...typography.label,
     fontSize: 11,
-    color: colors.error,
+    fontWeight: '800',
+    color: '#FFFFFF',
     textTransform: 'uppercase',
     letterSpacing: 1.2,
   },
   textPaused: {
-    color: colors.warning,
+    color: colors.goldInk,
   },
 });

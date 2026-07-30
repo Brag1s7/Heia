@@ -187,7 +187,8 @@ const styles = StyleSheet.create({
   },
   minute: {
     ...typography.body,
-    fontWeight: '700',
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
   },
   photo: {
     borderRadius: radius.md,

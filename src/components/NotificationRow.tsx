@@ -24,6 +24,19 @@ const CATEGORY_ICON: Record<NotificationCategory, string> = {
   system: 'ℹ️',
 };
 
+// Ikonflate per kategori — A v2s låste fargesemantikk: coral = live, blå =
+// info/kalender, lilla = påminnelse, sol = trenerbeskjed, mint = Heia-øyeblikk.
+const CATEGORY_SURFACE: Record<NotificationCategory, string> = {
+  match_live: colors.liveSoft,
+  new_post: colors.surfaceMuted,
+  new_comment: colors.infoSoft,
+  new_reaction: colors.heiaTint,
+  event_reminder: colors.remindSoft,
+  rsvp_update: colors.heiaSoft,
+  admin_message: colors.sun,
+  system: colors.surfaceMuted,
+};
+
 function timeAgo(date: Date): string {
   const diffMin = Math.floor((Date.now() - date.getTime()) / 60000);
   if (diffMin < 1) return 'Nå';
@@ -52,7 +65,14 @@ export function NotificationRow({
         unread && styles.unread,
         pressed && styles.pressed,
       ]}>
-      <View style={[styles.iconWrap, unread && styles.iconWrapUnread]}>
+      <View
+        style={[
+          styles.iconWrap,
+          {
+            backgroundColor:
+              CATEGORY_SURFACE[item.category] ?? colors.surfaceMuted,
+          },
+        ]}>
         <Text style={styles.icon}>
           {CATEGORY_ICON[item.category] ?? '🔔'}
         </Text>
@@ -101,12 +121,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  iconWrapUnread: {
-    backgroundColor: colors.surface,
   },
   icon: {
     fontSize: 18,
@@ -126,7 +142,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   titleUnread: {
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   time: {

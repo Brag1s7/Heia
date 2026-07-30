@@ -76,12 +76,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderSubtle,
   },
   pressed: {
     backgroundColor: colors.heiaSoft,
@@ -115,22 +115,23 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     flex: 1,
   },
+  // A v2-knapperegel: mintfyll bærer alltid heiaDeep-tekst, aldri ren svart.
   assignButton: {
     backgroundColor: colors.heia,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
   assignText: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
   },
   changeButton: {
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surfaceMuted,
   },
   changePressed: {
     backgroundColor: colors.border,

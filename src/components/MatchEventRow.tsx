@@ -23,15 +23,18 @@ const eventIcons: Record<MatchEventType, string> = {
   melding: '💬',
 };
 
+// A v2: mål/avspark/fortsettelse feires på mint-tint (grønt = feiring, aldri
+// coral), kort på solskinnsflate, resten dempet. Myke flater bak emoji leses
+// bedre enn solide sirkler.
 const eventColors: Record<MatchEventType, string> = {
-  avspark: colors.heia,
-  mål: colors.heia,
-  pause: colors.textTertiary,
-  andre_omgang: colors.success,
-  slutt: colors.textSecondary,
-  bytte: colors.textSecondary,
-  kort: colors.warning,
-  melding: colors.textTertiary,
+  avspark: colors.heiaTint,
+  mål: colors.heiaTint,
+  pause: colors.surfaceMuted,
+  andre_omgang: colors.heiaTint,
+  slutt: colors.surfaceMuted,
+  bytte: colors.surfaceMuted,
+  kort: colors.sun,
+  melding: colors.surfaceMuted,
 };
 
 export function MatchEventRow({
@@ -125,7 +128,8 @@ const styles = StyleSheet.create({
   },
   minute: {
     ...typography.body,
-    fontWeight: '700',
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
     color: colors.textPrimary,
   },
   player: {

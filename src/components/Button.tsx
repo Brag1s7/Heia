@@ -7,7 +7,7 @@ import {
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, typography, spacing, radius, shadows} from '../theme';
 
 // `selected` er en av/på-tilstand, ikke et hierarkinivå: samme «valgt»-språk
 // som chipsene (heiaSoft-fyll + heia-ramme). Bruk den når et trykk slår en
@@ -44,6 +44,8 @@ export function Button({
         styles.base,
         sizeStyles[size],
         variantStyles[variant],
+        // Glød er reservert for aktiv hovedhandling — aldri på deaktivert knapp.
+        variant === 'primary' && !isDisabled && shadows.glow,
         pressed && !isDisabled && pressedStyles[variant],
         isDisabled && styles.disabled,
         style,
@@ -52,8 +54,9 @@ export function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === 'primary' ? colors.textPrimary : colors.heia}
+          color={variant === 'primary' ? colors.heiaDeep : colors.heiaInk}
         />
+
       ) : (
         <Text
           style={[
@@ -73,7 +76,7 @@ const styles = StyleSheet.create({
   base: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.xl,
+    borderRadius: radius.lg,
   },
   text: {
     ...typography.body,
@@ -135,8 +138,9 @@ const pressedStyles: Record<ButtonVariant, ViewStyle> = {
 };
 
 const variantTextStyles: Record<ButtonVariant, TextStyle> = {
+  // heiaDeep på mintfyll — merkevarens tekst-på-mint-farge (A v2)
   primary: {
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
   },
   secondary: {
     color: colors.textPrimary,

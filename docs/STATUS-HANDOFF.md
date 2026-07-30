@@ -1,10 +1,10 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30. **Fase 4–9 er ferdig, testet i simulator, og
-merget til `main` (PR #16).** Lagoversikt, kamera + kampbilder i kamptidslinja,
-feed-kort som åpner kampen, og push som åpner riktig kamp. Migrasjoner
-00022–00028 deployet. `tsc` grønn, ESLint 0 errors.
-**Neste samtale: design** (se under)._
+_Sist oppdatert: 2026-07-30 (sen kveld). **Designretningen «A v2 · Stadium Pop
+Hybrid» er LÅST. Skive 1 (hjem) OG skive 2 (kalender/varsler/kampdetalj) er
+kodet, optisk godkjent av bruker og COMMITTET på `Brage`.** Neste: velg neste
+skive — design på resten av flatene (profil/onboarding/sheets) eller
+produktkandidatene (se «🎯 SENERE»). Fase 4–9 fra før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1155,7 +1155,9 @@ terminalen med `npm run ios` blir lista stående gammel.
 ## 📦 Git-status (2026-07-30)
 
 Alt av Fase 4–9 er **committet, pushet og merget til `main`** (PR #16).
-Innholdet i `Brage` og `origin/main` er byte-identisk. Arbeidstreet er rent.
+**Designskive 1 + 2 er committet på `Brage`** (2026-07-30, etter brukerens
+optiske OK). Ikke pushet/merget til `main` ennå — husk squash-merge-mønsteret
+når det skjer.
 
 **Merk mønsteret som skaper konflikter hver gang:** GitHub squash-merger PR-en,
 så `main` får ÉN commit mens `Brage` beholder sine egne. Neste gang du merger
@@ -1165,10 +1167,130 @@ selv om innholdet er identisk. Løsningen er alltid den samme: merge
 faktisk er et supersett (`git diff origin/main:<fil> Brage:<fil>`), ikke bare
 anta det.
 
-## 🎨 NESTE SAMTALE — design
+## 🎨 DESIGN — «A v2 · Stadium Pop Hybrid» (LÅST 2026-07-30)
 
-Bruker-beslutning 2026-07-30: neste samtale handler om **design**, ikke ny
-funksjonalitet. Ta den diskusjonen før du bygger mer.
+Prosess: 3 HTML-konsepter (artifact) → bruker valgte A → A v2-iterasjon →
+**låst**. Artifacts (designintensjon, IKKE piksel-spesifikasjon):
+- Konsepter A/B/C: https://claude.ai/code/artifact/51dd852d-7ac7-4b98-b756-f97797538505
+- A v2 (den låste): https://claude.ai/code/artifact/cefe92dd-a148-4202-a9b9-71bf8cd28431
+
+**Låste identitetsgrep:** varm mintkrem-hverdag (#F6F8F0); #02FFAB = Heia/
+handling/energi; **kampen bor ALLTID på mørk stadionflate** (fra fullt
+scoreboard ned til liten score-chip — dette er signaturen); banesirkelmotiv
+subtilt, maks ett sted per skjerm; coral = KUN live-status; grønt/gult = mål/
+feiring (aldri coral på mål); lagfarge kontrollert (ring/stripe/«oss»-side);
+store tabulære 800-tall. Regler: aldri mint tekst på lyst; gradient-disiplin;
+ingen «TAP»-roping (SEIER-pill finnes, tap-pill finnes ikke); glød KUN på
+live-score, hovedhandling og enkelte Heia-øyeblikk.
+
+### ✅ Skive 1 — hjem (KODET 2026-07-30, IKKE optisk verifisert)
+Ren TS/TSX — **kun Metro-reload.** ESLint: 0 nye feil.
+- `theme/tokens.ts` — v2-palett (alle gamle tokennavn beholdt + nye:
+  heiaDeep/heiaTint/sun/stadium/live/info/remind/gold …), typografi
+  (heading1 30/800, scoreLarge/scoreSmall/displayTime m/ tabular-nums),
+  grønntonede restriktive skygger + `shadows.glow` (rasjonert).
+- Nye: `StatusPill` (semantiske pills, m/ onPress+suffix for «Viktig ✕»),
+  `ScoreChip` (mørk kamp-chip), `NextEventHero` (vanlig hero; hele kortet
+  åpner EventDetail — bevisst ingen inline-RSVP).
+- Endret: `Button` (radius 16, primær = mintfyll + heiaDeep-tekst + glød kun
+  aktiv), `Card`, `SectionHeader` (mint-strek + caps), `LiveBadge` (solid
+  coral/gul), `TeamHeader` (lagmerke m/ ring + stripe, bg=background),
+  `LiveMatchBanner` (stadion-hero: mørk flate, flomlys/banesirkel som
+  View-sirkler, glødende mint-score m/ textShadow, minutt fra startedAt),
+  `FeedCard` (rail FJERNET; sun-flate for pinned, ScoreChip på kamp-poster,
+  reaksjons-pills), `TeamHomeScreen` (hero-prioritet live>neste hendelse via
+  `pickNextEvent` på eksisterende `getTeamEvents`; composer m/ avatar+felt+
+  kamerachip; Publiser/varsle-rad vises først når noe skal publiseres),
+  `AppNavigator` (aktiv fane = mint-pille + mørk tekst — fikser kontrastfeil
+  der aktiv farge var #02FFAB på hvitt; +-knapp squircle m/ glød; badge i
+  coral).
+- **Kjente hull (bevisste):** feed-kampchip viser «Kamp»/«Resultat» uten
+  stilling — `get_team_feed` hydrerer ikke matchEvent (krever migrasjon,
+  kjent fra Fase 8). Tekstglyf-ikoner består til samlet rebuild.
+
+### ✅ Optisk review gjennomført 2026-07-30 (alle 4 tilstander sett)
+Bruker viste skjermbilder; funn og fikser samme dag:
+- **Tab-bar-glyfene ble klippet til strimler** — ikon-slotten i bottom-tabs
+  er ~30 px bred; pillens `paddingHorizontal` spiste hele bredden. Fiks:
+  `tabBarIconStyle` (64×32) + fast pillebredde (56×30). Verifisert OK.
+- **Flomlys-/kremsirklene var for harde** (synlige skivekanter — Views har
+  ingen blur). Gjort større + svakere; ekte radial-glød kommer med
+  gradient-modulen i rebuilden.
+- **Ferdigspilt kamp sto som «neste hendelse»** når avsparket lå frem i tid
+  (test-case: kamp spilt før planlagt start). `pickNextEvent` hopper nå over
+  `finished` i tillegg til `cancelled`.
+- **Slutt-poster i feeden** fikk chip «Slutt» (dempet) i stedet for «KAMP»
+  (coral). Coral = kun pågående.
+Stadion-hero, sun-kort, bildepost, composer og seksjonsheadere satt som
+tegnet. Brukeren åpnet ny samtale med «fortsett» → tolket som OK, skive 2
+startet.
+
+### ✅ Skive 2 — kalender, varsler og kampdetalj (KODET + optisk OK 2026-07-30)
+Ren TS/TSX — **kun Metro-reload.** `npx eslint src`: **0 errors**, 4 warnings
+(alle fra før). tsc ikke kjørt (låst regel — sjekk i editoren).
+
+- **`ScoreBoard` skrevet om til stadionflate** — det låste signaturgrepet
+  («kampen bor ALLTID på mørk flate») gjaldt fra fullt scoreboard og ned, men
+  ScoreBoard var fortsatt et hvitt kort. Nå: samme motiv som `LiveMatchBanner`
+  (flomlys-/banesirkel-Views, lagmerke med ring + «oss»-stripe i lagfarge,
+  48 pt tabulær mint-score). **Glød KUN når kampen pågår** (live/pause);
+  ferdig = rolig flate med «Slutt»-pill + **SEIER-pill ved seier** (home >
+  away — home/away er alltid oss/dem, se Fase 3A). Ingen tap-pill (låst
+  regel). Props uendret; henter lagfarge selv via `useActiveTeam`, akkurat
+  som `LiveMatchBanner`.
+- **`EventCard`:** `Chip` → `StatusPill` (samme type→pill-språk som
+  `NextEventHero`); resultatfeltet er nå en **mørk stadionstripe** (coral
+  label kun live, gul i pause, dempet «Sluttresultat» + SEIER-pill);
+  `featured` (live) = tynn coral kant i stedet for mint-rail (coral eier
+  live-status); kortflate på Card-språket (radius.xl + borderSubtle);
+  datotall 800 tabulær.
+- **`KalenderScreen`:** seksjonsetikettene fikk mint-streken (samme uttrykk
+  som `SectionHeader`, men beholdt plassen til `LiveBadge` ved «I dag»);
+  tomkort på Card-språket.
+- **`RSVPBar`:** mint fylling på mørkgrønn-tonet track — samme språk som
+  oppmøtestripa i `NextEventHero`. «Kan ikke» roper ikke lenger i rødt
+  (fravær er informasjon, ikke en feil); «kan ikke»-segmentet er dempet grått.
+- **`ReporterActions`:** «Mål oss» = mintfyll + heiaDeep-tekst + **glød**
+  (reporterens hovedhandling — ett av de rasjonerte glød-stedene; mål feires
+  i grønt, aldri coral). «Mål dem» = nøytral hvit flate. Radius-harmonisert.
+- **`ReporterBar`:** «Velg» følger knapperegelen (heiaDeep på mint — var
+  svart-på-mint); borderSubtle + radius.lg.
+- **`MatchEventRow` + `MatchTimeline`:** mål/avspark/fortsettelse på
+  heiaTint-sirkler (grønt = feiring), kort på sun, resten dempet — myke
+  flater bak emoji i stedet for solide sirkler. Minutter 800 tabulær.
+- **`NotificationRow`:** semantisk ikonflate per kategori (match_live=
+  liveSoft, new_comment=infoSoft, event_reminder=remindSoft (lilla =
+  påminnelse), admin_message=sun, new_reaction=heiaTint, ellers dempet);
+  ulest tittel 700.
+- **`InboxScreen`:** liste + tomkort på Card-språket.
+- **`EventDetailScreen`:** `Chip` → `StatusPill` i infokortet — eneste
+  endring; all logikk urørt.
+- **`Chip.tsx` SLETTET** (+ ut av `components/index.ts`) — ingen brukere
+  igjen etter EventCard/EventDetail.
+
+### Test dette (Metro-reload — optisk review, samme øvelse som skive 1)
+1. **Kalender:** pill per type på kortene; mint-strek på seksjonsetikettene.
+   Live kamp = coral kant + mørk stripe «PÅGÅR NÅ» med mint-score; pause =
+   gul label; ferdig = «SLUTTRESULTAT» + grønn «Seier»-pill når vi vant —
+   og INGEN pill når vi tapte.
+2. **Kampdetalj live:** mørkt scoreboard med lagmerker, glødende mint-score
+   og minutt-pill; som reporter er «Mål oss» mint med glød, «Mål dem» hvit.
+3. **Kampdetalj pause:** gul «PAUSE»-badge, stillestående, «Pause — kampen
+   fortsetter» under.
+4. **Ferdig kamp:** samme mørke flate uten glød, «Slutt»- (+ evt. «Seier»-)
+   pill; kampforløpet har mint-sirkler på mål.
+5. **Varsler:** fargede ikonsirkler per kategori (coral kamp, blå kommentar,
+   lilla påminnelse, gul trenerbeskjed, mint 👏); ulest = grønn flate + prikk
+   som før.
+6. **Oppmøtestripa** (kalenderkort + hendelse): mint fylling, ingen rød.
+
+### Til den SAMLEDE native rebuilden (én gang, senere)
+- **Lucide React Native** (+ react-native-svg) — ikoner i tab bar/kontroller.
+- **react-native-linear-gradient** — ekte gradienter (hero/stadion bruker
+  nå lagdelte sirkel-Views som erstatning).
+- **Rounded displayfont** til score-tall: SF Rounded er IKKE tilgjengelig i
+  RN uten bundlet font/native oppsett (artifact-notatet «gratis» gjaldt web).
+  Frem til da: systemfont 800 + tabular-nums.
 
 ---
 
