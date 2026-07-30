@@ -1,10 +1,10 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (**Fase 6 FERDIG** — lagoversikt, `00027` deployet,
-tsc grønn. **Fase 7 + 8 KODET, ikke verifisert** — kamera + kampbilder i
-tidslinja (`00028` deployet), og feed-kort som åpner kampen. Lint rent.
-**⚠️ Krever REBUILD** (ny Info.plist-nøkkel for kamera); ikke sett i
-simulator ennå.)_
+_Sist oppdatert: 2026-07-30. **Fase 4–9 er ferdig, testet i simulator, og
+merget til `main` (PR #16).** Lagoversikt, kamera + kampbilder i kamptidslinja,
+feed-kort som åpner kampen, og push som åpner riktig kamp. Migrasjoner
+00022–00028 deployet. `tsc` grønn, ESLint 0 errors.
+**Neste samtale: design** (se under)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -1152,7 +1152,27 @@ terminalen med `npm run ios` blir lista stående gammel.
 
 ---
 
-## 🎯 NESTE SLICE — fritt valg
+## 📦 Git-status (2026-07-30)
+
+Alt av Fase 4–9 er **committet, pushet og merget til `main`** (PR #16).
+Innholdet i `Brage` og `origin/main` er byte-identisk. Arbeidstreet er rent.
+
+**Merk mønsteret som skaper konflikter hver gang:** GitHub squash-merger PR-en,
+så `main` får ÉN commit mens `Brage` beholder sine egne. Neste gang du merger
+vil git derfor se to historikker som rører samme linjer, og du får konflikter
+selv om innholdet er identisk. Løsningen er alltid den samme: merge
+`origin/main` inn i `Brage` og behold Brage — men verifiser først at Brage
+faktisk er et supersett (`git diff origin/main:<fil> Brage:<fil>`), ikke bare
+anta det.
+
+## 🎨 NESTE SAMTALE — design
+
+Bruker-beslutning 2026-07-30: neste samtale handler om **design**, ikke ny
+funksjonalitet. Ta den diskusjonen før du bygger mer.
+
+---
+
+## 🎯 SENERE — produktkandidater
 
 **Visjonen (bruker, 2026-07-30):** hver kamp skal bli et automatisk *kampminne*
 — før kamp (bane, oppvarming), under (mål, bilder, reaksjoner kronologisk),
