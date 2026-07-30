@@ -5,9 +5,9 @@ Hybrid» er LÅST og GJENNOMFØRT på ALLE flater (skive 1+2+3+4 — skive 4 er 
 samlede native rebuilden, optisk godkjent av bruker).** Nyeste skiver er
 **KAMPRAPPORTEN (skive 5)** og **APP-IKON + LAUNCH SCREEN (skive 6)** — begge
 **KODET, ikke optisk verifisert**. Skive 6 krever **rebuild** (ikoner og
-storyboard bakes inn i binæren). Designarbeidet er ikke pushet/merget til
-`main` ennå. **Neste:** optisk review av skive 5 + 6, og **bruker må velge
-ikonvariant** (A er installert, B/C/D er ett kall unna — se skive 6). Deretter
+storyboard bakes inn i binæren). **Ikonvalget er LÅST: variant C, figur med
+glød** — bygget i produksjonsversjon 2026-07-30. Designarbeidet er ikke
+pushet/merget til `main` ennå. **Neste:** optisk review av skive 5 + 6, deretter
 produktkandidatene («🎯 SENERE»). Fase 4–9 fra før er merget (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
@@ -1511,8 +1511,15 @@ viser ingenting. Ingen ny pakke, ingen pod install, ingen pbxproj-endring
 (`Images.xcassets` er en `folder.assetcatalog`-referanse, så nye imagesets
 trengs ikke registreres).
 
-**Vurderingsside med alle fire kandidater:**
+**Produksjonsspesifikasjon (siden er oppdatert fra valg til fasit):**
 https://claude.ai/code/artifact/143f2aaf-c2b4-48cd-b86c-0ecb01ef7cf5
+
+#### 🔒 LÅST BESLUTNING (bruker, 2026-07-30): variant **C — figur med glød**
+Begrunnelse fra bruker: virker best i liten størrelse, tydeligst egenart,
+matcher stadionmodus og mint-energien. **Ordmerket skal IKKE brukes som
+app-ikon** — variant D er derfor fjernet fra scriptet, ikke bare fravalgt.
+Brukerens tre justeringer er innarbeidet: helt solid flate, større figur,
+dempet glød.
 
 #### Merkevarekilden — figurmerket, ikke ordmerket
 `Heia logoer/` har fem varianter av **samme lockup** («Heia» + jubelfigur) i
@@ -1537,22 +1544,52 @@ A v2 låste. Merkevaren og designsystemet var allerede samstemte.
 
 #### `scripts/build-app-icon.py` (ny) — ikonet er DERIVERT, ikke tegnet
 ```
-python3 scripts/build-app-icon.py --variant A   # A er installert
-python3 scripts/build-app-icon.py --variant B   # bytt når som helst
-python3 scripts/build-app-icon.py --android     # tar med mipmap-ene
-python3 scripts/build-app-icon.py --preview /tmp/x.png --variant C
+python3 scripts/build-app-icon.py                # C, standard
+python3 scripts/build-app-icon.py --variant A|B  # de to andre som ble vurdert
+python3 scripts/build-app-icon.py --android      # tar med mipmap-ene
+python3 scripts/build-app-icon.py --preview /tmp/x.png
 ```
 Stadionflaten er **portert 1:1 fra `StadiumSurface.tsx`** (linear 165°
 `#0B1912→#143126` stop .78, radial amber cx 18 %, radial mint cx 85 %,
 banesirkelringene). Endrer `theme/tokens.ts` seg, kan ikonet følge etter uten
-at noen åpner Photoshop. Varianter: **A** figur på stadionflate (valgt),
-**B** figur på mint, **C** figur med rasjonert glød, **D** ordmerket.
+at noen åpner Photoshop.
 
-**⚠️ Fellen som kostet en runde:** `ImageDraw.ellipse(outline=MINT+(33,),
-width=17)` tegner **hvert av de 17 pikslene i strekbredden som sitt eget
-alfa-kompositt**. 0.13 lagt oppå seg selv 17 ganger ≈ 0.90 — den «subtile»
-banesirkelen lyste som en neonring. Ringen må tegnes **solid på et eget lag**
-og komposittes ÉN gang med riktig alfa. Gjelder alle PIL-strøk med alfa.
+**Hver ikonstørrelse tegnes for seg** (`build_icon(variant, px)`), ikke skalert
+ned fra én 1024-master — gløden må ha egne tall per størrelse
+(`_glow_profile`). Intern oppløsning holdes alltid over ~1024 px, så hårfine
+detaljer ikke forsvinner i supersamplingen på et 40 px-ikon. Merkehøyden er
+`MARK_HEIGHT_FRAC = 0.68`.
+
+Byggingen **kaster** hvis flaten ikke er 100 % dekkende, i stedet for å kaste
+alfakanalen i stillhet. App Store-kravet er dermed håndhevet i koden.
+
+#### ⚠️ FIRE alfa-feller i PIL — alle kostet en runde
+Disse gjelder all bildegenerering i Python, ikke bare dette ikonet:
+
+1. **`ImageDraw.ellipse(outline=MINT+(33,), width=17)`** tegner hvert av de 17
+   pikslene i strekbredden som sitt eget alfa-kompositt. 0.13 lagt oppå seg
+   selv 17 ganger ≈ 0.90 — den «subtile» banesirkelen lyste som en neonring.
+   Tegn strøket **solid på et eget lag** og komposit ÉN gang med riktig alfa.
+2. **`GaussianBlur` på et RGBA-lag blurrer også FARGEN.** Utenfor figuren er
+   fargen gjennomsiktig svart, så gløden falmet mot svart og **dempet flaten
+   sin egen glød** i stedet for å løfte den — den døde innen 15 px uansett hvor
+   høyt tall man skrev. Blur **kun alfakanalen** (`Image.new("L", …)`), og la
+   fargen stå solid.
+3. **Gjentatt kompositt av samme lag ganger ikke opp lineært.** `0.3` tre
+   ganger blir ≈ `0.66`. Da er tallet i koden ikke tallet på skjermen, og
+   uttrykket blir umulig å styre.
+4. **Et bredt blur sprer alfaen tynt, så toppverdien synker med spredningen.**
+   Uten normalisering betyr `strength` noe helt ulikt for et stramt og et bredt
+   lag. Normaliser etter blur — da ER `strength` den faktiske toppdekningen.
+
+**Glødet er derfor to lag med ulik spredning:** en stram bloom tett på figuren
+(`bloom`) og en bred, svak ambient rundt (`ambient`). Det er *kontrasten*
+mellom spredningene som gjør at lyset føles fysisk. Ett jevnt blur-lag er
+nettopp det som leser som gaming.
+
+**Målt fasit (1024 px):** grønnkanalen løftes ~30 nivåer rett ved figurkanten,
+~18 ved 15 px, ~8 ved 40 px, borte ved 150 px. Vil du justere, endre
+`_glow_profile` og mål på nytt — ikke gjett på tallene.
 
 #### Launch screen — stadionflaten, ingen tekst
 Malen fra React Native sto urørt: hvit flate, «Heia2» i systemfont, «Powered
@@ -1588,7 +1625,9 @@ feilen i en 10-minutters Xcode-build.
 2. **Oppstart:** mørk stadionflate med merket sentrert. Ingen hvit flash,
    ingen «Powered by React Native».
 3. **Innstillinger → Heia:** ikonet i 29 pt skal fortsatt leses.
-4. Vil du bytte variant: kjør scriptet med `--variant B|C|D` + rebuild.
+4. **Varsler:** ikonet i 20 pt — figuren skal fortsatt kjennes igjen som en
+   person, ikke bli en grønn flekk. (Kontrollert i generert kontaktark ned til
+   40 px; den tynne hevede armen er det som ryker først.)
 
 **Ikke gjort (bevisst):**
 - **Android-mipmapene** står på RN-malen. Ett flagg unna (`--android`), men
@@ -1596,6 +1635,57 @@ feilen i en 10-minutters Xcode-build.
 - **iOS 18 mørk/tonet ikonvariant.** Krever det nyere single-size
   `Contents.json`-formatet; dagens eksplisitte størrelsesformat bygger
   uendret. Egen liten skive hvis det blir aktuelt.
+
+---
+
+## 📱 Test på fysisk iPhone (etablert 2026-07-30)
+
+Første gang appen kjørte på ekte enhet (iPhone 15). Tre ting kostet tid og er
+verdt å kunne.
+
+### ⚠️ `DEVELOPMENT_TEAM = Q5A6QMRZ4A` er BRUKERENS PERSONLIGE Apple-ID
+Lagt inn av Xcode da bruker logget på for å teste på egen telefon.
+**Den skal IKKE brukes ved publisering** — bytt til firmakontoen når den
+finnes. Team-ID er ingen hemmelighet (den ligger i hver publiserte app), så
+den er committet med vilje: alternativet var en permanent endret
+`project.pbxproj`, og dette repoet har allerede nok merge-støy fra
+squash-mønsteret. Xcode normaliserte samtidig hele fila (omsortering +
+tomme `inputPaths`/`outputPaths` på CocoaPods-fasene) — ufarlig.
+
+### «Bygget lyktes, men appen finnes ikke på telefonen»
+Bygget lå ferdig signert i `Debug-iphoneos/Heia2.app`, men
+`xcrun devicectl device info apps` viste **`Apps installed:` tomt**.
+Installasjonssteget hadde aldri kjørt — typisk **⌘B (Build)** i stedet for
+**⌘R (Run)**. Diagnose og fiks uten å bygge på nytt:
+
+```bash
+xcrun devicectl list devices                       # finn UDID-en
+xcrun devicectl device info apps --device <UDID>   # er den installert i det hele tatt?
+xcrun devicectl device install app --device <UDID> \
+  ~/Library/Developer/Xcode/DerivedData/Heia2-*/Build/Products/Debug-iphoneos/Heia2.app
+xcrun devicectl device process launch --device <UDID> org.reactjs.native.example.Heia2
+```
+
+**Appen heter «Heia» på hjemskjermen, ikke «Heia2»** — `CFBundleDisplayName`
+i `Info.plist` overstyrer `PRODUCT_NAME`. Lett å lete etter feil navn.
+
+### Profilen må godkjennes PÅ telefonen
+`process launch` feilet med «its profile has not been explicitly trusted by
+the user». Med personlig Apple-ID må man selv gjøre:
+**Innstillinger → Generelt → VPN og enhetsadministrering → Utviklerapp →
+Apple-ID-en → «Stol på»**. Kan ikke gjøres fra Mac-en.
+
+⚠️ **Gratis provisioning gir 7 dagers sertifikat.** Appen slutter å starte
+etter en uke og må installeres på nytt. Ikke en feil.
+
+### ⛔ Fri provisioning låser fortsatt opp push
+Personlig Apple-ID gir **ikke** APNs-entitlement. Fase 4 er derfor fremdeles
+parkert på nøyaktig samme sted: ekte push krever **betalt** Apple Developer
+Program. At det nå finnes et DEVELOPMENT_TEAM endrer ingenting der.
+
+### iOS cacher app-ikoner hardt
+Etter en rebuild med nytt ikon kan hjemskjermen bli stående på det gamle.
+Slett appen og installer på nytt — det er den pålitelige veien.
 
 ---
 

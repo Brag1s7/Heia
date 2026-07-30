@@ -48,6 +48,11 @@ IOS_SIZES = {40: "Icon-40", 58: "Icon-58", 60: "Icon-60", 80: "Icon-80",
 ANDROID_SIZES = {"mipmap-mdpi": 48, "mipmap-hdpi": 72, "mipmap-xhdpi": 96,
                  "mipmap-xxhdpi": 144, "mipmap-xxxhdpi": 192}
 
+# Merkets høyde som andel av ikonflaten. Figuren er høy og smal (680×1025), så
+# 0.68 i høyde er ~0.45 i bredde — den fyller flaten uten å ta bort lufta som
+# gjør at et ikon leses som ett objekt og ikke som en full rute.
+MARK_HEIGHT_FRAC = 0.68
+
 # Launch screen: merket tegnes i punkt, så @1x-størrelsen ER punktstørrelsen.
 MARK_PT_WIDTH = 132
 LAUNCH_BG = (1170, 2532)
@@ -132,55 +137,113 @@ def _place(canvas, mark, height_frac):
     return canvas
 
 
-def _glow(canvas, mark, height_frac, passes=3, spread=0.05):
-    """Den rasjonerte mint-glødet (shadows.glow i appen). Ett blur-lag drukner
-    mot stadionflaten — derfor legges samme lag flere ganger."""
+def _glow(canvas, mark, height_frac, bloom, ambient, bloom_spread, ambient_spread):
+    """Den rasjonerte mint-glødet (shadows.glow i appen), som ekte lysbloom.
+
+    TO lag med ulik spredning: en stram indre bloom tett på figuren, og en
+    bred, svak ambient rundt. Det er KONTRASTEN mellom de to spredningene som
+    får lyset til å føles fysisk. Ett enkelt hardt blur-lag — eller samme lag
+    lagt oppå seg selv flere ganger — gir en jevn neonkant, og det er akkurat
+    det som leser som gaming i stedet for premium.
+
+    Hvert lag komposittes ÉN gang med skalert alfa. Gjentatt kompositt av
+    samme lag ganger ikke opp lineært (0.3 tre ganger ≈ 0.66), og det er
+    umulig å styre uttrykket når tallet i koden ikke er tallet på skjermen.
+
+    ⚠️ Det er KUN alfakanalen som blurres, aldri en RGBA-figur. Blurrer man
+    hele laget, trekkes den gjennomsiktige svarte bakgrunnen inn i fargen:
+    noen piksler utenfor figuren er «gløden» blitt nesten svart, og da demper
+    den flaten sin egen glød i stedet for å løfte den. Fargen skal stå solid
+    mint over hele laget; det er bare dekningen som avtar.
+    """
     n = canvas.width
     h = int(n * height_frac)
     w = int(mark.width * h / mark.height)
     m = mark.resize((w, h), Image.LANCZOS)
     cx, cy = _centroid(m)
-    layer = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    layer.alpha_composite(_tint(m, MINT), (int(n / 2 - cx * w), int(n / 2 - cy * h)))
-    layer = layer.filter(ImageFilter.GaussianBlur(n * spread))
-    for _ in range(passes):
+    pos = (int(n / 2 - cx * w), int(n / 2 - cy * h))
+
+    silhouette = Image.new("L", canvas.size, 0)
+    silhouette.paste(m.getchannel("A"), pos)
+
+    for strength, spread in ((ambient, ambient_spread), (bloom, bloom_spread)):
+        blurred = silhouette.filter(ImageFilter.GaussianBlur(n * spread))
+
+        # NORMALISER før styrken påføres. Et gaussisk blur sprer figurens alfa
+        # utover et større areal, så toppverdien synker med spredningen: uten
+        # dette betyr `strength` noe helt ulikt for den stramme og den brede
+        # ambienten. Etter normaliseringen ER strength den faktiske toppalfaen.
+        a = np.array(blurred).astype(np.float64)
+        peak = a.max()
+        if peak <= 0:
+            continue
+        a = a / peak * strength * 255
+
+        layer = Image.new("RGBA", canvas.size, MINT + (0,))
+        layer.putalpha(Image.fromarray(np.clip(a, 0, 255).astype(np.uint8)))
         canvas.alpha_composite(layer)
     return canvas
 
 
-def build_master(variant, size=1024):
-    """1024-masteren. Alt annet skaleres ned fra denne."""
-    n = size * SS
+def _glow_profile(px):
+    """Glødet må krympe raskere enn ikonet.
+
+    En blur på 6 % av flaten er en glød på 1024 px og en uskarp flekk på 60.
+    Ved små størrelser strammes spredningen inn og styrken ned, så figuren
+    holder kanten sin — det er lesbarheten i 60 pt som avgjør om ikonet
+    virker, ikke hvordan masteren ser ut i App Store.
+    """
+    if px >= 512:
+        return dict(bloom=0.17, ambient=0.075, bloom_spread=0.014, ambient_spread=0.055)
+    if px >= 120:
+        return dict(bloom=0.14, ambient=0.060, bloom_spread=0.012, ambient_spread=0.045)
+    return dict(bloom=0.10, ambient=0.040, bloom_spread=0.009, ambient_spread=0.032)
+
+
+def build_icon(variant, size=1024):
+    """Tegner ikonet i ØNSKET størrelse — ikke en 1024-master som skaleres ned.
+
+    Grunnen er glødet: den må ha egne parametre per størrelse (se
+    `_glow_profile`). Nedskalering av én master ville dratt 1024-glødet med
+    seg inn i 40 px og gjort figuren uskarp.
+
+    Intern oppløsning holdes på minst 1024 uansett måltørrelse, så hårfine
+    detaljer i figuren ikke forsvinner i supersamplingen på små ikoner.
+    """
+    ss = max(SS, -(-1024 // size))          # aldri under ~1024 px internt
+    n = size * ss
     mark = Image.open(MARK).convert("RGBA")
 
     if variant == "A":       # figur på stadionflate + banesirkel
         c = _arcs(_stadium(n, n))
-        _place(c, mark, 0.64)
+        _place(c, mark, MARK_HEIGHT_FRAC)
     elif variant == "B":     # figur på mint (invertert)
         c = Image.new("RGBA", (n, n), MINT + (255,))
-        _place(c, _tint(mark, HEIA_DEEP), 0.64)
-    elif variant == "C":     # figur på ren stadionflate med glød
+        _place(c, _tint(mark, HEIA_DEEP), MARK_HEIGHT_FRAC)
+    elif variant == "C":     # VALGT: figur på ren stadionflate med dempet bloom
         c = _stadium(n, n)
-        _glow(c, mark, 0.64)
-        _place(c, mark, 0.64)
-    elif variant == "D":     # dagens ordmerke på stadionflaten
-        c = _arcs(_stadium(n, n))
-        lock = Image.open(ROOT / "src/assets/images/logo-icon.png").convert("RGBA")
-        lock = lock.crop(lock.getchannel("A").getbbox())
-        w = int(n * 0.80)
-        h = int(lock.height * w / lock.width)
-        c.alpha_composite(lock.resize((w, h), Image.LANCZOS), ((n - w) // 2, (n - h) // 2))
+        _glow(c, mark, MARK_HEIGHT_FRAC, **_glow_profile(size))
+        _place(c, mark, MARK_HEIGHT_FRAC)
     else:
-        raise SystemExit(f"Ukjent variant {variant!r} — velg A, B, C eller D.")
+        raise SystemExit(f"Ukjent variant {variant!r} — velg A, B eller C. "
+                         "(Ordmerket er utelukket som app-ikon, se handoffen.)")
 
-    # RGB, ikke RGBA: App Store Connect avviser alfakanal i ikoner.
-    return c.convert("RGB").resize((size, size), Image.LANCZOS)
+    out = c.resize((size, size), Image.LANCZOS)
+
+    # App Store Connect avviser alfakanal. Flaten SKAL være helt dekkende —
+    # sjekk det, ikke bare kast kanalen og håpe.
+    alpha = out.getchannel("A")
+    if alpha.getextrema()[0] != 255:
+        raise SystemExit("Flaten er ikke helt dekkende — ikonet ville fått "
+                         "transparente piksler.")
+    return out.convert("RGB")
 
 
-def write_app_icon(master):
+def write_app_icon(variant):
     APPICON.mkdir(parents=True, exist_ok=True)
     for px, name in IOS_SIZES.items():
-        master.resize((px, px), Image.LANCZOS).save(APPICON / f"{name}.png")
+        # Hver størrelse tegnes for seg — se build_icon().
+        build_icon(variant, px).save(APPICON / f"{name}.png")
 
     # Contents.json beholdes på det eksplisitte størrelsesformatet prosjektet
     # allerede bruker — det bygger uendret, og sparer oss en pbxproj-runde.
@@ -227,7 +290,7 @@ def write_launch():
           f"LaunchMark {MARK_PT_WIDTH}×{int(round(MARK_PT_WIDTH * ratio))} pt @1x/@2x/@3x")
 
 
-def write_android(master):
+def write_android(variant):
     if not ANDROID_RES.exists():
         print("  android   → hoppet over (finner ikke res/)")
         return
@@ -235,7 +298,7 @@ def write_android(master):
         d = ANDROID_RES / folder
         if not d.exists():
             continue
-        icon = master.resize((px, px), Image.LANCZOS)
+        icon = build_icon(variant, px)
         icon.save(d / "ic_launcher.png")
         # Round-varianten er samme bilde; Android maskerer den selv.
         icon.save(d / "ic_launcher_round.png")
@@ -245,24 +308,23 @@ def write_android(master):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--variant", default="A", choices=list("ABCD"),
-                    help="A=figur på stadion (valgt), B=figur på mint, "
-                         "C=figur med glød, D=ordmerket")
+    ap.add_argument("--variant", default="C", choices=list("ABC"),
+                    help="C=figur med dempet bloom (VALGT), A=figur på stadion, "
+                         "B=figur på mint")
     ap.add_argument("--android", action="store_true", help="oppdater også mipmap-ene")
-    ap.add_argument("--preview", metavar="PATH", help="skriv bare 1024-masteren hit")
+    ap.add_argument("--preview", metavar="PATH", help="skriv bare 1024-ikonet hit")
     args = ap.parse_args()
 
-    master = build_master(args.variant)
     if args.preview:
-        master.save(args.preview)
+        build_icon(args.variant).save(args.preview)
         print(f"forhåndsvisning → {args.preview}")
         return
 
     print(f"Bygger variant {args.variant}:")
-    write_app_icon(master)
+    write_app_icon(args.variant)
     write_launch()
     if args.android:
-        write_android(master)
+        write_android(args.variant)
     print("\nFerdig. Ikoner og storyboard bakes inn i binæren → krever rebuild "
           "(npm run ios). Metro-reload er ikke nok.")
 
