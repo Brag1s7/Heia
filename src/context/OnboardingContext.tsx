@@ -10,6 +10,7 @@ import React, {
 import {useAuth} from './UserContext';
 import {useActiveTeam} from './TeamContext';
 import {joinTeamSpace, createTeamFromScratch} from '../lib/api/teams';
+import {offerClubLogoAfterCreate} from '../lib/clubLogo';
 import type {CreateTeamPayload, MemberRole} from '../lib/types';
 
 // ---------------------------------------------------------------------------
@@ -87,6 +88,15 @@ export function OnboardingProvider({children}: PropsWithChildren) {
       await refreshMemberships();
       setActiveTeamSpace(result.teamSpaceId);
       setJustCreatedTeamSpaceId(result.teamSpaceId);
+      // NY klubb (clubName satt = opprettet nå) → tilby klubblogo (P4).
+      // Her og ikke i skjermen, så auth-before-commit-resumet også dekkes.
+      if (payload.clubName) {
+        offerClubLogoAfterCreate(
+          result.teamSpaceId,
+          payload.clubName,
+          refreshMemberships,
+        );
+      }
     },
     [refreshMemberships, setActiveTeamSpace],
   );

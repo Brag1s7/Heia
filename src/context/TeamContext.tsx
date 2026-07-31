@@ -4,11 +4,12 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
 import {useAuth} from './UserContext';
-import {getUserMemberships} from '../lib/api/teams';
+import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
 import type {
   EnrichedMembership,
   MemberRole,
@@ -22,6 +23,11 @@ interface TeamContextValue {
   activeTeam: Team | null;
   /** Innlogget brukers rolle i det aktive lagrommet. */
   activeRole: MemberRole | null;
+  /**
+   * Antall aktive medlemskap i det aktive lagrommet (TeamHeader-underteksten).
+   * null til tallet er hentet — vis sport · årsklasse som fallback, aldri tomt.
+   */
+  activeMemberCount: number | null;
   userMemberships: EnrichedMembership[];
   loading: boolean;
   setActiveTeamSpace: (teamSpaceId: string) => void;
@@ -44,19 +50,37 @@ export function TeamProvider({children}: PropsWithChildren) {
   // objekt-identitet ved hver token-refresh.
   const userId = session?.user?.id;
 
+  // Hvem gjeldende liste er lastet for. Refresh for samme bruker er STILLE:
+  // AppNavigator river ned hele navigatoren når loading er true, så en
+  // lagfarge-/navne-/logo-lagring (som refresher memberships) ville ellers
+  // kastet brukeren til Hjem-fanen (telefonfunn 2026-07-31).
+  const loadedForRef = useRef<string | null>(null);
+
   const fetchMemberships = useCallback(async () => {
     if (!userId) {
+      loadedForRef.current = null;
       setUserMemberships([]);
       return;
     }
-    setLoading(true);
+    const isRefresh = loadedForRef.current === userId;
+    if (!isRefresh) {
+      setLoading(true);
+    }
     try {
       const memberships = await getUserMemberships();
+      loadedForRef.current = userId;
       setUserMemberships(memberships);
     } catch {
-      setUserMemberships([]);
+      // Første last: tom liste (onboarding-flyten eier feilen). Stille
+      // refresh: behold forrige liste — et nettverksglipp skal ikke sende
+      // en innlogget bruker tilbake til onboarding.
+      if (!isRefresh) {
+        setUserMemberships([]);
+      }
     } finally {
-      setLoading(false);
+      if (!isRefresh) {
+        setLoading(false);
+      }
     }
   }, [userId]);
 
@@ -96,6 +120,41 @@ export function TeamProvider({children}: PropsWithChildren) {
     [userMemberships, activeTeamSpaceId],
   );
 
+  // Medlemstallet til TeamHeader-underteksten. Cachet per lagrom, så et
+  // lagbytte viser forrige tall med én gang mens ferskt hentes. Feiler
+  // hentingen beholdes cache/null — headeren har sport · årsklasse som
+  // fallback. userMemberships er bevisst med i deps: en refresh av
+  // medlemskapene skal også friske opp tallet (head-count er billig).
+  const memberCountCache = useRef<Map<string, number>>(new Map());
+  const [activeMemberCount, setActiveMemberCount] = useState<number | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!activeTeamSpaceId) {
+      setActiveMemberCount(null);
+      return;
+    }
+    setActiveMemberCount(memberCountCache.current.get(activeTeamSpaceId) ?? null);
+    // RLS teller kun rader man selv ser — uten eget medlemskap ville svaret
+    // blitt et falskt 0, så vent til medlemskapet finnes i listen.
+    if (!userMemberships.some(m => m.teamSpaceId === activeTeamSpaceId)) {
+      return;
+    }
+    let cancelled = false;
+    getTeamMemberCount(activeTeamSpaceId)
+      .then(count => {
+        memberCountCache.current.set(activeTeamSpaceId, count);
+        if (!cancelled) {
+          setActiveMemberCount(count);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeamSpaceId, userMemberships]);
+
   const setActiveTeamSpace = useCallback((teamSpaceId: string) => {
     setActiveTeamSpaceId(teamSpaceId);
   }, []);
@@ -107,6 +166,7 @@ export function TeamProvider({children}: PropsWithChildren) {
         activeTeamSpace,
         activeTeam,
         activeRole,
+        activeMemberCount,
         userMemberships,
         loading,
         setActiveTeamSpace,

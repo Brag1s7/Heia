@@ -32,6 +32,7 @@ export interface Club {
   id: string;
   name: string;
   shortName: string | null;
+  logoUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,8 +139,9 @@ export interface CreateResult {
   membershipId: string;
 }
 
-/** Klubb-autocomplete-treff. */
+/** Klubb-autocomplete-treff. Logoen er dedup-incentivet i dropdownen. */
 export interface ClubSearchResult {
   id: string;
   name: string;
+  logoUrl: string | null;
 }

@@ -1,4 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   View,
   Text,
@@ -15,7 +20,20 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, CommonActions} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar, ListRow, TeamColorSheet} from '../components';
+import {Avatar, ListRow, TeamBadge} from '../components';
+import {
+  Bell,
+  Check,
+  ChevronRight,
+  Info,
+  LogOut,
+  Phone,
+  Plus,
+  Settings,
+  Share2,
+  UserPlus,
+  Users,
+} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
 import {
@@ -24,7 +42,7 @@ import {
   enablePush,
   type PushPermission,
 } from '../lib/push';
-import {updateProfile, updateTeamColor} from '../lib/api';
+import {updateProfile} from '../lib/api';
 import type {ProfilStackParamList} from '../shared/types';
 
 // Undertekst på «Varslinger»-raden per status.
@@ -37,18 +55,34 @@ const PUSH_SUBTITLE: Record<PushPermission, string> = {
 
 type Nav = NativeStackNavigationProp<ProfilStackParamList, 'Profil'>;
 
+// Mint-strek-etiketten — samme merkevaredetalj som SectionHeader, men uten
+// dens innebygde padding (seksjonene her eier luften selv).
+function SectionLabel({title}: {title: string}) {
+  return (
+    <View style={styles.sectionTitleRow}>
+      <View style={styles.sectionDash} />
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+// Fast slot så alle rad-ikonene står på samme akse (P7: konsekvent
+// ikonlogikk — ingen tomme streng-slots).
+function MenuIcon({children}: {children: ReactNode}) {
+  return <View style={styles.menuIconSlot}>{children}</View>;
+}
+
+// Chevron på rader som NAVIGERER — handlinger (logg ut, varsler) får ingen.
+function RowChevron() {
+  return <ChevronRight size={18} color={colors.textTertiary} />;
+}
+
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const {profile, signOut, refreshProfile} = useAuth();
-  const {
-    activeTeamSpaceId,
-    userMemberships,
-    setActiveTeamSpace,
-    refreshMemberships,
-  } = useActiveTeam();
+  const {activeTeamSpaceId, userMemberships, setActiveTeamSpace} =
+    useActiveTeam();
   const navigation = useNavigation<Nav>();
-
-  const [colorSheetVisible, setColorSheetVisible] = useState(false);
 
   // Varsel-status. Oppdateres når skjermen mountes og hver gang appen kommer i
   // forgrunn igjen (bytter du i iOS-Innstillinger og kommer tilbake, stemmer den).
@@ -118,26 +152,6 @@ export function ProfilScreen() {
     );
   }, [profile?.phone, refreshProfile]);
 
-  // Trykk på swatch = lagre og lukk (ReporterSheet-mønsteret). Fargen leses
-  // via context overalt (lagmerke, scoreboard, «oss»-stripe, laglisten), så
-  // refreshMemberships() er alt som trengs for at den skifter i hele appen.
-  const handleColorSelect = useCallback(
-    async (color: string) => {
-      setColorSheetVisible(false);
-      if (!activeTeamSpaceId) return;
-      try {
-        await updateTeamColor(activeTeamSpaceId, color);
-        await refreshMemberships();
-      } catch (e: any) {
-        Alert.alert(
-          'Kunne ikke lagre fargen',
-          e?.message ?? 'Prøv igjen om litt.',
-        );
-      }
-    },
-    [activeTeamSpaceId, refreshMemberships],
-  );
-
   if (!profile) return null;
 
   const activeMembership = userMemberships.find(
@@ -160,15 +174,14 @@ export function ProfilScreen() {
   }
 
   return (
-    <>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
-      {/* Profil-seksjon */}
+      {/* Profil-toppen — på den varme bakgrunnstonen, ikke eget hvitt kort (P7) */}
       <View
         style={[
           styles.profileSection,
-          {paddingTop: insets.top + spacing['2xl']},
+          {paddingTop: insets.top + spacing.lg},
         ]}>
         <Avatar name={profile.displayName} size="lg" />
         <Text style={styles.userName}>{profile.displayName}</Text>
@@ -194,10 +207,7 @@ export function ProfilScreen() {
       {/* Dine lag */}
       {userMemberships.length > 0 && (
         <View style={styles.teamsSection}>
-          <View style={styles.sectionTitleRow}>
-            <View style={styles.sectionDash} />
-            <Text style={styles.sectionTitle}>Dine lag</Text>
-          </View>
+          <SectionLabel title="Dine lag" />
           {userMemberships.map(m => {
             const isActive = m.teamSpaceId === activeTeamSpaceId;
             return (
@@ -209,11 +219,15 @@ export function ProfilScreen() {
                   isActive && styles.teamCardActive,
                   pressed && styles.teamCardPressed,
                 ]}>
-                <View
-                  style={[
-                    styles.teamDot,
-                    {backgroundColor: m.teamSpace.color},
-                  ]}
+                {/* Logoen når den finnes (lag → klubb), ellers initialer på
+                    lagfargen — samme kjede som headeren (Brages P7-ønske). */}
+                <TeamBadge
+                  name={m.teamSpace.displayName}
+                  logoUrl={m.teamSpace.logoUrl ?? m.team.club.logoUrl}
+                  color={m.teamSpace.color}
+                  size={36}
+                  cornerRadius={radius.full}
+                  fontSize={12}
                 />
                 <View style={styles.teamInfo}>
                   <Text style={styles.teamName}>
@@ -223,90 +237,132 @@ export function ProfilScreen() {
                     {m.team.ageGroup} · {ROLE_LABELS[m.role]}
                   </Text>
                 </View>
-                {isActive && <Text style={styles.activeCheck}>✓</Text>}
+                {/* heiaInk — mint er kun fyll på lys flate (A v2-regel). */}
+                {isActive && (
+                  <Check size={18} color={colors.heiaInk} strokeWidth={3} />
+                )}
               </Pressable>
             );
           })}
         </View>
       )}
 
-      {/* Meny */}
-      <View style={styles.menuSection}>
-        {Platform.OS === 'ios' && (
-          <ListRow
-            icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-            title="Telefonnummer"
-            subtitle={profile.phone ?? 'Legg til så trenerne når deg'}
-            onPress={handlePhone}
-          />
-        )}
-        {activeMembership && (
-          <ListRow
-            icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-            title="Lagoversikt"
-            subtitle="Se hvem som er med i laget"
-            onPress={() => navigation.navigate('TeamMembers')}
-          />
-        )}
-        {activeMembership && isTrener && (
+      {/* Laget — radene som gjelder det aktive laget */}
+      {activeMembership && (
+        <View style={styles.menuBlock}>
+          <SectionLabel title={activeMembership.teamSpace.displayName} />
+          <View style={styles.menuCard}>
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Users size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Lagoversikt"
+              subtitle="Se hvem som er med i laget"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('TeamMembers')}
+            />
+            {isTrener && (
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Settings size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Laginnstillinger"
+                subtitle="Lagnavn, lagfarge og logo"
+                right={<RowChevron />}
+                onPress={() => navigation.navigate('TeamSettings')}
+              />
+            )}
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Share2 size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Inviter til laget"
+              subtitle="Del invitasjonskoden"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('Invite')}
+              showBorder={false}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Innstillinger */}
+      <View style={styles.menuBlock}>
+        <SectionLabel title="Innstillinger" />
+        <View style={styles.menuCard}>
+          {Platform.OS === 'ios' && (
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Phone size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Telefonnummer"
+              subtitle={profile.phone ?? 'Legg til så trenerne når deg'}
+              onPress={handlePhone}
+            />
+          )}
           <ListRow
             icon={
-              <View
-                style={[
-                  styles.colorDot,
-                  {
-                    backgroundColor:
-                      activeMembership.teamSpace.color ||
-                      colors.textSecondary,
-                  },
-                ]}
-              />
+              <MenuIcon>
+                <UserPlus size={20} color={colors.textSecondary} />
+              </MenuIcon>
             }
-            title="Lagfarge"
-            subtitle="Fargen laget spiller i"
-            onPress={() => setColorSheetVisible(true)}
+            title="Bli med i et lag"
+            subtitle="Har du fått en invitasjonskode?"
+            right={<RowChevron />}
+            onPress={() => navigation.navigate('JoinTeamCode')}
           />
-        )}
-        <ListRow
-          icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-          title="Bli med i et lag"
-          subtitle="Har du fått en invitasjonskode?"
-          onPress={() => navigation.navigate('JoinTeamCode')}
-        />
-        <ListRow
-          icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-          title="Opprett et nytt lag"
-          subtitle="Du blir trener for laget"
-          onPress={() => navigation.navigate('CreateTeam')}
-        />
-        {activeMembership && (
           <ListRow
-            icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-            title="Inviter til laget"
-            subtitle="Del invitasjonskoden"
-            onPress={() => navigation.navigate('Invite')}
+            icon={
+              <MenuIcon>
+                <Plus size={20} color={colors.textSecondary} />
+              </MenuIcon>
+            }
+            title="Opprett et nytt lag"
+            subtitle="Du blir trener for laget"
+            right={<RowChevron />}
+            onPress={() => navigation.navigate('CreateTeam')}
           />
-        )}
-        {isPushAvailable() && (
+          {isPushAvailable() && (
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Bell size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Varslinger"
+              subtitle={PUSH_SUBTITLE[pushPerm]}
+              onPress={handleNotifications}
+            />
+          )}
           <ListRow
-            icon={<Text style={styles.menuIcon}>🔔</Text>}
-            title="Varslinger"
-            subtitle={PUSH_SUBTITLE[pushPerm]}
-            onPress={handleNotifications}
+            icon={
+              <MenuIcon>
+                <LogOut size={20} color={colors.textSecondary} />
+              </MenuIcon>
+            }
+            title="Logg ut"
+            subtitle="Logg ut av Heia"
+            onPress={signOut}
           />
-        )}
-        <ListRow
-          icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-          title="Logg ut"
-          subtitle="Logg ut av Heia"
-          onPress={signOut}
-        />
-        <ListRow
-          icon={<Text style={styles.menuIcon}>{'  '}</Text>}
-          title="Om Heia"
-          subtitle="v0.1.0"
-          showBorder={false}
-        />
+          <ListRow
+            icon={
+              <MenuIcon>
+                <Info size={20} color={colors.textSecondary} />
+              </MenuIcon>
+            }
+            title="Om Heia"
+            subtitle="v0.1.0"
+            showBorder={false}
+          />
+        </View>
       </View>
 
       {/* Footer */}
@@ -319,13 +375,6 @@ export function ProfilScreen() {
         <Text style={styles.footerTagline}>Idrettsglede for alle</Text>
       </View>
     </ScrollView>
-    <TeamColorSheet
-      visible={colorSheetVisible}
-      current={activeMembership?.teamSpace.color ?? null}
-      onSelect={handleColorSelect}
-      onClose={() => setColorSheetVisible(false)}
-    />
-    </>
   );
 }
 
@@ -335,16 +384,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   profileSection: {
-    backgroundColor: colors.surface,
     alignItems: 'center',
-    paddingBottom: spacing['2xl'],
+    paddingBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-    ...shadows.card,
+    gap: spacing.xs,
   },
   userName: {
     ...typography.heading2,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
   roleRow: {
     flexDirection: 'row',
@@ -357,8 +404,12 @@ const styles = StyleSheet.create({
   roleBadgeTrener: {
     backgroundColor: 'rgba(2, 255, 171, 0.15)',
   },
+  // Hvit pill med subtil kant — background-tonen forsvant mot den nye
+  // background-flaten bak.
   roleBadgeForelder: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
   },
   roleBadgeText: {
     ...typography.caption,
@@ -371,7 +422,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   teamsSection: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
@@ -413,11 +464,6 @@ const styles = StyleSheet.create({
   teamCardPressed: {
     opacity: 0.7,
   },
-  teamDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
   teamInfo: {
     flex: 1,
     gap: 2,
@@ -429,34 +475,22 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
   },
-  // heiaInk — mint er kun fyll på lys flate (A v2-regel).
-  activeCheck: {
-    fontSize: 18,
-    color: colors.heiaInk,
-    fontWeight: '700',
+  menuBlock: {
+    marginTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
   },
-  menuSection: {
+  menuCard: {
     backgroundColor: colors.surface,
-    marginTop: spacing.lg,
-    marginHorizontal: spacing.lg,
     borderRadius: radius.xl,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     overflow: 'hidden',
     ...shadows.card,
   },
-  menuIcon: {
-    fontSize: 20,
-    width: 32,
-    textAlign: 'center',
-  },
-  // Sentrert i samme 32 px-slot som menuIcon (marginHorizontal = (32−20)/2).
-  colorDot: {
-    width: 20,
-    height: 20,
-    borderRadius: radius.full,
-    marginHorizontal: 6,
-    alignSelf: 'center',
+  menuIconSlot: {
+    width: 28,
+    alignItems: 'center',
   },
   footer: {
     alignItems: 'center',

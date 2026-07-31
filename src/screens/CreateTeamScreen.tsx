@@ -5,7 +5,7 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,7 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button, TeamColorPicker} from '../components';
+import {BackBar, Button, Skeleton, TeamColorPicker} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
 import {TEAM_COLORS} from '../shared/teamColors';
@@ -25,6 +25,36 @@ import type {OnboardingStackParamList} from '../shared/types';
 type Nav = NativeStackNavigationProp<OnboardingStackParamList, 'CreateTeam'>;
 
 type SelectedClub = {id?: string; name: string};
+
+/** «Ottestad IL» → «OI», ett ord → to første tegn. */
+function clubInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return (parts[0] ?? '?').slice(0, 2).toUpperCase();
+}
+
+// Logo ved klubbnavnet i dropdownen — dette ER dedup-incentivet (P4): folk
+// gjenbruker klubben når de SER den ferdig med logo, i stedet for å opprette
+// en duplikat. Initial-sirkel som fallback.
+function ClubBadge({name, logoUrl}: {name: string; logoUrl: string | null}) {
+  const [failed, setFailed] = useState(false);
+  if (logoUrl && !failed) {
+    return (
+      <Image
+        source={{uri: logoUrl}}
+        style={styles.clubBadge}
+        onError={() => setFailed(true)}
+      />
+    );
+  }
+  return (
+    <View style={[styles.clubBadge, styles.clubBadgeFallback]}>
+      <Text style={styles.clubBadgeText}>{clubInitials(name)}</Text>
+    </View>
+  );
+}
 
 export function CreateTeamScreen() {
   const insets = useSafeAreaInsets();
@@ -254,6 +284,7 @@ export function CreateTeamScreen() {
                       key={c.id}
                       style={styles.dropdownRow}
                       onPress={() => pickExistingClub(c)}>
+                      <ClubBadge name={c.name} logoUrl={c.logoUrl} />
                       <Text style={styles.dropdownText}>{c.name}</Text>
                     </Pressable>
                   ))}
@@ -276,10 +307,11 @@ export function CreateTeamScreen() {
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Idrett</Text>
           {sportsLoading ? (
-            <ActivityIndicator
-              color={colors.heia}
-              style={{alignSelf: 'flex-start'}}
-            />
+            <View style={styles.sportRow}>
+              <Skeleton width={92} height={36} round />
+              <Skeleton width={104} height={36} round />
+              <Skeleton width={80} height={36} round />
+            </View>
           ) : sportsError ? (
             <Pressable onPress={() => setSportsReloadKey(k => k + 1)}>
               <Text style={styles.retryText}>
@@ -422,6 +454,9 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   dropdownRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -429,6 +464,25 @@ const styles = StyleSheet.create({
   },
   dropdownText: {
     ...typography.body,
+    flexShrink: 1,
+  },
+  clubBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.full,
+  },
+  clubBadgeFallback: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clubBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    color: colors.textSecondary,
   },
   // heiaInk — mint-toner er kun fyll på lys flate (A v2-regel).
   dropdownCreate: {

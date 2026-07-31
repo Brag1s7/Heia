@@ -2,19 +2,10 @@ import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
-import {inkOnTeamColor} from '../shared/teamColors';
 import {useActiveTeam} from '../context';
 import {StadiumSurface} from './StadiumSurface';
+import {TeamBadge} from './TeamBadge';
 import {Trophy} from './icons';
-
-/** Initialer til lagmerket: «Kjelsås G14» → «KG», ett ord → to første tegn. */
-function teamInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return (parts[0] ?? '?').slice(0, 2).toUpperCase();
-}
 
 interface TeamHeaderProps {
   /**
@@ -26,27 +17,40 @@ interface TeamHeaderProps {
 
 export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
   const insets = useSafeAreaInsets();
-  const {activeTeamSpace} = useActiveTeam();
+  const {activeTeamSpace, activeTeam, activeMemberCount} = useActiveTeam();
 
   if (!activeTeamSpace) return null;
 
   const teamColor = activeTeamSpace.color || colors.textSecondary;
 
+  // Undertekst: «Fotball · 18 medlemmer»; før tallet finnes (eller om
+  // hentingen feiler): «Fotball · G14». Aldri en tom linje.
+  const subtitle = [
+    activeTeam?.sport.displayName,
+    activeMemberCount != null
+      ? activeMemberCount === 1
+        ? '1 medlem'
+        : `${activeMemberCount} medlemmer`
+      : activeTeam?.ageGroup,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <View style={[styles.container, {paddingTop: insets.top + spacing.sm}]}>
-      {/* Lagfargens identitetsrolle: ring rundt merket + stripe under navnet */}
+      {/* Lagfargen bor i ringen — lagmerket (logo → initialer) inni */}
       <View style={[styles.badgeRing, {borderColor: teamColor}]}>
-        <View style={[styles.badge, {backgroundColor: teamColor}]}>
-          <Text style={[styles.badgeText, {color: inkOnTeamColor(teamColor)}]}>
-            {teamInitials(activeTeamSpace.displayName)}
-          </Text>
-        </View>
+        <TeamBadge size={32} cornerRadius={radius.full} fontSize={12} />
       </View>
       <View style={styles.nameWrap}>
         <Text style={styles.name} numberOfLines={1}>
           {activeTeamSpace.displayName}
         </Text>
-        <View style={[styles.stripe, {backgroundColor: teamColor}]} />
+        {subtitle.length > 0 && (
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        )}
       </View>
       {onSeasonPress && (
         <Pressable
@@ -82,38 +86,27 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: spacing.md,
   },
+  // 32 + 2×2 padding + 2×2 border = 40 totalt — samme høyde som før
+  // (høydevakten: neste hendelse-kortet skal fortsatt synes uten scrolling)
   badgeRing: {
     borderWidth: 2,
-    borderRadius: radius.lg,
+    borderRadius: radius.full,
     padding: 2,
-  },
-  badge: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.md - 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Farge settes inline — gult krever mørke initialer (inkOnTeamColor).
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
   nameWrap: {
     flexShrink: 1,
   },
   name: {
     ...typography.heading3,
-    fontSize: 19,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
-  stripe: {
-    width: 34,
-    height: 3,
-    borderRadius: 2,
-    marginTop: 4,
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
   seasonWrap: {
     marginLeft: 'auto',

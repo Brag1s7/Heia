@@ -1,11 +1,12 @@
-import React from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import React, {useEffect, useRef} from 'react';
+import {View, Text, StyleSheet, Animated} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
 import {StadiumSurface} from './StadiumSurface';
 import {StatusPill} from './StatusPill';
+import {TeamBadge} from './TeamBadge';
 import {useActiveTeam} from '../context';
-import {inkOnTeamColor} from '../shared/teamColors';
+import {useGoalMoment, GOAL_CELEBRATION_TINT} from './useGoalMoment';
 import type {MatchStatus} from '../shared/types';
 
 interface ScoreBoardProps {
@@ -47,8 +48,34 @@ export function ScoreBoard({
   const isUnderway = matchStatus === 'live' || isPaused;
   const isWin = matchStatus === 'finished' && homeScore > awayScore;
 
+  const {scoreScale, celebrate} = useGoalMoment(homeScore, awayScore);
+
+  // SEIER-øyeblikket: pillen spretter inn når den dukker opp — både i det
+  // kampen ender med seier, og hver gang rapporten åpnes. Liten forsinkelse
+  // så skjermbyttet rekker å lande først.
+  const seierIn = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (isWin) {
+      Animated.spring(seierIn, {
+        toValue: 1,
+        delay: 250,
+        friction: 5,
+        tension: 120,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      seierIn.setValue(0);
+    }
+  }, [isWin, seierIn]);
+
   return (
     <StadiumSurface style={styles.container}>
+      {/* Mål for oss: kort mint-glød over flaten (feiring i grønt, aldri
+          coral). Ligger under innholdet — teksten skal ikke tones. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.celebration, {opacity: celebrate}]}
+      />
       <View style={styles.topRow}>
         {isUnderway ? (
           <>
@@ -65,37 +92,42 @@ export function ScoreBoard({
               kind="neutral"
               label={matchStatus === 'cancelled' ? 'Avlyst' : 'Slutt'}
             />
-            {isWin && <StatusPill kind="seier" label="Seier" />}
+            {isWin && (
+              <Animated.View
+                style={{opacity: seierIn, transform: [{scale: seierIn}]}}>
+                <StatusPill kind="seier" label="Seier" />
+              </Animated.View>
+            )}
           </>
         )}
       </View>
 
       <View style={styles.teamsRow}>
         <View style={styles.teamCol}>
-          <View
-            style={[
-              styles.teamBadge,
-              styles.usRing,
-              {backgroundColor: teamColor},
-            ]}>
-            {/* Gult lagmerke krever mørke initialer — motstanderen er urørt. */}
-            <Text
-              style={[
-                styles.teamBadgeText,
-                {color: inkOnTeamColor(teamColor)},
-              ]}>
-              {initials(homeTeam)}
-            </Text>
-          </View>
+          {/* Lagmerket (logo → initialer) — hvit plate bak logoen mot den
+              mørke stadionflaten; motstanderen er urørt. */}
+          <TeamBadge
+            size={48}
+            cornerRadius={radius.lg}
+            fontSize={14}
+            logoPlate
+            name={homeTeam}
+            style={styles.usRing}
+          />
           <Text style={styles.teamName} numberOfLines={2}>
             {homeTeam}
           </Text>
           <View style={[styles.usMark, {backgroundColor: teamColor}]} />
         </View>
 
-        <Text style={[styles.score, isUnderway && styles.scoreGlow]}>
+        <Animated.Text
+          style={[
+            styles.score,
+            isUnderway && styles.scoreGlow,
+            {transform: [{scale: scoreScale}]},
+          ]}>
           {homeScore}–{awayScore}
-        </Text>
+        </Animated.Text>
 
         <View style={styles.teamCol}>
           <View style={[styles.teamBadge, styles.themBadge]}>
@@ -120,6 +152,10 @@ const styles = StyleSheet.create({
     padding: spacing['2xl'],
     gap: spacing.xl,
     ...shadows.elevated,
+  },
+  celebration: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: GOAL_CELEBRATION_TINT,
   },
   topRow: {
     flexDirection: 'row',

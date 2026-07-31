@@ -1,10 +1,11 @@
 import React from 'react';
-import {View, Text, Pressable, StyleSheet} from 'react-native';
+import {View, Text, Pressable, StyleSheet, Animated} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
 import {StadiumSurface} from './StadiumSurface';
+import {TeamBadge} from './TeamBadge';
 import {useActiveTeam} from '../context';
-import {inkOnTeamColor} from '../shared/teamColors';
+import {useGoalMoment, GOAL_CELEBRATION_TINT} from './useGoalMoment';
 import type {HeiaEvent} from '../shared/types';
 
 interface LiveMatchBannerProps {
@@ -28,6 +29,14 @@ function initials(name: string): string {
 export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
   const {activeTeamSpace} = useActiveTeam();
 
+  // MÅL-øyeblikket gjelder også her: feed-subscriben på Hjem refetcher
+  // banneret ved hvert mål (målet er en feed-post), så scoren spretter hos
+  // foreldre som står på Hjem. Kalles før early return — hooks-regelen.
+  const {scoreScale, celebrate} = useGoalMoment(
+    event.score?.home ?? 0,
+    event.score?.away ?? 0,
+  );
+
   // Pause er også «pågående» — kampen er ikke over, klokka står bare stille.
   const isPaused = event.matchStatus === 'halfTime';
   const isUnderway = event.matchStatus === 'live' || isPaused;
@@ -49,6 +58,12 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
       accessibilityLabel={`Følg kampen mot ${event.opponent}`}
       style={({pressed}) => [styles.wrap, pressed && styles.pressed]}>
       <StadiumSurface style={styles.banner}>
+      {/* Mål for oss: kort mint-glød over flaten (feiring i grønt, aldri
+          coral). Ligger under innholdet — teksten skal ikke tones. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.celebration, {opacity: celebrate}]}
+      />
       <View style={styles.topRow}>
         <LiveBadge paused={isPaused} />
         {minute !== null && (
@@ -60,25 +75,26 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
 
       <View style={styles.teamsRow}>
         <View style={styles.teamCol}>
-          <View style={[styles.teamBadge, styles.usRing, {backgroundColor: teamColor}]}>
-            {/* Gult lagmerke krever mørke initialer — motstanderen er urørt. */}
-            <Text
-              style={[
-                styles.teamBadgeText,
-                {color: inkOnTeamColor(teamColor)},
-              ]}>
-              {initials(teamName)}
-            </Text>
-          </View>
+          {/* Lagmerket (logo → initialer) — hvit plate bak logoen mot den
+              mørke stadionflaten; motstanderen er urørt. */}
+          <TeamBadge
+            size={42}
+            cornerRadius={radius.lg - 1}
+            fontSize={13}
+            logoPlate
+            name={teamName}
+            style={styles.usRing}
+          />
           <Text style={styles.teamName} numberOfLines={2}>
             {teamName}
           </Text>
           <View style={[styles.usMark, {backgroundColor: teamColor}]} />
         </View>
 
-        <Text style={styles.score}>
+        <Animated.Text
+          style={[styles.score, {transform: [{scale: scoreScale}]}]}>
           {event.score.home}–{event.score.away}
-        </Text>
+        </Animated.Text>
 
         <View style={styles.teamCol}>
           <View style={[styles.teamBadge, styles.themBadge]}>
@@ -112,6 +128,10 @@ const styles = StyleSheet.create({
   banner: {
     padding: spacing.xl,
     gap: spacing.lg,
+  },
+  celebration: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: GOAL_CELEBRATION_TINT,
   },
   pressed: {
     opacity: 0.92,

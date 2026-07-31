@@ -5,14 +5,20 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, ScoreChip, StadiumSurface, StatusPill} from '../components';
+import {
+  BackBar,
+  ListRowSkeleton,
+  ScoreChip,
+  Skeleton,
+  StadiumSurface,
+  StatusPill,
+} from '../components';
 import {Plus, Trophy} from '../components/icons';
 import {useActiveTeam} from '../context';
 import {isTeamAdmin} from '../shared/roles';
@@ -177,7 +183,35 @@ export function SeasonScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.heia} />
+          <>
+            {/* Tallene bor på stadionflaten også som skeleton — flatebyttet
+                lys/mørk skal ikke blinke inn etter lastingen. */}
+            <StadiumSurface style={styles.hero}>
+              <Skeleton width={110} height={11} style={styles.stadiumBone} />
+              <View style={styles.kpiRow}>
+                <View style={styles.kpi}>
+                  <Skeleton width={44} height={34} style={styles.stadiumBone} />
+                  <Skeleton width={52} height={10} style={styles.stadiumBone} />
+                </View>
+                <View style={styles.kpi}>
+                  <Skeleton width={44} height={34} style={styles.stadiumBone} />
+                  <Skeleton width={52} height={10} style={styles.stadiumBone} />
+                </View>
+                <View style={styles.kpi}>
+                  <Skeleton width={44} height={34} style={styles.stadiumBone} />
+                  <Skeleton width={52} height={10} style={styles.stadiumBone} />
+                </View>
+              </View>
+            </StadiumSurface>
+            <View style={styles.sectionHeader}>
+              <Skeleton width={80} height={11} />
+            </View>
+            <View style={styles.listCard}>
+              <ListRowSkeleton />
+              <ListRowSkeleton />
+              <ListRowSkeleton showBorder={false} />
+            </View>
+          </>
         ) : error || !stats ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>
@@ -424,8 +458,8 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
-  loader: {
-    marginTop: spacing.xl,
+  stadiumBone: {
+    backgroundColor: colors.stadiumEdge,
   },
   emptyCard: {
     marginHorizontal: spacing.lg,

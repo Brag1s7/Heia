@@ -1,10 +1,18 @@
 import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
-import {Ball, Flag, MessageCircle, Pause, Play} from './icons';
+import {
+  ArrowLeftRight,
+  Ball,
+  BookingCard,
+  Flag,
+  MessageCircle,
+  Pause,
+  Play,
+} from './icons';
 import {ScoreChip} from './ScoreChip';
 import type {MatchPhoto} from '../lib/api/feed';
-import type {MatchEvent, MatchEventType} from '../shared/types';
+import type {MatchEvent} from '../shared/types';
 
 interface MatchEventRowProps {
   event: MatchEvent;
@@ -16,37 +24,63 @@ interface MatchEventRowProps {
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
-// MÅ stå FØR eventIcons — JSX-en under evalueres i det modulen lastes.
-const glyphStyles = StyleSheet.create({
-  glyph: {fontSize: 14},
-});
+interface Marker {
+  icon: React.ReactNode;
+  bg: string;
+  /** Liten gulldetalj på sirkelen — kun mål for oss (feiring: grønt/gult). */
+  goldDot?: boolean;
+}
 
-// Lucide-ikoner, blekket i flatens ink-farge. `bytte`/`kort` lages ikke av
-// appen ennå og beholder tegn-glyfene sine til de får et ordentlig øyeblikk.
-const eventIcons: Record<MatchEventType, React.ReactNode> = {
-  avspark: <Ball size={16} color={colors.heiaInk} />,
-  mål: <Ball size={16} color={colors.heiaInk} />,
-  pause: <Pause size={15} color={colors.textSecondary} />,
-  andre_omgang: <Play size={15} color={colors.heiaInk} />,
-  slutt: <Flag size={15} color={colors.textSecondary} />,
-  bytte: <Text style={glyphStyles.glyph}>↔</Text>,
-  kort: <Text style={glyphStyles.glyph}>🟨</Text>,
-  melding: <MessageCircle size={15} color={colors.textSecondary} />,
-};
-
-// A v2: mål/avspark/fortsettelse feires på mint-tint (grønt = feiring, aldri
-// coral), kort på solskinnsflate, resten dempet. Myke flater bak ikonet leses
-// bedre enn solide sirkler.
-const eventColors: Record<MatchEventType, string> = {
-  avspark: colors.heiaTint,
-  mål: colors.heiaTint,
-  pause: colors.surfaceMuted,
-  andre_omgang: colors.heiaTint,
-  slutt: colors.surfaceMuted,
-  bytte: colors.surfaceMuted,
-  kort: colors.sun,
-  melding: colors.surfaceMuted,
-};
+// P5-skannbarhet: ballen betyr MÅL og ingenting annet, og kun mål for OSS
+// feires (mint + gulldetalj). Mål imot er informasjon — dempet nøytral, aldri
+// coral (låst: coral = live-status; «ingen TAP-roping»). Avspark/fortsettelse
+// er spillet i gang (nøytral pil, ikke feiring), slutt lukker kampen på
+// stadion-mørk markør.
+function markerFor(event: MatchEvent): Marker {
+  switch (event.type) {
+    case 'mål':
+      // teamSide mangler (skal ikke skje etter 00020) → dempet som mål imot:
+      // bedre å underfeire eget mål enn å feire motstanderens.
+      return event.teamSide === 'home'
+        ? {
+            icon: <Ball size={16} color={colors.heiaInk} />,
+            bg: colors.heiaTint,
+            goldDot: true,
+          }
+        : {
+            icon: <Ball size={16} color={colors.textSecondary} />,
+            bg: colors.surfaceMuted,
+          };
+    case 'avspark':
+    case 'andre_omgang':
+      return {
+        icon: <Play size={15} color={colors.textSecondary} />,
+        bg: colors.surfaceMuted,
+      };
+    case 'pause':
+      return {
+        icon: <Pause size={15} color={colors.textSecondary} />,
+        bg: colors.surfaceMuted,
+      };
+    case 'slutt':
+      return {
+        icon: <Flag size={15} color={colors.stadiumText} />,
+        bg: colors.stadium,
+      };
+    case 'bytte':
+      return {
+        icon: <ArrowLeftRight size={15} color={colors.textSecondary} />,
+        bg: colors.surfaceMuted,
+      };
+    case 'kort':
+      return {icon: <BookingCard size={16} />, bg: colors.sun};
+    case 'melding':
+      return {
+        icon: <MessageCircle size={15} color={colors.textSecondary} />,
+        bg: colors.surfaceMuted,
+      };
+  }
+}
 
 export function MatchEventRow({
   event,
@@ -55,14 +89,16 @@ export function MatchEventRow({
   score,
   onPressPhoto,
 }: MatchEventRowProps) {
-  const icon = eventIcons[event.type];
-  const iconColor = eventColors[event.type];
+  const marker = markerFor(event);
 
   return (
     <View style={[styles.container, isLatest && styles.latest]}>
       <View style={styles.timeline}>
-        <View style={[styles.iconCircle, {backgroundColor: iconColor}]}>
-          {icon}
+        <View>
+          <View style={[styles.iconCircle, {backgroundColor: marker.bg}]}>
+            {marker.icon}
+          </View>
+          {marker.goldDot && <View style={styles.goldDot} />}
         </View>
         <View style={styles.line} />
       </View>
@@ -125,6 +161,18 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Gulldetaljen på mål for oss — hvit kant løfter den av mint-sirkelen.
+  goldDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 11,
+    height: 11,
+    borderRadius: 5.5,
+    backgroundColor: colors.gold,
+    borderWidth: 2,
+    borderColor: colors.surface,
   },
   line: {
     flex: 1,

@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
   Linking,
   Alert,
@@ -14,7 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar, BackBar} from '../components';
+import {Avatar, BackBar, ListRowSkeleton, Skeleton} from '../components';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
@@ -114,8 +113,21 @@ export function TeamMembersScreen() {
     return (
       <View style={styles.screen}>
         <BackBar title="Lagoversikt" />
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.heiaPressed} />
+        {/* Lagnavnet er kjent fra context — bare medlemmene lastes. */}
+        <View style={styles.header}>
+          <Text style={styles.teamName}>
+            {activeTeamSpace?.displayName ?? 'Laget'}
+          </Text>
+          <Skeleton width={80} height={12} />
+        </View>
+        <View style={styles.section}>
+          <Skeleton width={110} height={11} />
+          <View style={styles.card}>
+            <ListRowSkeleton />
+            <ListRowSkeleton />
+            <ListRowSkeleton />
+            <ListRowSkeleton showBorder={false} />
+          </View>
         </View>
       </View>
     );
@@ -220,12 +232,6 @@ export function TeamMembersScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: colors.background,
   },
   header: {

@@ -1,24 +1,66 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {NotificationRow, TeamHeader} from '../components';
+import {
+  ListRowSkeleton,
+  NotificationRow,
+  SectionHeader,
+  TeamHeader,
+} from '../components';
 import {useActiveTeam, useNotifications} from '../context';
 import {getNotifications} from '../lib/api/notifications';
 import type {HeiaNotification} from '../lib/api/notifications';
 import type {InboxStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<InboxStackParamList, 'InboxList'>;
+
+const DAY_MS = 86_400_000;
+
+/**
+ * «I dag / I går / Siste 7 dager / Tidligere» (P6) — ren lesehjelp, ingen ny
+ * modell. Radene kommer nyest først fra serveren, så hver bolk er en
+ * sammenhengende run og rekkefølgen består.
+ */
+function groupByAge(
+  items: HeiaNotification[],
+): {label: string; items: HeiaNotification[]}[] {
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+
+  const labelFor = (d: Date): string => {
+    const t = d.getTime();
+    if (t >= startOfToday) return 'I dag';
+    if (t >= startOfToday - DAY_MS) return 'I går';
+    if (t >= startOfToday - 7 * DAY_MS) return 'Siste 7 dager';
+    return 'Tidligere';
+  };
+
+  const sections: {label: string; items: HeiaNotification[]}[] = [];
+  for (const item of items) {
+    const label = labelFor(item.createdAt);
+    const last = sections[sections.length - 1];
+    if (last && last.label === label) {
+      last.items.push(item);
+    } else {
+      sections.push({label, items: [item]});
+    }
+  }
+  return sections;
+}
 
 export function InboxScreen() {
   const insets = useSafeAreaInsets();
@@ -100,6 +142,8 @@ export function InboxScreen() {
     markAllRead();
   }, [markAllRead]);
 
+  const sections = useMemo(() => groupByAge(items), [items]);
+
   if (!activeTeamSpaceId) return null;
 
   return (
@@ -131,13 +175,18 @@ export function InboxScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.heia} />
+          <View style={[styles.list, styles.standalone]}>
+            <ListRowSkeleton />
+            <ListRowSkeleton />
+            <ListRowSkeleton />
+            <ListRowSkeleton showBorder={false} />
+          </View>
         ) : error ? (
-          <View style={styles.emptyCard}>
+          <View style={[styles.emptyCard, styles.standalone]}>
             <Text style={styles.emptyText}>{error}</Text>
           </View>
         ) : items.length === 0 ? (
-          <View style={styles.emptyCard}>
+          <View style={[styles.emptyCard, styles.standalone]}>
             <Text style={styles.emptyTitle}>Ingen varsler ennå</Text>
             <Text style={styles.emptyText}>
               Mål, kampstart og nye innlegg fra laget havner her — også når du
@@ -145,16 +194,23 @@ export function InboxScreen() {
             </Text>
           </View>
         ) : (
-          <View style={styles.list}>
-            {items.map((item, i) => (
-              <NotificationRow
-                key={item.id}
-                item={item}
-                showBorder={i < items.length - 1}
-                onPress={() => handlePress(item)}
-              />
-            ))}
-          </View>
+          /* Bolkene «I dag / I går / …» — mint-strek-etikett + samme enkle
+             liste som før, bare delt opp. Ikke kort per varsel. */
+          sections.map(section => (
+            <View key={section.label}>
+              <SectionHeader title={section.label} />
+              <View style={styles.list}>
+                {section.items.map((item, i) => (
+                  <NotificationRow
+                    key={item.id}
+                    item={item}
+                    showBorder={i < section.items.length - 1}
+                    onPress={() => handlePress(item)}
+                  />
+                ))}
+              </View>
+            </View>
+          ))
         )}
       </ScrollView>
     </View>
@@ -166,13 +222,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // Luften under headeren kommer fra SectionHeaders eget topp-rom («I dag»
+  // osv.); tilstander uten seksjoner bruker `standalone` i stedet.
   header: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
-    marginBottom: spacing.xl,
+  },
+  standalone: {
+    marginTop: spacing.xl,
   },
   headerText: {
     flex: 1,
@@ -189,9 +249,6 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.heiaInk,
     fontWeight: '600',
-  },
-  loader: {
-    marginTop: spacing.xl,
   },
   list: {
     marginHorizontal: spacing.lg,

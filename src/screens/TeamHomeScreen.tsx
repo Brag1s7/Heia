@@ -8,22 +8,27 @@ import {
   RefreshControl,
   StyleSheet,
   TextInput,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  type NavigationProp,
+  type RouteProp,
+} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
 import {
   SectionHeader,
   FeedCard,
   Button,
   LiveMatchBanner,
-  NextEventHero,
+  NextEventCarousel,
   TeamHeader,
   MatchPhotoGallery,
   Avatar,
+  FeedCardSkeleton,
 } from '../components';
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
@@ -39,7 +44,12 @@ import {
   type MatchPhoto,
 } from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
-import type {FeedItem, HeiaEvent, HomeStackParamList} from '../shared/types';
+import type {
+  FeedItem,
+  HeiaEvent,
+  HomeStackParamList,
+  RootTabParamList,
+} from '../shared/types';
 
 /** Valgt bilde i compose-boksen: preview-uri + payload for opplasting. */
 type SelectedImage = PickedImage;
@@ -85,20 +95,24 @@ function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
 }
 
 /**
- * Dagens hovedøyeblikk til heroen: første hendelse som ikke er over.
+ * Hendelsene til hero-karusellen: de neste `limit` som ikke er over.
  * `getTeamEvents` leverer stigende på starttid; en hendelse uten sluttid
  * regnes som ferdig 2 t etter start. Live kamp håndteres separat og vinner.
  */
-function pickNextEvent(events: HeiaEvent[]): HeiaEvent | null {
+function pickNextEvents(events: HeiaEvent[], limit: number): HeiaEvent[] {
   const now = Date.now();
+  const upcoming: HeiaEvent[] = [];
   for (const e of events) {
     // Avlyst er ikke et hovedøyeblikk — og en kamp som alt er SPILT skal
     // ikke stå som «neste» selv om det planlagte avsparket er frem i tid.
     if (e.matchStatus === 'cancelled' || e.matchStatus === 'finished') continue;
     const end = e.endTime ?? new Date(e.startTime.getTime() + 2 * 3600000);
-    if (end.getTime() >= now) return e;
+    if (end.getTime() >= now) {
+      upcoming.push(e);
+      if (upcoming.length >= limit) break;
+    }
   }
-  return null;
+  return upcoming;
 }
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
@@ -117,7 +131,7 @@ export function TeamHomeScreen() {
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
-  const [nextEvent, setNextEvent] = useState<HeiaEvent | null>(null);
+  const [nextEvents, setNextEvents] = useState<HeiaEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composeText, setComposeText] = useState('');
@@ -144,7 +158,7 @@ export function TeamHomeScreen() {
       ]);
       setFeed(items);
       setLiveMatch(live);
-      setNextEvent(pickNextEvent(events));
+      setNextEvents(pickNextEvents(events, 3));
     } catch {
       setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
     } finally {
@@ -332,7 +346,9 @@ export function TeamHomeScreen() {
       {/* Team-header (kompakt) — med inngangen til sesongflaten */}
       <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
 
-      {/* HERO — dagens hovedøyeblikk: live kamp slår neste aktivitet */}
+      {/* HERO — dagens hovedøyeblikk: live kamp slår neste aktivitet.
+          Hverdagsmodus = karusell over de neste hendelsene + kalender-kort;
+          karusellens sider eier skjermmargen selv (full bredde her). */}
       {liveMatch ? (
         <View style={styles.section}>
           <LiveMatchBanner
@@ -342,12 +358,17 @@ export function TeamHomeScreen() {
             }
           />
         </View>
-      ) : nextEvent ? (
-        <View style={styles.section}>
-          <NextEventHero
-            event={nextEvent}
-            onPress={() =>
-              navigation.navigate('EventDetail', {eventId: nextEvent.id})
+      ) : nextEvents.length > 0 ? (
+        <View style={styles.carouselSection}>
+          <NextEventCarousel
+            events={nextEvents}
+            onEventPress={e =>
+              navigation.navigate('EventDetail', {eventId: e.id})
+            }
+            onOpenCalendar={() =>
+              navigation
+                .getParent<NavigationProp<RootTabParamList>>()
+                ?.navigate('KalenderStack')
             }
           />
         </View>
@@ -441,17 +462,18 @@ export function TeamHomeScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator
-          style={styles.feedLoader}
-          color={colors.heia}
-        />
+        <View style={styles.feedSkeleton}>
+          <FeedCardSkeleton />
+          <FeedCardSkeleton />
+          <FeedCardSkeleton />
+        </View>
       ) : error ? (
         <View style={styles.emptyFeed}>
           <Text style={styles.emptyText}>{error}</Text>
         </View>
       ) : feed.length === 0 ? (
         <View style={styles.emptyFeed}>
-          <Text style={styles.emptyTitle}>Ingen aktivitet ennå</Text>
+          <Text style={styles.emptyTitle}>Stille her ennå …</Text>
           <Text style={styles.emptyText}>
             Skriv den første meldingen, eller inviter foreldre og spillere så
             blir laget levende.
@@ -531,6 +553,9 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  carouselSection: {
     paddingTop: spacing.lg,
   },
   cardWrap: {
@@ -641,8 +666,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '600',
   },
-  feedLoader: {
-    marginTop: spacing.xl,
+  feedSkeleton: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
   emptyFeed: {
     marginHorizontal: spacing.lg,

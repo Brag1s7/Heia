@@ -4,14 +4,19 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {EventCard, LiveBadge, TeamHeader} from '../components';
+import {
+  EventCard,
+  EventCardSkeleton,
+  LiveBadge,
+  Skeleton,
+  TeamHeader,
+} from '../components';
 import {useActiveTeam} from '../context';
 import {getTeamEvents} from '../lib/api/events';
 import type {KalenderStackParamList, HeiaEvent} from '../shared/types';
@@ -31,6 +36,15 @@ function isPast(date: Date): boolean {
   return startOfDay(date) < startOfDay(new Date());
 }
 
+/** «August», eller «Januar 2027» når måneden bor i et annet år. */
+function formatMonthLabel(date: Date): string {
+  const month = date.toLocaleDateString('nb-NO', {month: 'long'});
+  const capped = month.charAt(0).toUpperCase() + month.slice(1);
+  return date.getFullYear() === new Date().getFullYear()
+    ? capped
+    : `${capped} ${date.getFullYear()}`;
+}
+
 function getSectionLabel(date: Date): string {
   const today = startOfDay(new Date());
   const eventDay = startOfDay(date);
@@ -40,7 +54,9 @@ function getSectionLabel(date: Date): string {
   if (diffDays === 0) return 'I dag';
   if (diffDays === 1) return 'I morgen';
   if (diffDays <= 7) return 'Denne uken';
-  return 'Kommende';
+  // Lenger frem sier «Kommende» ingenting — månedsnavnet gir kalenderen
+  // rytme (P9): August, September … som egne seksjoner.
+  return formatMonthLabel(date);
 }
 
 /**
@@ -146,16 +162,30 @@ export function KalenderScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.heia} />
+          <>
+            <View style={styles.sectionHeader}>
+              <Skeleton width={90} height={11} />
+            </View>
+            <View style={styles.cardWrap}>
+              <EventCardSkeleton />
+            </View>
+            <View style={styles.cardWrap}>
+              <EventCardSkeleton />
+            </View>
+            <View style={styles.cardWrap}>
+              <EventCardSkeleton />
+            </View>
+          </>
         ) : error ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>{error}</Text>
           </View>
         ) : events.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Ingen hendelser ennå</Text>
+            <Text style={styles.emptyTitle}>Kalenderen er tom</Text>
             <Text style={styles.emptyText}>
-              Treninger, kamper og sosiale samlinger dukker opp her.
+              Treninger, kamper og det sosiale dukker opp her når laget
+              planlegger noe.
             </Text>
           </View>
         ) : (
@@ -171,17 +201,39 @@ export function KalenderScreen() {
                     <LiveBadge />
                   )}
               </View>
-              {section.events.map(event => (
-                <View key={event.id} style={styles.cardWrap}>
-                  <EventCard
-                    event={event}
-                    featured={event.matchStatus === 'live'}
-                    onPress={() =>
-                      navigation.navigate('EventDetail', {eventId: event.id})
-                    }
-                  />
-                </View>
-              ))}
+              {section.events.map((event, index) => {
+                const prev = index > 0 ? section.events[index - 1] : null;
+                // Arkivet ruller bakover i tid — en dempet månedsetikett når
+                // måneden bytter gir rytme uten å rope (fremover er månedene
+                // egne seksjoner, så dette gjelder kun «Tidligere»).
+                const monthBreak =
+                  section.label === 'Tidligere' &&
+                  prev !== null &&
+                  (prev.startTime.getMonth() !== event.startTime.getMonth() ||
+                    prev.startTime.getFullYear() !==
+                      event.startTime.getFullYear());
+                return (
+                  <React.Fragment key={event.id}>
+                    {monthBreak && (
+                      <Text style={styles.monthDivider}>
+                        {formatMonthLabel(event.startTime)}
+                      </Text>
+                    )}
+                    <View style={styles.cardWrap}>
+                      <EventCard
+                        event={event}
+                        featured={event.matchStatus === 'live'}
+                        past={section.label === 'Tidligere'}
+                        onPress={() =>
+                          navigation.navigate('EventDetail', {
+                            eventId: event.id,
+                          })
+                        }
+                      />
+                    </View>
+                  </React.Fragment>
+                );
+              })}
             </View>
           ))
         )}
@@ -207,9 +259,6 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: spacing.xs,
-  },
-  loader: {
-    marginTop: spacing.xl,
   },
   emptyCard: {
     marginHorizontal: spacing.lg,
@@ -253,5 +302,17 @@ const styles = StyleSheet.create({
   cardWrap: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
+  },
+  // Stillere enn seksjonsetiketten (ingen mint-strek, tertiær) — rytme i
+  // arkivet, ikke et nytt rop.
+  monthDivider: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.textTertiary,
   },
 });
