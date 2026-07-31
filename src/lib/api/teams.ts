@@ -41,6 +41,7 @@ function mapEnrichedMembership(row: any): EnrichedMembership {
         id: t.club.id,
         name: t.club.name,
         shortName: t.club.short_name,
+        logoUrl: t.club.logo_url,
       },
       sport: {
         id: t.sport.id,
@@ -145,6 +146,25 @@ export async function activateTeamSpace(
     inviteCode: data.invite_code,
     membershipId: data.membership_id,
   };
+}
+
+/**
+ * Antall aktive medlemskap i lagrommet — samme telling som lookup_invite_code
+ * (memberships-rader, ikke unike personer). Head-request: ingen rader over
+ * nettet. RLS teller kun rader man selv kan se, så kall den bare for lag man
+ * er medlem i — ellers blir svaret 0, ikke en feil.
+ */
+export async function getTeamMemberCount(teamSpaceId: string): Promise<number> {
+  const {count, error} = await supabase
+    .from('memberships')
+    .select('id', {count: 'exact', head: true})
+    .eq('team_space_id', teamSpaceId)
+    .eq('status', 'active');
+
+  if (error) {
+    throw error;
+  }
+  return count ?? 0;
 }
 
 /**

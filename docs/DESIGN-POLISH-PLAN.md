@@ -11,6 +11,7 @@ punkt.» Kryss av her når en skive er ferdig OG sett på telefon._
 - [ ] Skive 5 — kamprapporten (aldri optisk verifisert)
 - [x] P1 — skeletons — ✅ godkjent på telefon + committet 2026-07-31
 - [x] P2 — MÅL-øyeblikket — ✅ godkjent på telefon + committet 2026-07-31
+- [x] P3 — headeren — ✅ godkjent på telefon + committet 2026-07-31
 
 ---
 
@@ -85,7 +86,9 @@ bra», inkl. banner-dempingen) og committet.**
   match_live-varsler for kampen du står på (i fokus, mens den er i gang)
   dempes; badge/inbox består, alle andre skjermer/kategorier urørt.
 
-## P3 — Headeren som mockupen
+## P3 — Headeren som mockupen — ✅ FERDIG
+
+**Status: FERDIG — godkjent på telefon av Brage 2026-07-31 og committet.**
 
 **Hva:** TeamHeader matcher A v2-mockupen: logo-sirkel + lagnavn +
 undertekst «Fotball · 18 medlemmer».
@@ -101,6 +104,18 @@ undertekst «Fotball · 18 medlemmer».
 - **Vakt:** headeren skal ikke bli høyere enn mockupen — neste
   hendelse-kortet skal fortsatt synes uten scrolling.
 - Kun JS → Metro-reload.
+
+**Slik ble det (2026-07-31):**
+- `TeamHeader`: rundet firkant → SIRKEL; lagfarge-stripen under navnet er
+  erstattet av underteksten (lagfargen bor i ringen + initial-fyllet).
+  Høyden er uendret (40 pt sirkel, navn+undertekst ≈ 38 pt) — vakten holdt.
+- Fallback-kjeden står klar FØR URL-ene finnes (P4 lager opplastingen):
+  `Club`-typen fikk `logoUrl` (feltet lå alt i selecten, var bare ikke
+  mappet); `onError` → initialer, husket per URL så lagbytte prøver igjen.
+- `TeamContext.activeMemberCount`: ny `getTeamMemberCount()` (head-count,
+  samme telling som `lookup_invite_code`), cachet per lagrom i en ref-Map.
+  RLS-vakt: teller ikke før eget medlemskap finnes i listen (ellers falskt
+  0 — RLS teller kun synlige rader). Singular «1 medlem».
 
 ## P4 — «Laginnstillinger»-side + KLUBBLOGO
 
@@ -290,8 +305,8 @@ at alle kort er identiske, ikke av listeformen.
   allerede, appen navigerer bare ikke (kjent v1-hull fra Fase 4).
 - [ ] **Delbart invitasjonskort** — invitasjonskoden som pent bilde å dele
   i foreldregruppa (Strava-DNA: deling er vekstmotoren). Idé, ikke lovet.
-- [ ] **Sport + årsklasse** dekkes av P3 (undertekst) — SENERE-punkt 9 i
-  STATUS-HANDOFF kan strykes når P3 er ferdig.
+- [x] **Sport + årsklasse** — ✅ dekket av P3 (undertekst); SENERE-punkt 9
+  i STATUS-HANDOFF er strøket 2026-07-31.
 
 ## Faste regler for alle skivene
 

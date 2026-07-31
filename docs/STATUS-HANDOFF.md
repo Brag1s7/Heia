@@ -1,20 +1,17 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-31. **Nyeste skive: P2 MÅL-ØYEBLIKKET (design-
-polish-planen) — score-sprett + mint-feiring i ScoreBoard/LiveMatchBanner,
-SEIER-pill som spretter inn, trykk-respons på målknappene + banner-demping
-på kampsiden. FERDIG — godkjent på telefon av Brage 2026-07-31 («funker
-veldig bra») og committet. Se «⚽ P2 — MÅL-ØYEBLIKKET» under.** Fra før: P1 SKELETONS
-er FERDIG (godkjent på telefon + committet 2026-07-31); LAGFARGE er FERDIG
-(verifisert på telefon + committet 2026-07-31); SESONGFLATEN + TURNERINGER
-+ VÅR/HØST-SESONGER (migrasjoner `00030`–`00033` deployet, flyt godkjent og
-pushet). LÅST underveis: ingen toppscorer/spillerstatistikk før strukturert
-spillerstall; sesong = vår/høst-halvår; turnering = enkel kampsamling;
-lagfarge = kuratert palett, aldri fri velger. **Skive 6 (app-ikon + launch
-screen) er FERDIG — bruker: «perfekt gjennomført» 2026-07-30.** Fortsatt
-uverifisert: kun **KAMPRAPPORTEN (skive 5)**. **Neste: P3 (headeren
-som mockupen)** — se punkt 5 under. Design skive 1–5 er merget (PR #17),
-Fase 4–9 fra før (PR #16)._
+_Sist oppdatert: 2026-07-31. **P3 HEADEREN er FERDIG (godkjent på telefon +
+committet 2026-07-31).** Fra før: P2 MÅL-ØYEBLIKKET og P1 SKELETONS
+er FERDIG (begge godkjent på telefon + committet 2026-07-31); LAGFARGE er
+FERDIG (verifisert på telefon + committet 2026-07-31); SESONGFLATEN +
+TURNERINGER + VÅR/HØST-SESONGER (migrasjoner `00030`–`00033` deployet, flyt
+godkjent og pushet). LÅST underveis: ingen toppscorer/spillerstatistikk før
+strukturert spillerstall; sesong = vår/høst-halvår; turnering = enkel
+kampsamling; lagfarge = kuratert palett, aldri fri velger. **Skive 6
+(app-ikon + launch screen) er FERDIG — bruker: «perfekt gjennomført»
+2026-07-30.** Fortsatt uverifisert: **KAMPRAPPORTEN (skive 5)**.
+**Neste: P5 + P5B (kampforløpet + hendelsessiden)** når P4 er verifisert —
+se punkt 5 under. Design skive 1–5 er merget (PR #17), Fase 4–9 (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -48,8 +45,9 @@ Se seksjonen «✅ TURNERINGER + VÅR/HØST-SESONGER» for modellen og testliste
 
 **5. 🗺 DESIGN-POLISH-PLANEN er i gang: `docs/DESIGN-POLISH-PLAN.md`** —
 9 skiver (P1 skeletons → P2 MÅL-øyeblikket → P3 header, deretter P4–P9) +
-backlog. Brages valgte rekkefølge. **P1 og P2 er FERDIG (begge godkjent
-på telefon 2026-07-31) — neste åpne skive er P3 (headeren som mockupen).**
+backlog. Brages valgte rekkefølge. **P1, P2 og P3 er FERDIG (alle godkjent
+på telefon + committet 2026-07-31). Neste åpne skive er P5 + P5B når P4
+(laginnstillinger + klubblogo) er verifisert.**
 **NY skive P5B (2026-07-31, Brages telefonfunn): hendelsessiden har for
 mye hvitt / kjedelig hero, og før-kampstart-skjermen fortjener
 kampdag-følelse — tas sammen med P5 (samme skjerm). Se planens P5B.**
@@ -62,8 +60,55 @@ punkt.»
 Deretter (etter polish-planen): kandidat 2 (kommentarer + heiing synlig i
 kamptidslinja).
 
-**Fortsatt uverifisert (din jobb):** kun skive 5 (kamprapporten).
-**Skive 6, LAGFARGEN, P1 og P2 er FERDIG** (bruker-verifisert 2026-07-30/31).
+**Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten).
+**Skive 6, LAGFARGEN, P1, P2 og P3 er FERDIG** (bruker-verifisert
+2026-07-30/31).
+
+---
+
+## 🎽 P3 — HEADEREN SOM MOCKUPEN (✅ FERDIG — godkjent på telefon + committet 2026-07-31)
+
+Tredje skive i design-polish-planen. Ingen migrasjon, ingen native-deps —
+ren JS. `npx eslint src`: 0 errors, 2 warnings (begge fra før).
+
+- **`TeamHeader` matcher A v2-mockupen:** logo-SIRKEL (før: rundet firkant)
+  + lagnavn + undertekst «Fotball · 18 medlemmer». Lagfarge-stripen under
+  navnet er erstattet av underteksten — lagfargen bor nå i ringen rundt
+  sirkelen + initial-fyllet. Vises på alle tre fanene (Hjem/Kalender/Varsler);
+  Sesongen-chipen er urørt.
+- **Logo-sirkelens fallback-kjede** (P4-modellen, kjeden står klar før
+  URL-ene finnes): `teamSpace.logoUrl` → `club.logoUrl` → initialer på
+  lagfarge (`inkOnTeamColor` — gult krever mørke initialer). `Club`-typen
+  fikk `logoUrl`, mappet i `mapEnrichedMembership` (`clubs(*)` var alt med
+  i selecten — feltet var bare ikke mappet). Feiler bildelastingen
+  (`onError`) faller sirkelen tilbake til initialene; failed-URL-en huskes
+  per URL, så et lagbytte prøver på nytt.
+- **Medlemstallet bor i TeamContext** (`activeMemberCount`), IKKE i
+  headeren — headeren monteres på tre skjermer og skal ikke spørre per
+  skjerm. Ny `getTeamMemberCount(teamSpaceId)` i `teams.ts`: head-count på
+  `memberships` (`status='active'`, `count: 'exact'`) — samme telling som
+  `lookup_invite_code` (medlemskap, ikke unike personer; en forelder med to
+  barn teller to). Cachet per lagrom (Map i ref) så lagbytte viser forrige
+  tall med én gang; refetches når memberships refetches.
+  **RLS-vakt:** teller du et lag du ikke er medlem i, gir RLS et falskt 0 —
+  effekten venter derfor til medlemskapet finnes i `userMemberships`.
+- **Underteksten er aldri tom:** tall mangler (henting/feil) → «Fotball ·
+  G14» (sport + ageGroup). Singular: «1 medlem».
+- **Høydevakten holdt:** sirkelen er 40 pt totalt som før (32 + ring),
+  navn 18 pt + undertekst 12 pt ≈ 38 pt — headeren er IKKE høyere, neste
+  hendelse-kort synes fortsatt uten scrolling.
+
+### Test dette først (Metro-reload)
+1. Hjem: sirkel med initialer på lagfargen + lagnavn + «Fotball · N
+   medlemmer». Tallet skal stemme med Lagoversikt-tellingen.
+2. Kalender + Varsler: samme header (tallet hentes ÉN gang, fra context).
+3. Bytt lag (om du har to): underteksten oppdaterer seg — sport/tall følger
+   laget, og gammelt lags tall vises aldri på det nye.
+4. Headerens høyde: neste hendelse-kortet på Hjem skal fortsatt synes uten
+   å scrolle (vakten fra planen).
+5. (Logo-bildet kan først testes i P4 når opplasting finnes — men sett
+   gjerne en URL manuelt på `team_spaces.logo_url`/`clubs.logo_url` i SQL
+   for å se sirkelen med ekte logo.)
 
 ---
 
@@ -2202,10 +2247,8 @@ Andre kandidater:
 8. **Rydd `NSLocationWhenInUseUsageDescription`** — står med tom streng i
    Info.plist og posisjon brukes ingen steder. Tomme begrunnelser er en kjent
    grunn til avslag i App Store-review.
-9. **Sport + årsklasse i TeamHeader** — «HamKam» alene sier ikke HVILKET lag
-   det er (forelder med to barn i to lag). `activeTeam` (sport/ageGroup/
-   klubb) ligger alt i context; legg «FOTBALL · G14» på stripe-raden så
-   headeren ikke vokser i høyde. Bruker viste interesse 2026-07-30.
+9. ~~**Sport + årsklasse i TeamHeader**~~ — ✅ **DEKKET AV P3 2026-07-31**
+   (undertekst «Fotball · N medlemmer», fallback «Fotball · G14»).
 
 ### 🎨 Designgjeld (kartlagt 2026-07-30 — ikke påbegynt)
 - **BRAND_UI.md beskriver FØR-A v2-systemet** (gamle fargeverdier, slettet

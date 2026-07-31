@@ -1,5 +1,5 @@
-import React from 'react';
-import {View, Text, Pressable, StyleSheet} from 'react-native';
+import React, {useState} from 'react';
+import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
 import {inkOnTeamColor} from '../shared/teamColors';
@@ -26,27 +26,61 @@ interface TeamHeaderProps {
 
 export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
   const insets = useSafeAreaInsets();
-  const {activeTeamSpace} = useActiveTeam();
+  const {activeTeamSpace, activeTeam, activeMemberCount} = useActiveTeam();
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
 
   if (!activeTeamSpace) return null;
 
   const teamColor = activeTeamSpace.color || colors.textSecondary;
 
+  // Logo-sirkelens fallback-kjede: lag-logo → klubblogo → initialer på
+  // lagfarge. URL-ene settes først i P4 (laginnstillinger), men kjeden står
+  // klar. Feiler nedlastingen faller vi tilbake til initialene i stedet for
+  // en tom sirkel.
+  const logoUrl = activeTeamSpace.logoUrl ?? activeTeam?.club.logoUrl ?? null;
+  const showLogo = logoUrl != null && logoUrl !== failedLogoUrl;
+
+  // Undertekst: «Fotball · 18 medlemmer»; før tallet finnes (eller om
+  // hentingen feiler): «Fotball · G14». Aldri en tom linje.
+  const subtitle = [
+    activeTeam?.sport.displayName,
+    activeMemberCount != null
+      ? activeMemberCount === 1
+        ? '1 medlem'
+        : `${activeMemberCount} medlemmer`
+      : activeTeam?.ageGroup,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <View style={[styles.container, {paddingTop: insets.top + spacing.sm}]}>
-      {/* Lagfargens identitetsrolle: ring rundt merket + stripe under navnet */}
+      {/* Lagfargen bor i ringen — logoen (eller initial-fyllet) inni */}
       <View style={[styles.badgeRing, {borderColor: teamColor}]}>
-        <View style={[styles.badge, {backgroundColor: teamColor}]}>
-          <Text style={[styles.badgeText, {color: inkOnTeamColor(teamColor)}]}>
-            {teamInitials(activeTeamSpace.displayName)}
-          </Text>
-        </View>
+        {showLogo ? (
+          <Image
+            source={{uri: logoUrl}}
+            style={styles.logo}
+            onError={() => setFailedLogoUrl(logoUrl)}
+          />
+        ) : (
+          <View style={[styles.badge, {backgroundColor: teamColor}]}>
+            <Text
+              style={[styles.badgeText, {color: inkOnTeamColor(teamColor)}]}>
+              {teamInitials(activeTeamSpace.displayName)}
+            </Text>
+          </View>
+        )}
       </View>
       <View style={styles.nameWrap}>
         <Text style={styles.name} numberOfLines={1}>
           {activeTeamSpace.displayName}
         </Text>
-        <View style={[styles.stripe, {backgroundColor: teamColor}]} />
+        {subtitle.length > 0 && (
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+        )}
       </View>
       {onSeasonPress && (
         <Pressable
@@ -82,17 +116,24 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     gap: spacing.md,
   },
+  // 32 + 2×2 padding + 2×2 border = 40 totalt — samme høyde som før
+  // (høydevakten: neste hendelse-kortet skal fortsatt synes uten scrolling)
   badgeRing: {
     borderWidth: 2,
-    borderRadius: radius.lg,
+    borderRadius: radius.full,
     padding: 2,
   },
   badge: {
     width: 32,
     height: 32,
-    borderRadius: radius.md - 1,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  logo: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.full,
   },
   // Farge settes inline — gult krever mørke initialer (inkOnTeamColor).
   badgeText: {
@@ -105,15 +146,15 @@ const styles = StyleSheet.create({
   },
   name: {
     ...typography.heading3,
-    fontSize: 19,
     fontWeight: '800',
     letterSpacing: -0.3,
   },
-  stripe: {
-    width: 34,
-    height: 3,
-    borderRadius: 2,
-    marginTop: 4,
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.1,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
   seasonWrap: {
     marginLeft: 'auto',

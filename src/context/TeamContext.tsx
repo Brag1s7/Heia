@@ -4,11 +4,12 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
 import {useAuth} from './UserContext';
-import {getUserMemberships} from '../lib/api/teams';
+import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
 import type {
   EnrichedMembership,
   MemberRole,
@@ -22,6 +23,11 @@ interface TeamContextValue {
   activeTeam: Team | null;
   /** Innlogget brukers rolle i det aktive lagrommet. */
   activeRole: MemberRole | null;
+  /**
+   * Antall aktive medlemskap i det aktive lagrommet (TeamHeader-underteksten).
+   * null til tallet er hentet — vis sport · årsklasse som fallback, aldri tomt.
+   */
+  activeMemberCount: number | null;
   userMemberships: EnrichedMembership[];
   loading: boolean;
   setActiveTeamSpace: (teamSpaceId: string) => void;
@@ -96,6 +102,41 @@ export function TeamProvider({children}: PropsWithChildren) {
     [userMemberships, activeTeamSpaceId],
   );
 
+  // Medlemstallet til TeamHeader-underteksten. Cachet per lagrom, så et
+  // lagbytte viser forrige tall med én gang mens ferskt hentes. Feiler
+  // hentingen beholdes cache/null — headeren har sport · årsklasse som
+  // fallback. userMemberships er bevisst med i deps: en refresh av
+  // medlemskapene skal også friske opp tallet (head-count er billig).
+  const memberCountCache = useRef<Map<string, number>>(new Map());
+  const [activeMemberCount, setActiveMemberCount] = useState<number | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!activeTeamSpaceId) {
+      setActiveMemberCount(null);
+      return;
+    }
+    setActiveMemberCount(memberCountCache.current.get(activeTeamSpaceId) ?? null);
+    // RLS teller kun rader man selv ser — uten eget medlemskap ville svaret
+    // blitt et falskt 0, så vent til medlemskapet finnes i listen.
+    if (!userMemberships.some(m => m.teamSpaceId === activeTeamSpaceId)) {
+      return;
+    }
+    let cancelled = false;
+    getTeamMemberCount(activeTeamSpaceId)
+      .then(count => {
+        memberCountCache.current.set(activeTeamSpaceId, count);
+        if (!cancelled) {
+          setActiveMemberCount(count);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeamSpaceId, userMemberships]);
+
   const setActiveTeamSpace = useCallback((teamSpaceId: string) => {
     setActiveTeamSpaceId(teamSpaceId);
   }, []);
@@ -107,6 +148,7 @@ export function TeamProvider({children}: PropsWithChildren) {
         activeTeamSpace,
         activeTeam,
         activeRole,
+        activeMemberCount,
         userMemberships,
         loading,
         setActiveTeamSpace,

@@ -32,6 +32,7 @@ export interface Club {
   id: string;
   name: string;
   shortName: string | null;
+  logoUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
