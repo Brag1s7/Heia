@@ -1,18 +1,19 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (natt). **Nyeste skiver: SESONGFLATEN +
-TURNERINGER + VÅR/HØST-SESONGER — KODET, migrasjoner `00030`–`00033`
-deployet. Turneringsflyten OMLAGT etter første brukertest: turneringer bor
-nå i sesongsidens velger, kalenderen viser kampene, kampskjemaet velger
-turnering. Bruker godkjente flyten → committet og pushet på `Brage`.** LÅST
-underveis: ingen toppscorer/spillerstatistikk før strukturert spillerstall;
-sesong = vår/høst-halvår; turnering = enkel kampsamling (event +
-parent_event_id). Kveldens telefonfikser (BackBar m.m.) er committet
-(`ed5d897`). Fortsatt uverifisert fra før: **KAMPRAPPORTEN (skive 5)** og
-**APP-IKON + LAUNCH SCREEN (skive 6)** — skive 6 krever **rebuild**
-(ikonvalget er LÅST: variant C). **Neste:** brukertest av kveldens skiver →
-commit, deretter kandidat 2. Design skive 1–5 er merget (PR #17), Fase 4–9
-fra før (PR #16)._
+_Sist oppdatert: 2026-07-30 (natt, oppd. 2). **Nyeste skive: LAGFARGE —
+kuratert palett ved lagopprettelse + «Lagfarge»-innstilling på Profil (kun
+trener/lagleder/admin) + mørke initialer på gult lagmerke. KODET, ikke
+committet — kun Metro-reload, INGEN migrasjon.** Fra før samme døgn:
+SESONGFLATEN + TURNERINGER + VÅR/HØST-SESONGER (migrasjoner `00030`–`00033`
+deployet, flyt godkjent og pushet). LÅST underveis: ingen toppscorer/
+spillerstatistikk før strukturert spillerstall; sesong = vår/høst-halvår;
+turnering = enkel kampsamling; lagfarge = kuratert palett, aldri fri velger.
+**Skive 6 (app-ikon + launch screen) er FERDIG — bruker: «perfekt
+gjennomført» 2026-07-30. LAGFARGEN er FERDIG — verifisert på telefon og
+committet 2026-07-31.** Fortsatt uverifisert: kun **KAMPRAPPORTEN
+(skive 5)**. **Neste:** design-polish-planen (P1 skeletons først) — se
+punkt 5 under. Design skive 1–5 er merget (PR #17), Fase 4–9 fra før
+(PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -40,12 +41,24 @@ kampene, og kampskjemaet har et «Turnering»-felt når det finnes turneringer.
 Se seksjonen «✅ TURNERINGER + VÅR/HØST-SESONGER» for modellen og testlisten.
 **Bruker godkjente flyten 2026-07-30 (natt) → alt er committet og pushet.**
 
-Deretter: kandidat 2 (kommentarer + heiing synlig i kamptidslinja).
+**4. ✅ LAGFARGE er FERDIG** — verifisert på telefon av bruker og committet
+2026-07-31. Kuratert palett ved lagopprettelse + «Lagfarge»-rad på Profil
+(kun trener/lagleder/admin) + mørke initialer på gult lagmerke.
 
-**Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten) og skive 6
-(produksjonsikonet + launch screen). ⚠️ Ikonet du så på telefonen 2026-07-30
-var fra bygget 18:52 — altså FØR produksjonsversjonen av variant C. Bygg på
-nytt før du bedømmer det.
+**5. 🗺 DESIGN-POLISH-PLANEN er skrevet (2026-07-31):
+`docs/DESIGN-POLISH-PLAN.md`** — 9 skiver (P1 skeletons → P2 MÅL-øyeblikket
+→ P3 header, deretter P4–P9) + backlog. Brages valgte rekkefølge. LÅST
+underveis: **klubblogo bor på KLUBBEN** (`clubs.logo_url` finnes alt),
+write-once for lagadmin i klubben, aldri overskriving i MVP — detaljer og
+begrunnelse i planens P4. Start design-samtaler med: «Les
+docs/STATUS-HANDOFF.md og docs/DESIGN-POLISH-PLAN.md, og ta neste åpne
+punkt.»
+
+Deretter (etter polish-planen): kandidat 2 (kommentarer + heiing synlig i
+kamptidslinja).
+
+**Fortsatt uverifisert (din jobb):** kun skive 5 (kamprapporten).
+**Skive 6 og LAGFARGEN er FERDIG** (bruker-verifisert 2026-07-30/31).
 
 **Telefontest-funn 2026-07-30 (kveld), fikset i JS (kun reload — ingen
 rebuild):**
@@ -1595,7 +1608,7 @@ faktisk møtte. Ikke omdøp den til «Var med» uten ekte oppmøteregistrering.
 5. **Oppmøte på spilt kamp:** kun «Påmeldt (N)», ingen «Ikke svart».
 6. **Trening/kommende kamp:** uendret — infokort med Dato/Tid/Sted øverst.
 
-### ✅ Skive 6 — APP-IKON + LAUNCH SCREEN (KODET 2026-07-30, ikke optisk verifisert)
+### ✅ Skive 6 — APP-IKON + LAUNCH SCREEN (FERDIG — bruker: «perfekt gjennomført», 2026-07-30)
 
 **⚠️ KREVER REBUILD.** Ikoner og storyboard bakes inn i binæren — Metro-reload
 viser ingenting. Ingen ny pakke, ingen pod install, ingen pbxproj-endring
@@ -1940,6 +1953,54 @@ en vanlig kamp i sesongen.» Det er dét som nå er bygget (00033).
 
 ---
 
+## ✅ LAGFARGE (FERDIG — verifisert på telefon og committet 2026-07-31)
+
+Bruker-funn: fargevalg fantes ikke i appen — CreateTeam sendte aldri farge,
+så ALLE lag fikk RPC-defaulten `#6366F1` (indigo, 00016). Nå: fargevalg ved
+opprettelse + innstilling på Profil. **Kun Metro-reload — INGEN migrasjon.**
+Skrivingen dekkes av «Admins can update team space»-policyen som alt lå i
+00014.
+
+#### 🔒 Kuratert palett, ikke fri fargevelger (bruker godkjente 2026-07-30)
+A v2-regelen er «lagfarge kontrollert»: fri velger lar en trener plukke
+hvitt/krem (usynlig på flatene) eller mint (kolliderer med #02FFAB =
+Heia/handling — live-scoren blir tvetydig). 12 farger i
+`src/shared/teamColors.ts` dekker i praksis norske klubbdrakter. Indigo er
+MED i paletten slik at eksisterende lag viser «valgt» når velgeren åpnes.
+
+- **`src/shared/teamColors.ts` (ny):** `TEAM_COLORS` (12, med norske navn
+  til accessibilityLabel) + `inkOnTeamColor(hex)` — YIQ-luminans → mørke
+  initialer på gult (Glimt/LSK-gult tåler ikke hvit tekst), hvite ellers.
+- **`TeamColorPicker.tsx` (ny):** swatch-grid, valgt = ring i fargen + hake.
+  **`TeamColorSheet.tsx` (ny):** valgark på ReporterSheet-mønsteret —
+  trykk på swatch = lagre og lukk.
+- **`updateTeamColor` (teams.ts):** direkte UPDATE på `team_spaces` med
+  `.select('id')`-vakt — RLS-nekt via USING gir ellers null rader og INGEN
+  feil (setMatchReporter-lærdommen). Kaster norsk melding for ikke-admin.
+- **ProfilScreen:** «Lagfarge»-rad (kun trener/lagleder/admin), lagfarget
+  prikk som ikon → sheet → `refreshMemberships()`. Fargen leses via context
+  overalt, så lagmerket, scoreboardet, «oss»-stripa og laglisten skifter
+  uten reload.
+- **CreateTeamScreen:** «Lagfarge»-feltgruppe med forhåndsvalgt TILFELDIG
+  palettfarge (sprer fargene mellom lag, null ny friksjon — alltid utfylt).
+  Payload sender `color`; auth-before-commit (pendingAction) bærer den også.
+- **Gul-fiksen:** TeamHeader/ScoreBoard/LiveMatchBanner hadde hardkodet
+  hvite initialer på lagfargen. Alle tre bruker nå `inkOnTeamColor` på
+  «oss»-merket. Motstandermerket er urørt (nøytral mørk flate).
+
+### Test dette (Metro-reload)
+1. Profil som trener → «Lagfarge»-rad med dagens farge som prikk → trykk →
+   ark med 12 farger, dagens har ring + hake.
+2. Velg ny farge → arket lukkes, lagmerket i headeren + prikken i «Dine
+   lag» skifter uten reload. Sjekk scoreboardet på en kamp også.
+3. Velg GULT → initialene på lagmerket blir mørke, ikke hvite.
+4. Som forelder: ingen «Lagfarge»-rad på Profil.
+5. Opprett nytt lag → «Lagfarge» står forhåndsvalgt; bytt farge → laget
+   får fargen (sjekk lagmerket etterpå).
+6. `npx eslint src`: 0 errors, 3 warnings (alle fra før).
+
+---
+
 ## 📱 Test på fysisk iPhone (etablert 2026-07-30)
 
 Første gang appen kjørte på ekte enhet (iPhone 15). Tre ting kostet tid og er
@@ -2026,6 +2087,27 @@ Andre kandidater:
 8. **Rydd `NSLocationWhenInUseUsageDescription`** — står med tom streng i
    Info.plist og posisjon brukes ingen steder. Tomme begrunnelser er en kjent
    grunn til avslag i App Store-review.
+9. **Sport + årsklasse i TeamHeader** — «HamKam» alene sier ikke HVILKET lag
+   det er (forelder med to barn i to lag). `activeTeam` (sport/ageGroup/
+   klubb) ligger alt i context; legg «FOTBALL · G14» på stripe-raden så
+   headeren ikke vokser i høyde. Bruker viste interesse 2026-07-30.
+
+### 🎨 Designgjeld (kartlagt 2026-07-30 — ikke påbegynt)
+- **BRAND_UI.md beskriver FØR-A v2-systemet** (gamle fargeverdier, slettet
+  `Chip`, «Unicode-symboler» som ikonstil, 5-tab med «Meldinger»). Alt låst
+  A v2-språk bor kun i denne fila. Skriv den om FØR noen bygger på den.
+- **13 rå `ActivityIndicator`-lastetilstander** — «default spinners» er
+  eksplisitt anti-mønster i BRAND_UI. Skeleton/tomkort på Card-språket.
+- **Null bevegelse i appen** (kun LiveBadge-puls + SimulatedPush). Størst
+  effekt per innsats: MÅL-øyeblikket (scoren teller opp / feiring).
+- **Ingen haptikk** på mål/Heia/start-slutt — krever native modul → rebuild.
+- **Tilgjengelighet:** 7 accessibilityLabels i hele appen; fast px-typografi
+  (ingen Dynamic Type). Målgruppa er foreldre 40+.
+- **`bytte`/`kort`** i MatchEventRow/MatchPhotoSheet er fortsatt tegn-glyfer
+  (↔/🟨) blant Lucide-ikonene — appen lager dem ikke ennå, men de VISES om
+  data finnes.
+- **Mørk modus: lås bevisst «nei i v1»** — mørk flate BETYR kamp i A v2; en
+  systemvid mørk modus ville spist signaturen.
 
 ---
 

@@ -2,6 +2,7 @@ import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
+import {inkOnTeamColor} from '../shared/teamColors';
 import {useActiveTeam} from '../context';
 import {StadiumSurface} from './StadiumSurface';
 import {Trophy} from './icons';
@@ -36,7 +37,7 @@ export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
       {/* Lagfargens identitetsrolle: ring rundt merket + stripe under navnet */}
       <View style={[styles.badgeRing, {borderColor: teamColor}]}>
         <View style={[styles.badge, {backgroundColor: teamColor}]}>
-          <Text style={styles.badgeText}>
+          <Text style={[styles.badgeText, {color: inkOnTeamColor(teamColor)}]}>
             {teamInitials(activeTeamSpace.displayName)}
           </Text>
         </View>
@@ -93,10 +94,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Farge settes inline — gult krever mørke initialer (inkOnTeamColor).
   badgeText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   nameWrap: {

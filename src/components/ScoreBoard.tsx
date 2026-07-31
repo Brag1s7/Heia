@@ -5,6 +5,7 @@ import {LiveBadge} from './LiveBadge';
 import {StadiumSurface} from './StadiumSurface';
 import {StatusPill} from './StatusPill';
 import {useActiveTeam} from '../context';
+import {inkOnTeamColor} from '../shared/teamColors';
 import type {MatchStatus} from '../shared/types';
 
 interface ScoreBoardProps {
@@ -77,7 +78,14 @@ export function ScoreBoard({
               styles.usRing,
               {backgroundColor: teamColor},
             ]}>
-            <Text style={styles.teamBadgeText}>{initials(homeTeam)}</Text>
+            {/* Gult lagmerke krever mørke initialer — motstanderen er urørt. */}
+            <Text
+              style={[
+                styles.teamBadgeText,
+                {color: inkOnTeamColor(teamColor)},
+              ]}>
+              {initials(homeTeam)}
+            </Text>
           </View>
           <Text style={styles.teamName} numberOfLines={2}>
             {homeTeam}

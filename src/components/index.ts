@@ -21,6 +21,8 @@ export {ReporterSheet} from './ReporterSheet';
 export {SimulatedPush} from './SimulatedPush';
 export {CreateSheet} from './CreateSheet';
 export {TeamHeader} from './TeamHeader';
+export {TeamColorPicker} from './TeamColorPicker';
+export {TeamColorSheet} from './TeamColorSheet';
 export {InviteCodeCard} from './InviteCodeCard';
 export {NotificationRow} from './NotificationRow';
 export {NotificationBanner} from './NotificationBanner';

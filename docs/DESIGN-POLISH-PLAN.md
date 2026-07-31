@@ -1,0 +1,238 @@
+# Heia — design- og polish-plan
+
+_Skrevet 2026-07-31 etter gjennomgang med Brage (skjermbilde av A v2-mockupen
+som referanse). Rekkefølgen P1→P3 er Brages valg; resten er anbefalt
+rekkefølge og kan stokkes. **Én skive per samtale.** Start samtalen med:
+«Les docs/STATUS-HANDOFF.md og docs/DESIGN-POLISH-PLAN.md, og ta neste åpne
+punkt.» Kryss av her når en skive er ferdig OG sett på telefon._
+
+**Før alt annet — venter på Brages øyne (alt kodet):**
+- [x] Lagfarge-skiven — ✅ verifisert på telefon + committet 2026-07-31
+- [ ] Skive 5 — kamprapporten (aldri optisk verifisert)
+
+---
+
+## P1 — Lastetilstander: skeleton + tomkort (designgjeld b)
+
+**Hva:** Erstatt de rå `ActivityIndicator`-ene på skjermnivå med
+skeleton-kort på Card-språket (grå/krem flater med svak puls) og gi tomme
+tilstander personlighet (copy-retningslinjene i BRAND_UI).
+
+- Skjermer: TeamHome (feeden), Kalender, Season, Inbox, TeamMembers,
+  EventDetail, Comments, Auth/CreateTeam/JoinTeamCode (mindre viktig).
+- **Behold** spinneren i `Button` (inline lagre-state er riktig bruk) og
+  små inline-tilfeller (MatchPhotoSheet); dette gjelder skjerm-åpninger.
+- Ny delt `Skeleton`-komponent: RN `Animated` opacity-puls — **ingen
+  shimmer-bibliotek, ingen nye deps.**
+- Samme skive: `tintColor` på alle `RefreshControl` (i dag system-grå).
+- Kun JS → Metro-reload.
+
+## P2 — MÅL-øyeblikket (designgjeld c)
+
+**Hva:** Én målrettet animasjon der appen lever mest: scoren.
+
+- Score-tallet i `ScoreBoard`/`LiveMatchBanner` spretter/skalerer når det
+  endres (Animated spring). Gjelder også via realtime hos foreldre — det
+  er DER magien er.
+- Mål for oss: kort feiring i grønt/gult (f.eks. glød-puls på flaten).
+  **Aldri coral** (låst: coral = live-status, grønt/gult = feiring).
+- Reporterens «Mål oss»-knapp: liten trykk-respons (scale).
+- Stretch: SEIER-øyeblikk når kampen ender med seier (pill-en animerer inn).
+- **KUN innebygd RN `Animated`** — reanimated er IKKE installert, og skal
+  ikke installeres for dette (rebuild-kostnad + risiko).
+- Kun JS → Metro-reload.
+
+## P3 — Headeren som mockupen
+
+**Hva:** TeamHeader matcher A v2-mockupen: logo-sirkel + lagnavn +
+undertekst «Fotball · 18 medlemmer».
+
+- Sport kommer gratis fra `activeTeam.sport.displayName` (ligger i context,
+  ubrukt av headeren i dag).
+- Medlemstall: billig count-select (`memberships`, `status='active'`,
+  `head: true`) — cache i TeamContext så headeren ikke spør per skjerm.
+  Faller tallet bort (feil/tregt): vis «Fotball · G14» (sport + ageGroup)
+  — aldri en tom undertekst.
+- Logo-sirkelen, fallback-kjede: lag-logo → klubblogo → dagens initialer
+  på lagfarge (med `inkOnTeamColor` — gult krever mørke initialer).
+- **Vakt:** headeren skal ikke bli høyere enn mockupen — neste
+  hendelse-kortet skal fortsatt synes uten scrolling.
+- Kun JS → Metro-reload.
+
+## P4 — «Laginnstillinger»-side + KLUBBLOGO
+
+**Modell (BESLUTTET 2026-07-31 etter diskusjon Brage ↔ Claude): logoen bor
+på KLUBBEN, ikke laget.** Brages resonnement vant, og skjemaet bekrefter
+det — `clubs.logo_url` FINNES allerede (00002, dødt felt):
+
+- Oppretter Ottestad G10 «Ottestad IL» med logo, finner Ottestad G12
+  klubben senere i søket med navn + logo ferdig — profesjonelt, og et
+  reelt dedup-incentiv (folk gjenbruker klubben i stedet for å opprette
+  duplikat når de SER den med logo).
+- Klubbnavnet har ALLEREDE samme governance: første bruker skriver det,
+  alle senere gjenbruker det, ingen kan endre. Write-once-logoen speiler
+  bare det som alt gjelder.
+- Klubb er ren metadata i Heia — lag som deler klubb deler INGENTING annet
+  (ikke feed, ikke medlemmer, ikke tilgang). At vilkårlige lag deler
+  klubbrad er derfor ufarlig; logoen er den eneste delte flaten.
+
+**MVP-regler:**
+- Lagadmin i klubben kan **LEGGE TIL** logo når klubben mangler en —
+  **aldri overskrive**. Endringer = manuelt (SQL/dashboard) til en
+  klubbadmin-/verifiseringsrolle finnes. Akseptert risiko: feil/upassende
+  logo står til manuell fiks — OK på MVP-skala.
+- Opplasteren blir IKKE klubbeier/klubbadmin — de er bare admin for sitt
+  eget lag.
+
+**Teknisk (krever ÉN migrasjon, INGEN rebuild — picker er alt inne):**
+- RPC `set_club_logo(p_club_id, p_url)` — SECURITY DEFINER (clubs er
+  client-read-only, 00016-mønsteret). Vakter, ALLE med COALESCE
+  (NULL-fella fra 00020): caller er trener/lagleder/admin i et lag i
+  klubben (hindrer drive-by-opplasting på fremmede klubber) +
+  `logo_url IS NULL` (write-once).
+- **Offentlig** storage-bucket `club-logos`, path `{club_id}/logo` —
+  offentlig fordi logo ikke er persondata, og signerte URL-er utløper
+  (header + søkeresultater rendres konstant). INSERT-policy speiler
+  RPC-vakten.
+- Resize i picker (maxWidth/maxHeight ~512) — headeren skal ikke laste
+  et 12 MP-foto.
+
+**Lag-logo som override (BESLUTTET 2026-07-31 — Brage spurte, svaret er ja):**
+- `team_spaces.logo_url` (finnes alt, mappes alt som `logoUrl`) er
+  per-lag-OVERRIDE: fallback-kjeden overalt er **lag-logo → klubblogo →
+  initialer på lagfarge**.
+- Lagadmin kan sette OG endre lag-logoen fritt — ingen write-once her,
+  for blast radius er kun eget lag (i motsetning til den delte klubblogoen).
+- Bor på samme «Laginnstillinger»-side. Path `{team_space_id}/logo` i
+  samme bucket.
+
+**Fleridrettslag (vurdert 2026-07-31 — Storhamar fotball vs. håndball):**
+- Modellen er ALLEREDE riktig: klubb = paraply, sport bor på laget
+  (`teams.sport_id`) — dette speiler NIF-virkeligheten der et idrettslag
+  har grupper per idrett under ett navn og én hovedlogo.
+- IKKE flytt sport til klubben, IKKE bygg gruppe-hierarki. To ventiler
+  finnes allerede for grupper med egen identitet: (1) klubbnavnet er
+  fritekst — «Storhamar Håndball» kan opprettes som egen klubboppføring
+  med egen logo; (2) lag-logo-overriden over.
+- Brukerne velger selv hvilken ventil som passer — ingen migrasjon
+  trengs for noen av utfallene. La bruken svare, som Brage sa.
+
+**UX:**
+- Klubb-dropdownen i CreateTeam viser logo ved klubbnavnet (initialer
+  som fallback) — dette ER dedup-incentivet.
+- Ny klubb: valgfritt «Legg til klubblogo?»-steg ETTER at laget er
+  opprettet (klubben må finnes først for path/RPC — logoen kan ikke
+  lastes opp før klubbraden eksisterer).
+- Egen **«Laginnstillinger»**-side (ProfilStack, kun trener/lagleder/
+  admin): lagnavn (UPDATE dekkes av 00014-policyen, husk
+  `.select('id')`-vakta), lagfarge (flytt raden fra lagfarge-skiven hit),
+  og «Legg til klubblogo» KUN når klubben mangler en (finnes den: vis
+  read-only).
+- **Inngang: Profil-rad, IKKE header-trykk.** Headeren er også
+  foreldrenes flate — et trykk som åpner admin-redigering er dødt for de
+  fleste (samme prinsipp som «+-knappen skal aldri være død for en
+  forelder»).
+
+## P5 — Kampforløpet: skannbarhet (+ designgjeld f)
+
+**Hva:** Differensier markørene i `MatchEventRow`/`MatchTimeline` så et mål
+oppdages ved rask scrolling. Brages spec, med én korreksjon:
+
+- Avspark/fortsettelse: nøytral mørk/dempet markør (i dag heiaTint — feil,
+  avspark er ikke feiring).
+- **Mål for oss: mint-sirkel med liten gull-detalj** (feiring: grønt/gult).
+- **Mål imot: dempet NØYTRAL markør — IKKE coral.** (Brages forslag sa
+  «nøytral/coral», men coral er låst til KUN live-status, «aldri coral på
+  mål». Dempet nøytral er også riktig etos: mål imot er informasjon, ikke
+  alarm — samme tankegang som «ingen TAP-roping».)
+- Slutt: mørk sluttmarkør (stadium-tone).
+- **Samme fil, samme skive:** erstatt tegn-glyfene `bytte` (↔) og `kort`
+  (🟨) med tegnede ikoner i icons.tsx-mønsteret (Lucide har
+  repeat/rectangle-vertical — eller egen liten svg som `Ball`).
+- Ikke mer pynt enn dette — skannbarhet, ikke nytt konsept.
+- Kun JS → Metro-reload.
+
+## P6 — Varsler-polish + globalt kontrastpass
+
+**Hva:** Brages funn fra telefon i dagslys. Kontrasten er egentlig et
+GLOBALT token-funn, ikke bare Varsler.
+
+- **Token-grep (forsiktig!):** mørkne `textSecondary` (#5F7265) og
+  `textTertiary` (#93A195) ett hakk (kandidat: ~#54685C / ~#7E8E82).
+  Endrer HELE appen — sjekk på fysisk telefon i dagslys, ikke simulator.
+- `NotificationRow`: tydeligere luft/hierarki mellom avsender, innhold og
+  tidspunkt. Ulest har ALT heiaSoft-flate + grønn prikk (Fase 5) — juster
+  styrken heller enn å bygge nytt.
+- **Behold listen enkel** — ikke separate store kort (Brages ord).
+- Kun JS → Metro-reload.
+
+## P7 — Profil-polish
+
+**Hva:** Skjermen er ryddig men generisk — løft den til resten av appen,
+uten redesign.
+
+- Toppområdet på varm bakgrunnstone (`background`, i dag hvit `surface`
+  som føles frakoblet).
+- Strammere vertikal luft øverst.
+- `ChevronRight` på navigasjonsrader — `ListRow` har alt en ubrukt
+  `right`-prop. Konsekvent ikonlogikk på radene (i dag er de fleste
+  ikon-slots tomme strenger).
+- Tydeligere seksjonsskille lag ↔ innstillinger (mint-strek-etiketter som
+  resten av appen). «Laginnstillinger»-raden fra P4 hører hjemme her.
+- Kun JS → Metro-reload.
+
+## P8 — Hero-karusell på Hjem
+
+**Hva:** Brages forslag — bla bortover på øverste hendelse.
+
+- Horisontal `FlatList` med `pagingEnabled`: neste 2–3 hendelser + et
+  siste «Åpne kalenderen»-kort. Prikker under (aktiv = mint).
+- **Live-kampen beholder hero-prioritet** — karusellen gjelder kun
+  hverdagsmodus (uten aktiv kamp).
+- `pickNextEvent`-logikken generaliseres til `pickNextEvents(n)`.
+- Kun JS → Metro-reload.
+
+## P9 — Kalenderen: rytme, ikke grid
+
+**Vurdering (anbefaling — Brage avgjør):** Listen er RIKTIG for lagrytme.
+Et lag har 2–3 hendelser i uka — et månedsgrid blir stort sett tomme
+ruter, og uke-visning gir lite over listen. Repetisjonsfølelsen kommer av
+at alle kort er identiske, ikke av listeformen.
+
+- Gjør: månedsskiller (dempet etikett når måneden bytter), fortidskort
+  dempes, treningsrader litt kompaktere enn kamp-kort (kamp er alt mørk
+  stripe — bevar hierarkiet kamp > trening > annet).
+- **Parkert beslutning:** uke-/månedsvisning som toggle. Ta den opp igjen
+  når lag har mer historikk/tetthet — ikke bygg nå.
+- Kun JS → Metro-reload.
+
+---
+
+## Backlog (fra designgjeld-listen + nye idéer — ikke i P-rekkefølgen)
+
+- [ ] **a) BRAND_UI.md skrives om til A v2** — beskytter alle fremtidige
+  samtaler mot å bygge på det gamle systemet. Kan tas når som helst,
+  gjerne sammen med en P-skive.
+- [ ] **d) Haptikk** (mål/Heia/start/slutt) — **krever native modul →
+  rebuild.** Ta den samtidig med neste rebuild uansett årsak.
+- [ ] **e) Tilgjengelighet:** accessibilityLabels på interaktive elementer
+  (7 stk i hele appen i dag) + vurder Dynamic Type. Målgruppa er
+  foreldre 40+.
+- [ ] **g) LÅS beslutning: ingen mørk modus i v1** — mørk flate BETYR kamp
+  i A v2; systemvid mørk modus spiser signaturen. (Skriv inn i BRAND_UI
+  når a) tas.)
+- [ ] **Push deep-link ved tap** — `data.feed_post_id/event_id` sendes
+  allerede, appen navigerer bare ikke (kjent v1-hull fra Fase 4).
+- [ ] **Delbart invitasjonskort** — invitasjonskoden som pent bilde å dele
+  i foreldregruppa (Strava-DNA: deling er vekstmotoren). Idé, ikke lovet.
+- [ ] **Sport + årsklasse** dekkes av P3 (undertekst) — SENERE-punkt 9 i
+  STATUS-HANDOFF kan strykes når P3 er ferdig.
+
+## Faste regler for alle skivene
+
+1. `npx eslint src` — 0 nye feil/warnings. **ALDRI kjør tsc** (låst regel).
+2. Ingen nye native-deps uten eksplisitt avtale (rebuild koster).
+3. Låste A v2-regler gjelder: coral = kun live; grønt/gult = feiring;
+   mint aldri som tekst på lyst; glød rasjonert; ingen TAP-roping;
+   «valgt skifter flate».
+4. Oppdater STATUS-HANDOFF.md + kryss av her når skiven er ferdig.

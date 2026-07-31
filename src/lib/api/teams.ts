@@ -147,6 +147,30 @@ export async function activateTeamSpace(
   };
 }
 
+/**
+ * Endrer lagfargen. Direkte UPDATE — «Admins can update team space»-policyen
+ * (00014) gjelder trener/lagleder/admin. Nekter RLS via USING får vi ingen
+ * feil, bare null rader (samme felle som setMatchReporter) — derfor
+ * `.select('id')` + egen throw.
+ */
+export async function updateTeamColor(
+  teamSpaceId: string,
+  color: string,
+): Promise<void> {
+  const {data, error} = await supabase
+    .from('team_spaces')
+    .update({color})
+    .eq('id', teamSpaceId)
+    .select('id');
+
+  if (error) {
+    throw error;
+  }
+  if (!data || data.length === 0) {
+    throw new Error('Bare trenere og lagledere kan endre lagfargen.');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Create-from-scratch onboarding (team-first / invite-first)
 // ---------------------------------------------------------------------------

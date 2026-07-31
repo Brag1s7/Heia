@@ -4,6 +4,7 @@ export {
   lookupInviteCode,
   joinTeamSpace,
   activateTeamSpace,
+  updateTeamColor,
   createTeamFromScratch,
   searchClubs,
   getSports,
