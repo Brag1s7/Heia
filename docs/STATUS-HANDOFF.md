@@ -673,7 +673,8 @@ for at ekte push skal leve (se «Fase 4 — EKTE PUSH»).**
 **Fase 5 (INBOX) er kodet: Varsler-fanen leser `notifications`, har ulest-badge
 og deep-link til hendelse/kommentarer. Siste døde hjørne i appen er borte.**
 
-Branch: `Brage` (pushet til `origin/Brage` t.o.m. 3C). `npx eslint src` har 6
+Branch: `Brage` (pushet til `origin/Brage` t.o.m. P9 — commit `b99c2e2`,
+hele design-polish-planen P4–P9 committet og pushet 2026-07-31). `npx eslint src` har 6
 errors + 5 warnings, alle fra før (ubrukte variabler i `Avatar`/`CommentsScreen`/
 `InviteScreen`, `exhaustive-deps` i `UserContext`/`TeamContext`) — ingen nye.
 
