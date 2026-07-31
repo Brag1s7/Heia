@@ -1,18 +1,20 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-31. **Nyeste skive: P1 SKELETONS (design-polish-
-planen) — alle skjermnivå-spinnere erstattet med skeleton-kort på
-Card-språket + copy-polish på tomtilstander. FERDIG — godkjent på telefon
-av Brage 2026-07-31 og committet. Se «🦴 P1 — SKELETONS» under.** Fra før:
-LAGFARGE er FERDIG (verifisert på telefon + committet 2026-07-31);
-SESONGFLATEN + TURNERINGER + VÅR/HØST-SESONGER (migrasjoner `00030`–`00033`
-deployet, flyt godkjent og pushet). LÅST underveis: ingen toppscorer/
-spillerstatistikk før strukturert spillerstall; sesong = vår/høst-halvår;
-turnering = enkel kampsamling; lagfarge = kuratert palett, aldri fri velger.
-**Skive 6 (app-ikon + launch screen) er FERDIG — bruker: «perfekt
-gjennomført» 2026-07-30.** Fortsatt uverifisert: kun **KAMPRAPPORTEN
-(skive 5)**. **Neste: P2 (MÅL-øyeblikket)** — se punkt 5 under. Design
-skive 1–5 er merget (PR #17), Fase 4–9 fra før (PR #16)._
+_Sist oppdatert: 2026-07-31. **Nyeste skive: P2 MÅL-ØYEBLIKKET (design-
+polish-planen) — score-sprett + mint-feiring i ScoreBoard/LiveMatchBanner,
+SEIER-pill som spretter inn, trykk-respons på målknappene + banner-demping
+på kampsiden. FERDIG — godkjent på telefon av Brage 2026-07-31 («funker
+veldig bra») og committet. Se «⚽ P2 — MÅL-ØYEBLIKKET» under.** Fra før: P1 SKELETONS
+er FERDIG (godkjent på telefon + committet 2026-07-31); LAGFARGE er FERDIG
+(verifisert på telefon + committet 2026-07-31); SESONGFLATEN + TURNERINGER
++ VÅR/HØST-SESONGER (migrasjoner `00030`–`00033` deployet, flyt godkjent og
+pushet). LÅST underveis: ingen toppscorer/spillerstatistikk før strukturert
+spillerstall; sesong = vår/høst-halvår; turnering = enkel kampsamling;
+lagfarge = kuratert palett, aldri fri velger. **Skive 6 (app-ikon + launch
+screen) er FERDIG — bruker: «perfekt gjennomført» 2026-07-30.** Fortsatt
+uverifisert: kun **KAMPRAPPORTEN (skive 5)**. **Neste: P3 (headeren
+som mockupen)** — se punkt 5 under. Design skive 1–5 er merget (PR #17),
+Fase 4–9 fra før (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -46,8 +48,8 @@ Se seksjonen «✅ TURNERINGER + VÅR/HØST-SESONGER» for modellen og testliste
 
 **5. 🗺 DESIGN-POLISH-PLANEN er i gang: `docs/DESIGN-POLISH-PLAN.md`** —
 9 skiver (P1 skeletons → P2 MÅL-øyeblikket → P3 header, deretter P4–P9) +
-backlog. Brages valgte rekkefølge. **P1 er KODET 2026-07-31 (se
-«🦴 P1 — SKELETONS» under) — neste åpne skive er P2 (MÅL-øyeblikket).**
+backlog. Brages valgte rekkefølge. **P1 og P2 er FERDIG (begge godkjent
+på telefon 2026-07-31) — neste åpne skive er P3 (headeren som mockupen).**
 **NY skive P5B (2026-07-31, Brages telefonfunn): hendelsessiden har for
 mye hvitt / kjedelig hero, og før-kampstart-skjermen fortjener
 kampdag-følelse — tas sammen med P5 (samme skjerm). Se planens P5B.**
@@ -61,7 +63,67 @@ Deretter (etter polish-planen): kandidat 2 (kommentarer + heiing synlig i
 kamptidslinja).
 
 **Fortsatt uverifisert (din jobb):** kun skive 5 (kamprapporten).
-**Skive 6, LAGFARGEN og P1 er FERDIG** (bruker-verifisert 2026-07-30/31).
+**Skive 6, LAGFARGEN, P1 og P2 er FERDIG** (bruker-verifisert 2026-07-30/31).
+
+---
+
+## ⚽ P2 — MÅL-ØYEBLIKKET (✅ FERDIG — godkjent på telefon + committet 2026-07-31)
+
+Andre skive i design-polish-planen. Ingen migrasjon, ingen native-deps —
+ren RN `Animated` med native driver (reanimated er bevisst IKKE
+installert). `npx eslint src`: 0 errors, 2 warnings (begge fra før).
+
+- **Ny `src/components/useGoalMoment.ts`:** hook som oppdager scoreendring
+  fra props og driver to Animated-verdier: `scoreScale` (sprett: raskt opp
+  til ~1.3, fjærende ned med spring) og `celebrate` (mint-glød over
+  stadionflaten: 150 ms opp → kort topp → 800 ms ut). **Mål for oss =
+  sprett + glød; mål imot = kun sprett** — informasjon, ikke feiring, og
+  aldri coral (låst regel). Prop-diff er poenget: animasjonen fyrer også
+  hos foreldre som får ny stilling via realtime-refetch. Prev-ref seedes
+  med gjeldende score, så å ÅPNE en pågående kamp animerer ingenting —
+  kun endring spretter.
+- **`ScoreBoard`:** `Animated.Text` på scoren + feirings-overlay
+  (absoluteFill, ligger UNDER innholdet så teksten ikke tones,
+  `pointerEvents="none"`). Stretch-punktet tatt: **SEIER-pillen spretter
+  inn** (spring, 250 ms delay så skjermbyttet lander først) — både i det
+  kampen ender med seier og hver gang kamprapporten åpnes.
+- **`LiveMatchBanner`:** samme hook + overlay + animert score. Hooken
+  kalles FØR early return (hooks-regelen). Hjem-banneret oppdateres av
+  feed-subscriben i TeamHome (hvert mål er en feed-post → debounced
+  `loadFeed` → ny `liveMatch`), så foreldre som står på Hjem ser spretten
+  uten å gjøre noe.
+- **`ReporterActions`:** målknappene er nå `GoalButton` (modulnivå, ikke
+  nested — eslint-regelen): gir etter til 0.95 ved press (timing 90 ms),
+  fjærer tilbake ved slipp (spring). Scale-transformen bor på en
+  `Animated.View`-wrapper med `flex: 1` (Pressable kan ikke selv bære en
+  Animated-transform); `goalButton`-stilen mistet derfor `flex: 1`.
+- **Banner-demping på kampsiden (Brages telefonfunn 2026-07-31):**
+  varselbanneret («⚽ MÅL! …») la seg OPPÅ scoreboardet — dobbelt opp når
+  animasjonen skjer rett foran deg. Nå: `NotificationsContext` har
+  `watchEvent(eventId)` (ref, ikke state — leses i realtime-callbacken
+  uten re-subscribe; slipp-funksjonen nuller kun hvis den fortsatt eier
+  registreringen). EventDetail registrerer via `useFocusEffect` KUN mens
+  kampen er i gang (`isUnderway`) — og callbacken dropper banneret når
+  `category='match_live'` OG `data.event_id` matcher (`data` fra 00023
+  bærer alt event_id). Badge/inbox/liveNonce består. FOKUS, ikke mount:
+  går du inn i kommentarene når banneret deg igjen; alle andre skjermer
+  og andre kategorier (kommentar/heia) er urørt.
+
+### Test dette først (Metro-reload)
+1. Start en kamp som trener → trykk «Mål oss»: scoren spretter og flaten
+   får et kort mint-glimt. «Mål dem»: kun sprett, ingen feiring.
+2. **Det viktige:** forelder på annen enhet står på kampskjermen — eller
+   på Hjem med live-banneret — mens treneren scorer. Samme sprett/glød
+   skal skje der, via realtime, uten at forelderen gjør noe.
+3. Kjenn på målknappene: de skal gi etter under fingeren og fjære tilbake.
+4. Avslutt en kamp med seier → SEIER-pillen spretter inn på scoreboardet.
+   Åpne kamprapporten senere → den spretter inn igjen.
+5. Åpne en kamp som allerede pågår → ingen sprett ved åpning (ro først,
+   liv kun ved endring).
+6. Banner-dempingen: stå på kampsiden som forelder mens det scores →
+   INGEN «⚽ MÅL!»-banner over scoreboardet (bare animasjonen). Gå til
+   Hjem eller kommentartråden → banneret kommer som før. Varsler-badgen
+   teller opp uansett.
 
 ---
 

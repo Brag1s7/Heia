@@ -10,6 +10,7 @@ punkt.» Kryss av her når en skive er ferdig OG sett på telefon._
 - [x] Lagfarge-skiven — ✅ verifisert på telefon + committet 2026-07-31
 - [ ] Skive 5 — kamprapporten (aldri optisk verifisert)
 - [x] P1 — skeletons — ✅ godkjent på telefon + committet 2026-07-31
+- [x] P2 — MÅL-øyeblikket — ✅ godkjent på telefon + committet 2026-07-31
 
 ---
 
@@ -48,7 +49,10 @@ tilstander personlighet (copy-retningslinjene i BRAND_UI).
 - Copy: TeamHome-tom «Stille her ennå …», Kalender-tom «Kalenderen er
   tom» (BRAND_UI-eksemplene); resten hadde alt personlighet.
 
-## P2 — MÅL-øyeblikket (designgjeld c)
+## P2 — MÅL-øyeblikket (designgjeld c) — ✅ FERDIG
+
+**Status: FERDIG — godkjent på telefon av Brage 2026-07-31 («funker veldig
+bra», inkl. banner-dempingen) og committet.**
 
 **Hva:** Én målrettet animasjon der appen lever mest: scoren.
 
@@ -62,6 +66,24 @@ tilstander personlighet (copy-retningslinjene i BRAND_UI).
 - **KUN innebygd RN `Animated`** — reanimated er IKKE installert, og skal
   ikke installeres for dette (rebuild-kostnad + risiko).
 - Kun JS → Metro-reload.
+
+**Slik ble det (2026-07-31):**
+- Ny `src/components/useGoalMoment.ts`: hook som oppdager scoreendring fra
+  props (prop-diff = fyrer også via realtime-refetch hos foreldre) og
+  driver `scoreScale` (sprett ~1.3 → fjærende ned) + `celebrate`
+  (mint-glød over stadionflaten, 150 ms opp → 800 ms ut). **Mål for oss =
+  sprett + glød; mål imot = kun sprett** (informasjon, ikke feiring).
+  Ingen animasjon ved mount — å åpne en pågående kamp gir ro.
+- `ScoreBoard`: Animated-score + glød-overlay + **SEIER-pillen spretter
+  inn** (spring, liten delay) når den dukker opp — stretch-punktet tatt.
+- `LiveMatchBanner`: samme hook — Hjem-banneret refetches av
+  feed-subscriben (hvert mål er en feed-post), så foreldre på Hjem ser det.
+- `ReporterActions`: målknappene gir etter (0.95) ved press og fjærer
+  tilbake ved slipp (`GoalButton`, flex flyttet til wrapperen).
+- Telefonfunn samme dag: varselbanneret la seg oppå scoreboardet på
+  kampsiden. Fikset: `watchEvent(eventId)` i NotificationsContext —
+  match_live-varsler for kampen du står på (i fokus, mens den er i gang)
+  dempes; badge/inbox består, alle andre skjermer/kategorier urørt.
 
 ## P3 — Headeren som mockupen
 

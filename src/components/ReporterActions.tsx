@@ -1,5 +1,5 @@
-import React from 'react';
-import {View, Text, Pressable, StyleSheet} from 'react-native';
+import React, {useRef} from 'react';
+import {View, Text, Pressable, StyleSheet, Animated} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Ball, Camera, Flag, MessageCircle, Pause, Play} from './icons';
 
@@ -47,6 +47,60 @@ const goalActions: ActionButton[] = [
   {type: 'mål_dem', label: 'Mål dem'},
 ];
 
+/**
+ * Målknapp med trykk-respons (P2): knappen «gir etter» ved press og fjærer
+ * tilbake ved slipp. Skalaen bor på en wrapper — Pressable kan ikke selv
+ * bære en Animated-transform. Ren RN Animated, native driver.
+ */
+function GoalButton({
+  action,
+  onAction,
+}: {
+  action: ActionButton;
+  onAction: (type: ReporterActionType) => void;
+}) {
+  const isUs = action.type === 'mål_oss';
+  const IconGlyph = ACTION_ICON[action.type];
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const pressIn = () =>
+    Animated.timing(scale, {
+      toValue: 0.95,
+      duration: 90,
+      useNativeDriver: true,
+    }).start();
+  const pressOut = () =>
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 4,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+
+  return (
+    <Animated.View style={[styles.goalWrap, {transform: [{scale}]}]}>
+      <Pressable
+        onPress={() => onAction(action.type)}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        style={({pressed}) => [
+          styles.goalButton,
+          isUs ? styles.goalButtonUs : styles.goalButtonAway,
+          pressed && (isUs ? styles.pressedUs : styles.pressed),
+        ]}>
+        <IconGlyph
+          size={26}
+          color={isUs ? colors.heiaDeep : colors.textPrimary}
+          strokeWidth={2}
+        />
+        <Text style={[styles.goalLabel, isUs && styles.goalLabelUs]}>
+          {action.label}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
 const PAUSE_ACTION: ActionButton = {type: 'pause', label: 'Pause'};
 const RESUME_ACTION: ActionButton = {type: 'andre_omgang', label: 'Fortsett'};
 
@@ -66,29 +120,9 @@ export function ReporterActions({
   return (
     <View style={styles.container}>
       <View style={styles.goalRow}>
-        {goalActions.map(action => {
-          const isUs = action.type === 'mål_oss';
-          const IconGlyph = ACTION_ICON[action.type];
-          return (
-            <Pressable
-              key={action.type}
-              onPress={() => onAction(action.type)}
-              style={({pressed}) => [
-                styles.goalButton,
-                isUs ? styles.goalButtonUs : styles.goalButtonAway,
-                pressed && (isUs ? styles.pressedUs : styles.pressed),
-              ]}>
-              <IconGlyph
-                size={26}
-                color={isUs ? colors.heiaDeep : colors.textPrimary}
-                strokeWidth={2}
-              />
-              <Text style={[styles.goalLabel, isUs && styles.goalLabelUs]}>
-                {action.label}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {goalActions.map(action => (
+          <GoalButton key={action.type} action={action} onAction={onAction} />
+        ))}
       </View>
       <View style={styles.row}>
         {smallActions.map(action => {
@@ -129,8 +163,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
-  goalButton: {
+  // flex bor på wrapperen (som bærer scale-transformen); knappen fyller den.
+  goalWrap: {
     flex: 1,
+  },
+  goalButton: {
     paddingVertical: spacing.xl,
     borderRadius: radius.lg,
     alignItems: 'center',

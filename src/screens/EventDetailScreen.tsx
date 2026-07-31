@@ -34,7 +34,7 @@ import {
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
 import type {PillKind} from '../components/StatusPill';
-import {useAuth, useActiveTeam} from '../context';
+import {useAuth, useActiveTeam, useNotifications} from '../context';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
 import {
   getEventDetail,
@@ -281,7 +281,8 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Varselet ligger IKKE her lenger: det er `NotificationBanner` over fanene,
   // matet av `notifications`-kanalen. Databasen bestemmer allerede hvem som
   // skal varsles (00023: alle aktive medlemmer unntatt forfatteren), og
-  // banneret følger deg gjennom hele appen — ikke bare på denne skjermen.
+  // banneret følger deg gjennom hele appen — med ett unntak: står du HER
+  // på en pågående kamp, dempes match_live-banneret (se watchEvent under).
   useEffect(() => {
     if (!liveMatchSessionId) return;
     return subscribeToMatch(liveMatchSessionId, eventId, () => {
@@ -298,6 +299,19 @@ export function EventDetailScreen({route, navigation}: Props) {
     const id = setInterval(() => setNowMs(Date.now()), 30_000);
     return () => clearInterval(id);
   }, [liveMatchSessionId]);
+
+  // Mens en pågående kamp er I FOKUS her, dempes match_live-banneret for den
+  // (NotificationsContext): scoren spretter jo rett foran deg (P2), og
+  // banneret ville lagt seg oppå øyeblikket. Fokus, ikke mount — går du
+  // videre til kommentarene skal banneret nå deg igjen.
+  const {watchEvent} = useNotifications();
+  const watchedEventId = isUnderway ? eventId : null;
+  useFocusEffect(
+    useCallback(() => {
+      if (!watchedEventId) return;
+      return watchEvent(watchedEventId);
+    }, [watchedEventId, watchEvent]),
+  );
 
   if (loading) {
     return (
