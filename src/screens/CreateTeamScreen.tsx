@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -14,7 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button, TeamColorPicker} from '../components';
+import {BackBar, Button, Skeleton, TeamColorPicker} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
 import {TEAM_COLORS} from '../shared/teamColors';
@@ -276,10 +275,11 @@ export function CreateTeamScreen() {
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Idrett</Text>
           {sportsLoading ? (
-            <ActivityIndicator
-              color={colors.heia}
-              style={{alignSelf: 'flex-start'}}
-            />
+            <View style={styles.sportRow}>
+              <Skeleton width={92} height={36} round />
+              <Skeleton width={104} height={36} round />
+              <Skeleton width={80} height={36} round />
+            </View>
           ) : sportsError ? (
             <Pressable onPress={() => setSportsReloadKey(k => k + 1)}>
               <Text style={styles.retryText}>

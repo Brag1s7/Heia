@@ -9,10 +9,14 @@ punkt.» Kryss av her når en skive er ferdig OG sett på telefon._
 **Før alt annet — venter på Brages øyne (alt kodet):**
 - [x] Lagfarge-skiven — ✅ verifisert på telefon + committet 2026-07-31
 - [ ] Skive 5 — kamprapporten (aldri optisk verifisert)
+- [x] P1 — skeletons — ✅ godkjent på telefon + committet 2026-07-31
 
 ---
 
-## P1 — Lastetilstander: skeleton + tomkort (designgjeld b)
+## P1 — Lastetilstander: skeleton + tomkort (designgjeld b) — ✅ FERDIG
+
+**Status: FERDIG — godkjent på telefon av Brage 2026-07-31 og committet.**
+Kun JS → Metro-reload.
 
 **Hva:** Erstatt de rå `ActivityIndicator`-ene på skjermnivå med
 skeleton-kort på Card-språket (grå/krem flater med svak puls) og gi tomme
@@ -26,6 +30,23 @@ tilstander personlighet (copy-retningslinjene i BRAND_UI).
   shimmer-bibliotek, ingen nye deps.**
 - Samme skive: `tintColor` på alle `RefreshControl` (i dag system-grå).
 - Kun JS → Metro-reload.
+
+**Slik ble det (2026-07-31):**
+- Ny `src/components/Skeleton.tsx`: `Skeleton` (pulserende blokk, ÉN delt
+  modul-loop med refcount så alle bones puster i takt), `SkeletonCard`,
+  `FeedCardSkeleton`, `EventCardSkeleton`, `ListRowSkeleton`.
+- Skeleton inne: TeamHome (3 feedkort), Kalender (etikett + 3 eventkort),
+  Season (stadion-KPI med `stadiumEdge`-bones + kampliste), Inbox (4 rader
+  i listekortet), TeamMembers (header + 4 rader — lagnavnet vises ekte,
+  det er kjent fra context), EventDetail (info-kort + RSVP-kort),
+  Comments (innleggskort + 2 replikk-bobler), CreateTeam (3 sport-piller).
+- **Beholdt som spinner (bevisst):** Auth (submit-state) og JoinTeamCode
+  (oppslag ETTER knappetrykk) — det er handlingstilstander, samme kategori
+  som `Button loading`; pluss AppNavigator-bootskjermen (før noe UI finnes).
+- `RefreshControl`-tinten var allerede mint på alle 5 (fikset i
+  telefontest-runden) — verifisert, ingenting å gjøre.
+- Copy: TeamHome-tom «Stille her ennå …», Kalender-tom «Kalenderen er
+  tom» (BRAND_UI-eksemplene); resten hadde alt personlighet.
 
 ## P2 — MÅL-øyeblikket (designgjeld c)
 
@@ -150,6 +171,28 @@ oppdages ved rask scrolling. Brages spec, med én korreksjon:
   (🟨) med tegnede ikoner i icons.tsx-mønsteret (Lucide har
   repeat/rectangle-vertical — eller egen liten svg som `Ball`).
 - Ikke mer pynt enn dette — skannbarhet, ikke nytt konsept.
+- Kun JS → Metro-reload.
+
+## P5B — Hendelsessiden: hero + kampdag-modus (NY 2026-07-31 — Brages funn)
+
+**Hva:** Brage så på telefon at hendelsessiden er «for mye hvitt og for
+kjedelig hero»: info-kortet (pill + tittel + rå metaliste) er likt for
+trening og kamp, og skjermen FØR kampstart blander kampdag-følelse
+(«Start kamp» med glød) med et helt nøytralt kort. Tas **sammen med eller
+rett etter P5** — samme skjerm, samme samtale er billigst.
+
+- **Trening/sosialt/annet:** gi info-kortet personlighet UTEN mørk flate
+  (låst: mørk flate = kamp). Retning: type-tonet aksent på kortet
+  (infoSoft-topp for trening, remindSoft for sosialt — samme semantikk
+  som pillene), stor tid/dato med displayfonten (Nunito) i stedet for
+  metaliste-rad, sted som egen rolig rad.
+- **Kamp før avspark («kampdag»):** motstander + avspark fortjener mer
+  enn «kamp mot lyn» i sort på hvitt. Retning: en liten stadion-smak —
+  mørk mini-platte med «oss – dem»/avsparkstid (IKKE full ScoreBoard, det
+  er live-kampens språk) — og «Start kamp»-flyten under. RSVP består,
+  men kampdagen skal føles som noe annet enn en trening.
+- **Vakt:** ikke rør live-modusen og kamprapporten (de er alt på
+  stadionspråket) — dette gjelder VANLIG event-modus + før-kamp.
 - Kun JS → Metro-reload.
 
 ## P6 — Varsler-polish + globalt kontrastpass

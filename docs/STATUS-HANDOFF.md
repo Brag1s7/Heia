@@ -1,19 +1,18 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-30 (natt, oppd. 2). **Nyeste skive: LAGFARGE —
-kuratert palett ved lagopprettelse + «Lagfarge»-innstilling på Profil (kun
-trener/lagleder/admin) + mørke initialer på gult lagmerke. KODET, ikke
-committet — kun Metro-reload, INGEN migrasjon.** Fra før samme døgn:
+_Sist oppdatert: 2026-07-31. **Nyeste skive: P1 SKELETONS (design-polish-
+planen) — alle skjermnivå-spinnere erstattet med skeleton-kort på
+Card-språket + copy-polish på tomtilstander. FERDIG — godkjent på telefon
+av Brage 2026-07-31 og committet. Se «🦴 P1 — SKELETONS» under.** Fra før:
+LAGFARGE er FERDIG (verifisert på telefon + committet 2026-07-31);
 SESONGFLATEN + TURNERINGER + VÅR/HØST-SESONGER (migrasjoner `00030`–`00033`
 deployet, flyt godkjent og pushet). LÅST underveis: ingen toppscorer/
 spillerstatistikk før strukturert spillerstall; sesong = vår/høst-halvår;
 turnering = enkel kampsamling; lagfarge = kuratert palett, aldri fri velger.
 **Skive 6 (app-ikon + launch screen) er FERDIG — bruker: «perfekt
-gjennomført» 2026-07-30. LAGFARGEN er FERDIG — verifisert på telefon og
-committet 2026-07-31.** Fortsatt uverifisert: kun **KAMPRAPPORTEN
-(skive 5)**. **Neste:** design-polish-planen (P1 skeletons først) — se
-punkt 5 under. Design skive 1–5 er merget (PR #17), Fase 4–9 fra før
-(PR #16)._
+gjennomført» 2026-07-30.** Fortsatt uverifisert: kun **KAMPRAPPORTEN
+(skive 5)**. **Neste: P2 (MÅL-øyeblikket)** — se punkt 5 under. Design
+skive 1–5 er merget (PR #17), Fase 4–9 fra før (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -45,10 +44,14 @@ Se seksjonen «✅ TURNERINGER + VÅR/HØST-SESONGER» for modellen og testliste
 2026-07-31. Kuratert palett ved lagopprettelse + «Lagfarge»-rad på Profil
 (kun trener/lagleder/admin) + mørke initialer på gult lagmerke.
 
-**5. 🗺 DESIGN-POLISH-PLANEN er skrevet (2026-07-31):
-`docs/DESIGN-POLISH-PLAN.md`** — 9 skiver (P1 skeletons → P2 MÅL-øyeblikket
-→ P3 header, deretter P4–P9) + backlog. Brages valgte rekkefølge. LÅST
-underveis: **klubblogo bor på KLUBBEN** (`clubs.logo_url` finnes alt),
+**5. 🗺 DESIGN-POLISH-PLANEN er i gang: `docs/DESIGN-POLISH-PLAN.md`** —
+9 skiver (P1 skeletons → P2 MÅL-øyeblikket → P3 header, deretter P4–P9) +
+backlog. Brages valgte rekkefølge. **P1 er KODET 2026-07-31 (se
+«🦴 P1 — SKELETONS» under) — neste åpne skive er P2 (MÅL-øyeblikket).**
+**NY skive P5B (2026-07-31, Brages telefonfunn): hendelsessiden har for
+mye hvitt / kjedelig hero, og før-kampstart-skjermen fortjener
+kampdag-følelse — tas sammen med P5 (samme skjerm). Se planens P5B.**
+LÅST underveis: **klubblogo bor på KLUBBEN** (`clubs.logo_url` finnes alt),
 write-once for lagadmin i klubben, aldri overskriving i MVP — detaljer og
 begrunnelse i planens P4. Start design-samtaler med: «Les
 docs/STATUS-HANDOFF.md og docs/DESIGN-POLISH-PLAN.md, og ta neste åpne
@@ -58,7 +61,57 @@ Deretter (etter polish-planen): kandidat 2 (kommentarer + heiing synlig i
 kamptidslinja).
 
 **Fortsatt uverifisert (din jobb):** kun skive 5 (kamprapporten).
-**Skive 6 og LAGFARGEN er FERDIG** (bruker-verifisert 2026-07-30/31).
+**Skive 6, LAGFARGEN og P1 er FERDIG** (bruker-verifisert 2026-07-30/31).
+
+---
+
+## 🦴 P1 — SKELETONS (KODET 2026-07-31, kun Metro-reload)
+
+Første skive i design-polish-planen. Ingen migrasjon, ingen native-deps —
+ren JS. `npx eslint src`: 0 errors, 2 warnings (begge fra før:
+`no-bitwise` i Avatar, nested component i AppNavigator).
+
+- **Ny `src/components/Skeleton.tsx`:** `Skeleton` (grå/krem blokk med
+  svak opacity-puls, RN `Animated` + native driver), `SkeletonCard`
+  (hvit kortflate), `FeedCardSkeleton`, `EventCardSkeleton`,
+  `ListRowSkeleton`. Én delt modul-`Animated.Value` med refcount-loop:
+  alle bones i hele appen puster i takt, og loopen kjører kun mens minst
+  én bone er montert.
+- **Skjermene som fikk skeleton i stedet for skjermnivå-spinner:**
+  TeamHome (3 feedkort), Kalender (etikett + 3 eventkort), Season
+  (stadion-KPI-bones i `stadiumEdge` på `StadiumSurface` + kampliste —
+  flatebyttet lys/mørk skal ikke blinke inn etter lastingen), Inbox
+  (4 rader i listekortet), TeamMembers (lagnavnet vises EKTE — kjent fra
+  context — bone kun på tellingen + medlemsrader), EventDetail (speiler
+  info-kortet: pill + tittel + metarader), Comments (innleggskort + 2
+  replikk-bobler med chat-hjørnet), CreateTeam (3 sport-piller).
+- **Bevisst BEHOLDT som spinner:** `Button` (loading-prop) og
+  `MatchPhotoSheet` (planens unntak), AppNavigator-bootskjermen (før noe
+  UI finnes), Auth (submit-state) og JoinTeamCode (oppslag ETTER
+  «Finn lag»-trykk) — de to siste er handlingstilstander, ikke
+  skjerm-åpninger.
+- **`RefreshControl`-punktet i planen var alt gjort:** alle 5 (TeamHome,
+  Kalender, Inbox, Season, TeamMembers) hadde `tintColor={colors.heia}`
+  fra telefontest-runden. Verifisert, ingen endring.
+- **Copy-polish på tomtilstander** (BRAND_UI-retningslinjene): TeamHome
+  «Stille her ennå …», Kalender «Kalenderen er tom» + varmere brødtekst.
+  Resten (Inbox, Season «Sesongen starter her», Comments) hadde alt
+  personlighet.
+- **RN-fallgruve verdt å huske:** `width: undefined` i en SENERE style
+  nullstiller IKKE en tidligere `width: '100%'` (RN dropper undefined ved
+  flatten). Trengs en flex-styrt bone: legg den i en `{flex: 1}`-wrapper
+  (se `skeletonBubbleWrap` i CommentsScreen).
+
+### Test dette først (Metro-reload)
+1. Bytt fane til Kalender/Varsler første gang (eller dra ned + slipp på
+   tregt nett): grå/krem kort som puster, i samme form som innholdet som
+   kommer — ingen spinner, ingen hopp i layout når innholdet lander.
+2. Sesongen: mørk stadionflate med pulserende tall-bones — flaten skal
+   IKKE blinke hvit→mørk når tallene kommer.
+3. Åpne en hendelse og en kommentartråd — skeleton i kort-/bobleform.
+4. Tomtilstander: nytt lag uten innhold viser «Stille her ennå …» (Hjem)
+   og «Kalenderen er tom» (Kalender).
+5. Pulsen: alle blokker på en skjerm dimmer i takt (én delt loop).
 
 **Telefontest-funn 2026-07-30 (kveld), fikset i JS (kun reload — ingen
 rebuild):**

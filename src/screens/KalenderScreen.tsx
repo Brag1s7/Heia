@@ -4,14 +4,19 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {EventCard, LiveBadge, TeamHeader} from '../components';
+import {
+  EventCard,
+  EventCardSkeleton,
+  LiveBadge,
+  Skeleton,
+  TeamHeader,
+} from '../components';
 import {useActiveTeam} from '../context';
 import {getTeamEvents} from '../lib/api/events';
 import type {KalenderStackParamList, HeiaEvent} from '../shared/types';
@@ -146,16 +151,30 @@ export function KalenderScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.heia} />
+          <>
+            <View style={styles.sectionHeader}>
+              <Skeleton width={90} height={11} />
+            </View>
+            <View style={styles.cardWrap}>
+              <EventCardSkeleton />
+            </View>
+            <View style={styles.cardWrap}>
+              <EventCardSkeleton />
+            </View>
+            <View style={styles.cardWrap}>
+              <EventCardSkeleton />
+            </View>
+          </>
         ) : error ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>{error}</Text>
           </View>
         ) : events.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Ingen hendelser ennå</Text>
+            <Text style={styles.emptyTitle}>Kalenderen er tom</Text>
             <Text style={styles.emptyText}>
-              Treninger, kamper og sosiale samlinger dukker opp her.
+              Treninger, kamper og det sosiale dukker opp her når laget
+              planlegger noe.
             </Text>
           </View>
         ) : (
@@ -207,9 +226,6 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: spacing.xs,
-  },
-  loader: {
-    marginTop: spacing.xl,
   },
   emptyCard: {
     marginHorizontal: spacing.lg,

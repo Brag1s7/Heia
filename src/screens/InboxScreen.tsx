@@ -5,14 +5,13 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {NotificationRow, TeamHeader} from '../components';
+import {ListRowSkeleton, NotificationRow, TeamHeader} from '../components';
 import {useActiveTeam, useNotifications} from '../context';
 import {getNotifications} from '../lib/api/notifications';
 import type {HeiaNotification} from '../lib/api/notifications';
@@ -131,7 +130,12 @@ export function InboxScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.heia} />
+          <View style={styles.list}>
+            <ListRowSkeleton />
+            <ListRowSkeleton />
+            <ListRowSkeleton />
+            <ListRowSkeleton showBorder={false} />
+          </View>
         ) : error ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyText}>{error}</Text>
@@ -189,9 +193,6 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.heiaInk,
     fontWeight: '600',
-  },
-  loader: {
-    marginTop: spacing.xl,
   },
   list: {
     marginHorizontal: spacing.lg,

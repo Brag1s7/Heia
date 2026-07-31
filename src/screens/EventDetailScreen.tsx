@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -30,6 +29,8 @@ import {
   MatchPhotoRail,
   MatchPhotoGallery,
   MatchTimeline,
+  Skeleton,
+  SkeletonCard,
 } from '../components';
 import type {ReporterActionType} from '../components/ReporterActions';
 import type {PillKind} from '../components/StatusPill';
@@ -302,8 +303,23 @@ export function EventDetailScreen({route, navigation}: Props) {
     return (
       <View style={styles.screen}>
         <BackBar title="Hendelse" />
-        <View style={styles.centered}>
-          <ActivityIndicator color={colors.heia} />
+        {/* Speiler info-kortet: pill + tittel + metarader. */}
+        <View style={styles.section}>
+          <SkeletonCard>
+            <Skeleton width={72} height={24} style={skeletonStyles.pill} />
+            <Skeleton width="70%" height={20} />
+            <View style={skeletonStyles.metaLines}>
+              <Skeleton width="55%" height={12} />
+              <Skeleton width="45%" height={12} />
+              <Skeleton width="50%" height={12} />
+            </View>
+          </SkeletonCard>
+        </View>
+        <View style={styles.section}>
+          <SkeletonCard>
+            <Skeleton width="40%" height={14} />
+            <Skeleton height={12} />
+          </SkeletonCard>
         </View>
       </View>
     );
@@ -1049,5 +1065,15 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+  },
+});
+
+const skeletonStyles = StyleSheet.create({
+  pill: {
+    borderRadius: 12,
+  },
+  metaLines: {
+    gap: spacing.sm,
+    marginTop: spacing.xs,
   },
 });

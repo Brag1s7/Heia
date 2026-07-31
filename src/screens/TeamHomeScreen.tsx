@@ -8,7 +8,6 @@ import {
   RefreshControl,
   StyleSheet,
   TextInput,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -24,6 +23,7 @@ import {
   TeamHeader,
   MatchPhotoGallery,
   Avatar,
+  FeedCardSkeleton,
 } from '../components';
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
@@ -441,17 +441,18 @@ export function TeamHomeScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator
-          style={styles.feedLoader}
-          color={colors.heia}
-        />
+        <View style={styles.feedSkeleton}>
+          <FeedCardSkeleton />
+          <FeedCardSkeleton />
+          <FeedCardSkeleton />
+        </View>
       ) : error ? (
         <View style={styles.emptyFeed}>
           <Text style={styles.emptyText}>{error}</Text>
         </View>
       ) : feed.length === 0 ? (
         <View style={styles.emptyFeed}>
-          <Text style={styles.emptyTitle}>Ingen aktivitet ennå</Text>
+          <Text style={styles.emptyTitle}>Stille her ennå …</Text>
           <Text style={styles.emptyText}>
             Skriv den første meldingen, eller inviter foreldre og spillere så
             blir laget levende.
@@ -641,8 +642,9 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '600',
   },
-  feedLoader: {
-    marginTop: spacing.xl,
+  feedSkeleton: {
+    paddingHorizontal: spacing.lg,
+    gap: spacing.md,
   },
   emptyFeed: {
     marginHorizontal: spacing.lg,

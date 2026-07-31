@@ -7,7 +7,6 @@ import {
   ScrollView,
   StyleSheet,
   TextInput,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -15,7 +14,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {Avatar, BackBar, Button} from '../components';
+import {Avatar, BackBar, Button, Skeleton} from '../components';
 import {getComments, createComment, getFeedPost} from '../lib/api/comments';
 import {toggleReaction} from '../lib/api/feed';
 import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
@@ -166,7 +165,32 @@ export function CommentsScreen({route}: Props) {
         )}
 
         {loading ? (
-          <ActivityIndicator style={styles.loader} color={colors.heia} />
+          <>
+            {/* Innleggskortet + et par replikker — samme former som lastes. */}
+            <View style={styles.postCard}>
+              <View style={styles.postHeader}>
+                <Skeleton width={32} height={32} round />
+                <View style={styles.skeletonHeaderText}>
+                  <Skeleton width={120} height={13} />
+                  <Skeleton width={64} height={10} />
+                </View>
+              </View>
+              <Skeleton height={13} />
+              <Skeleton width="60%" height={13} />
+            </View>
+            <View style={styles.comment}>
+              <Skeleton width={32} height={32} round />
+              <View style={styles.skeletonBubbleWrap}>
+                <Skeleton height={56} style={styles.skeletonBubble} />
+              </View>
+            </View>
+            <View style={styles.comment}>
+              <Skeleton width={32} height={32} round />
+              <View style={styles.skeletonBubbleWrap}>
+                <Skeleton height={56} style={styles.skeletonBubble} />
+              </View>
+            </View>
+          </>
         ) : error ? (
           <Text style={styles.empty}>{error}</Text>
         ) : comments.length === 0 ? (
@@ -286,8 +310,16 @@ const styles = StyleSheet.create({
   reactTextOn: {
     color: colors.heiaInk,
   },
-  loader: {
-    marginTop: spacing.xl,
+  skeletonHeaderText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  skeletonBubbleWrap: {
+    flex: 1,
+  },
+  skeletonBubble: {
+    borderRadius: radius.lg,
+    borderTopLeftRadius: radius.sm,
   },
   empty: {
     ...typography.body,
