@@ -5,10 +5,15 @@ export {
   joinTeamSpace,
   activateTeamSpace,
   updateTeamColor,
+  updateTeamName,
+  updateTeamLogo,
+  setClubLogo,
+  getClubForTeamSpace,
   createTeamFromScratch,
   searchClubs,
   getSports,
   getCachedSports,
+  type LogoImageInput,
 } from './teams';
 export {
   getTeamFeed,

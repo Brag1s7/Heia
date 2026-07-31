@@ -16,6 +16,14 @@ const PICKER_OPTIONS = {
   selectionLimit: 1,
 } as const;
 
+// Logoer rendres 32–40 pt — 512 px er rikelig, og headeren skal ikke laste
+// et 12 MP-foto (P4-regelen: resize i pickeren).
+const LOGO_PICKER_OPTIONS = {
+  ...PICKER_OPTIONS,
+  maxWidth: 512,
+  maxHeight: 512,
+} as const;
+
 function toPickedImage(asset: Asset | undefined): PickedImage | null {
   if (!asset?.base64 || !asset.uri) return null;
   return {
@@ -80,6 +88,15 @@ async function runPicker(
     return null;
   }
   return picked;
+}
+
+/**
+ * Velger en logo fra kamerarullen — rett til biblioteket, uten
+ * kamera-spørsmål (en logo ligger lagret, den tas ikke der og da).
+ * `null` betyr avbrutt/feilet; feilmeldingen er allerede vist.
+ */
+export function pickLogoImage(): Promise<PickedImage | null> {
+  return runPicker(() => launchImageLibrary(LOGO_PICKER_OPTIONS));
 }
 
 /**

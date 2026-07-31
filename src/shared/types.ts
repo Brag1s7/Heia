@@ -257,6 +257,7 @@ export type InboxStackParamList = {
 export type ProfilStackParamList = {
   Profil: undefined;
   TeamMembers: undefined;
+  TeamSettings: undefined;
   Invite: {firstTime?: boolean} | undefined;
   // Samme skjermer som i onboarding — her for å legge til lag nr. 2.
   JoinTeamCode: {prefillCode?: string} | undefined;

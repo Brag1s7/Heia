@@ -3,8 +3,8 @@ import {View, Text, Pressable, StyleSheet, Animated} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
 import {StadiumSurface} from './StadiumSurface';
+import {TeamBadge} from './TeamBadge';
 import {useActiveTeam} from '../context';
-import {inkOnTeamColor} from '../shared/teamColors';
 import {useGoalMoment, GOAL_CELEBRATION_TINT} from './useGoalMoment';
 import type {HeiaEvent} from '../shared/types';
 
@@ -75,16 +75,16 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
 
       <View style={styles.teamsRow}>
         <View style={styles.teamCol}>
-          <View style={[styles.teamBadge, styles.usRing, {backgroundColor: teamColor}]}>
-            {/* Gult lagmerke krever mørke initialer — motstanderen er urørt. */}
-            <Text
-              style={[
-                styles.teamBadgeText,
-                {color: inkOnTeamColor(teamColor)},
-              ]}>
-              {initials(teamName)}
-            </Text>
-          </View>
+          {/* Lagmerket (logo → initialer) — hvit plate bak logoen mot den
+              mørke stadionflaten; motstanderen er urørt. */}
+          <TeamBadge
+            size={42}
+            cornerRadius={radius.lg - 1}
+            fontSize={13}
+            logoPlate
+            name={teamName}
+            style={styles.usRing}
+          />
           <Text style={styles.teamName} numberOfLines={2}>
             {teamName}
           </Text>

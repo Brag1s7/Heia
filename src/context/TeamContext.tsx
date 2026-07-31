@@ -50,19 +50,37 @@ export function TeamProvider({children}: PropsWithChildren) {
   // objekt-identitet ved hver token-refresh.
   const userId = session?.user?.id;
 
+  // Hvem gjeldende liste er lastet for. Refresh for samme bruker er STILLE:
+  // AppNavigator river ned hele navigatoren når loading er true, så en
+  // lagfarge-/navne-/logo-lagring (som refresher memberships) ville ellers
+  // kastet brukeren til Hjem-fanen (telefonfunn 2026-07-31).
+  const loadedForRef = useRef<string | null>(null);
+
   const fetchMemberships = useCallback(async () => {
     if (!userId) {
+      loadedForRef.current = null;
       setUserMemberships([]);
       return;
     }
-    setLoading(true);
+    const isRefresh = loadedForRef.current === userId;
+    if (!isRefresh) {
+      setLoading(true);
+    }
     try {
       const memberships = await getUserMemberships();
+      loadedForRef.current = userId;
       setUserMemberships(memberships);
     } catch {
-      setUserMemberships([]);
+      // Første last: tom liste (onboarding-flyten eier feilen). Stille
+      // refresh: behold forrige liste — et nettverksglipp skal ikke sende
+      // en innlogget bruker tilbake til onboarding.
+      if (!isRefresh) {
+        setUserMemberships([]);
+      }
     } finally {
-      setLoading(false);
+      if (!isRefresh) {
+        setLoading(false);
+      }
     }
   }, [userId]);
 

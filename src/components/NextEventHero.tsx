@@ -3,6 +3,7 @@ import {View, Text, Pressable, StyleSheet} from 'react-native';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {ChevronRight, MapPin} from './icons';
+import {StadiumSurface} from './StadiumSurface';
 import {StatusPill, type PillKind} from './StatusPill';
 import type {HeiaEvent, EventType} from '../shared/types';
 
@@ -51,11 +52,86 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
   const total = coming + notComing + pending;
   const fillPct = total > 0 ? Math.max(6, (coming / total) * 100) : 0;
 
+  // Kampen bor på mørk stadionflate også som kommende hero (Brages retning
+  // 2026-07-31) — samme uttrykk som kalenderens kampkort: ringen, mint
+  // avspark, men UTEN flomlys (det er live-kampens dramatikk).
+  const stadium = event.type === 'kamp';
+  // Pillen sier alt «Kamp» — standardtittelen strammes til «Mot Lyn».
+  const title =
+    stadium && event.opponent && event.title === `Kamp mot ${event.opponent}`
+      ? `Mot ${event.opponent}`
+      : event.title;
+
+  const inner = (
+    <>
+      <View style={styles.kicker}>
+        <View style={styles.kickerLeft}>
+          <StatusPill kind={pill.kind} label={pill.label} withDot />
+          <Text style={[styles.day, stadium && styles.dayStadium]}>
+            {dayLabel(event.startTime)}
+          </Text>
+        </View>
+        <Text style={[styles.time, stadium && styles.timeStadium]}>
+          {formatTime(event.startTime)}
+        </Text>
+      </View>
+
+      <View style={styles.titleRow}>
+        <Text
+          style={[styles.title, stadium && styles.titleStadium]}
+          numberOfLines={2}>
+          {title}
+        </Text>
+        <ChevronRight
+          size={22}
+          color={stadium ? colors.stadiumDim : '#41604F'}
+          strokeWidth={2.2}
+        />
+      </View>
+
+      {event.location && (
+        <View style={styles.metaRow}>
+          <MapPin size={13} color={stadium ? colors.stadiumDim : '#41604F'} />
+          <Text
+            style={[styles.meta, stadium && styles.metaStadium]}
+            numberOfLines={1}>
+            {event.location}
+          </Text>
+        </View>
+      )}
+
+      {total > 0 && (
+        <View style={styles.rsvpRow}>
+          <View style={[styles.rsvpTrack, stadium && styles.rsvpTrackStadium]}>
+            <View style={[styles.rsvpFill, {width: `${fillPct}%`}]} />
+          </View>
+          <Text style={[styles.rsvpText, stadium && styles.rsvpTextStadium]}>
+            {coming} kommer
+          </Text>
+        </View>
+      )}
+    </>
+  );
+
+  if (stadium) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={`${title}, ${dayLabel(event.startTime)} ${formatTime(event.startTime)}`}
+        style={({pressed}) => [pressed && styles.pressed]}>
+        <StadiumSurface style={styles.stadiumHero} flood={false}>
+          {inner}
+        </StadiumSurface>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${event.title}, ${dayLabel(event.startTime)} ${formatTime(event.startTime)}`}
+      accessibilityLabel={`${title}, ${dayLabel(event.startTime)} ${formatTime(event.startTime)}`}
       style={({pressed}) => [styles.hero, pressed && styles.pressed]}>
       {/* Ekte mint→krem-gradient (140°) — varmt kremdrag nede til høyre. */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -72,39 +148,7 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
       </View>
       <View style={styles.arcOuter} pointerEvents="none" />
       <View style={styles.arcInner} pointerEvents="none" />
-
-      <View style={styles.kicker}>
-        <View style={styles.kickerLeft}>
-          <StatusPill kind={pill.kind} label={pill.label} withDot />
-          <Text style={styles.day}>{dayLabel(event.startTime)}</Text>
-        </View>
-        <Text style={styles.time}>{formatTime(event.startTime)}</Text>
-      </View>
-
-      <View style={styles.titleRow}>
-        <Text style={styles.title} numberOfLines={2}>
-          {event.title}
-        </Text>
-        <ChevronRight size={22} color="#41604F" strokeWidth={2.2} />
-      </View>
-
-      {event.location && (
-        <View style={styles.metaRow}>
-          <MapPin size={13} color="#41604F" />
-          <Text style={styles.meta} numberOfLines={1}>
-            {event.location}
-          </Text>
-        </View>
-      )}
-
-      {total > 0 && (
-        <View style={styles.rsvpRow}>
-          <View style={styles.rsvpTrack}>
-            <View style={[styles.rsvpFill, {width: `${fillPct}%`}]} />
-          </View>
-          <Text style={styles.rsvpText}>{coming} kommer</Text>
-        </View>
-      )}
+      {inner}
     </Pressable>
   );
 }
@@ -121,6 +165,28 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.93,
+  },
+  stadiumHero: {
+    padding: spacing.xl,
+    ...shadows.cardResting,
+  },
+  dayStadium: {
+    color: colors.stadiumDim,
+  },
+  timeStadium: {
+    color: colors.heia,
+  },
+  titleStadium: {
+    color: colors.stadiumText,
+  },
+  metaStadium: {
+    color: colors.stadiumDim,
+  },
+  rsvpTrackStadium: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  rsvpTextStadium: {
+    color: colors.stadiumText,
   },
   arcOuter: {
     position: 'absolute',

@@ -1,20 +1,11 @@
-import React, {useState} from 'react';
-import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
+import React from 'react';
+import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
-import {inkOnTeamColor} from '../shared/teamColors';
 import {useActiveTeam} from '../context';
 import {StadiumSurface} from './StadiumSurface';
+import {TeamBadge} from './TeamBadge';
 import {Trophy} from './icons';
-
-/** Initialer til lagmerket: «Kjelsås G14» → «KG», ett ord → to første tegn. */
-function teamInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return (parts[0] ?? '?').slice(0, 2).toUpperCase();
-}
 
 interface TeamHeaderProps {
   /**
@@ -27,18 +18,10 @@ interface TeamHeaderProps {
 export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
   const insets = useSafeAreaInsets();
   const {activeTeamSpace, activeTeam, activeMemberCount} = useActiveTeam();
-  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
 
   if (!activeTeamSpace) return null;
 
   const teamColor = activeTeamSpace.color || colors.textSecondary;
-
-  // Logo-sirkelens fallback-kjede: lag-logo → klubblogo → initialer på
-  // lagfarge. URL-ene settes først i P4 (laginnstillinger), men kjeden står
-  // klar. Feiler nedlastingen faller vi tilbake til initialene i stedet for
-  // en tom sirkel.
-  const logoUrl = activeTeamSpace.logoUrl ?? activeTeam?.club.logoUrl ?? null;
-  const showLogo = logoUrl != null && logoUrl !== failedLogoUrl;
 
   // Undertekst: «Fotball · 18 medlemmer»; før tallet finnes (eller om
   // hentingen feiler): «Fotball · G14». Aldri en tom linje.
@@ -55,22 +38,9 @@ export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
 
   return (
     <View style={[styles.container, {paddingTop: insets.top + spacing.sm}]}>
-      {/* Lagfargen bor i ringen — logoen (eller initial-fyllet) inni */}
+      {/* Lagfargen bor i ringen — lagmerket (logo → initialer) inni */}
       <View style={[styles.badgeRing, {borderColor: teamColor}]}>
-        {showLogo ? (
-          <Image
-            source={{uri: logoUrl}}
-            style={styles.logo}
-            onError={() => setFailedLogoUrl(logoUrl)}
-          />
-        ) : (
-          <View style={[styles.badge, {backgroundColor: teamColor}]}>
-            <Text
-              style={[styles.badgeText, {color: inkOnTeamColor(teamColor)}]}>
-              {teamInitials(activeTeamSpace.displayName)}
-            </Text>
-          </View>
-        )}
+        <TeamBadge size={32} cornerRadius={radius.full} fontSize={12} />
       </View>
       <View style={styles.nameWrap}>
         <Text style={styles.name} numberOfLines={1}>
@@ -122,24 +92,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderRadius: radius.full,
     padding: 2,
-  },
-  badge: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logo: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.full,
-  },
-  // Farge settes inline — gult krever mørke initialer (inkOnTeamColor).
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
   },
   nameWrap: {
     flexShrink: 1,

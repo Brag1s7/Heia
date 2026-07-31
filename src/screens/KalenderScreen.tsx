@@ -36,6 +36,15 @@ function isPast(date: Date): boolean {
   return startOfDay(date) < startOfDay(new Date());
 }
 
+/** «August», eller «Januar 2027» når måneden bor i et annet år. */
+function formatMonthLabel(date: Date): string {
+  const month = date.toLocaleDateString('nb-NO', {month: 'long'});
+  const capped = month.charAt(0).toUpperCase() + month.slice(1);
+  return date.getFullYear() === new Date().getFullYear()
+    ? capped
+    : `${capped} ${date.getFullYear()}`;
+}
+
 function getSectionLabel(date: Date): string {
   const today = startOfDay(new Date());
   const eventDay = startOfDay(date);
@@ -45,7 +54,9 @@ function getSectionLabel(date: Date): string {
   if (diffDays === 0) return 'I dag';
   if (diffDays === 1) return 'I morgen';
   if (diffDays <= 7) return 'Denne uken';
-  return 'Kommende';
+  // Lenger frem sier «Kommende» ingenting — månedsnavnet gir kalenderen
+  // rytme (P9): August, September … som egne seksjoner.
+  return formatMonthLabel(date);
 }
 
 /**
@@ -190,17 +201,39 @@ export function KalenderScreen() {
                     <LiveBadge />
                   )}
               </View>
-              {section.events.map(event => (
-                <View key={event.id} style={styles.cardWrap}>
-                  <EventCard
-                    event={event}
-                    featured={event.matchStatus === 'live'}
-                    onPress={() =>
-                      navigation.navigate('EventDetail', {eventId: event.id})
-                    }
-                  />
-                </View>
-              ))}
+              {section.events.map((event, index) => {
+                const prev = index > 0 ? section.events[index - 1] : null;
+                // Arkivet ruller bakover i tid — en dempet månedsetikett når
+                // måneden bytter gir rytme uten å rope (fremover er månedene
+                // egne seksjoner, så dette gjelder kun «Tidligere»).
+                const monthBreak =
+                  section.label === 'Tidligere' &&
+                  prev !== null &&
+                  (prev.startTime.getMonth() !== event.startTime.getMonth() ||
+                    prev.startTime.getFullYear() !==
+                      event.startTime.getFullYear());
+                return (
+                  <React.Fragment key={event.id}>
+                    {monthBreak && (
+                      <Text style={styles.monthDivider}>
+                        {formatMonthLabel(event.startTime)}
+                      </Text>
+                    )}
+                    <View style={styles.cardWrap}>
+                      <EventCard
+                        event={event}
+                        featured={event.matchStatus === 'live'}
+                        past={section.label === 'Tidligere'}
+                        onPress={() =>
+                          navigation.navigate('EventDetail', {
+                            eventId: event.id,
+                          })
+                        }
+                      />
+                    </View>
+                  </React.Fragment>
+                );
+              })}
             </View>
           ))
         )}
@@ -269,5 +302,17 @@ const styles = StyleSheet.create({
   cardWrap: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
+  },
+  // Stillere enn seksjonsetiketten (ingen mint-strek, tertiær) — rytme i
+  // arkivet, ikke et nytt rop.
+  monthDivider: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.textTertiary,
   },
 });

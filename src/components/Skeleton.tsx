@@ -114,16 +114,18 @@ export function FeedCardSkeleton() {
   );
 }
 
-/** Kalenderkort: datoblokk + tittel og metalinje (speiler EventCard). */
+/** Kalenderkort: kompakt hero — pill + tid, tittel, metalinje, progress. */
 export function EventCardSkeleton() {
   return (
     <SkeletonCard>
-      <View style={styles.eventRow}>
-        <Skeleton width={44} height={52} style={styles.dateBlock} />
-        <View style={styles.eventText}>
-          <Skeleton width="60%" height={15} />
-          <Skeleton width="40%" height={12} />
-        </View>
+      <View style={styles.eventBand}>
+        <Skeleton width={80} height={20} round />
+        <Skeleton width={52} height={16} />
+      </View>
+      <View style={styles.eventLines}>
+        <Skeleton width="55%" height={16} />
+        <Skeleton width="35%" height={11} />
+        <Skeleton height={8} round />
       </View>
     </SkeletonCard>
   );
@@ -167,16 +169,13 @@ const styles = StyleSheet.create({
   lines: {
     gap: spacing.sm,
   },
-  eventRow: {
+  eventBand: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.lg,
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
   },
-  dateBlock: {
-    borderRadius: radius.md,
-  },
-  eventText: {
-    flex: 1,
+  eventLines: {
     gap: spacing.sm,
   },
   listRow: {

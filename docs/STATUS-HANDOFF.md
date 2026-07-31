@@ -1,17 +1,35 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-31. **P3 HEADEREN er FERDIG (godkjent på telefon +
-committet 2026-07-31).** Fra før: P2 MÅL-ØYEBLIKKET og P1 SKELETONS
-er FERDIG (begge godkjent på telefon + committet 2026-07-31); LAGFARGE er
-FERDIG (verifisert på telefon + committet 2026-07-31); SESONGFLATEN +
-TURNERINGER + VÅR/HØST-SESONGER (migrasjoner `00030`–`00033` deployet, flyt
-godkjent og pushet). LÅST underveis: ingen toppscorer/spillerstatistikk før
-strukturert spillerstall; sesong = vår/høst-halvår; turnering = enkel
-kampsamling; lagfarge = kuratert palett, aldri fri velger. **Skive 6
-(app-ikon + launch screen) er FERDIG — bruker: «perfekt gjennomført»
-2026-07-30.** Fortsatt uverifisert: **KAMPRAPPORTEN (skive 5)**.
-**Neste: P5 + P5B (kampforløpet + hendelsessiden)** når P4 er verifisert —
-se punkt 5 under. Design skive 1–5 er merget (PR #17), Fase 4–9 (PR #16)._
+_Sist oppdatert: 2026-07-31. **Nyeste skive: P9 KALENDEREN — RYTME, IKKE
+GRID (design-polish-planen), OMLAGT etter første telefontest:
+kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
+(mint→krem-gradient + banedekor, type-pill, dag + tid i displayfonten,
+RSVP-progress) — kamp på mørk stadionflate MED RINGEN (flomlys av),
+mint avspark og stillingen som bunnrad. RUNDE 3 samme dag:
+hendelsessidens infokort = samme hero-flate (ny delt `HeroSurface`), og
+kommende kamp i HJEM-heroen er også stadionmørk med ring.
+Månedsseksjoner + dempet arkiv består. ✅ GODKJENT på telefon 2026-07-31
+(«Alt dette ser bra ut») — **HELE P1–P9-PLANEN ER I MÅL.** LÅST
+samtidig: INGEN visningstoggle i kalenderen i v1 (Brage spurte selv;
+listen ER visningen — uke/måned tas opp ved reell tetthet). Se «🗓 P9»
+under.** Fra før: P8
+HERO-KARUSELL er FERDIG (godkjent 2026-07-31, se
+«🎠 P8»); P7 PROFIL-POLISH er FERDIG
+(godkjent 2026-07-31); P6 VARSLER-LISTEN er FERDIG (godkjent på telefon
+2026-07-31); P5 + P5B KAMPFORLØPET + HENDELSESSIDEN er FERDIG (godkjent
+2026-07-31); P4 LAGINNSTILLINGER + KLUBBLOGO er FERDIG (godkjent
+2026-07-31; migrasjoner `00034`–`00036` deployet); P3 HEADEREN, P2
+MÅL-ØYEBLIKKET og P1 SKELETONS er FERDIG; LAGFARGE er FERDIG;
+SESONGFLATEN + TURNERINGER + VÅR/HØST-SESONGER (migrasjoner
+`00030`–`00033` deployet, flyt godkjent og pushet).
+LÅST underveis: ingen toppscorer/spillerstatistikk før strukturert
+spillerstall; sesong = vår/høst-halvår; turnering = enkel kampsamling;
+lagfarge = kuratert palett, aldri fri velger; **klubblogo bor på KLUBBEN,
+write-once; laglogo = fri override**. **Skive 6 (app-ikon + launch
+screen) er FERDIG.** Fortsatt uverifisert: **KAMPRAPPORTEN (skive 5)**.
+**Neste: planens backlog eller kandidat 2 (kommentarer + heiing synlig
+i kamptidslinja)** — se punkt 5 under. Design skive 1–5 er merget (PR #17),
+Fase 4–9 (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
 
@@ -45,12 +63,11 @@ Se seksjonen «✅ TURNERINGER + VÅR/HØST-SESONGER» for modellen og testliste
 
 **5. 🗺 DESIGN-POLISH-PLANEN er i gang: `docs/DESIGN-POLISH-PLAN.md`** —
 9 skiver (P1 skeletons → P2 MÅL-øyeblikket → P3 header, deretter P4–P9) +
-backlog. Brages valgte rekkefølge. **P1, P2 og P3 er FERDIG (alle godkjent
-på telefon + committet 2026-07-31). Neste åpne skive er P5 + P5B når P4
-(laginnstillinger + klubblogo) er verifisert.**
-**NY skive P5B (2026-07-31, Brages telefonfunn): hendelsessiden har for
-mye hvitt / kjedelig hero, og før-kampstart-skjermen fortjener
-kampdag-følelse — tas sammen med P5 (samme skjerm). Se planens P5B.**
+backlog. Brages valgte rekkefølge. **P1–P9 er FERDIG (alle godkjent på
+telefon 2026-07-31) — HELE P-PLANEN ER I MÅL. P9 endte som kompakte
+hero-kort etter tre retningsrunder (se «🗓 P9» under), og beslutningen
+«ingen visningstoggle i kalenderen i v1» er LÅST. Gjenstår: backloggen
+i planen, deretter kandidat 2 (kommentarer + heiing i kamptidslinja).**
 LÅST underveis: **klubblogo bor på KLUBBEN** (`clubs.logo_url` finnes alt),
 write-once for lagadmin i klubben, aldri overskriving i MVP — detaljer og
 begrunnelse i planens P4. Start design-samtaler med: «Les
@@ -60,9 +77,393 @@ punkt.»
 Deretter (etter polish-planen): kandidat 2 (kommentarer + heiing synlig i
 kamptidslinja).
 
-**Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten).
-**Skive 6, LAGFARGEN, P1, P2 og P3 er FERDIG** (bruker-verifisert
-2026-07-30/31).
+**Fortsatt uverifisert (din jobb):** skive 5 (kamprapporten). **Skive 6,
+LAGFARGEN og P1–P9 er FERDIG** (bruker-verifisert 2026-07-30/31).
+
+---
+
+## 🗓 P9 — KALENDEREN: RYTME, IKKE GRID (✅ FERDIG — godkjent på telefon 2026-07-31)
+
+Niende og siste P-skive i design-polish-planen. **To retningsrunder
+samme dag:** Claude anbefalte «miniatyr av hendelsessiden» (P5B-bånd på
+hvite kort) og Brage valgte den i samtalen — men AVVISTE den på telefon:
+for store hvite «admin»-flater, og spilte kamper ble dobbelt mørke-tunge
+(bånd + stripe). **Brages endelige retning (GJELDER): kompakt
+hero-variant** — Hjem-heroens designspråk i kalenderformat (mint/varm
+gradient, runde former, svak banegrafikk, type-chip, dato/tid i kortet,
+RSVP/progress nederst), kamp mørk/dramatisk, ingen store hvite flater;
+skannbar OG umiddelbart samme Heia som Hjem. Ingen migrasjon, ingen
+native-deps — ren JS. `npx eslint src`: 0 errors, 2 warnings (begge fra
+før).
+
+- **`EventCard` er skrevet om til en kompakt hero.** Lys variant
+  (trening/sosialt/turnering/annet): SAMME mint→krem-gradient og
+  banedekor som NextEventHero (arcs skalert ned), type-pill med prikk +
+  dagetikett (heroens dayLabel: «I dag», «I morgen», «Fredag 12. jun») +
+  tid i displayfonten (19, heiaDeep), tittel 18, MapPin-rad,
+  mint-progress + «N kommer». Datoblokken (SØN/17/JUN) er borte —
+  dagetiketten bærer datoen.
+- **Kamp = mørk/dramatisk:** `StadiumSurface` med **RINGEN PÅ og flomlys
+  AV** (ringen er kampens signatur — Brage OPPHEVET «maks ett sted per
+  skjerm»-regelen i runde 3, kommentaren i StadiumSurface.tsx er
+  oppdatert; flomlyset er live-kampens dramatikk — kommende/spilt kamp
+  skal være «litt svakere»), kamp-pill, mint avsparkstid, sted i
+  stadiumDim.
+  Standardtittelen «Kamp mot Lyn» strammes til «Mot Lyn» (pillen sier
+  alt Kamp); egne titler vises som de er. **Spilt/pågående kamp:
+  stillingen som bunnrad I kortet** (label + evt. SEIER-pill + score i
+  mint display) — ingen egen stripe-flate lenger, kortet ER mørkt.
+  Live: coral «PÅGÅR NÅ» + prikk; `featured` = coral kant.
+- **Avlyst kamp:** lys variant med nøytral «Avlyst»-pill — en avlyst
+  kamp er ingen kampdag.
+- **RSVP-progressen** (mint-fyll + «N kommer») skjules i arkivet, på
+  avlyste, og når stillingen har tatt over kortet. RSVPBar-komponenten
+  lever videre på hendelsessiden.
+- **Fra runde 1 består:** månedsseksjoner i stedet for «Kommende»
+  («August»; «Januar 2027» ved annet år), dempede månedsskiller
+  (tertiær, ingen mint-strek) i arkivet, `past`-prop (opacity 0.6 +
+  skjult oppmøte — kun kalenderen sender den), og `EventCardSkeleton`
+  som speiler kortformen (pill + tid, linjer, progress-bone).
+- Turneringslisten på hendelsessiden bruker samme kort → kampene der er
+  mørke kompakthero-kort.
+- **LÅST (Brage spurte selv ved godkjenningen): ingen visningstoggle i
+  v1.** Listen er kalenderens ene, gjennomtenkte visning — en toggle
+  dobler designflaten, og hero-kortene har ingen god grid-form.
+  Uke-/månedsvisning tas opp ved reell tetthet (turneringshelger, flere
+  lag) eller når foreldre faktisk spør.
+
+**Runde 3 (samme dag — Brages telefonfunn på hendelsessiden + Hjem):**
+- **Hendelsessidens infokort = samme hero-flate:** P5B-aksentbåndet er
+  erstattet av ny delt **`HeroSurface`** (components — StadiumSurfaces
+  LYSE tvilling: mint→krem-gradient + banedekor, gjenbrukes av
+  EventCard) med type-pill, stor tid (24, heiaDeep), dato i fet, tittel,
+  sted og beskjed. Avlyst kamp får nøytral «Avlyst»-pill.
+  Kampdag-platta, live-modus og kamprapporten er urørt (de er alt på
+  stadionspråket — kampdag-platta har hatt ringen hele tiden).
+- **Kommende kamp på HJEM-heroen er stadionmørk:** `NextEventHero`
+  rendrer kamp på StadiumSurface med ring, flomlys av, mint avspark,
+  «Mot X»-tittelregelen og RSVP-progress på mørk track — samme uttrykk
+  som kalenderens kampkort («samme hero» — Brages krav). Lys hero for
+  alt annet er urørt; P8-karusellen selv er ikke endret.
+
+### Test dette først (Metro-reload)
+1. Kalenderen: trening/sosialt/turnering = kompakte gradient-hero-kort
+   (pill + dagetikett + stor tid + sted + «N kommer»-progress) — skal
+   umiddelbart kjennes som Hjem-heroen, ingen hvite adminflater.
+2. En kommende kamp: mørkt stadionkort med RINGEN nede til høyre, mint
+   avsparkstid, «Mot X» — og RSVP-progress på mørk track. En kamp med
+   egen tittel («Seriefinalen») viser den i stedet. Roligere enn
+   live-banneret (ingen flomlys-glød).
+3. En spilt kamp: mørkt kort med «SLUTTRESULTAT»-bunnrad + SEIER-pill
+   ved seier — ÉN mørk flate, ingen stripe-i-kortet.
+4. Live kamp: coral kant + «PÅGÅR NÅ» med prikk; LiveBadge på
+   «I dag»-etiketten.
+5. Arkivet: kortene er dempet, oppmøtet er skjult, og dempet
+   månedsetikett («JULI», «JUNI» …) når måneden bytter. Fremover:
+   «I dag / I morgen / Denne uken», så «August», «September» som egne
+   seksjoner med mint-strek.
+6. Turneringslisten inne på en turnering (hendelsessiden): mørke
+   kompakthero-kampkort — sjekk at de ser riktige ut der og IKKE er
+   dempet.
+7. **(Runde 3)** Hendelsessiden for en trening/sosialt: infokortet er
+   hero-flaten (gradient + banedekor + pill + stor tid + dato) — ingen
+   hvit adminflate. Beskjeden («Vi øver på pasninger!») står i kortet.
+8. **(Runde 3)** Hjem-karusellen: kommende KAMP er mørk med ring og mint
+   avspark («Mot Ottestad»); trening-heroen er lys som før. Live-banner
+   og kampdag-platta på kampsiden ser ut som før.
+
+---
+
+## 🎠 P8 — HERO-KARUSELL PÅ HJEM (✅ FERDIG — godkjent på telefon 2026-07-31)
+
+Åttende skive i design-polish-planen (Brages forslag: bla bortover på
+øverste hendelse). Ingen migrasjon, ingen native-deps — ren JS.
+`npx eslint src`: 0 errors, 2 warnings (begge fra før).
+
+- **Ny `NextEventCarousel` (components):** horisontal FlatList med
+  `pagingEnabled` — sidene er skjermbredde (`useWindowDimensions`) og
+  bærer skjermmargen selv, så TeamHome legger karusellen i en wrapper
+  UTEN horisontal padding (`carouselSection`, kun paddingTop). Alle
+  sidene (maks 4) rendres med én gang (`initialNumToRender`) så
+  listehøyden settes av det høyeste kortet og ikke hopper når man blar.
+- **Sidene:** de neste inntil 3 hendelsene som `NextEventHero` (urørt)
+  + et siste «Åpne kalenderen»-kort: hvit flate, Calendar-ikon i
+  heiaTint-sirkel, «Treninger, kamper og alt som skjer». Kortet fyller
+  sidehøyden (flex) og navigerer til Kalender-fanen via
+  `getParent().navigate('KalenderStack')` — samme idiom som NewEvent.
+- **Prikkene under:** aktiv = mint pill (18×6, `colors.heia` — samme
+  språk som RSVP-fyllet i heroen), inaktive = dempet mørkgrønn 6 px.
+  Aktiv side spores via `onMomentumScrollEnd` (clampet mot sideantall).
+- **`pickNextEvent` → `pickNextEvents(events, 3)`** i TeamHomeScreen
+  (samme filter som før: avlyst/ferdig hoppes over, uten sluttid = start
+  + 2 t); state `nextEvent` → `nextEvents`.
+- **Live-kampen beholder hero-prioritet:** karusellen rendres kun i
+  hverdagsmodus (ingen `liveMatch`) — og uten kommende hendelser vises
+  ingen karusell i det hele tatt (aldri et ensomt kalenderkort).
+
+### Test dette først (Metro-reload)
+1. Hjem uten live kamp, med flere kommende hendelser: bla bortover —
+   inntil 3 hendelseskort + «Åpne kalenderen»-kortet bakerst; prikkene
+   følger med, aktiv prikk er mint pill.
+2. Trykk et hendelseskort → hendelsessiden. Trykk kalenderkortet →
+   Kalender-fanen.
+3. Kun ÉN kommende hendelse → to sider (hendelsen + kalenderkortet).
+   Ingen kommende hendelser → ingen hero (som før).
+4. Start en kamp → live-banneret tar hero-plassen alene; avslutt →
+   karusellen er tilbake.
+5. Sidebyttet skal snappe rent (paging), høyden skal ikke hoppe mellom
+   sider, og vanlig vertikal scrolling av feeden skal ikke forstyrres.
+
+---
+
+## 👤 P7 — PROFIL-POLISH (✅ FERDIG — godkjent på telefon 2026-07-31)
+
+Sjuende skive i design-polish-planen + Brages ønske samme dag: lagmerkene
+under «Dine lag» skal vise LOGOEN når den finnes, ikke bare lagfargen.
+Ingen migrasjon, ingen native-deps — ren JS. `npx eslint src`: 0 errors,
+2 warnings (begge fra før).
+
+- **Toppen på varm bakgrunnstone:** profilseksjonen (avatar/navn/rolle)
+  er ikke lenger et hvitt kort med skygge — den ligger rett på
+  `background`, og luften øverst er strammet (paddingTop 2xl→lg, gap
+  sm→xs). Forelder-rollepillen fikk hvit flate + subtil kant (den gamle
+  background-tonen forsvant mot den nye bakgrunnen).
+- **«Dine lag» viser lagmerket:** 12 px-fargeprikken er erstattet av
+  `TeamBadge` (36 pt sirkel) per medlemskap — fallback-kjeden lag-logo →
+  klubblogo → initialer på lagfarge, samme som headeren/kampsiden.
+  **`TeamBadge` fikk `logoUrl`/`color`-props som overstyrer context** —
+  den var låst til AKTIVT lag, og Profil-listen viser alle lagene dine.
+  Utelatt prop = context-kjeden som før, så alle gamle kallsteder
+  (ScoreBoard, LiveMatchBanner, TeamHeader, EventDetail) er urørt.
+  Aktiv-haken er nå tegnet `Check` i heiaInk (før tekst-«✓»).
+- **To menykort med mint-strek-etiketter** (seksjonsskillet lag ↔
+  innstillinger fra planen): «[LAGNAVNET]» (Lagoversikt, Laginnstillinger
+  (kun trener), Inviter til laget) og «INNSTILLINGER» (Telefonnummer,
+  Bli med i et lag, Opprett et nytt lag, Varslinger, Logg ut, Om Heia).
+  Uten aktivt medlemskap rendres lag-kortet ikke.
+- **Konsekvent ikonlogikk:** alle rader har tegnet Lucide-ikon
+  (textSecondary, 20 pt) i fast 28 px-slot — de tomme streng-slotene og
+  🔔-emojien er borte. Fire nye ikoner i icons.tsx-eksporten: `LogOut`,
+  `Settings`, `Share2`, `UserPlus`. `ChevronRight` (textTertiary) på alle
+  navigasjonsrader — `ListRow`s `right`-prop endelig i bruk;
+  handlingsrader (Telefonnummer, Varslinger, Logg ut) har bevisst ingen
+  chevron. Laginnstillinger-raden bruker Settings-ikonet — fargeprikken
+  der er borte; lag-identiteten bor nå i «Dine lag»-kortene.
+
+### Test dette først (Metro-reload)
+1. Profil-fanen: toppen ligger på kremtonen (ikke eget hvitt kort),
+   luften øverst er strammere, rollepillen leses fortsatt tydelig.
+2. «Dine lag»: laget med logo viser LOGOEN i sirkelen; lag uten logo
+   viser initialer på lagfargen. Aktivt lag har mint-flate + hake som før,
+   og lagbytte fungerer.
+3. To kort under: «[lagnavnet ditt]» og «Innstillinger» med
+   mint-strek-etiketter; alle rader har ikon, og navigasjonsradene har
+   chevron til høyre.
+4. Trykk deg gjennom radene — alle går dit de skal (Lagoversikt,
+   Laginnstillinger, Inviter, Bli med, Opprett, Varslinger, Logg ut).
+5. Som forelder: ingen «Laginnstillinger»-rad; lag-kortet viser
+   Lagoversikt + Inviter.
+6. Headeren, kampsiden og live-banneret ser ut som før (TeamBadge-
+   endringen er kun nye valgfrie props).
+
+---
+
+## 📬 P6 — VARSLER-LISTEN (✅ FERDIG — godkjent på telefon 2026-07-31)
+
+Sjette skive i design-polish-planen — **scope omskrevet av Brage samme
+dag: det gamle P6-punktet om globalt kontrastpass (mørkne
+textSecondary/textTertiary) var en misforståelse og er STRØKET.** Dette
+er ren Varsler-polish: luft i raden + tidsbolker. Ingen migrasjon, ingen
+native-deps. `npx eslint src`: 0 errors, 2 warnings (begge fra før).
+
+- **Tidsbolker i `InboxScreen`:** «I dag / I går / Siste 7 dager /
+  Tidligere» med appens mint-strek-etikett (`SectionHeader`) over hvert
+  listekort. Radene kommer nyest først fra serveren (`ORDER BY created_at
+  DESC`), så `groupByAge` er en enkel run-deling — rekkefølgen består,
+  tomme bolker finnes ikke. Fortsatt samme enkle liste — IKKE kort per
+  varsel (Brages ord).
+- **`NotificationRow` — tydeligere avstand avsender/innhold/tidspunkt:**
+  paddingVertical md→lg, gap tittel↔innhold 2→4, gap tittel↔tidspunkt
+  sm→md. Ulest-flaten (heiaSoft) + grønn prikk er urørt.
+- **Tidsstempelet:** «I går»/«3 d» → ukedag («tir.») for 1–6 dager siden —
+  bolk-etiketten sier alt «I går», raden skal ikke gjenta den. Eldre enn
+  7 dager: dato («12. jul») som før.
+- **Luft-eierskap:** headerens marginBottom er flyttet til
+  seksjonsetikettens eget topp-rom; skeleton/feil/tom-tilstandene har
+  egen `standalone`-margin i stedet.
+
+### Test dette først (Metro-reload)
+1. Varsler-fanen med blandede varsler: bolkene «I dag», «I går» osv. med
+   mint-strek-etikett — og bare bolker som faktisk har innhold.
+2. Radene: mer luft mellom tittel, innholdstekst og tidspunktet til
+   høyre; listen skal fortsatt være én enkel flate, ikke store kort.
+3. Et varsel fra i går viser ukedag («ons.») — ikke «I går» dobbelt opp
+   mot etiketten.
+4. Ulest: heiaSoft-flate + prikk som før; «Merk alle som lest» virker.
+5. Tom inbox og feil (flymodus + dra ned): kortet ligger med samme luft
+   under headeren som før.
+
+---
+
+## 🎨 P5 + P5B — KAMPFORLØPET + HENDELSESSIDEN (✅ FERDIG — godkjent på telefon 2026-07-31)
+
+Femte skive i design-polish-planen (P5 skannbarhet + P5B hendelsessidens
+hero, samme samtale som planlagt). Ingen migrasjon, ingen native-deps —
+ren JS. `npx eslint src`: 0 errors, 2 warnings (begge fra før).
+
+- **P5 — markørene i kampforløpet (`MatchEventRow`):** ny `markerFor(event)`
+  erstatter de statiske ikon/farge-tabellene — markøren avhenger nå av
+  `teamSide`, ikke bare type. **Ballen betyr MÅL og ingenting annet:**
+  avspark/fortsettelse har Play-pil på dempet `surfaceMuted` (før heiaTint —
+  avspark er ikke feiring). **Mål for oss:** mint-sirkel + liten gull-prikk
+  med hvit kant (feiring: grønt/gult). **Mål imot** (og mål uten `teamSide`):
+  dempet nøytral — aldri coral («ingen TAP-roping»). **Slutt:** stadion-mørk
+  markør (`colors.stadium`, Flag i `stadiumText`).
+- **P5 — glyfene erstattet:** `bytte` = Lucide `ArrowLeftRight` (tegnet
+  versjon av ↔), `kort` = ny egen svg **`BookingCard`** i icons.tsx (FYLT
+  gull-rektangel, lett helning, goldInk-kant — Lucide har kun
+  stroke-rektangler, og et dommerkort er en fylt flate). `MatchPhotoSheet`
+  beholder tekst-glyfene bevisst — der er de del av en ren tekstetikett i
+  øyeblikk-velgeren, ikke tidslinje-markører.
+- **P5B — info-kortet (trening/sosialt/turnering/annet + avlyst kamp):**
+  type-tonet aksentbånd øverst i kortet (infoSoft/remindSoft/sun/
+  surfaceMuted — pillenes semantikk) med typeetiketten i båndets ink-farge
+  (en pill i softfargen ville druknet i bånd av samme farge), stort
+  klokkeslett i displayfonten (Nunito 24) til høyre, dato i fet under.
+  Metalisten (Dato/Tid/Sted-label-rader) er borte; sted er en rolig
+  MapPin-rad i kortkroppen. `MetaRow`-hjelperen er slettet.
+- **P5B — KAMPDAG (kommende kamp med motstander):** mørk mini-platte
+  (`StadiumSurface`, cardResting — roligere enn ScoreBoard): «KAMPDAG» +
+  dato øverst, lagmerkene (TeamBadge m/ logo + motstander-initialer på
+  ScoreBoard-grå) rundt stort avsparkstidspunkt i mint (Nunito 32, UTEN
+  glød — gløden er live-scorens signatur), «Avspark»-caption, sted sentrert
+  nederst. Standardtittelen («Kamp mot Lyn») vises ikke (platta sier det
+  samme); egendefinert tittel vises. Kamp uten motstander → info-kortet med
+  kamp-aksent. ReporterBar + «Start kamp» + RSVP under er urørt.
+- **Vakten holdt:** live-modus og kamprapporten er ikke rørt.
+
+### Test dette først (Metro-reload)
+1. Åpne en spilt kamp (kamprapporten) → kampforløpet: mål for oss har
+   mint-sirkel med gull-prikk, mål imot er grå, avspark/2. omgang har
+   grå pil (ikke mint), slutt er mørk. Målene skal hoppe ut ved rask
+   scrolling — resten skal ligge rolig.
+2. Åpne en trening → kort med blått bånd øverst: «TRENING» + stort
+   klokkeslett, dato i fet, sted med kartnål under tittelen. Sosialt =
+   lilla bånd, turnering = gult.
+3. Opprett/åpne en KOMMENDE kamp → mørk kampdag-platte: lagmerket ditt
+   (logo!) mot motstander-initialer, stort avsparkstidspunkt i mint,
+   sted nederst. «Start kamp»-knappen og RSVP står under som før.
+4. Gi en kommende kamp egen tittel (f.eks. «Seriefinalen») → tittelen
+   vises på platta; standard «Kamp mot X» vises ikke dobbelt.
+5. Live-kamp og kamprapport-toppen (ScoreBoard) skal se HELT ut som før.
+
+---
+
+## 🛠 P4 — LAGINNSTILLINGER + KLUBBLOGO (✅ FERDIG — godkjent på telefon 2026-07-31)
+
+Fjerde skive i design-polish-planen. Én migrasjon (deployet), ingen
+native-deps (pickeren var alt inne). `npx eslint src`: 0 errors, 2 warnings
+(begge fra før).
+
+- **Modellen (LÅST, se planens P4):** klubblogo bor på KLUBBEN
+  (`clubs.logo_url`, dødt felt fra 00002 — nå i bruk), **write-once** for
+  lagadmin i klubben, aldri overskriving i MVP. Laglogo
+  (`team_spaces.logo_url`) er per-lag-OVERRIDE og endres/fjernes fritt av
+  lagadmin. Fallback-kjeden fra P3 (lag → klubb → initialer) lyser nå opp.
+- **Migrasjon `00034_club_logo.sql` (✅ deployet):** ny helper
+  `is_club_team_admin(club_id)` (lagadmin i ET av klubbens lag — brukes av
+  både RPC og storage-policy). **Offentlig** bucket `club-logos` (logo er
+  ikke persondata; signerte URL-er utløper og headeren/søket rendres
+  konstant). Tre storage-policyer: klubb-INSERT (kun klubbens lagadmins,
+  kun mens `logo_url IS NULL` — write-once også på filnivå), lag-INSERT og
+  lag-DELETE (`is_team_admin` på første path-segment; en club_id gir false
+  der, så ingen kan slette klubblogoer fra klienten). RPC
+  `set_club_logo(p_club_id, p_url)`: SECURITY DEFINER (clubs er
+  client-read-only, 00016-mønsteret), alle vakter i COALESCE (NULL-fella
+  fra 00020), `FOR UPDATE`-lås mot samtidige opplastinger, og URL-en må
+  peke inn i klubbens egen mappe i bucketen.
+- **To RLS-fikser etter Brages telefonfunn samme kveld («new row violates
+  row-level security policy» ved opplasting):**
+  - **`00035`:** i klubb-INSERT-policyens EXISTS-subquery ble det
+    UKVALIFISERTE `name` bundet til `clubs.name` (nærmeste relasjon i
+    subqueryen), ikke `storage.objects.name` — write-once-sjekken
+    sammenlignet klubb-id mot `foldername('Hamkam')` = NULL og policyen sa
+    alltid nei. **Regel (samme familie som COALESCE-NULL-fella): ytre
+    kolonner i policy-subqueries MÅ kvalifiseres (`objects.name`).**
+  - **`00036`:** storage-API-et laster opp med `INSERT … RETURNING`, og
+    RETURNING krever at raden også passerer en SELECT-policy —
+    `club-logos` hadde ingen. **Regel: en bucket det lastes opp til
+    trenger alltid SELECT-policy, også når den er offentlig** (public-URL-
+    nedlasting går utenom RLS; API-ets insert-returning gjør ikke).
+    feed-media virket hele tiden fordi 00018 har SELECT-policy.
+  - Begge er verifisert direkte i SQL som Brages bruker (simulert JWT +
+    `authenticated`-rolle): både klubb- og lag-path passerer nå med
+    RETURNING. Testradene er ryddet. Fiksene er rene DB-endringer — ny
+    test i appen krever INGEN reload.
+- **Runde 2 av telefonfunn (2026-07-31, KODET — Metro-reload):** Brage
+  bekreftet at opplastingen virker («Det funker!») og fant to ting til:
+  - **Lagfarge-valg kastet deg til Hjem:** hver lagring på Laginnstillinger
+    (farge/navn/logo) kaller `refreshMemberships`, som satte
+    `loading=true` i TeamContext → AppNavigator (linje ~410) river ned
+    hele navigatoren på loading → remount lander på Hjem-fanen. Fiks:
+    **stille refresh** — `loadedForRef` i TeamContext; loading settes kun
+    på FØRSTE last per bruker. Bonus: en refresh som feiler beholder nå
+    forrige liste i stedet for å nulle den (et nettverksglipp kunne før
+    sende en innlogget bruker til onboarding). Samme bug gjaldt gamle
+    Lagfarge-raden på Profil — den har alltid hoppet til Hjem.
+  - **Logoen manglet på kampsiden:** ScoreBoard og LiveMatchBanner tegnet
+    initialer direkte. Ny delt **`TeamBadge`** (components) eier
+    fallback-kjeden lag → klubb → initialer på lagfarge; brukes nå i
+    ScoreBoard (kampside + kamprapport, 48 pt), LiveMatchBanner (42 pt)
+    og TeamHeader (32 pt sirkel — refaktorert til samme komponent).
+    På mørk stadionflate får logoen hvit plate (`logoPlate`) så
+    transparente PNG-er ikke drukner. Motstander-merket er urørt.
+- **`teams.ts`:** `uploadLogo` (nytt filnavn per opplasting — RN-Image
+  cacher per URL, så en BYTTET logo må få ny URL), `setClubLogo`,
+  `updateTeamLogo` (null = fjern; best-effort sletting av gammel fil),
+  `updateTeamName` (display_name; `.select('id')`-vakta), `getClubForTeamSpace`;
+  `searchClubs` returnerer nå `logoUrl`.
+- **`media.ts`:** `pickLogoImage()` — rett til kamerarullen (ingen
+  kamera-spørsmål; en logo ligger lagret) og resize 512 px (headeren skal
+  ikke laste et 12 MP-foto).
+- **Ny `TeamSettingsScreen`** (ProfilStack): fire kort — lagnavn
+  (input + «Lagre navnet» når endret), lagfarge (TeamColorPicker inline,
+  trykk = lagre), laglogo (forhåndsvisning i lagfarge-ring + Velg/Bytt +
+  Fjern med bekreftelse), klubblogo (read-only med forklaring når den
+  finnes; «Legg til klubblogo» når den mangler). Inngang: Profil-raden
+  «Laginnstillinger» (fargeprikk-ikonet) — erstatter Lagfarge-raden, og
+  `TeamColorSheet` er SLETTET (arket bodde kun der).
+- **CreateTeam:** klubb-dropdownen viser `ClubBadge` (logo, initialer som
+  fallback) ved hvert treff — dedup-incentivet fra planen.
+- **`OnboardingContext.executeCreate`:** oppretter du en NY klubb kommer
+  et valgfritt «Legg til klubblogoen?»-alert etter at laget er opprettet
+  (ny `src/lib/clubLogo.ts`). Bor i executeCreate, IKKE i skjermen — da
+  dekkes både direkteveien og auth-before-commit-resumet. Write-once-racen
+  håndteres stille (rakk noen andre å sette logoen, hopper vi over).
+
+### Test dette først (Metro-reload)
+1. Profil som trener → «Laginnstillinger». Endre lagnavnet + «Lagre
+   navnet» → headeren og Profil viser nytt navn.
+2. Trykk en lagfarge-swatch → lagres direkte (ring + hake flytter seg),
+   lagmerket skifter farge overalt.
+3. «Velg laglogo» → bilde fra kamerarullen → lagmerket i headeren viser
+   logoen (alle tre faner). «Bytt» og «Fjern» — fjern faller tilbake til
+   klubblogo/initialer.
+4. Klubblogo: mangler klubben logo → «Legg til klubblogo» → etterpå viser
+   kortet den som read-only («deles av alle lag i klubben»). **NB: satte
+   du en test-URL på `clubs.logo_url` i SQL under P3-testen, null den ut
+   først** (`update clubs set logo_url = null where id = '…';`).
+5. Profil → «Opprett et nytt lag» → søk klubb: treff viser logo-sirkel
+   (initialer uten logo). Velg klubben MED logo → laget arver den i
+   headeren uten mer oppsett.
+6. Opprett et lag med NY klubb → etter opprettelsen: «Legg til
+   klubblogoen?»-spørsmål (Senere / Velg bilde).
+7. Som forelder: ingen «Laginnstillinger»-rad på Profil.
+8. **(Runde 2)** Endre lagfarge/navn/logo på Laginnstillinger → du BLIR
+   på siden (ingen hopp til Hjem).
+9. **(Runde 2)** Åpne en kamp (og kamprapporten, og live-banneret på
+   Hjem): lagmerket viser logoen på hvit plate — ikke initialer — når
+   laget/klubben har logo.
 
 ---
 

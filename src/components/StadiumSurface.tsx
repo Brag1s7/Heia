@@ -14,7 +14,10 @@ interface StadiumSurfaceProps {
   style?: StyleProp<ViewStyle>;
   /** Flomlys-glødene (amber + mint) øverst. Av på små flater (chips/striper). */
   flood?: boolean;
-  /** Banesirkelen nede til høyre. Maks ett sted per skjerm (låst regel). */
+  /** Banesirkelen nede til høyre — kampens signatur (Brage 2026-07-31:
+      ringen SKAL med på kampflater, også kampkort i lister; den gamle
+      «maks ett sted per skjerm»-regelen er opphevet). Av på småflater
+      (chips/striper). */
   arc?: boolean;
   /** Kantlinjen (stadiumEdge). Av på chips som skal ligge rett på et kort. */
   bordered?: boolean;

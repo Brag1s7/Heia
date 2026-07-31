@@ -9,18 +9,21 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {colors, typography, spacing} from '../theme';
+import {colors, typography, spacing, radius, fonts, shadows} from '../theme';
 import {
   BackBar,
   Card,
-  StatusPill,
   Button,
   RSVPBar,
   SectionHeader,
   Avatar,
   ListRow,
   EventCard,
+  HeroSurface,
   ScoreBoard,
+  StadiumSurface,
+  StatusPill,
+  TeamBadge,
   ReporterActions,
   ReporterModal,
   ReporterBar,
@@ -32,8 +35,9 @@ import {
   Skeleton,
   SkeletonCard,
 } from '../components';
-import type {ReporterActionType} from '../components/ReporterActions';
+import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
+import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam, useNotifications} from '../context';
 import {getTeamMembers, type TeamMember} from '../lib/api/members';
 import {
@@ -89,7 +93,8 @@ function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
-// Samme type→pill-språk som NextEventHero/EventCard (A v2).
+// Samme type-pill som kortene på Hjem og i kalenderen — infokortet er samme
+// hero-flate (Brages retning 2026-07-31), og pillen bærer typefargen.
 const typePill: Record<EventType, {kind: PillKind; label: string}> = {
   trening: {kind: 'trening', label: 'Trening'},
   kamp: {kind: 'kamp', label: 'Kamp'},
@@ -97,6 +102,15 @@ const typePill: Record<EventType, {kind: PillKind; label: string}> = {
   sosialt: {kind: 'sosialt', label: 'Sosialt'},
   annet: {kind: 'neutral', label: 'Hendelse'},
 };
+
+/** Samme forkorting som ScoreBoard/TeamBadge — motstandermerket på platta. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return (parts[0] ?? '?').slice(0, 2).toUpperCase();
+}
 
 function formatDateLong(date: Date): string {
   const day = dayNamesLong[date.getDay()];
@@ -705,6 +719,12 @@ export function EventDetailScreen({route, navigation}: Props) {
     .filter(Boolean)
     .join(' · ');
 
+  // En avlyst kamp er ingen kampdag — nøytral «Avlyst»-pill (som kalenderen).
+  const infoPill =
+    event.type === 'kamp' && event.matchStatus === 'cancelled'
+      ? {kind: 'neutral' as PillKind, label: 'Avlyst'}
+      : (typePill[event.type] ?? typePill.annet);
+
   return (
     <View style={styles.screen}>
       <BackBar title="Hendelse" />
@@ -725,30 +745,87 @@ export function EventDetailScreen({route, navigation}: Props) {
             <Text style={styles.description}>{event.description}</Text>
           )}
         </View>
-      ) : (
-        /* Event-info */
-        <Card style={styles.infoCard}>
-          <StatusPill
-            kind={(typePill[event.type] ?? typePill.annet).kind}
-            label={(typePill[event.type] ?? typePill.annet).label}
-          />
-          <Text style={styles.title}>{event.title}</Text>
-          <View style={styles.metaList}>
-            <MetaRow label="Dato" value={formatDateLong(event.startTime)} />
-            <MetaRow
-              label="Tid"
-              value={
-                event.endTime
-                  ? `${formatTime(event.startTime)} – ${formatTime(event.endTime)}`
-                  : formatTime(event.startTime)
-              }
-            />
-            {event.location && <MetaRow label="Sted" value={event.location} />}
-          </View>
+      ) : isUpcomingMatch && event.opponent ? (
+        /* Kampdag (P5B): motstander + avspark fortjener mer enn sort på
+           hvitt — en liten stadion-smak, IKKE full ScoreBoard (det er
+           live-kampens språk). RSVP og «Start kamp»-flyten består under. */
+        <View style={styles.kampdagSection}>
+          <StadiumSurface style={styles.kampdag}>
+            <View style={styles.kampdagTop}>
+              <Text style={styles.kampdagLabel}>Kampdag</Text>
+              <Text style={styles.kampdagDay}>
+                {formatDateLong(event.startTime)}
+              </Text>
+            </View>
+            {/* Standardtittelen («Kamp mot Lyn») sier ikke mer enn platta
+                selv — kun en egen tittel fortjener plassen. */}
+            {event.title !== `Kamp mot ${event.opponent}` && (
+              <Text style={styles.kampdagTitle}>{event.title}</Text>
+            )}
+            <View style={styles.kampdagTeams}>
+              <View style={styles.kampdagTeamCol}>
+                <TeamBadge
+                  size={44}
+                  cornerRadius={radius.lg}
+                  fontSize={13}
+                  logoPlate
+                  name={teamName}
+                  style={styles.kampdagUsRing}
+                />
+                <Text style={styles.kampdagTeamName} numberOfLines={2}>
+                  {teamName}
+                </Text>
+              </View>
+              <View style={styles.kampdagKickoff}>
+                <Text style={styles.kampdagTime}>
+                  {formatTime(event.startTime)}
+                </Text>
+                <Text style={styles.kampdagKickoffLabel}>Avspark</Text>
+              </View>
+              <View style={styles.kampdagTeamCol}>
+                <View style={styles.kampdagThemBadge}>
+                  <Text style={styles.kampdagThemText}>
+                    {initials(event.opponent)}
+                  </Text>
+                </View>
+                <Text style={styles.kampdagTeamName} numberOfLines={2}>
+                  {event.opponent}
+                </Text>
+              </View>
+            </View>
+            {event.location && (
+              <Text style={styles.kampdagMeta}>{event.location}</Text>
+            )}
+          </StadiumSurface>
           {event.description && (
             <Text style={styles.description}>{event.description}</Text>
           )}
-        </Card>
+        </View>
+      ) : (
+        /* Event-info: samme hero-flate som kortene på Hjem og i kalenderen
+           (Brages retning 2026-07-31) — mint→krem-gradient med banedekor,
+           type-pill og stor tid i displayfonten. Ingen hvite adminflater. */
+        <HeroSurface style={styles.infoHero}>
+          <View style={styles.infoHeroTop}>
+            <StatusPill kind={infoPill.kind} label={infoPill.label} withDot />
+            <Text style={styles.infoTime}>
+              {event.endTime
+                ? `${formatTime(event.startTime)}–${formatTime(event.endTime)}`
+                : formatTime(event.startTime)}
+            </Text>
+          </View>
+          <Text style={styles.infoDate}>{formatDateLong(event.startTime)}</Text>
+          <Text style={styles.infoTitle}>{event.title}</Text>
+          {event.location && (
+            <View style={styles.locationRow}>
+              <MapPin size={14} color="#41604F" />
+              <Text style={styles.locationText}>{event.location}</Text>
+            </View>
+          )}
+          {event.description && (
+            <Text style={styles.description}>{event.description}</Text>
+          )}
+        </HeroSurface>
       )}
 
       {/* Turnering: dagens kjøreplan. Kampene bor HER — kalenderen viser
@@ -921,15 +998,6 @@ export function EventDetailScreen({route, navigation}: Props) {
 // ---------------------------------------------------------------------------
 // Hjelpkomponenter
 // ---------------------------------------------------------------------------
-function MetaRow({label, value}: {label: string; value: string}) {
-  return (
-    <View style={styles.metaRow}>
-      <Text style={styles.metaLabel}>{label}</Text>
-      <Text style={styles.metaValue}>{value}</Text>
-    </View>
-  );
-}
-
 function AttendanceSection({
   title,
   users: attendeeList,
@@ -1000,9 +1068,130 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
   },
-  infoCard: {
+  // Info-kortet (P5B): aksentbåndet ligger kant-i-kant med kortets topp, så
+  // paddingen bor i båndet og kroppen — ikke på kortet selv.
+  infoHero: {
     margin: spacing.lg,
+    padding: spacing.xl,
     gap: spacing.sm,
+    ...shadows.cardResting,
+  },
+  infoHeroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  // Klokkeslettet er kortets store tall — displayfonten, aldri fontWeight.
+  infoTime: {
+    fontSize: 24,
+    letterSpacing: -0.3,
+    fontFamily: fonts.display,
+    color: colors.heiaDeep,
+  },
+  infoDate: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  infoTitle: {
+    ...typography.heading2,
+    marginTop: spacing.xs,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  locationText: {
+    ...typography.body,
+    color: '#41604F',
+    flex: 1,
+  },
+  // Kampdag (P5B): mini-stadion før avspark — samme språk som ScoreBoard,
+  // men roligere (ingen glød, ingen score).
+  kampdagSection: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  kampdag: {
+    padding: spacing.xl,
+    gap: spacing.lg,
+    ...shadows.cardResting,
+  },
+  kampdagTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  kampdagLabel: {
+    ...typography.label,
+    color: colors.stadiumDim,
+  },
+  kampdagDay: {
+    ...typography.caption,
+    color: colors.stadiumDim,
+  },
+  kampdagTitle: {
+    ...typography.heading3,
+    color: colors.stadiumText,
+  },
+  kampdagTeams: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  kampdagTeamCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  kampdagTeamName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.stadiumText,
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  kampdagKickoff: {
+    alignItems: 'center',
+  },
+  // Mint på stadionmørk er lov (låst regel gjelder LYSE flater) — men uten
+  // glød: gløden er live-scorens signatur, dette er før avspark.
+  kampdagTime: {
+    fontSize: 32,
+    letterSpacing: -0.5,
+    fontFamily: fonts.display,
+    color: colors.heia,
+  },
+  kampdagKickoffLabel: {
+    ...typography.caption,
+    color: colors.stadiumDim,
+  },
+  kampdagUsRing: {
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+  },
+  kampdagThemBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: '#3A4750',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kampdagThemText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  kampdagMeta: {
+    ...typography.caption,
+    color: colors.stadiumDim,
+    textAlign: 'center',
   },
   // Kamprapportens topp: resultatet først, «hvor og når» som undertekst.
   report: {
@@ -1017,27 +1206,6 @@ const styles = StyleSheet.create({
   reportMeta: {
     ...typography.bodySmall,
     color: colors.textSecondary,
-  },
-  title: {
-    ...typography.heading2,
-    marginTop: spacing.sm,
-  },
-  metaList: {
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  metaLabel: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
-    width: 48,
-  },
-  metaValue: {
-    ...typography.body,
-    flex: 1,
   },
   description: {
     ...typography.body,

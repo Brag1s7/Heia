@@ -59,8 +59,11 @@ function timeAgo(date: Date): string {
   const diffHour = Math.floor(diffMin / 60);
   if (diffHour < 24) return `${diffHour} t`;
   const diffDay = Math.floor(diffHour / 24);
-  if (diffDay === 1) return 'I går';
-  if (diffDay < 7) return `${diffDay} d`;
+  // Ukedag («tir.») i stedet for «I går»/«3 d» — seksjonsetikettene i
+  // Varsler-listen sier alt hvilken bolk raden hører til.
+  if (diffDay < 7) {
+    return date.toLocaleDateString('nb-NO', {weekday: 'short'});
+  }
   return date.toLocaleDateString('nb-NO', {day: 'numeric', month: 'short'});
 }
 
@@ -114,11 +117,13 @@ export function NotificationRow({
 }
 
 const styles = StyleSheet.create({
+  // P6: litt mer luft i og mellom radene — avsender, innhold og tidspunkt
+  // skal puste hver for seg. Fortsatt en enkel liste, ikke kort.
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     backgroundColor: colors.surface,
   },
@@ -141,12 +146,12 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    gap: 2,
+    gap: spacing.xs,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
   },
   title: {
     ...typography.body,
