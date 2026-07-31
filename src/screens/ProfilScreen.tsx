@@ -15,7 +15,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, CommonActions} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar, ListRow} from '../components';
+import {Avatar, ListRow, TeamColorSheet} from '../components';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
 import {
@@ -24,7 +24,7 @@ import {
   enablePush,
   type PushPermission,
 } from '../lib/push';
-import {updateProfile} from '../lib/api';
+import {updateProfile, updateTeamColor} from '../lib/api';
 import type {ProfilStackParamList} from '../shared/types';
 
 // Undertekst på «Varslinger»-raden per status.
@@ -40,9 +40,15 @@ type Nav = NativeStackNavigationProp<ProfilStackParamList, 'Profil'>;
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const {profile, signOut, refreshProfile} = useAuth();
-  const {activeTeamSpaceId, userMemberships, setActiveTeamSpace} =
-    useActiveTeam();
+  const {
+    activeTeamSpaceId,
+    userMemberships,
+    setActiveTeamSpace,
+    refreshMemberships,
+  } = useActiveTeam();
   const navigation = useNavigation<Nav>();
+
+  const [colorSheetVisible, setColorSheetVisible] = useState(false);
 
   // Varsel-status. Oppdateres når skjermen mountes og hver gang appen kommer i
   // forgrunn igjen (bytter du i iOS-Innstillinger og kommer tilbake, stemmer den).
@@ -112,6 +118,26 @@ export function ProfilScreen() {
     );
   }, [profile?.phone, refreshProfile]);
 
+  // Trykk på swatch = lagre og lukk (ReporterSheet-mønsteret). Fargen leses
+  // via context overalt (lagmerke, scoreboard, «oss»-stripe, laglisten), så
+  // refreshMemberships() er alt som trengs for at den skifter i hele appen.
+  const handleColorSelect = useCallback(
+    async (color: string) => {
+      setColorSheetVisible(false);
+      if (!activeTeamSpaceId) return;
+      try {
+        await updateTeamColor(activeTeamSpaceId, color);
+        await refreshMemberships();
+      } catch (e: any) {
+        Alert.alert(
+          'Kunne ikke lagre fargen',
+          e?.message ?? 'Prøv igjen om litt.',
+        );
+      }
+    },
+    [activeTeamSpaceId, refreshMemberships],
+  );
+
   if (!profile) return null;
 
   const activeMembership = userMemberships.find(
@@ -134,6 +160,7 @@ export function ProfilScreen() {
   }
 
   return (
+    <>
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
@@ -221,6 +248,25 @@ export function ProfilScreen() {
             onPress={() => navigation.navigate('TeamMembers')}
           />
         )}
+        {activeMembership && isTrener && (
+          <ListRow
+            icon={
+              <View
+                style={[
+                  styles.colorDot,
+                  {
+                    backgroundColor:
+                      activeMembership.teamSpace.color ||
+                      colors.textSecondary,
+                  },
+                ]}
+              />
+            }
+            title="Lagfarge"
+            subtitle="Fargen laget spiller i"
+            onPress={() => setColorSheetVisible(true)}
+          />
+        )}
         <ListRow
           icon={<Text style={styles.menuIcon}>{'  '}</Text>}
           title="Bli med i et lag"
@@ -273,6 +319,13 @@ export function ProfilScreen() {
         <Text style={styles.footerTagline}>Idrettsglede for alle</Text>
       </View>
     </ScrollView>
+    <TeamColorSheet
+      visible={colorSheetVisible}
+      current={activeMembership?.teamSpace.color ?? null}
+      onSelect={handleColorSelect}
+      onClose={() => setColorSheetVisible(false)}
+    />
+    </>
   );
 }
 
@@ -396,6 +449,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     width: 32,
     textAlign: 'center',
+  },
+  // Sentrert i samme 32 px-slot som menuIcon (marginHorizontal = (32−20)/2).
+  colorDot: {
+    width: 20,
+    height: 20,
+    borderRadius: radius.full,
+    marginHorizontal: 6,
+    alignSelf: 'center',
   },
   footer: {
     alignItems: 'center',

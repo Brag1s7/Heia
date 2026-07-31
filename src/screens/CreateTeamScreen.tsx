@@ -14,9 +14,10 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button} from '../components';
+import {BackBar, Button, TeamColorPicker} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
+import {TEAM_COLORS} from '../shared/teamColors';
 import type {Sport, ClubSearchResult, CreateTeamPayload} from '../lib/types';
 import type {OnboardingStackParamList} from '../shared/types';
 
@@ -37,6 +38,11 @@ export function CreateTeamScreen() {
 
   const [teamName, setTeamName] = useState('');
   const [ageGroup, setAgeGroup] = useState('');
+  // Forhåndsvalgt tilfeldig palettfarge — sprer fargene mellom lag i stedet
+  // for at alle blir stående på samme default. Kan byttes på Profil senere.
+  const [teamColor, setTeamColor] = useState(
+    () => TEAM_COLORS[Math.floor(Math.random() * TEAM_COLORS.length)].value,
+  );
   const [sports, setSports] = useState<Sport[]>(() => getCachedSports() ?? []);
   const [sportSlug, setSportSlug] = useState<string | null>(null);
   const [sportsLoading, setSportsLoading] = useState(
@@ -151,6 +157,7 @@ export function CreateTeamScreen() {
       ageGroup: ageGroup.trim(),
       clubId: selectedClub.id,
       clubName: selectedClub.id ? undefined : selectedClub.name,
+      color: teamColor,
     };
 
     // Auth-before-commit: gjest lagrer intent og autentiserer først.
@@ -315,6 +322,12 @@ export function CreateTeamScreen() {
             onChangeText={setAgeGroup}
             autoCapitalize="characters"
           />
+        </View>
+
+        {/* Lagfarge */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Lagfarge</Text>
+          <TeamColorPicker value={teamColor} onChange={setTeamColor} />
         </View>
 
         {error && <Text style={styles.error}>{error}</Text>}

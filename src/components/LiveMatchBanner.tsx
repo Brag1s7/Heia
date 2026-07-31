@@ -4,6 +4,7 @@ import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
 import {StadiumSurface} from './StadiumSurface';
 import {useActiveTeam} from '../context';
+import {inkOnTeamColor} from '../shared/teamColors';
 import type {HeiaEvent} from '../shared/types';
 
 interface LiveMatchBannerProps {
@@ -60,7 +61,14 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
       <View style={styles.teamsRow}>
         <View style={styles.teamCol}>
           <View style={[styles.teamBadge, styles.usRing, {backgroundColor: teamColor}]}>
-            <Text style={styles.teamBadgeText}>{initials(teamName)}</Text>
+            {/* Gult lagmerke krever mørke initialer — motstanderen er urørt. */}
+            <Text
+              style={[
+                styles.teamBadgeText,
+                {color: inkOnTeamColor(teamColor)},
+              ]}>
+              {initials(teamName)}
+            </Text>
           </View>
           <Text style={styles.teamName} numberOfLines={2}>
             {teamName}
