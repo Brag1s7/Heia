@@ -1,12 +1,13 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-01. **NYESTE SPOR: 💳 BETALINGER — fase 0–2
-FERDIG og GODKJENT (fase 2-review tatt 2026-08-01: godkjent uten
-justeringer; pengeveien live-testes i fase 4s første checkout — besluttet).
-NESTE: FASE 3 — claiming + manuell godkjenning + Stripe-onboarding.
-GO ER GITT — ny samtale kan starte rett på fase 3-arbeidet.** Se
-«💳 BETALINGSSPORET» rett under + `docs/PAYMENTS.md` (sannhetskilden for
-alle betalingsbeslutninger, inkl. review-resultatet og fase 4-kontrakten).**
+_Sist oppdatert: 2026-08-01 (kveld). **NYESTE SPOR: 💳 BETALINGER — fase 3
+(claiming + manuell godkjenning + Stripe-onboarding) er KODET + DEPLOYET +
+DB-VERIFISERT 19/19 samme dag. GJENSTÅR I FASE 3: Brages telefontest
+(ende-til-ende i sandbox — testliste i «💳 BETALINGSSPORET» under) +
+fase 3-review. GATE: fase 4 (checkout i appen) starter IKKE før reviewen
+er tatt.** Se «💳 BETALINGSSPORET» rett under + `docs/PAYMENTS.md`
+(sannhetskilden for alle betalingsbeslutninger, inkl. fase 3-detaljene,
+ops-runbooken for manuell godkjenning og fase 4-kontrakten).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
@@ -84,13 +85,44 @@ låste invariants og fase 0-funnene. Kortversjonen:
   checkout** — detaljer og fase 4-KONTRAKTEN (metadata på sesjon +
   subscription_data) i PAYMENTS.md §Fase 2. **REVIEW TATT 2026-08-01:
   GODKJENT uten justeringer; pengevei-testen i fase 4 er BESLUTTET.**
+- **Fase 3 (✅ KODET + DEPLOYET + DB-VERIFISERT 19/19 2026-08-01 — venter
+  Brages telefontest + review):** migrasjon `00038_club_claiming.sql`
+  (`submit_club_claim` med mod 11-orgnr-sjekk + én-åpen-claim-index;
+  `approve_club_claim`/`reject_club_claim` som service-role-only ops-
+  funksjoner — godkjenning skaper enhet+link+konto atomisk og GJENBRUKER
+  enhet/konto ved samme orgnr; `get_support_activation_status` for admin-
+  skjermen, ikke-admin → NULL). Edge Functions `stripe-onboarding`
+  (lat kontoopprettelse med Idempotency-Key = kontorad-id + Account Link i
+  klikkøyeblikket) og `stripe-onboarding-return` (offentlig landingsside for
+  Stripes redirect — domene er fortsatt fase 4/6). App: nytt kort «Støtte
+  fra supportere» i Laginnstillinger → ny `SupportSetupScreen` med hele
+  flyten (skjema → til vurdering → avslag/godkjent → «Fortsett hos Stripe» +
+  «Del lenken» → AKTIV). `verify-00038.sql` i spike-mappen: **19/19 PASS**
+  mot prod-DB (ruller alltid tilbake). Ops-runbook for manuell godkjenning:
+  PAYMENTS.md §Fase 3.
 - **Gate-regel (LÅST): hver fase stopper for Brages review før neste.**
-  **Fase 3 har GO (2026-08-01)** = claiming + manuell godkjenning +
-  Stripe-onboarding (Account Links genereres i klikkøyeblikket — de er
-  kortlevde, fase 0-funn #6).
-- Ingen app-endringer i fase 1–2. SupportScreen-mockupen (49/399 kr + «80 %
-  til laget») er BEVISST urørt til fase 4 — tallene der er feil med vilje
-  inntil offering-data finnes.
+  Fase 4 (checkout i appen) venter på fase 3-reviewen.
+- SupportScreen-mockupen (49/399 kr + «80 % til laget») er fortsatt BEVISST
+  urørt til fase 4 — tallene der er feil med vilje inntil offering-data
+  finnes.
+
+### 📱 Fase 3 — test dette på telefonen (Metro-reload holder)
+1. Profil → Laginnstillinger (som trener): nytt kort «Støtte fra
+   supportere» nederst → åpner skjermen med intro + søknadsskjema
+   (e-post prefylt, klubbnavn prefylt som juridisk navn).
+2. Send søknaden med klubbens EKTE orgnr (mod 11-sjekken avviser tastefeil
+   — prøv gjerne et feil siffer først og se feilmeldingen).
+3. Godkjenn søknaden i dashboardets SQL-editor (runbooken i PAYMENTS.md
+   §Fase 3 — claim-id-en får du fra spørringen der).
+4. Tilbake i appen (pull-to-refresh): kortet viser «GODKJENT» →
+   «Fortsett hos Stripe» åpner sandbox-onboarding i Safari (Stripes
+   testdata: testtelefon 000 000 0000, OTP 000000 — jf. spike-RUNBOOK
+   steg 4). «Del lenken med klubben» gir Share-arket.
+5. Fullfør onboardingen → tilbake i appen flipper account.updated-webhooken
+   status → skjermen viser «AKTIV» med orgnr + mottaker (AppState-lytteren
+   refetcher når du kommer fra Safari; ellers pull-to-refresh).
+6. Som forelder: Laginnstillinger finnes ikke (som før) — og RPC-en svarer
+   NULL for ikke-admins (verifisert i test 16).
 
 ---
 

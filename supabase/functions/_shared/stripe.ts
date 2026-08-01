@@ -8,9 +8,11 @@
 // objektformene vi parser er verifisert mot loggene i spike-mappen
 // på akkurat denne versjonen).
 //
-// Webhook-funksjonen er rent observerende: kun GET. Alt som flytter
-// penger (refusjoner, transfer-reverseringer) er bevisste ops-/RPC-
-// handlinger andre steder — aldri en webhook-bivirkning.
+// Webhook-funksjonen er rent observerende: kun GET. stripePost
+// (fase 3) brukes av stripe-onboarding til å PROVISJONERE (konto +
+// Account Link) — aldri til å flytte penger. Alt som flytter penger
+// (refusjoner, transfer-reverseringer) er bevisste ops-/RPC-
+// handlinger — aldri en webhook-bivirkning.
 // ============================================================
 
 // Pinnet både her (alle API-kall) og på webhook-endepunktene i Stripe
@@ -102,6 +104,41 @@ export async function stripeGet(
   if (!res.ok) {
     throw new Error(
       `Stripe GET ${path} → ${res.status}: ${body?.error?.message ?? 'ukjent feil'}`,
+    );
+  }
+  return body;
+}
+
+// Form-enkodet POST (Stripes eneste format). Nøstede felter skrives
+// med bracket-nøkler («controller[fees][payer]») — samme form som
+// spike-RUNBOOK-ens curl-kall, så parameterne kan sammenlignes 1:1.
+// Idempotency-Key gjør kall trygge å gjenta (Stripe returnerer det
+// første resultatet) — brukes ved kontoopprettelse så et dobbeltklikk
+// aldri kan gi to Stripe-kontoer.
+export async function stripePost(
+  path: string,
+  params: Record<string, string>,
+  idempotencyKey?: string,
+): Promise<StripeObject> {
+  const key = Deno.env.get('STRIPE_SECRET_KEY');
+  if (!key) throw new Error('STRIPE_SECRET_KEY mangler i miljøet');
+
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${key}`,
+    'Stripe-Version': STRIPE_API_VERSION,
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
+
+  const res = await fetch(`https://api.stripe.com${path}`, {
+    method: 'POST',
+    headers,
+    body: new URLSearchParams(params).toString(),
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new Error(
+      `Stripe POST ${path} → ${res.status}: ${body?.error?.message ?? 'ukjent feil'}`,
     );
   }
   return body;

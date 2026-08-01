@@ -11,7 +11,7 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 0 | Sandbox-spike, 16 bevispunkter | ✅ FERDIG + godkjent 2026-08-01 — se `~/Documents/Heia-Stripe-Spike/RAPPORT.md` (utenfor repo, med API-logger) |
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
 | 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
-| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ⏳ NESTE — **GO gitt 2026-08-01** |
+| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ KODET + DEPLOYET + DB-VERIFISERT **19/19** 2026-08-01 — venter Brages telefontest + fase 3-review (gate). Se «Fase 3» nederst |
 | 4 | Checkout-flyten i appen + Universal Links | ⏳ |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
@@ -258,6 +258,108 @@ transaksjonsrad; (3) fresh-GET-prinsippet; (4) fase 4-kontrakten er
 bindende; (5) Stripes purring (~3 døgn) er retry-mekanismen i v1 —
 reprosesseringsverktøy for `failed` bygges ved behov. **GO for fase 3 gitt
 samme dag.**
+
+## Fase 3 — claiming + manuell godkjenning + Stripe-onboarding (2026-08-01) — deployet + DB-verifisert
+
+**Migrasjon `00038_club_claiming.sql` (✅ deployet):**
+- `submit_club_claim(club_id, orgnr, juridisk navn, rolle, e-post, telefon)` —
+  klient-RPC, SECURITY DEFINER, gatet på `is_club_team_admin` (00034).
+  Normaliserer orgnr og validerer mod 11-kontrollsifferet (Brønnøysund-
+  standarden — fanger tastefeil, erstatter IKKE reviewen). Krever e-post
+  (Heia må kunne nå innsenderen). Avviser klubb med aktiv link og klubb med
+  åpen claim. Ny partiell unik index `idx_club_claims_one_open` vinner racet
+  når to admins sender samtidig.
+- `approve_club_claim(claim_id, reviewer, note, orgnr-override, navn-override)`
+  — **KUN service role/SQL-editor** (REVOKE fra authenticated/anon; verifisert
+  i test 18–19). I én transaksjon: juridisk enhet (GJENBRUKES ved samme orgnr —
+  samme orgnr = samme mottaker, aldri to Stripe-kontoer; verifisert i test 8)
+  + aktiv link + kontorad (`pending_onboarding`) + claim → approved.
+  Navn-overriden finnes fordi Brønnøysund er autoritativ for juridisk navn —
+  bruk registerets navn ved godkjenning. Enheten opprettes `verified`
+  (reviewen ER Heias verifisering); revoked enhet stopper godkjenning.
+- `reject_club_claim(claim_id, note, reviewer)` — begrunnelse er PÅKREVD
+  (innsenderen ser den i appen og kan sende ny søknad).
+- `get_support_activation_status(ts_id)` — hele aktiveringstilstanden for
+  admin-skjermen i ett kall. Gatet på LAGADMIN (ikke-admin → NULL, probe-
+  vernet fra 00037). Lekker bevisst ikke requirements-payload (kun avledet
+  `action_needed`-boolean) eller noe om split/offerings.
+  States: `none → claim_submitted/claim_in_review → claim_rejected` eller
+  `pending_onboarding → onboarding_started → restricted → active / disabled`
+  (kontostatusene eies fortsatt av fase 2-webhooken).
+
+**Edge Function `stripe-onboarding` (✅ deployet, `verify_jwt = true`):**
+- Gatet på lagadminskap (memberships-sjekk) + hele kapabilitetskjeden
+  (aktiv link + verifisert enhet + kontorad). Kontorad finnes kun etter
+  godkjent claim — det er selve gaten.
+- Oppretter Stripe-kontoen LAT ved første klikk med fase 0-spikens eksakte
+  controller-konfig (RUNBOOK steg 3: NO, non_profit, fees/losses=application,
+  express-dashboard, requirement_collection=stripe, card_payments+transfers,
+  business_profile.name = enhetens juridiske navn).
+  **Idempotency-Key = kontorad-id** → dobbeltklikk/kappløp kan aldri gi to
+  Stripe-kontoer. `provider_account_id` skrives write-once; status røres IKKE
+  (den eies av account.updated-webhooken).
+  **statement_descriptor settes bevisst ikke** (standarden er en åpen fase 6-
+  beslutning; Stripes onboarding avleder fra business_profile.name — mangler
+  noe, sier requirements fra via webhooken).
+- Genererer Account Link i klikkøyeblikket (fase 0-funn #6) og returnerer
+  URL-en. `_shared/stripe.ts` fikk `stripePost` (form-enkodet, med
+  Idempotency-Key-støtte) — fortsatt uten npm:stripe, samme pinnede API-versjon.
+
+**Edge Function `stripe-onboarding-return` (✅ deployet, `verify_jwt = false`):**
+statisk HTML-landingsside for Stripes return/refresh-redirect (Stripe krever
+HTTPS; Heia mangler domene — åpen fase 4/6-beslutning, denne er broen).
+Retur BEVISER ingenting (fase 2-prinsippet) — siden sier kun «gå tilbake til
+appen»; refresh-flowen forklarer at lenken er kortlevd.
+
+**Appen (fase 3-UI, kun admin):**
+- Nytt kort «Støtte fra supportere» i Laginnstillinger → ny
+  `SupportSetupScreen` (ProfilStack): intro + søknadsskjema (orgnr/juridisk
+  navn/rolle/e-post/telefon, e-post prefylt fra kontoen, klubbnavn prefylt) →
+  «til vurdering»-kort → avslagskort med begrunnelse + «Send ny søknad» →
+  godkjent-kort med «Fortsett hos Stripe» (åpner kortlevd lenke i Safari) og
+  «Del lenken med klubben» (Share-arket — kasserer/styreleder med REELL
+  fullmakt kan fullføre; lenken er kortlevd og hentes fersk per klikk) →
+  «AKTIV»-kort. AppState-lytter refetcher status når appen kommer tilbake
+  fra Safari; pull-to-refresh finnes også.
+- `src/lib/api/payments.ts` (`getSupportActivationStatus`, `submitClubClaim`,
+  `startStripeOnboarding` via `functions.invoke`). SupportScreen-mockupen
+  (49/399 kr) er fortsatt BEVISST urørt — den er fase 4.
+
+**Ops-runbook (manuell review — dashboardets SQL-editor):**
+```sql
+-- åpne søknader (sjekk orgnr manuelt mot Brønnøysund):
+select id, claimed_org_number, claimed_legal_name, claimed_role,
+       contact_email, contact_phone, created_at
+from club_claims where status in ('submitted','in_review')
+order by created_at;
+
+-- godkjenn (bruk REGISTERETS navn som siste argument):
+select approve_club_claim('<claim-id>', null, 'Sjekket mot Brønnøysund',
+                          null, 'KLUBBENS REGISTRERTE NAVN');
+
+-- avslå (begrunnelsen vises til innsenderen i appen):
+select reject_club_claim('<claim-id>', 'Begrunnelsen her');
+```
+Ingen automatisk varsling til Heia om nye claims i MVP — sjekk spørringen
+over (backlog: e-postvarsel). Allianseidrettslag: splitt/flytt klubbrader
+FØR godkjenning (låst operasjonell regel).
+
+**DB-verifisering (2026-08-01): 19/19 PASS** — `verify-00038.sql` i
+`~/Documents/Heia-Stripe-Spike/` (selvforsynt, ruller alltid tilbake; kjørt
+mot prod-DB-en via management-API-ets query-endepunkt). Dekker: mod 11-
+validatoren, alle submit-vaktene (forelder/ikke-medlem/duplikat/aktivert
+klubb), godkjenningens atomikk, enhet+konto-gjenbruk ved samme orgnr,
+avslagsflyten, alle status-states inkl. admin-gaten, race-indexen og
+grants-vaktene (authenticated kan ikke godkjenne/avslå).
+Røyktest utenfra: landingssiden svarer på begge flows; `stripe-onboarding`
+uten JWT → 401.
+
+**Gjenstår i fase 3 (Brages telefontest — gate før fase 4):**
+ende-til-ende i sandbox: send claim fra appen → godkjenn via runbooken →
+«Fortsett hos Stripe» → fullfør sandbox-onboarding (Stripes testdata, jf.
+spike-RUNBOOK steg 4) → account.updated flipper kontoen til `active` →
+skjermen viser «AKTIV». Edge-secretene har sandbox-nøkkelen, så hele løpet
+er trygt å kjøre nå.
 
 ## Miljøer og sikkerhet
 

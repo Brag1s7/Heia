@@ -44,6 +44,7 @@ import {KalenderScreen} from '../screens/KalenderScreen';
 import {ProfilScreen} from '../screens/ProfilScreen';
 import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {TeamSettingsScreen} from '../screens/TeamSettingsScreen';
+import {SupportSetupScreen} from '../screens/SupportSetupScreen';
 import {InboxScreen} from '../screens/InboxScreen';
 import {SeasonScreen} from '../screens/SeasonScreen';
 import type {
@@ -194,6 +195,7 @@ function ProfilStackNavigator() {
       <ProfilNav.Screen name="Profil" component={ProfilScreen} />
       <ProfilNav.Screen name="TeamMembers" component={TeamMembersScreen} />
       <ProfilNav.Screen name="TeamSettings" component={TeamSettingsScreen} />
+      <ProfilNav.Screen name="SupportSetup" component={SupportSetupScreen} />
       <ProfilNav.Screen name="Invite" component={InviteScreen} />
       <ProfilNav.Screen name="JoinTeamCode" component={JoinTeamCodeScreen} />
       <ProfilNav.Screen name="CreateTeam" component={CreateTeamScreen} />
