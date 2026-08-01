@@ -11,7 +11,7 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 0 | Sandbox-spike, 16 bevispunkter | ✅ FERDIG + godkjent 2026-08-01 — se `~/Documents/Heia-Stripe-Spike/RAPPORT.md` (utenfor repo, med API-logger) |
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
 | 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
-| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ KODET + DEPLOYET + DB-VERIFISERT **19/19** 2026-08-01 — venter Brages telefontest + fase 3-review (gate). Se «Fase 3» nederst |
+| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ FERDIG 2026-08-01: DB-verifisert **19/19** + **E2E-telefontest BESTÅTT** (claim → Brønnøysund-korrigert godkjenning → sandbox-onboarding → webhook → AKTIV i appen). Venter kun Brages fase 3-review (gate). Se «Fase 3» nederst |
 | 4 | Checkout-flyten i appen + Universal Links | ⏳ |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
@@ -306,10 +306,18 @@ samme dag.**
   Idempotency-Key-støtte) — fortsatt uten npm:stripe, samme pinnede API-versjon.
 
 **Edge Function `stripe-onboarding-return` (✅ deployet, `verify_jwt = false`):**
-statisk HTML-landingsside for Stripes return/refresh-redirect (Stripe krever
-HTTPS; Heia mangler domene — åpen fase 4/6-beslutning, denne er broen).
-Retur BEVISER ingenting (fase 2-prinsippet) — siden sier kun «gå tilbake til
-appen»; refresh-flowen forklarer at lenken er kortlevd.
+landingsside for Stripes return/refresh-redirect (Stripe krever HTTPS; Heia
+mangler domene — åpen fase 4/6-beslutning, denne er broen).
+**PLATTFORMFUNN (telefontesten):** Supabase omskriver text/html-svar fra
+`*.supabase.co`-funksjonsdomenet til `text/plain` + CSP `sandbox` + `nosniff`
+(anti-phishing) — Brage fikk rå kildekode med tegnrot i Safari (omskrivingen
+dropper også charset). HEAD berøres ikke av omskrivingen, så curl-røyktesten
+så riktig ut. **Fiks: siden er nå REN TEKST med eksplisitt
+`text/plain; charset=utf-8`** (verifisert at charset overlever) — HTML-versjonen
+kommer først når Heia har eget domene. Dette VEKTER domenebeslutningen opp:
+domenet trengs til Universal Links (fase 4), Apple Pay OG en ordentlig
+landingsside. Retur BEVISER ingenting (fase 2-prinsippet) — siden sier kun
+«gå tilbake til appen»; refresh-flowen forklarer at lenken er kortlevd.
 
 **Appen (fase 3-UI, kun admin):**
 - Nytt kort «Støtte fra supportere» i Laginnstillinger → ny
@@ -354,12 +362,21 @@ grants-vaktene (authenticated kan ikke godkjenne/avslå).
 Røyktest utenfra: landingssiden svarer på begge flows; `stripe-onboarding`
 uten JWT → 401.
 
-**Gjenstår i fase 3 (Brages telefontest — gate før fase 4):**
-ende-til-ende i sandbox: send claim fra appen → godkjenn via runbooken →
-«Fortsett hos Stripe» → fullfør sandbox-onboarding (Stripes testdata, jf.
-spike-RUNBOOK steg 4) → account.updated flipper kontoen til `active` →
-skjermen viser «AKTIV». Edge-secretene har sandbox-nøkkelen, så hele løpet
-er trygt å kjøre nå.
+**E2E-telefontest (2026-08-01 kveld): BESTÅTT.** Hele løpet kjørt live i
+sandbox: claim sendt fra appen (Ridabu IL) → manuell review fant at innsendt
+orgnr `000000000` ikke finnes i Brønnøysund (repdigits består mod 11 — derfor
+finnes reviewen) → godkjent med registerets verdier via overriden
+(**875661582 / RIDABU IDRETTSLAG**, begrunnelse i review_note) → «Fortsett
+hos Stripe» opprettet sandbox-kontoen lat → onboarding fullført med Stripes
+testdata → `account.updated` flippet kontoen → **appen viser AKTIV**.
+Reviewen ble gjort med Brønnøysunds åpne API
+(`data.brreg.no/enhetsregisteret/api/enheter/{orgnr}` — oppslag + navnesøk);
+det er den praktiske runbook-kanalen. Underveis ble landingsside-buggen
+(HTML-omskrivingen over) funnet og fikset. Den juridiske enheten bærer nå
+Ridabu ILs EKTE orgnr i prod-DB (bevisst valg — pilotklubben; Stripe-kontoen
+er sandbox, re-verifiseres uansett i fase 6).
+
+**Gjenstår i fase 3:** kun Brages formelle fase 3-review (gate før fase 4).
 
 ## Miljøer og sikkerhet
 

@@ -1,13 +1,17 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-01 (kveld). **NYESTE SPOR: 💳 BETALINGER — fase 3
-(claiming + manuell godkjenning + Stripe-onboarding) er KODET + DEPLOYET +
-DB-VERIFISERT 19/19 samme dag. GJENSTÅR I FASE 3: Brages telefontest
-(ende-til-ende i sandbox — testliste i «💳 BETALINGSSPORET» under) +
-fase 3-review. GATE: fase 4 (checkout i appen) starter IKKE før reviewen
-er tatt.** Se «💳 BETALINGSSPORET» rett under + `docs/PAYMENTS.md`
-(sannhetskilden for alle betalingsbeslutninger, inkl. fase 3-detaljene,
-ops-runbooken for manuell godkjenning og fase 4-kontrakten).**
+_Sist oppdatert: 2026-08-01 (sen kveld). **NYESTE SPOR: 💳 BETALINGER —
+fase 3 (claiming + manuell godkjenning + Stripe-onboarding) er FERDIG:
+DB-verifisert 19/19 OG E2E-TELEFONTEST BESTÅTT samme kveld (claim →
+Brønnøysund-korrigert godkjenning → sandbox-onboarding → webhook → AKTIV
+i appen; Ridabu IL er koblet med ekte orgnr 875661582, sandbox-konto).
+Landingsside-bug funnet+fikset i testen (Supabase omskriver HTML fra
+funksjonsdomenet → siden er nå ren tekst; detaljer i PAYMENTS.md §Fase 3).
+GJENSTÅR: kun Brages formelle fase 3-review. GATE: fase 4 (checkout i
+appen) starter IKKE før reviewen er tatt.** Se «💳 BETALINGSSPORET» rett
+under + `docs/PAYMENTS.md` (sannhetskilden for alle betalingsbeslutninger,
+inkl. fase 3-detaljene, ops-runbooken for manuell godkjenning og
+fase 4-kontrakten).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
@@ -106,23 +110,20 @@ låste invariants og fase 0-funnene. Kortversjonen:
   urørt til fase 4 — tallene der er feil med vilje inntil offering-data
   finnes.
 
-### 📱 Fase 3 — test dette på telefonen (Metro-reload holder)
-1. Profil → Laginnstillinger (som trener): nytt kort «Støtte fra
-   supportere» nederst → åpner skjermen med intro + søknadsskjema
-   (e-post prefylt, klubbnavn prefylt som juridisk navn).
-2. Send søknaden med klubbens EKTE orgnr (mod 11-sjekken avviser tastefeil
-   — prøv gjerne et feil siffer først og se feilmeldingen).
-3. Godkjenn søknaden i dashboardets SQL-editor (runbooken i PAYMENTS.md
-   §Fase 3 — claim-id-en får du fra spørringen der).
-4. Tilbake i appen (pull-to-refresh): kortet viser «GODKJENT» →
-   «Fortsett hos Stripe» åpner sandbox-onboarding i Safari (Stripes
-   testdata: testtelefon 000 000 0000, OTP 000000 — jf. spike-RUNBOOK
-   steg 4). «Del lenken med klubben» gir Share-arket.
-5. Fullfør onboardingen → tilbake i appen flipper account.updated-webhooken
-   status → skjermen viser «AKTIV» med orgnr + mottaker (AppState-lytteren
-   refetcher når du kommer fra Safari; ellers pull-to-refresh).
-6. Som forelder: Laginnstillinger finnes ikke (som før) — og RPC-en svarer
-   NULL for ikke-admins (verifisert i test 16).
+### 📱 Fase 3 — E2E-telefontest ✅ BESTÅTT 2026-08-01 (kveld)
+Hele løpet kjørt live: claim fra appen (Ridabu IL, innsendt orgnr
+`000000000`) → manuell review via Brønnøysunds åpne API fant at orgnr ikke
+finnes → godkjent med registerets verdier via approve-overriden
+(875661582 / RIDABU IDRETTSLAG) → «Fortsett hos Stripe» (lat
+sandbox-kontoopprettelse) → onboarding fullført med Stripes testdata →
+account.updated flippet kontoen → **appen viser AKTIV**. Brage bekreftet
+(«Det fungerte! Det står nå aktiv inne på appen»).
+**Funn i testen (fikset + deployet):** Stripes retur-side viste rå
+HTML-kildekode med tegnrot i Safari — Supabase omskriver text/html fra
+`*.supabase.co`-funksjonsdomenet til text/plain + CSP sandbox + nosniff
+(anti-phishing; HEAD berøres ikke, derfor så curl-røyktesten riktig ut).
+Landingssiden er nå REN TEKST med eksplisitt charset (verifisert);
+HTML-versjon krever eget domene → domenebeslutningen (fase 4/6) vektes opp.
 
 ---
 
