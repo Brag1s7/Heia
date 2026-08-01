@@ -11,8 +11,8 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 0 | Sandbox-spike, 16 bevispunkter | ✅ FERDIG + godkjent 2026-08-01 — se `~/Documents/Heia-Stripe-Spike/RAPPORT.md` (utenfor repo, med API-logger) |
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
 | 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
-| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ FERDIG 2026-08-01: DB-verifisert **19/19** + **E2E-telefontest BESTÅTT** (claim → Brønnøysund-korrigert godkjenning → sandbox-onboarding → webhook → AKTIV i appen). Venter kun Brages fase 3-review (gate). Se «Fase 3» nederst |
-| 4 | Checkout-flyten i appen + Universal Links | ⏳ |
+| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ FERDIG + **GODKJENT av Brage 2026-08-01**: DB-verifisert **19/19** + E2E-telefontest bestått **×2** (Ridabu: orgnr-korrigert godkjenning; Stange: avslag → ny søknad → godkjenning → onboarding → AKTIV; Stange-testdata ryddet etterpå). Se «Fase 3» nederst |
+| 4 | Checkout-flyten i appen + Universal Links | ⏳ NESTE — **GO gitt 2026-08-01** |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
 
@@ -376,7 +376,25 @@ det er den praktiske runbook-kanalen. Underveis ble landingsside-buggen
 Ridabu ILs EKTE orgnr i prod-DB (bevisst valg — pilotklubben; Stripe-kontoen
 er sandbox, re-verifiseres uansett i fase 6).
 
-**Gjenstår i fase 3:** kun Brages formelle fase 3-review (gate før fase 4).
+**E2E runde 2 (samme kveld): Stange Sportsklubb** — testklubb opprettet av
+Brage for å teste avslagsgrenen: søknad med falskt orgnr `111111111` →
+avslått med begrunnelse (appen viste «IKKE GODKJENT»-kortet + «Send ny
+søknad») → ny søknad med ekte orgnr `982764742` (STANGE SPORTSKLUBB finnes
+faktisk — bekreftet i Brønnøysund) → godkjent → full onboarding runde 2 →
+webhook → **AKTIV**. Retursiden vist i sin nye tekstform. **Alle
+Stange-testdata er RYDDET etterpå** (claims, link, enhet, konto, lagrom,
+klubb — i avhengighetsrekkefølge; webhook_events-radene består, append-only
+by design; sandbox-kontoen ligger ubrukt hos Stripe, harmløs).
+
+**Fase 3-review (Brage, 2026-08-01): GODKJENT — GO for fase 4 gitt samme
+kveld.** Design-notat fra testen: retur-landingssiden oppleves kjedelig →
+eskalert til fase 4-inngangen (domene + ev. in-app-browser for onboarding,
+se under). Brage bekreftet også at «egen UI etter innsending» er ønsket
+retning — nivåene er dokumentert: (1) appens AKTIV-tilstand finnes alt,
+(2) in-app-browser m/ URL-scheme (krever native rebuild — fase 4-bunken),
+(3) Universal Links med eget domene (fase 4). NB: kun onboardingen kan
+flyttes inn i appen — SELVE BETALINGEN skal forbli ekstern Safari
+(Apple 3.2.2(iv), låst).
 
 ## Miljøer og sikkerhet
 

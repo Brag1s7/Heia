@@ -1,17 +1,21 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-01 (sen kveld). **NYESTE SPOR: 💳 BETALINGER —
-fase 3 (claiming + manuell godkjenning + Stripe-onboarding) er FERDIG:
-DB-verifisert 19/19 OG E2E-TELEFONTEST BESTÅTT samme kveld (claim →
-Brønnøysund-korrigert godkjenning → sandbox-onboarding → webhook → AKTIV
-i appen; Ridabu IL er koblet med ekte orgnr 875661582, sandbox-konto).
-Landingsside-bug funnet+fikset i testen (Supabase omskriver HTML fra
-funksjonsdomenet → siden er nå ren tekst; detaljer i PAYMENTS.md §Fase 3).
-GJENSTÅR: kun Brages formelle fase 3-review. GATE: fase 4 (checkout i
-appen) starter IKKE før reviewen er tatt.** Se «💳 BETALINGSSPORET» rett
-under + `docs/PAYMENTS.md` (sannhetskilden for alle betalingsbeslutninger,
-inkl. fase 3-detaljene, ops-runbooken for manuell godkjenning og
-fase 4-kontrakten).**
+_Sist oppdatert: 2026-08-01 (natt). **NYESTE SPOR: 💳 BETALINGER — FASE 3
+ER FERDIG + GODKJENT (review tatt 2026-08-01: DB-verifisert 19/19 + E2E
+bestått ×2 — Ridabu IL aktivert med ekte orgnr 875661582 og består som
+pilotklubb; Stange-testrunden beviste avslagsgrenen og er RYDDET).
+NESTE: FASE 4 — checkout-flyten i appen. GO ER GITT — ny samtale kan
+starte rett på fase 4-arbeidet. Fase 4 åpner med: (1) domenebeslutningen
+(Universal Links + Apple Pay + landingsside — Brage velger/kjøper domene),
+(2) offering-oppsett + checkout (KONTRAKTEN i PAYMENTS.md §Fase 2 er
+bindende: subscription-rad FØR redirect + metadata på sesjon OG
+subscription_data), (3) pengevei-verifiseringen fra fase 2-restansen
+(invoice.paid → transaksjonsrad — første sandbox-checkout), (4) vurdere
+in-app-browser for onboarding (native rebuild; selve BETALINGEN forblir
+ekstern Safari — Apple 3.2.2(iv), låst). SupportScreen-mockupen (49/399 kr)
+skal ENDELIG få ekte offering-data i denne fasen.** Se «💳 BETALINGSSPORET»
+rett under + `docs/PAYMENTS.md` (sannhetskilden for alle
+betalingsbeslutninger, inkl. ops-runbooken for manuell claim-godkjenning).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
@@ -110,20 +114,24 @@ låste invariants og fase 0-funnene. Kortversjonen:
   urørt til fase 4 — tallene der er feil med vilje inntil offering-data
   finnes.
 
-### 📱 Fase 3 — E2E-telefontest ✅ BESTÅTT 2026-08-01 (kveld)
-Hele løpet kjørt live: claim fra appen (Ridabu IL, innsendt orgnr
-`000000000`) → manuell review via Brønnøysunds åpne API fant at orgnr ikke
-finnes → godkjent med registerets verdier via approve-overriden
-(875661582 / RIDABU IDRETTSLAG) → «Fortsett hos Stripe» (lat
-sandbox-kontoopprettelse) → onboarding fullført med Stripes testdata →
-account.updated flippet kontoen → **appen viser AKTIV**. Brage bekreftet
-(«Det fungerte! Det står nå aktiv inne på appen»).
-**Funn i testen (fikset + deployet):** Stripes retur-side viste rå
-HTML-kildekode med tegnrot i Safari — Supabase omskriver text/html fra
+### 📱 Fase 3 — E2E-telefontest ✅ BESTÅTT ×2 + REVIEW GODKJENT 2026-08-01
+**Runde 1 (Ridabu IL):** claim fra appen med orgnr `000000000` → reviewen
+(Brønnøysunds åpne API) fant at orgnr ikke finnes → godkjent med
+registerets verdier via approve-overriden (875661582 / RIDABU IDRETTSLAG)
+→ lat sandbox-kontoopprettelse → onboarding → account.updated → **AKTIV**.
+Ridabu består som aktivert pilotklubb.
+**Runde 2 (Stange Sportsklubb, testklubb):** avslagsgrenen — falskt orgnr →
+avslått med begrunnelse («IKKE GODKJENT»-kortet verifisert på telefon) →
+ny søknad med ekte orgnr → godkjent → onboarding runde 2 → **AKTIV**.
+**Stange-testdataene er RYDDET** (i avhengighetsrekkefølge; webhook_events
+består by design).
+**Funn i testen (fikset + deployet):** Supabase omskriver text/html fra
 `*.supabase.co`-funksjonsdomenet til text/plain + CSP sandbox + nosniff
-(anti-phishing; HEAD berøres ikke, derfor så curl-røyktesten riktig ut).
-Landingssiden er nå REN TEKST med eksplisitt charset (verifisert);
-HTML-versjon krever eget domene → domenebeslutningen (fase 4/6) vektes opp.
+(anti-phishing; HEAD berøres ikke — curl-røyktest med HEAD lyver!).
+Landingssiden er nå ren tekst m/ charset («💚 Heia!»); pen side/ingen side
+krever domene → førsteoppgave i fase 4. Brage vil ha «egen UI etter
+innsending» — nivåene står i PAYMENTS.md §Fase 3 (in-app-browser krever
+native rebuild; betalingen forblir ekstern Safari, låst).
 
 ---
 
