@@ -377,6 +377,18 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# Onboarding-lenker genereres kun for innloggede lagadmins —
+# funksjonen sjekker selv adminskapet mot memberships.
+[functions.stripe-onboarding]
+enabled = true
+verify_jwt = true
+
+# Landingsside for Stripes return/refresh-redirect (nettleser uten
+# JWT). Statisk HTML, leser ingen data.
+[functions.stripe-onboarding-return]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

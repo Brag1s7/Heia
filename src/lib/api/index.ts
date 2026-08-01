@@ -34,6 +34,13 @@ export {
 } from './notifications';
 export {getTeamMembers, type TeamMember} from './members';
 export {
+  getSupportActivationStatus,
+  submitClubClaim,
+  startStripeOnboarding,
+  type SupportActivationState,
+  type SupportActivationStatus,
+} from './payments';
+export {
   getSeasonStats,
   type SeasonStats,
   type SeasonMatch,

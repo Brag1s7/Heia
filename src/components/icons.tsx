@@ -17,6 +17,7 @@ export {
   ChevronRight,
   Clock,
   Flag,
+  HandHeart,
   House,
   Image as ImageIcon,
   Info,

@@ -6,14 +6,19 @@ import {
   ScrollView,
   Image,
   Alert,
+  Pressable,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {inkOnTeamColor} from '../shared/teamColors';
+import type {ProfilStackParamList} from '../shared/types';
 import {BackBar, Button, TeamColorPicker} from '../components';
+import {ChevronRight, HandHeart} from '../components/icons';
 import {useActiveTeam} from '../context';
 import {pickLogoImage} from '../lib/media';
 import {
@@ -66,8 +71,11 @@ function LogoCircle({
  * Laginnstillinger (P4) — kun trener/lagleder/admin (Profil-raden er gated).
  * Lagnavn + lagfarge + laglogo (fri override) + klubblogo (write-once).
  */
+type Nav = NativeStackNavigationProp<ProfilStackParamList, 'TeamSettings'>;
+
 export function TeamSettingsScreen() {
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace, activeTeam, refreshMemberships} =
     useActiveTeam();
 
@@ -308,6 +316,23 @@ export function TeamSettingsScreen() {
             )}
           </View>
         )}
+
+        {/* Støtte fra supportere (betalingsspor fase 3) */}
+        {club && (
+          <Pressable
+            style={styles.card}
+            onPress={() => navigation.navigate('SupportSetup')}>
+            <Text style={styles.label}>Støtte fra supportere</Text>
+            <View style={styles.supportRow}>
+              <HandHeart size={22} color={colors.heiaDeep} strokeWidth={2} />
+              <Text style={styles.hintFlex}>
+                Aktiver «Støtt laget» — faste månedlige bidrag fra foreldre og
+                supportere, utbetalt til klubben.
+              </Text>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </View>
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -388,6 +413,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  supportRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
   flexButton: {
     flex: 1,
