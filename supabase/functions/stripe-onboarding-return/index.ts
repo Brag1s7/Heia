@@ -19,16 +19,21 @@
 // Supabase-JWT. Siden er statisk og leser ingen data.
 // ============================================================
 
-const RETURN_TEXT = `Takk!
+const RETURN_TEXT = `💚 Heia!
 
-Du kan lukke denne siden og gå tilbake til Heia-appen.
-Statusen der oppdaterer seg av seg selv om et lite øyeblikk.`;
+Det var alt — du kan lukke denne siden
+og gå tilbake til Heia-appen.
 
-const REFRESH_TEXT = `Lenken er utløpt
+Statusen der oppdaterer seg av seg selv
+om et lite øyeblikk.`;
+
+const REFRESH_TEXT = `⏳ Lenken er utløpt
 
 Onboarding-lenker fra Stripe varer bare en kort stund.
-Gå tilbake til Heia-appen og trykk «Fortsett hos Stripe» på nytt
-for å få en fersk lenke.`;
+
+Gå tilbake til Heia-appen og trykk
+«Fortsett hos Stripe» på nytt,
+så får du en fersk lenke.`;
 
 Deno.serve((req) => {
   const flow = new URL(req.url).searchParams.get('flow');
