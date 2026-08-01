@@ -1,6 +1,13 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-07-31. **Nyeste skive: P9 KALENDEREN — RYTME, IKKE
+_Sist oppdatert: 2026-08-01. **NYESTE SPOR: 💳 BETALINGER — beslutningsbok
+låst, fase 0-spike ferdig, fase 1 (migrasjon `00037`) deployet + verifisert
+28/28, og FASE 2 (`stripe-webhook` Edge Function) DEPLOYET og
+SANDBOX-VERIFISERT samme dag (ekte events: signaturavvisning, ende-til-ende
+account.updated, duplikatvern, skip-spor). Venter på Brages fase 2-review
+før fase 3 (claiming). Se «💳 BETALINGSSPORET» rett under +
+`docs/PAYMENTS.md` (sannhetskilden for alle betalingsbeslutninger).**
+Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
 (mint→krem-gradient + banedekor, type-pill, dag + tid i displayfonten,
@@ -32,6 +39,56 @@ i kamptidslinja)** — se punkt 5 under. Design skive 1–5 er merget (PR #17),
 Fase 4–9 (PR #16)._
 
 Si i den nye chatten: **«Les docs/STATUS-HANDOFF.md og fortsett.»**
+
+---
+
+## 💳 BETALINGSSPORET (aktivt spor — startet 2026-08-01)
+
+**Sannhetskilden er `docs/PAYMENTS.md`** — beslutningsbok, fasetabell, alle
+låste invariants og fase 0-funnene. Kortversjonen:
+
+- **Modellen (LÅST + teknisk BEKREFTET i sandbox):** Stripe Connect,
+  destination charges + `on_behalf_of`, klubben (juridisk enhet med orgnr)
+  er KYC-mottaker, laget er allokering, Heia tar application fee, webhooks
+  er eneste sannhetskilde. 79 kr/mnd; splitten (75/25 vs fast 60) er ULÅST
+  og ligger som data i `support_offerings` — ALDRI hardkodet.
+- **Fase 0 (✅ ferdig + godkjent 2026-08-01):** 16 bevispunkter bevist i
+  Stripe-sandbox. Spike-mappen `~/Documents/Heia-Stripe-Spike/` (UTENFOR
+  repo, med vilje): RUNBOOK.md, RAPPORT.md, logs/. `.env` der har
+  sandbox-nøkkelen — aldri i repo/chat.
+- **Fase 1 (✅ DEPLOYET + VERIFISERT 2026-08-01):** migrasjon
+  `00037_payments_domain.sql` — 9 tabeller, deny-by-default RLS (kun to
+  smale klient-SELECT-er), immutability-triggere (offerings versjonert,
+  transaksjoner append-only), `get_payment_account_for_team_space()`
+  (gatet på lagmedlemskap + service role), dropp av døde felt
+  (`profiles.stripe_customer_id`, `team_spaces.stripe_account_id` —
+  kontrollert ubrukt). Pushet med GO fra Brage (uten backup — Brages
+  eksplisitte valg; migrasjonen er transaksjonell og tabellene var nye),
+  deretter **`verify-00037.sql` i dashboardets SQL-editor: 28/28 PASS**
+  (alle invariants, kapabilitetsoppslag i 4 varianter, RLS som simulert
+  bruker; full tabell i `docs/PAYMENTS.md`). Scriptet ligger i
+  `~/Documents/Heia-Stripe-Spike/` og ruller alltid tilbake.
+  Committet som `66e22a1`.
+- **Fase 2 (✅ DEPLOYET + SANDBOX-VERIFISERT 2026-08-01):**
+  `stripe-webhook` Edge Function (`supabase/functions/stripe-webhook/` +
+  `_shared/stripe.ts` — håndrullet, uten npm:stripe, API-versjon pinnet
+  `2026-07-29.dahlia`). Idempotent (webhook_events-upsert), rekkefølge-
+  agnostisk (hendelsen er trigger, sannheten GET-es fresh fra Stripe),
+  rent observerende (aldri pengeflyttende kall). To endepunkter i sandbox
+  (platform + connect for account.updated), to signatur-secrets satt som
+  Edge Function-secrets + speilet i spike-`.env`. **Verifisert med EKTE
+  sandbox-events:** signaturavvisning (400), account.updated ende-til-ende
+  (konto-rad → active), duplikatvern (attempts forble 1), skip-spor for
+  ukjent konto. Testradene i DB er ryddet. **Bevisst restanse: pengeveien
+  (invoice.paid → transaksjonsrad) kjøres live først i fase 4s første
+  checkout** — detaljer og fase 4-KONTRAKTEN (metadata på sesjon +
+  subscription_data) i PAYMENTS.md §Fase 2. Venter på Brages review.
+- **Gate-regel (LÅST): hver fase stopper for Brages review før neste.**
+  Fase 3 = claiming + manuell godkjenning + Stripe-onboarding (Account
+  Links genereres i klikkøyeblikket — de er kortlevde, fase 0-funn #6).
+- Ingen app-endringer i fase 1–2. SupportScreen-mockupen (49/399 kr + «80 %
+  til laget») er BEVISST urørt til fase 4 — tallene der er feil med vilje
+  inntil offering-data finnes.
 
 ---
 
