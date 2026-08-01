@@ -10,8 +10,8 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 |---|---|---|
 | 0 | Sandbox-spike, 16 bevispunkter | ✅ FERDIG + godkjent 2026-08-01 — se `~/Documents/Heia-Stripe-Spike/RAPPORT.md` (utenfor repo, med API-logger) |
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
-| 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ DEPLOYET + SANDBOX-VERIFISERT 2026-08-01 (se «Fase 2» nederst) — venter på Brages review |
-| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ⏳ NESTE — venter på Brages GO |
+| 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
+| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ⏳ NESTE — **GO gitt 2026-08-01** |
 | 4 | Checkout-flyten i appen + Universal Links | ⏳ |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
@@ -243,12 +243,21 @@ hendelse stå alene selv når den ankommer før `checkout.session.completed`.
 | Duplikatleveranse av ferdigbehandlet event (gyldig signatur) | ✅ 200 `{duplicate:true}`, attempts forble 1 |
 | Event for ukjent konto | ✅ `skipped` med notat («ukjent konto …») |
 
-**Restanse (bevisst):** pengeveien (checkout → invoice.paid →
-`payment_transactions`-rad) er kodegjennomgått mot fase 0-loggenes eksakte
-objektformer, men IKKE kjørt live — en live-test krever offering-/
-transaksjonsrader i append-only-tabeller (permanente). Den kjøres naturlig
-som del av fase 4s første sandbox-checkout; vil Brage ha den FØR fase 4,
-gjøres den med tydelig merkede testrader (eksplisitt valg).
+**Restanse (BESLUTTET i reviewen 2026-08-01):** pengeveien (checkout →
+invoice.paid → `payment_transactions`-rad) er kodegjennomgått mot fase 0-
+loggenes eksakte objektformer, men ikke kjørt live. **Brage valgte: live-
+testes som del av fase 4s første sandbox-checkout** (unngår permanente
+testrader i append-only-tabellene). Fase 4s definisjonsliste MÅ inkludere
+denne verifiseringen: transaksjonsrad med korrekt frossen splitt, gebyr fra
+balance transaction, og abonnement → active.
+
+**Fase 2-review (Brage, 2026-08-01): GODKJENT uten justeringer.** Eksplisitt
+bekreftet i reviewen: (1) webhooken er passiv bokfører — refusjoner/
+reverseringer forblir ops-handlinger; (2) feilet trekk gir ingen
+transaksjonsrad; (3) fresh-GET-prinsippet; (4) fase 4-kontrakten er
+bindende; (5) Stripes purring (~3 døgn) er retry-mekanismen i v1 —
+reprosesseringsverktøy for `failed` bygges ved behov. **GO for fase 3 gitt
+samme dag.**
 
 ## Miljøer og sikkerhet
 

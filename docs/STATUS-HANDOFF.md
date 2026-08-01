@@ -1,12 +1,12 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-01. **NYESTE SPOR: 💳 BETALINGER — beslutningsbok
-låst, fase 0-spike ferdig, fase 1 (migrasjon `00037`) deployet + verifisert
-28/28, og FASE 2 (`stripe-webhook` Edge Function) DEPLOYET og
-SANDBOX-VERIFISERT samme dag (ekte events: signaturavvisning, ende-til-ende
-account.updated, duplikatvern, skip-spor). Venter på Brages fase 2-review
-før fase 3 (claiming). Se «💳 BETALINGSSPORET» rett under +
-`docs/PAYMENTS.md` (sannhetskilden for alle betalingsbeslutninger).**
+_Sist oppdatert: 2026-08-01. **NYESTE SPOR: 💳 BETALINGER — fase 0–2
+FERDIG og GODKJENT (fase 2-review tatt 2026-08-01: godkjent uten
+justeringer; pengeveien live-testes i fase 4s første checkout — besluttet).
+NESTE: FASE 3 — claiming + manuell godkjenning + Stripe-onboarding.
+GO ER GITT — ny samtale kan starte rett på fase 3-arbeidet.** Se
+«💳 BETALINGSSPORET» rett under + `docs/PAYMENTS.md` (sannhetskilden for
+alle betalingsbeslutninger, inkl. review-resultatet og fase 4-kontrakten).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
@@ -82,10 +82,12 @@ låste invariants og fase 0-funnene. Kortversjonen:
   ukjent konto. Testradene i DB er ryddet. **Bevisst restanse: pengeveien
   (invoice.paid → transaksjonsrad) kjøres live først i fase 4s første
   checkout** — detaljer og fase 4-KONTRAKTEN (metadata på sesjon +
-  subscription_data) i PAYMENTS.md §Fase 2. Venter på Brages review.
+  subscription_data) i PAYMENTS.md §Fase 2. **REVIEW TATT 2026-08-01:
+  GODKJENT uten justeringer; pengevei-testen i fase 4 er BESLUTTET.**
 - **Gate-regel (LÅST): hver fase stopper for Brages review før neste.**
-  Fase 3 = claiming + manuell godkjenning + Stripe-onboarding (Account
-  Links genereres i klikkøyeblikket — de er kortlevde, fase 0-funn #6).
+  **Fase 3 har GO (2026-08-01)** = claiming + manuell godkjenning +
+  Stripe-onboarding (Account Links genereres i klikkøyeblikket — de er
+  kortlevde, fase 0-funn #6).
 - Ingen app-endringer i fase 1–2. SupportScreen-mockupen (49/399 kr + «80 %
   til laget») er BEVISST urørt til fase 4 — tallene der er feil med vilje
   inntil offering-data finnes.
