@@ -371,6 +371,12 @@ deno_version = 2
 enabled = true
 verify_jwt = false
 
+# Stripe kan ikke sende Supabase-JWT — autentisering er
+# signaturverifisering mot webhook-secretene (se funksjonens header).
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

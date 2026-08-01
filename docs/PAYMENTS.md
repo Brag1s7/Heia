@@ -10,8 +10,8 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 |---|---|---|
 | 0 | Sandbox-spike, 16 bevispunkter | ✅ FERDIG + godkjent 2026-08-01 — se `~/Documents/Heia-Stripe-Spike/RAPPORT.md` (utenfor repo, med API-logger) |
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
-| 2 | `stripe-webhook` Edge Function + idempotent prosessering | ⏳ NESTE — venter på Brages GO |
-| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ⏳ |
+| 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ DEPLOYET + SANDBOX-VERIFISERT 2026-08-01 (se «Fase 2» nederst) — venter på Brages review |
+| 3 | Claiming + manuell godkjenning + Stripe-onboarding | ⏳ NESTE — venter på Brages GO |
 | 4 | Checkout-flyten i appen + Universal Links | ⏳ |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
@@ -181,6 +181,74 @@ ikke en skjemafeil); fikset og kjørt på nytt. Fullt resultat:
 
 Scriptet ligger i `~/Documents/Heia-Stripe-Spike/verify-00037.sql` og kan
 kjøres på nytt når som helst (idempotent — ruller alltid tilbake).
+
+## Fase 2 — `stripe-webhook` (2026-08-01) — deployet + sandbox-verifisert
+
+**Filene:** `supabase/functions/stripe-webhook/index.ts` +
+`supabase/functions/_shared/stripe.ts` (håndrullet klient, samme mønster som
+`apns.ts` — bevisst uten npm:stripe; API-versjonen er PINNET til
+`2026-07-29.dahlia` både i klienten og på webhook-endepunktene).
+`verify_jwt = false` i config.toml — autentisering ER signaturverifiseringen
+(WebCrypto HMAC, konstant-tid-sammenligning, 5 min replay-toleranse).
+
+**Prinsippene (implementert som fase 0 krevde):**
+- **Idempotent:** `webhook_events`-upsert med `ignoreDuplicates` er
+  duplikatvernet; ferdigbehandlede events kvitteres uten reprosessering,
+  `failed`/`received` reprosesseres trygt.
+- **Rekkefølge-agnostisk:** hendelsen er kun en TRIGGER — sannheten hentes
+  alltid fresh fra Stripe-API-et (GET), så prosesseringen konvergerer uansett
+  leveranserekkefølge og tåler dobbeltkjøring.
+- **Rent observerende:** kun GET mot Stripe. Refusjoner/transfer-reverseringer
+  (policyene fra fase 0) er bevisste ops-handlinger, aldri webhook-bivirkninger.
+- **Feilet trekk ≠ transaksjon:** `payment_transactions` er penger som faktisk
+  flyttet seg; purreløpet eies av Stripe (abonnementet går `past_due` via synk).
+- Handler-feil → 500 → Stripe reprøver → `failed`-raden reprosesseres.
+  `error`-kolonnen bærer også skip-/prosesseringsnotater (driftssporet).
+
+**Hendelsene (to endepunkter i sandbox, samme URL):**
+- Platform (`we_1TzdPh2Y2NeXDnHBcZJtlnBS`): checkout.session.completed/expired,
+  customer.subscription.created/updated/deleted, invoice.paid,
+  invoice.payment_failed, charge.refunded, charge.dispute.created/closed.
+- Connect (`we_1TzdPi2Y2NeXDnHBnP5Tjo94`): account.updated (leveres KUN på
+  connect-endepunkt — derfor to secrets: `STRIPE_WEBHOOK_SECRET` +
+  `STRIPE_CONNECT_WEBHOOK_SECRET`, begge satt som Edge Function-secrets og
+  speilet i spike-`.env`).
+
+**Statusavledninger (én plass, alltid fra fresh API-tilstand):**
+- Konto: `rejected*` → disabled; charges+payouts uten disabled_reason →
+  active; details_submitted/charges → restricted; ellers onboarding_started.
+  `requirements` lagres som SMALT utdrag (disabled_reason, currently_due,
+  past_due, pending_verification, current_deadline) — aldri hele payloaden.
+- Abonnement: incomplete_expired → abandoned; trialing→active og
+  paused→past_due er defensive mappinger (vi skaper dem aldri selv).
+  `cancel_at`/`current_period_end` leses slik fase 0 fant dem (timestamp;
+  på abonnements-ITEMET).
+- Transaksjon: charge slås opp via `invoice_payments` → payment_intent →
+  charges-listen (fase 0-funn #4); charge-id er idempotensnøkkelen;
+  status går kun FREMOVER (rank-vakt — refund nedgraderer aldri en dispute);
+  split fryses fra abonnementets offering, aldri «dagens».
+
+**KONTRAKT MOT FASE 4 (bindende):** checkout-flyten oppretter
+`support_subscriptions`-raden FØR redirect (status `checkout_pending`, med
+`provider_checkout_session_id`) og setter `metadata.support_subscription_id`
+på BÅDE checkout-sesjonen og `subscription_data` — da kan hver webhook-
+hendelse stå alene selv når den ankommer før `checkout.session.completed`.
+
+**Verifisert i sandbox 2026-08-01 (ekte events, testrader ryddet):**
+
+| Test | Resultat |
+|---|---|
+| POST uten/med ugyldig signatur | ✅ 400 (GET → 405) |
+| Ekte `account.updated` (connect-secret) ende-til-ende | ✅ processed; konto-rad `pending_onboarding` → `active`, charges/payouts true, requirements-utdrag lagret |
+| Duplikatleveranse av ferdigbehandlet event (gyldig signatur) | ✅ 200 `{duplicate:true}`, attempts forble 1 |
+| Event for ukjent konto | ✅ `skipped` med notat («ukjent konto …») |
+
+**Restanse (bevisst):** pengeveien (checkout → invoice.paid →
+`payment_transactions`-rad) er kodegjennomgått mot fase 0-loggenes eksakte
+objektformer, men IKKE kjørt live — en live-test krever offering-/
+transaksjonsrader i append-only-tabeller (permanente). Den kjøres naturlig
+som del av fase 4s første sandbox-checkout; vil Brage ha den FØR fase 4,
+gjøres den med tydelig merkede testrader (eksplisitt valg).
 
 ## Miljøer og sikkerhet
 
