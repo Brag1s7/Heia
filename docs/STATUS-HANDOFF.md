@@ -62,7 +62,28 @@ placeholder (byttes i native-runden). Merket i PR #28 + oppfølgings-
 commits. GJENSTÅR I FASE 6: native-runden (bundle-ID FØRST, så
 Associated Domains + heia:// + AASA-oppdatering), vilkårs-TODO-ene,
 e-postvarselet (Resend), AS/Apple-løpet hos Brage. Dette er
-STRIPE-sporet (fase 6), IKKE nettside-prosjektet.** Fase 6-eksterne
+STRIPE-sporet (fase 6), IKKE nettside-prosjektet.**
+**NESTE SAMTALE (Brages valg 2026-08-02 natt) — tre ting, i denne
+rekkefølgen: (1) APPLE DEVELOPER-INNMELDING som privatperson med
+hello@heiaapp.no (Claude guider steg for steg; 99 USD/år; kontoen
+konverteres til Heia AS før offentlig lansering — låst beslutning).
+(2) VILKÅRS-TODO-ENE besvares i samme samtale: aldersgrense —
+Claudes anbefaling er 13 ÅR (norsk samtykkealder for digitale
+tjenester; 13–15-åringene er kjernebrukerne, under 13 dekkes av
+foreldre-administrerte profiler) — Brage bekrefter/velger;
+refusjonspolicy — Claude stiller Brage de konkrete spørsmålene
+direkte; juridisk enhet/orgnr — VENTER på AS-et (forhåpentligvis
+uken etter 2026-08-02), skriv «Heia (enkeltperson under stiftelse av
+AS)»-variant eller la TODO stå til orgnr finnes. Sidene oppdateres og
+auto-deployes ved push til main. (3) RESEND-OPPSETT: Brage oppretter
+gratis konto + API-nøkkel; Claude kobler e-postvarsel per rapport
+(Edge Function + database-webhook på content_reports, ~15 min) TIL
+hello@heiaapp.no. NB: Resend-kontoen skal SENERE også bli Supabase
+auth-SMTP (innebygd mailer er dev-only/rate-limited — MÅ byttes før
+ekstern TestFlight; utsending fra @heiaapp.no krever Resend-DNS-
+poster i Uniweb-panelet — samme øvelse som Vercel-postene).
+Apple-godkjenningen kan ta dager — start innmeldingen FØRST i
+samtalen, gjør resten mens den venter.** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
