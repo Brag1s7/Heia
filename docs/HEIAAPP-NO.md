@@ -23,7 +23,7 @@ ekstern Safari (Apple 3.2.2(iv), låst) — dette er retur-opplevelsen._
 
 ## Sjekklisten (i rekkefølge)
 
-### 1. Hosting (Brage — ~15 min; VERCEL + Uniweb-DNS)
+### 1. Hosting (✅ LIVE + RØYKTESTET 2026-08-02)
 **Valget er Vercel** (gratis Hobby-plan; se website_project-minnet for
 hvorfor ikke Cloudflare: **DNSSec er AKTIV hos Uniweb + SPF/DMARC-
 oppføringer finnes — navnetjenerne skal ALDRI flyttes**; vi legger kun
@@ -44,10 +44,12 @@ to oppføringer i Uniwebs DNS-panel):
    (home.uniweb.no). Rør ingenting annet der.
 5. Vent til Vercel-domenene viser «Valid Configuration» og sertifikatet
    er utstedt (minutter–timer, DNS-propagering).
-6. **Si fra til Claude: «hostingen er live»** → Claude røyktester
-   (`curl -i https://heiaapp.no/.well-known/apple-app-site-association`
-   = 200 + `application/json` uten redirect; `/betaling?flow=success` i
-   Safari) og vipper retur-URL-bryteren (steg 3 — forhåndskodet).
+6. ✅ Røyktestet 2026-08-02: AASA = 200 + `application/json` UTEN
+   redirect (Apples krav); `/betaling` + `/vilkar` + `/personvern` +
+   rotsiden = 200; `www` → 308 til heiaapp.no med sti+query intakt.
+   DNS-postene hos Uniweb ble Vercels NYE anbefalte verdier (A `@` →
+   `216.198.79.1`, CNAME `www` → `d21c109e4fde58eb.vercel-dns-017.com`);
+   DNSSec + SPF/DMARC urørt.
 
 ### 2. Native-runden (Brage kjører — Xcode åpen, appen IKKE på Metro)
 **Steg 0 — bundle-ID (VIKTIG, gjør først):** dagens
@@ -74,10 +76,9 @@ Alle tre funksjonene (`stripe-checkout`, `stripe-onboarding`,
 secreten **`WEB_BASE_URL`** satt lander alt på
 `https://heiaapp.no/betaling?flow=…`; uten den består dagens
 tekstsider (deployet 2026-08-02 — null atferdsendring til secreten
-settes). Byttet når steg 1 er live (Claude, én kommando):
-`supabase secrets set WEB_BASE_URL=https://heiaapp.no`
-— secrets når kjørende funksjoner uten redeploy, og tekstside-
-funksjonene består som fallback (fjern secreten = tilbake).
+settes). **Secreten er SATT 2026-08-02 (rett etter steg 1-røyktesten)
+— alle Stripe-returer lander nå på `heiaapp.no/betaling`.**
+Tekstside-funksjonene består som fallback (fjern secreten = tilbake).
 
 ### 4. Delbar lagkassa-lenke (neste skive — krever 1–3)
 `https://heiaapp.no/lag?kode=INVITEKODE` → åpner appen på laget (installert)
