@@ -42,20 +42,48 @@ består), alt personlig slettes. Vilkår + personvern (punkt 5) ligger
 som UTKAST i `web/vilkar/` + `web/personvern/` — 3 TODO-er i
 HTML-kommentarene VENTER FORTSATT PÅ BRAGE (juridisk enhet,
 aldersgrense, refusjonspolicy); svares før/når hostingen deployes.
-**heiaapp.no STEG 1: CLAUDE-DELEN ER GJORT 2026-08-02 (sen kveld) —
-retur-URL-ene i `stripe-checkout`/`stripe-onboarding`/`stripe-portal`
-er miljøstyrte via ny `_shared/web.ts` (secreten `WEB_BASE_URL` →
-`heiaapp.no/betaling?flow=…`; usatt = dagens tekstsider — DEPLOYET,
-null atferdsendring), `web/vercel.json` (AASA = application/json) +
-plassholder-rotside `web/index.html` ligger klare, og HEIAAPP-NO.md
-steg 1 er en konkret Vercel+Uniweb-runbook. RESTEN ER BRAGE-AVHENGIG
-(~15 min): PR til main → Vercel-import (Root Directory = `web`) → to
-DNS-poster i Uniwebs panel (ALDRI navnetjener-flytt — DNSSec er
-aktiv!) → si «hostingen er live» i en Claude-samtale → Claude
-røyktester AASA + /betaling og setter `WEB_BASE_URL` (én kommando,
-ingen redeploy). Da får vilkår/personvern samtidig offentlige URL-er
-(App Store-krav). Dette er STRIPE-sporet (fase 6), IKKE
-nettside-prosjektet.** Fase 6-eksterne
+**heiaapp.no STEG 1 + 3 ER LIVE 2026-08-02: `heiaapp.no` serveres fra
+Vercel (konto hello@heiaapp.no, prosjekt `heia`, Root Directory =
+`web`, produksjon fra `main`; www → 308 til apex). GitHub-repoet ble
+samme dag OVERFØRT fra yps1lon til **Brag1s7/Heia** (Brages egen
+konto — Vercel-appen er installert der; lokal remote er oppdatert).
+DNS hos Uniweb: A `@` → `216.198.79.1` + CNAME `www` →
+`d21c109e4fde58eb.vercel-dns-017.com` (Vercels nye anbefalte verdier;
+navnetjenere/DNSSec/SPF/DMARC urørt). Røyktestet: AASA = 200 +
+application/json UTEN redirect, /betaling + /vilkar + /personvern =
+200. Retur-URL-ene i `stripe-checkout`/`stripe-onboarding`/
+`stripe-portal` går via ny `_shared/web.ts`, og secreten
+`WEB_BASE_URL=https://heiaapp.no` ER SATT → alle Stripe-returer
+lander nå på den pene `/betaling`-siden (tekstsidene består som
+fallback; fjern secreten = tilbake). VILKÅR/PERSONVERN HAR NÅ
+OFFENTLIGE URL-ER (App Store-kravet) — men de 3 vilkårs-TODO-ene
+venter fortsatt på Brage, og AASA-filens bundle-ID er fortsatt
+placeholder (byttes i native-runden). Merket i PR #28 + oppfølgings-
+commits. GJENSTÅR I FASE 6: native-runden (bundle-ID FØRST, så
+Associated Domains + heia:// + AASA-oppdatering), vilkårs-TODO-ene,
+e-postvarselet (Resend), AS/Apple-løpet hos Brage. Dette er
+STRIPE-sporet (fase 6), IKKE nettside-prosjektet.**
+**NESTE SAMTALE (Brages valg 2026-08-02 natt) — tre ting, i denne
+rekkefølgen: (1) APPLE DEVELOPER-INNMELDING som privatperson med
+hello@heiaapp.no (Claude guider steg for steg; 99 USD/år; kontoen
+konverteres til Heia AS før offentlig lansering — låst beslutning).
+(2) VILKÅRS-TODO-ENE besvares i samme samtale: aldersgrense —
+Claudes anbefaling er 13 ÅR (norsk samtykkealder for digitale
+tjenester; 13–15-åringene er kjernebrukerne, under 13 dekkes av
+foreldre-administrerte profiler) — Brage bekrefter/velger;
+refusjonspolicy — Claude stiller Brage de konkrete spørsmålene
+direkte; juridisk enhet/orgnr — VENTER på AS-et (forhåpentligvis
+uken etter 2026-08-02), skriv «Heia (enkeltperson under stiftelse av
+AS)»-variant eller la TODO stå til orgnr finnes. Sidene oppdateres og
+auto-deployes ved push til main. (3) RESEND-OPPSETT: Brage oppretter
+gratis konto + API-nøkkel; Claude kobler e-postvarsel per rapport
+(Edge Function + database-webhook på content_reports, ~15 min) TIL
+hello@heiaapp.no. NB: Resend-kontoen skal SENERE også bli Supabase
+auth-SMTP (innebygd mailer er dev-only/rate-limited — MÅ byttes før
+ekstern TestFlight; utsending fra @heiaapp.no krever Resend-DNS-
+poster i Uniweb-panelet — samme øvelse som Vercel-postene).
+Apple-godkjenningen kan ta dager — start innmeldingen FØRST i
+samtalen, gjør resten mens den venter.** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
@@ -211,11 +239,11 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
    konfig i live · re-onboarding av Ridabu med live-KYC · refund-/
    disputepolicy som tekst · statement descriptor-standard ·
    varslingsflyt ved lagavvikling.
-3. **Vilkår + personvern** (App Store-krav: offentlig URL) — trenger
-   minimal heiaapp.no-hosting (HEIAAPP-NO.md steg 1); dette hører til
-   STRIPE-sporet. Retur-URL-byttet (steg 3) er FORHÅNDSKODET +
-   deployet 2026-08-02 (`WEB_BASE_URL`-secreten er bryteren — settes
-   når hostingen er live; se HEIAAPP-NO.md steg 3).
+3. ✅ **Vilkår + personvern har OFFENTLIGE URL-er** (App Store-kravet)
+   — heiaapp.no-hostingen + retur-URL-byttet gikk LIVE 2026-08-02
+   (HEIAAPP-NO.md steg 1+3; `WEB_BASE_URL` er satt). Gjenstår: de 3
+   vilkårs-TODO-ene (Brage) + privacy nutrition labels ved
+   innsendingen.
 4. **Native-runden** (Brage kjører): bundle-ID-bytte (placeholder i
    dag!) + Associated Domains + heia://-skjema — kreves uansett før
    TestFlight/App Store.
