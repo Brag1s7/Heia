@@ -22,10 +22,12 @@ HERO-KARUSELLEN på Hjem + SESONG-siden (bunnkortet på Hjem-feeden er
 FJERNET), SupportScreen med 60 kr-språket, «MIN STØTTE» på Profil.
 heiaapp.no-bunken (AASA + landingssider + native-sjekkliste) ligger
 klar: `docs/HEIAAPP-NO.md` — NB bundle-ID er RN-placeholder og byttes i
-native-runden. **NESTE SAMTALE: START FASE 6 (produksjon) — se
-«▶️ Fase 6» under betalingssporet; de tre Brage-avhengige punktene
-(juridisk enhet, regnskapsfører/MVA, live-nøkler) er flagget og kan
-løpe i parallell. NETTSIDEN (markedssiden på heiaapp.no) er
+native-runden. **NESTE SAMTALE (Brages valg 2026-08-02): START
+V1-HYGIENESKIVA — se «🧹 V1-HYGIENE» under betalingssporet (sletting av
+innlegg/kommentarer, rapportering, medlemsfjerning, kontosletting +
+tekstutkastene). Fase 6-eksterne ting (AS-stiftelse, Apple-innmelding
+som privatperson, regnskapsfører) løper hos Brage i parallell;
+native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
 BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
 ferdig (Brage 2026-08-02) — ikke start nettside-arbeid i
 stripe-samtalene; alt vi ble enige om ligger i minnet
@@ -187,7 +189,7 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
-### 🧹 V1-HYGIENE (BESLUTTET 2026-08-02 — kreves FØR ekstern TestFlight/lansering)
+### 🧹 V1-HYGIENE (⏳ NESTE OPPGAVE — Brages valg 2026-08-02; kreves FØR ekstern TestFlight/lansering)
 
 Brages presisering: ikke nye funksjoner, men fullføring — «fjerne
 innlegg osv.» + alt App Store krever. Kodekartlagt 2026-08-02: INGENTING
