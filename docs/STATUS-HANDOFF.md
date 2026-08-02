@@ -1,9 +1,12 @@
 # Heia — statusoverlevering (for ny chat)
 
 _Sist oppdatert: 2026-08-02 (kveld). **NYESTE SPOR: 💳 BETALINGER —
-FASE 4 GODKJENT (E2E med Apple Pay, pengevei DB-verifisert
-7900/1975/5925, webhooks 4/4). FASE 5 DEL 1 ER KODET + DEPLOYET +
-DB-VERIFISERT 8/8 — VENTER BRAGES TELEFONTEST + REVIEW.** Brages
+FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
+bestått, DB-verifisert 8/8) etter to review-justeringer på
+Profil/«Min støtte» (alltid synlig + trykkbar tom-rad → Lagkassa —
+siste justering venter kort blikk på telefon). FASE 4 GODKJENT (E2E
+med Apple Pay, pengevei DB-verifisert 7900/1975/5925, webhooks 4/4).**
+Brages
 beslutninger 2026-08-02 (LÅST — PAYMENTS.md §Pris og split + §Åpne
 beslutninger): fordelingen er OFFENTLIG og positiv («79 kr i måneden —
 60 kr går direkte til laget», «mer enn 3 av 4 kroner»), mekanikken =
@@ -18,10 +21,10 @@ HERO-KARUSELLEN på Hjem + SESONG-siden (bunnkortet på Hjem-feeden er
 FJERNET), SupportScreen med 60 kr-språket, «MIN STØTTE» på Profil.
 heiaapp.no-bunken (AASA + landingssider + native-sjekkliste) ligger
 klar: `docs/HEIAAPP-NO.md` — NB bundle-ID er RN-placeholder og byttes i
-native-runden. **Test: «📱 Fase 5 del 1 — telefontest» under (kun
-Metro-reload). NESTE SAMTALE: LUKK FASE 5 (telefontesten + Brages
-review — det ER resten av fasen) → DERETTER FASE 6 (produksjon) — se
-«▶️ Fase 6» under betalingssporet. NETTSIDEN (markedssiden på heiaapp.no) er
+native-runden. **NESTE SAMTALE: START FASE 6 (produksjon) — se
+«▶️ Fase 6» under betalingssporet; de tre Brage-avhengige punktene
+(juridisk enhet, regnskapsfører/MVA, live-nøkler) er flagget og kan
+løpe i parallell. NETTSIDEN (markedssiden på heiaapp.no) er
 BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
 ferdig (Brage 2026-08-02) — ikke start nettside-arbeid i
 stripe-samtalene; alt vi ble enige om ligger i minnet
@@ -151,12 +154,12 @@ låste invariants og fase 0-funnene. Kortversjonen:
   måneden — 60 kr går direkte til laget». Alltid kronebeløp fra offering-
   DATA, aldri hardkodet, aldri primært som prosent.
 
-### ▶️ Neste samtale: lukk fase 5 → start fase 6
+### ▶️ Neste samtale: fase 6
 
-**Fase 5 lukkes med:** telefontesten under (~5 min) + Brages review.
-Det er RESTEN av fase 5 — delbar lagkassa-lenke er omfordelt: web-delen
-→ nettside-prosjektet (etter sporet), app-/deep-link-delen →
-native-runden i fase 6. Deretter fase 6, som består av
+**Fase 5 er LUKKET (godkjent 2026-08-02** — telefontest bestått + review
+med to justeringer, se testseksjonen under). Delbar lagkassa-lenke er
+omfordelt: web-delen → nettside-prosjektet (etter sporet),
+app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 (PAYMENTS.md §Åpne beslutninger + fasetabellen):
 1. **Brage-avhengig (eksternt, si fra tidlig):** Heia juridisk enhet
    (ENK/AS — trengs for live Stripe-konto) · regnskapsfører om MVA på
@@ -174,7 +177,7 @@ native-runden i fase 6. Deretter fase 6, som består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
-### 📱 Fase 5 del 1 — telefontest (⏳ DIN TUR — kun Metro-reload)
+### 📱 Fase 5 del 1 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — «Alt funker fra fase 5»)
 
 1. **Hjem:** bunnkortet «Støtt laget» er BORTE. Bla i hero-karusellen →
    💚 LAGKASSA-kortet («60 kr til laget hver måned · 1 støttespiller») —
@@ -192,7 +195,45 @@ med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
    kanselleringen synker via webhook og raden viser «Avsluttes …» når du
    er tilbake; reaktiver gjerne i portalen etterpå).
 6. Som IKKE-supporter (annen bruker): Lagkassa viser CTA «Støtt laget ·
-   79 kr/mnd», og Profil har ingen «Min støtte»-seksjon.
+   79 kr/mnd», og Profil viser «Min støtte» med rolig tom-rad
+   («Du støtter ingen lag ennå» — review-fiks 2026-08-02, se under).
+
+**Review-funn 1 (Brage 2026-08-02, FIKSET — Metro-reload):** «Min støtte»
+skal ALLTID stå på Profil — før fiksen fantes seksjonen kun når fetchen
+var ferdig OG ga rader (pop-in etter betaling; usynlig for
+ikke-supportere). Nå: seksjonen rendres alltid — skeleton-rad under
+første last, «Du støtter ingen lag ennå» uten avtaler (ingen CTA —
+«ingen inngang på Profil» står), og en modul-cache gjør at supporterens
+rad vises umiddelbart ved remount (nulles ved utlogging).
+
+**Review-spørsmål 2 (Brage): automatisk retur til appen etter betaling?**
+Svar gitt: det er heiaapp.no steg 1–3 + native-runden (Universal Links) —
+hører til STRIPE-sporets fase 6, ikke nettside-prosjektet. NB: selv da
+viser Safari typisk «Åpne i Heia»-knapp/banner fremfor auto-hopp
+(forventningen står i HEIAAPP-NO.md) — landingssiden er opplevelsen.
+
+**Review-runde 2 (Brage 2026-08-02): FASE 5 GODKJENT («Alt funker fra
+fase 5!») + siste justering FIKSET (Metro-reload):** tom-raden i
+«Min støtte» er TRYKKBAR → Lagkassa (chevron + «Se lagkassa og hva
+støtten betyr for laget»). Brages premiss: veien til å støtte skal være
+enklest mulig å finne. Raden går bevisst til LAGKASSA, ikke rett på
+betalingssiden — «hvorfor» før «betal», og Lagkassa eier alle
+tilstander (uaktivert klubb osv.). Uten aktivt lag: ren
+informasjonsrad. «Ingen inngang på Profil»-beslutningen er dermed
+PRESISERT, ikke veltet: aldri salgs-/kampanjekort på Profil — tom-raden
+er veiviser. **Verifiser på telefon:** som ikke-supporter, trykk raden
+→ LagkassaScreen (Hjem-fanen aktiveres).
+
+**Review-funn 3 (Brage 2026-08-02, FIKSET — Metro-reload): Lagkassa
+lastet ikke smooth** ved første besøk (fra Profil-tom-raden): kun heroen
+hadde skeleton — fordelingskortet og CTA-knappen var SKJULT under
+lasting og poppet inn når svaret kom (dyttet «Hva støtten betyr»
+nedover). Nå: full skeleton-dekning (fordelingskort-bones + knappeformet
+bone i CTA-en) så sidestrukturen står fra første frame, + modul-cache
+per (bruker, lag) — gjenbesøk viser tallene umiddelbart, som «Min
+støtte» på Profil. **Verifiser:** trykk tom-raden på Profil → Lagkassa
+skal ligge rolig mens den laster (ingen hopp), og andre gangs besøk
+skal vise tall med én gang.
 
 ### 📱 Fase 4 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — PENGEVEIEN DB-VERIFISERT)
 

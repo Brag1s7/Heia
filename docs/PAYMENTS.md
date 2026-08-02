@@ -13,7 +13,7 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
 | 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ FERDIG + **GODKJENT av Brage 2026-08-01**: DB-verifisert **19/19** + E2E-telefontest bestått **×2** (Ridabu: orgnr-korrigert godkjenning; Stange: avslag → ny søknad → godkjenning → onboarding → AKTIV; Stange-testdata ryddet etterpå). Se «Fase 3» nederst |
 | 4 | Checkout-flyten i appen | ✅ FERDIG + **GODKJENT 2026-08-02** — E2E med **Apple Pay** (privat kort i sandbox), pengeveien DB-verifisert (7900/1975/5925), webhooks 4/4. Se «Fase 4» nederst |
-| 5 | Selvbetjening (Customer Portal) + lagaggregater | 🟡 DEL 1 KODET + DEPLOYET + DB-VERIFISERT **8/8** 2026-08-02 (Lagkassa + «Min støtte» + portal + fast-60-kommunikasjonen) — venter Brages telefontest + review. Universal Links-bunken (heiaapp.no) forberedt: `docs/HEIAAPP-NO.md`. Se «Fase 5» nederst |
+| 5 | Selvbetjening (Customer Portal) + lagaggregater | ✅ FERDIG + **GODKJENT 2026-08-02** — telefontest bestått («Alt funker fra fase 5»), DB-verifisert 8/8; to review-justeringer samme dag: «Min støtte» ALLTID synlig på Profil + trykkbar tom-rad → Lagkassa. Universal Links-bunken (heiaapp.no) forberedt: `docs/HEIAAPP-NO.md`. Se «Fase 5» nederst |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
 
 **Gate-regel: hver fase stopper for Brages review før neste starter.**
@@ -585,6 +585,20 @@ repekt til v2. Historikken urørt — første transaksjon står frosset på
   pris, klubbandel og statuslinje («Aktiv · fornyes 2. september» /
   «Avsluttes …» ved cancel_at / purreforklaring ved past_due). Trykk →
   fersk portal-lenke i Safari; AppState-refetch når appen våkner.
+  **Review-fiksene (Brage 2026-08-02): seksjonen står ALLTID på Profil** —
+  skeleton-rad under første last, og modul-cache av siste svar så
+  supporterens rad aldri popper inn ved remount (cachen nulles ved
+  utlogging). **Tom-raden («Du støtter ingen lag ennå») er TRYKKBAR →
+  Lagkassa** (Brages beslutning: veien til å støtte skal være lett å
+  finne). Den peker bevisst på Lagkassa og ikke rett på betalingssiden —
+  «hvorfor» før «betal», og Lagkassa eier alt av tilstander (uaktivert
+  klubb osv.). Uten aktivt lag er raden ren informasjon. Med det er
+  «ingen inngang på Profil»-beslutningen PRESISERT, ikke veltet: aldri
+  salgs-/kampanjekort på Profil — tom-raden er veiviser.
+  **Samme runde: LagkassaScreen fikk full skeleton-dekning** (før hadde
+  kun heroen skeleton — fordelingskortet og CTA-en poppet inn etter
+  fetch) + modul-cache per (bruker, lag): gjenbesøk rendrer tallene
+  umiddelbart, første besøk laster uten layout-hopp.
 
 **DB-verifisering: 8/8 PASS** — `verify-00040.sql` i spike-mappen
 (avledningen begge modeller, aktiv-versjon-oppslag, lekkasjevakt,
@@ -603,10 +617,12 @@ v1-scoping = åpne appen / App Store-side UTEN lagets tall på web**
 (aggregat på åpen web er en egen personvernbeslutning; web-checkout
 står fortsatt på «bygger bevisst ikke»-listen).
 
-**GJENSTÅR i fase 5:** Brages telefontest av del 1 (testliste i
-STATUS-HANDOFF) + review · heiaapp.no steg 1–3 (hosting → native-runde →
-URL-bytte) · delbar lenke-siden · ev. churn-innsikt fra portalens
-kanselleringsskjema (fase 0-funn #9).
+**FASE 5 LUKKET 2026-08-02:** telefontesten bestått («Alt funker fra
+fase 5») + review med to justeringer (over). Restene er omfordelt:
+heiaapp.no steg 1–3 → fase 6 · delbar lagkassa-lenke → web-delen til
+nettside-prosjektet, app-/deep-link-delen til native-runden i fase 6 ·
+churn-innsikt fra portalens kanselleringsskjema (fase 0-funn #9) →
+backlog.
 
 ## Miljøer og sikkerhet
 

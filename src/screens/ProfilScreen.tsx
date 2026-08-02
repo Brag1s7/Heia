@@ -17,10 +17,14 @@ import {
   Platform,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useNavigation, CommonActions} from '@react-navigation/native';
+import {
+  useNavigation,
+  CommonActions,
+  type NavigationProp,
+} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar, ListRow, TeamBadge} from '../components';
+import {Avatar, ListRow, ListRowSkeleton, TeamBadge} from '../components';
 import {
   Bell,
   Check,
@@ -50,7 +54,7 @@ import {
   type MySupportItem,
 } from '../lib/api';
 import {formatKr} from '../lib/money';
-import type {ProfilStackParamList} from '../shared/types';
+import type {ProfilStackParamList, RootTabParamList} from '../shared/types';
 
 // Undertekst på «Varslinger»-raden per status.
 const PUSH_SUBTITLE: Record<PushPermission, string> = {
@@ -83,6 +87,12 @@ function MenuIcon({children}: {children: ReactNode}) {
 function RowChevron() {
   return <ChevronRight size={18} color={colors.textTertiary} />;
 }
+
+// Siste kjente «Min støtte»-svar — lever over remounts så seksjonen aldri
+// popper inn for en supporter. Modul-state overlever utlogging, så cachen
+// nulles eksplisitt i logg ut-handleren (RLS gir uansett kun egne rader,
+// men en ny bruker skal aldri se forrige brukers avtaler et blunk).
+let supportOverviewCache: MySupportItem[] | null = null;
 
 // Statuslinjen på «Min støtte»-raden — rolig informasjon, aldri alarm.
 function supportStatusLine(item: MySupportItem): string {
@@ -125,13 +135,21 @@ export function ProfilScreen() {
   // «Min støtte» (betalingsspor fase 5) — brukerens egne støtteavtaler som
   // LISTE (flere lag senere). Refetches når appen våkner igjen: endringer
   // gjort i Customer Portal (Safari) skal synes når man er tilbake.
-  const [mySupport, setMySupport] = useState<MySupportItem[]>([]);
+  // Seksjonen står ALLTID på siden (Brages review-funn): null = aldri
+  // lastet (skeleton), [] = ingen avtaler (rolig tom-rad). Cachen gjør at
+  // en supporter ser avtalen sin umiddelbart ved remount, uten pop-in.
+  const [mySupport, setMySupport] = useState<MySupportItem[] | null>(
+    supportOverviewCache,
+  );
   const [portalLoading, setPortalLoading] = useState(false);
   useEffect(() => {
     let mounted = true;
     const load = () => {
       getMySupportOverview()
-        .then(items => mounted && setMySupport(items))
+        .then(items => {
+          supportOverviewCache = items;
+          if (mounted) setMySupport(items);
+        })
         .catch(() => {});
     };
     load();
@@ -161,6 +179,13 @@ export function ProfilScreen() {
       setPortalLoading(false);
     }
   }, [portalLoading]);
+
+  // Cachen er modul-state og overlever utlogging — nulles her så en ny
+  // bruker på samme enhet aldri ser forrige brukers avtaler et blunk.
+  const handleSignOut = useCallback(() => {
+    supportOverviewCache = null;
+    signOut();
+  }, [signOut]);
 
   const handleNotifications = useCallback(async () => {
     if (pushPerm === 'undetermined') {
@@ -353,35 +378,68 @@ export function ProfilScreen() {
       )}
 
       {/* Min støtte — egne støtteavtaler (fase 5). Klubbens onboarding og
-          økonomi bor i Laginnstillinger, ALDRI her (låst 2026-08-02). */}
-      {mySupport.length > 0 && (
-        <View style={styles.menuBlock}>
-          <SectionLabel title="Min støtte" />
-          <View style={styles.menuCard}>
-            {mySupport.map((item, index) => (
-              <ListRow
-                key={item.subscriptionId}
-                icon={
-                  <MenuIcon>
-                    <HandHeart size={20} color={colors.textSecondary} />
-                  </MenuIcon>
-                }
-                title={item.teamName}
-                subtitle={`${formatKr(item.amountMinor)}/mnd · ${formatKr(
-                  item.clubAmountMinor,
-                )} går til laget\n${supportStatusLine(item)}`}
-                right={<RowChevron />}
-                onPress={handleManageSupport}
-                showBorder={index < mySupport.length - 1}
-              />
-            ))}
-            <Text style={styles.supportHint}>
-              Betalingsmåte, kvitteringer og oppsigelse håndteres trygt hos
-              Stripe — lenken åpnes i Safari.
-            </Text>
-          </View>
+          økonomi bor i Laginnstillinger, ALDRI her (låst 2026-08-02).
+          Seksjonen står ALLTID her (Brages review-funn 2026-08-02) — flaten
+          er stabil, og en fersk betaling har et hjem fra første blikk. */}
+      <View style={styles.menuBlock}>
+        <SectionLabel title="Min støtte" />
+        <View style={styles.menuCard}>
+          {mySupport === null ? (
+            <ListRowSkeleton showBorder={false} />
+          ) : mySupport.length === 0 ? (
+            // Tom-raden peker inn i LAGKASSA, ikke rett på betalingssiden —
+            // «hvorfor» før «betal» (fordelingen og hva støtten betyr bor
+            // der). Uten aktivt lag er raden ren informasjon.
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <HandHeart size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Du støtter ingen lag ennå"
+              subtitle={
+                activeMembership
+                  ? 'Se lagkassa og hva støtten betyr for laget'
+                  : 'Avtalene dine samles her når du støtter et lag'
+              }
+              right={activeMembership ? <RowChevron /> : undefined}
+              onPress={
+                activeMembership
+                  ? () =>
+                      navigation
+                        .getParent<NavigationProp<RootTabParamList>>()
+                        ?.navigate('HjemStack', {screen: 'Lagkassa'})
+                  : undefined
+              }
+              showBorder={false}
+            />
+          ) : (
+            <>
+              {mySupport.map((item, index) => (
+                <ListRow
+                  key={item.subscriptionId}
+                  icon={
+                    <MenuIcon>
+                      <HandHeart size={20} color={colors.textSecondary} />
+                    </MenuIcon>
+                  }
+                  title={item.teamName}
+                  subtitle={`${formatKr(item.amountMinor)}/mnd · ${formatKr(
+                    item.clubAmountMinor,
+                  )} går til laget\n${supportStatusLine(item)}`}
+                  right={<RowChevron />}
+                  onPress={handleManageSupport}
+                  showBorder={index < mySupport.length - 1}
+                />
+              ))}
+              <Text style={styles.supportHint}>
+                Betalingsmåte, kvitteringer og oppsigelse håndteres trygt hos
+                Stripe — lenken åpnes i Safari.
+              </Text>
+            </>
+          )}
         </View>
-      )}
+      </View>
 
       {/* Innstillinger */}
       <View style={styles.menuBlock}>
@@ -441,7 +499,7 @@ export function ProfilScreen() {
             }
             title="Logg ut"
             subtitle="Logg ut av Heia"
-            onPress={signOut}
+            onPress={handleSignOut}
           />
           <ListRow
             icon={
