@@ -19,7 +19,13 @@ FJERNET), SupportScreen med 60 kr-språket, «MIN STØTTE» på Profil.
 heiaapp.no-bunken (AASA + landingssider + native-sjekkliste) ligger
 klar: `docs/HEIAAPP-NO.md` — NB bundle-ID er RN-placeholder og byttes i
 native-runden. **Test: «📱 Fase 5 del 1 — telefontest» under (kun
-Metro-reload).** Se «💳 BETALINGSSPORET» + `docs/PAYMENTS.md`
+Metro-reload). NESTE SAMTALE: LUKK FASE 5 (telefontesten + Brages
+review — det ER resten av fasen) → DERETTER FASE 6 (produksjon) — se
+«▶️ Fase 6» under betalingssporet. NETTSIDEN (markedssiden på heiaapp.no) er
+BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
+ferdig (Brage 2026-08-02) — ikke start nettside-arbeid i
+stripe-samtalene; alt vi ble enige om ligger i minnet
+(website_project.md).** Se «💳 BETALINGSSPORET» + `docs/PAYMENTS.md`
 (sannhetskilden).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
@@ -144,6 +150,29 @@ låste invariants og fase 0-funnene. Kortversjonen:
 - Fordelingen er nå OFFENTLIG kommunikasjon (låst 2026-08-02): «79 kr i
   måneden — 60 kr går direkte til laget». Alltid kronebeløp fra offering-
   DATA, aldri hardkodet, aldri primært som prosent.
+
+### ▶️ Neste samtale: lukk fase 5 → start fase 6
+
+**Fase 5 lukkes med:** telefontesten under (~5 min) + Brages review.
+Det er RESTEN av fase 5 — delbar lagkassa-lenke er omfordelt: web-delen
+→ nettside-prosjektet (etter sporet), app-/deep-link-delen →
+native-runden i fase 6. Deretter fase 6, som består av
+(PAYMENTS.md §Åpne beslutninger + fasetabellen):
+1. **Brage-avhengig (eksternt, si fra tidlig):** Heia juridisk enhet
+   (ENK/AS — trengs for live Stripe-konto) · regnskapsfører om MVA på
+   Heia-andelen · live-nøkler (aktivere ekte Stripe-konto).
+2. **Kode/ops (Claude):** live webhook-endepunkter + secrets · portal-
+   konfig i live · re-onboarding av Ridabu med live-KYC · refund-/
+   disputepolicy som tekst · statement descriptor-standard ·
+   varslingsflyt ved lagavvikling.
+3. **Vilkår + personvern** (App Store-krav: offentlig URL) — trenger
+   minimal heiaapp.no-hosting (HEIAAPP-NO.md steg 1); dette hører til
+   STRIPE-sporet. Retur-URL-byttet (steg 3) tas samtidig.
+4. **Native-runden** (Brage kjører): bundle-ID-bytte (placeholder i
+   dag!) + Associated Domains + heia://-skjema — kreves uansett før
+   TestFlight/App Store.
+**NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
+med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
 ### 📱 Fase 5 del 1 — telefontest (⏳ DIN TUR — kun Metro-reload)
 
