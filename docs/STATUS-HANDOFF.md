@@ -110,14 +110,8 @@ OG recovery med nytt passord; ingen deep links nødvendig),
 `supabase config push`: enable_confirmations=true (BEKREFTET i prod:
 mailer_autoconfirm=false), norske OTP-maler i `supabase/templates/`
 ({{ .Token }}, ikke lenke), otp_length 8→6, max_frequency 1m0s.
-NB: til SMTP er på gjelder innebygd-mailerens grense ~2 E-POSTER/TIME
-— nok til Brages egen testing, IKKE til ekstern TestFlight.
-GJENSTÅR FØR EKSTERN TESTFLIGHT: (1) RESEND_API_KEY-secreten (2 min),
-(2) verifisere heiaapp.no i Resend (DNS-poster i Uniweb — samme øvelse
-som Vercel-postene) og så avkommentere [auth.email.smtp]-blokken i
-config.toml + heve email_sent-raten og pushe config på nytt — da
-sender auth-e-post fra «Heia <hello@heiaapp.no>».
-TELEFONTEST (Metro-reload; husk 2/t-grensen): (1) registrer NY
+✅ SMTP-BYTTET ER FULLFØRT SAMME KVELD — se avsnittet under.
+TELEFONTEST (Metro-reload): (1) registrer NY
 testadresse → «Sjekk e-posten din»-skjerm → kod inn → rett inn i
 appen; (2) «Glemt passordet?» på innlogging (e-post utfylt) →
 kodeskjerm + nytt passord → innlogget; (3) etter nøkkelen er satt:
@@ -135,13 +129,20 @@ konto» nederst (delt bekreftelsesflyt med Profil via ny
 `src/lib/account.ts` — én kilde til dialogtekstene). BESLUTNING
 (produktanbefaling akseptert): IKKE mer kontoadministrasjon for
 lagløse brukere (e-postbytte o.l.) — laget er produktet.
-RESEND-DNS: Brage la heiaapp.no inn i Resend (EU-region, Sending PÅ,
-Receiving AV — riktig; Receiving skal FORBLI av, innboksen bor hos
-Uniweb) og fikk de 3 postene (DKIM-TXT + MX/TXT på `send`) til
-Uniweb-panelet. NÅR RESEND VISER «VERIFIED»: avkommenter
-[auth.email.smtp]-blokken i config.toml, hev email_sent-raten,
-`RESEND_API_KEY=re_… supabase config push`, og sett
-`RESEND_FROM="Heia <hello@heiaapp.no>"` som funksjonssecret.** Fase 6-eksterne
+✅ E-POSTSPORET ER 100 % FERDIG 2026-08-02 (sen kveld): Brage la
+heiaapp.no inn i Resend (EU-region, Sending PÅ, Receiving AV — skal
+FORBLI av, innboksen bor hos Uniweb), la de 3 DNS-postene (DKIM-TXT +
+MX/TXT på `send`) i Uniweb-panelet — Claude verifiserte alle tre mot
+autoritativ NS (ns02.no.brand.one.com) FØR «I've added the records».
+Domenet ble verifisert, og Brage kjørte
+`RESEND_API_KEY=re_… supabase config push` selv («Ferdig nå!»):
+[auth.email.smtp] = smtp.resend.com/465 med avsender
+«Heia <hello@heiaapp.no>», email_sent 2→100/t. RESEND_API_KEY +
+RESEND_FROM står som funksjonssecrets (samme nøkkel overalt) →
+rapportvarselet sender også fra hello@heiaapp.no. HELE KJEDEN LIVE:
+signup-kode + passord-reset + rapportvarsel, alt fra @heiaapp.no,
+ingen dev-grense. Røyktest ved anledning: be om passord-reset — 
+e-posten skal komme fra «Heia <hello@heiaapp.no>».** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
