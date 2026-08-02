@@ -219,6 +219,29 @@ export async function unpinPost(postId: string): Promise<void> {
 }
 
 /**
+ * Sletter et innlegg (soft delete). RPC-en `soft_delete_post` (00041) slipper
+ * gjennom forfatteren og trener/lagleder — og er en RPC fordi en soft-slettet
+ * rad ikke lenger passerer SELECT-policyen, så et vanlig
+ * `UPDATE … RETURNING` ikke kunne skilt suksess fra RLS-avslag.
+ *
+ * RPC-en returnerer storage-pathene til postens bilder; selve filene fjernes
+ * best-effort etterpå. Feiler det er bildet uansett usynlig (media-raden er
+ * soft-slettet) — opprydding av foreldreløse filer er en ops-jobb.
+ */
+export async function deletePost(postId: string): Promise<void> {
+  const {data, error} = await supabase.rpc('soft_delete_post', {
+    p_post_id: postId,
+  });
+  if (error) {
+    throw error;
+  }
+  const paths = (data ?? []) as string[];
+  if (paths.length > 0) {
+    await supabase.storage.from(FEED_MEDIA_BUCKET).remove(paths);
+  }
+}
+
+/**
  * Live feed: kaller onChange ved nytt innlegg, reaksjon eller kommentar.
  *
  * Kalleren REFETCHER i stedet for å flette inn payloaden — feeden må uansett

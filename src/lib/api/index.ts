@@ -20,10 +20,16 @@ export {
   createTextPost,
   createImagePost,
   toggleReaction,
+  deletePost,
   getMatchPhotos,
   type MatchPhoto,
 } from './feed';
-export {getComments, createComment} from './comments';
+export {getComments, createComment, deleteComment} from './comments';
+export {
+  reportContent,
+  type ReportReason,
+  type ReportableEntity,
+} from './reports';
 export {
   getNotifications,
   getUnreadCount,
@@ -32,7 +38,11 @@ export {
   type HeiaNotification,
   type NotificationCategory,
 } from './notifications';
-export {getTeamMembers, type TeamMember} from './members';
+export {
+  getTeamMembers,
+  removeTeamMember,
+  type TeamMember,
+} from './members';
 export {
   getSupportActivationStatus,
   submitClubClaim,

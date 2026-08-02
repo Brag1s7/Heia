@@ -26,6 +26,7 @@ export {
   Maximize2,
   Megaphone,
   MessageCircle,
+  MoreHorizontal,
   Pause,
   Phone,
   Play,

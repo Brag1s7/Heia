@@ -1,7 +1,7 @@
 import React from 'react';
 import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Maximize2, MessageCircle} from './icons';
+import {Maximize2, MessageCircle, MoreHorizontal} from './icons';
 import {Avatar} from './Avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
@@ -13,6 +13,12 @@ interface FeedCardProps {
   onComment?: () => void;
   /** Settes kun for den som kan løsne en festet post (trener/lagleder). */
   onUnpin?: () => void;
+  /**
+   * ⋯-menyen (rapporter/slett — Apple 1.2). Settes på alle poster: alle kan
+   * rapportere, og hva menyen tilbyr avgjøres av kallstedet (egen post →
+   * slett, andres → rapporter, admin → begge).
+   */
+  onMore?: () => void;
   /**
    * Gjør hele kortet trykkbart. Settes kun på poster som faktisk fører et
    * sted — en vanlig melding skal ikke se ut som en lenke.
@@ -116,6 +122,7 @@ export function FeedCard({
   onHeia,
   onComment,
   onUnpin,
+  onMore,
   onPress,
   onExpandImage,
 }: FeedCardProps) {
@@ -141,6 +148,16 @@ export function FeedCard({
           <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
         </View>
         <Marker item={item} onUnpin={onUnpin} />
+        {onMore && (
+          <Pressable
+            onPress={onMore}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Flere valg"
+            style={({pressed}) => [styles.more, pressed && styles.morePressed]}>
+            <MoreHorizontal size={18} color={colors.textTertiary} />
+          </Pressable>
+        )}
       </View>
 
       {/* Innhold */}
@@ -276,6 +293,13 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
     marginTop: 1,
+  },
+  more: {
+    padding: 2,
+    marginLeft: spacing.xs,
+  },
+  morePressed: {
+    opacity: 0.5,
   },
   content: {
     ...typography.body,

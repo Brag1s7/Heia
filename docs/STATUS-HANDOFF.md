@@ -22,10 +22,12 @@ HERO-KARUSELLEN på Hjem + SESONG-siden (bunnkortet på Hjem-feeden er
 FJERNET), SupportScreen med 60 kr-språket, «MIN STØTTE» på Profil.
 heiaapp.no-bunken (AASA + landingssider + native-sjekkliste) ligger
 klar: `docs/HEIAAPP-NO.md` — NB bundle-ID er RN-placeholder og byttes i
-native-runden. **NESTE SAMTALE (Brages valg 2026-08-02): START
-V1-HYGIENESKIVA — se «🧹 V1-HYGIENE» under betalingssporet (sletting av
-innlegg/kommentarer, rapportering, medlemsfjerning, kontosletting +
-tekstutkastene). Fase 6-eksterne ting (AS-stiftelse, Apple-innmelding
+native-runden. **V1-HYGIENE DEL 1 (MODERASJON) er KODET + DEPLOYET
+2026-08-02 (migrasjon `00041` pushet til prod) — VENTER BRAGES
+TELEFONTEST: slette innlegg/kommentarer (⋯-meny), rapportere til Heia,
+fjerne medlem fra Lagoversikt. Testlisten + ops-SQL står i «🧹
+V1-HYGIENE» under. NESTE SAMTALE: review av del 1, deretter del 2 =
+kontosletting (punkt 4) + vilkårstekstene (punkt 5). Fase 6-eksterne ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
 BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
@@ -189,28 +191,47 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
-### 🧹 V1-HYGIENE (⏳ NESTE OPPGAVE — Brages valg 2026-08-02; kreves FØR ekstern TestFlight/lansering)
+### 🧹 V1-HYGIENE (🟡 DEL 1 KODET + DEPLOYET 2026-08-02 — venter telefontest; kreves FØR ekstern TestFlight/lansering)
 
 Brages presisering: ikke nye funksjoner, men fullføring — «fjerne
-innlegg osv.» + alt App Store krever. Kodekartlagt 2026-08-02: INGENTING
-av dette finnes ennå (grep på api-laget + skjermene). Listen, mappet mot
-Apples retningslinjer:
-1. **Slette eget innlegg** + **admin (trener/lagleder) sletter alt i
-   laget** — UGC-moderasjon (Apple 1.2). Gjelder feed-innlegg OG
-   kommentarer (comments.ts har ingen delete i dag).
-2. **Rapportere innhold** (innlegg/kommentar → rapport til Heia) —
-   eksplisitt 1.2-krav for UGC-apper.
-3. **Fjerne medlem fra laget** (admin, fra Lagoversikt) — «block
-   abusive users»-kravet i lukket lag-kontekst (TeamMembersScreen har
-   ingen fjerning i dag).
-4. **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav, review-
+innlegg osv.» + alt App Store krever. Listen, mappet mot Apples
+retningslinjer — **punkt 1–3 er BYGGET (migrasjon `00041` deployet)**:
+1. ✅ **Slette eget innlegg** + **admin (trener/lagleder) sletter alt i
+   laget** — UGC-moderasjon (Apple 1.2). Feed-innlegg OG kommentarer.
+   Soft delete via RPC-ene `soft_delete_post`/`soft_delete_comment`
+   (deleted_at fantes alt fra 00009, HELE lesestien filtrerte allerede
+   på den — vi trengte bare skriveveien). RPC og ikke direkte UPDATE:
+   en soft-slettet rad passerer ikke SELECT-policyen, så
+   `UPDATE … RETURNING` kunne ikke skilt suksess fra RLS-avslag
+   (00036-familien). Postens bilder soft-slettes i samme transaksjon,
+   og RPC-en returnerer storage-pathene så klienten fjerner filene
+   best-effort. UI: ⋯-meny på alle feed-kort + innleggskortet og hver
+   kommentarboble i tråden.
+2. ✅ **Rapportere innhold** → ny tabell `content_reports` (RLS PÅ uten
+   policies = deny all; kun RPC-en `report_content` skriver, kun
+   service role/SQL-editor leser). Rapporten FRYSER innholdet
+   (content_snapshot) så saken kan vurderes selv om innlegget slettes
+   etterpå. Idempotent (én åpen sak per person per innhold). UI: samme
+   ⋯-meny, delt flyt i `src/lib/moderation.ts` (årsak → takk).
+3. ✅ **Fjerne medlem fra laget** — RPC `remove_team_member`, admin-
+   gatet I DATABASEN: aldri deg selv, aldri trener/lagleder (rollebytte
+   først den dagen det trengs). Setter `status='removed'` + left_at
+   (skjemaet har ventet på det siden 00007 — unik-indeksen gjelder kun
+   'active', så personen kan inviteres inn igjen). Fjerner ALLE
+   personens medlemskap (barna følger forelderen) og RSVP-ene deres på
+   fremtidige hendelser. Innholdet deres blir stående. UI: ⋯ på
+   medlemsrader i Lagoversikt (kun for admin, kun på foreldre/spillere).
+   KJENT BEGRENSNING (akseptert v1): en fjernet som husker
+   invitasjonskoden kan bli med igjen — kode-rotering er backlog.
+4. ⏳ **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav, review-
    blokkerende). NB kjent spenning: payment_transactions/bokføring vs
    GDPR (flagget i PAYMENTS.md) → løsning: anonymiser profilen, behold
    finansradene (bokføringslovens unntak). Trenger egen migrasjon +
-   design av «Slett konto»-flyt på Profil.
-5. **Vilkår + personvern-URL** (spor C-tekstene, publiseres på
+   Edge Function (service role: kanseller aktive Stripe-abonnement +
+   slett auth-brukeren) + «Slett konto»-flyt på Profil. **= DEL 2.**
+5. ⏳ **Vilkår + personvern-URL** (spor C-tekstene, publiseres på
    heiaapp.no) + privacy nutrition labels (skjema i App Store Connect
-   ved innsending).
+   ved innsending). **= DEL 2/3.**
 ✅ Avklart: auth er e-post+passord (Supabase) uten tredjeparts-login →
 «Sign in with Apple» (4.8) kreves IKKE. Betalingsmodellen er alt
 3.2.2(iv)-kompatibel. Events kan alt avlyses.
@@ -219,6 +240,56 @@ Apples retningslinjer:
 hygiene — start så snart native-runden er gjort. Ekstern TestFlight
 (Ridabu-foreldrene), nettsiden og App Store-innsending VENTER på
 V1-hygienelisten.
+
+**Hva skjer når noen rapporterer? (Brages spørsmål 2026-08-02):**
+Ingen forhåndsmoderering — Apple krever ikke at Heia overvåker innhold,
+bare at brukere KAN rapportere og at det ryddes når en rapport kommer
+(1.2-forventningen er reaksjon innen ~24 t på rapportert innhold).
+Flyten i praksis: (1) det meste løses I LAGET — trener/lagleder kan alt
+slette alt selv, uten Heia; (2) en rapport lander som rad i
+`content_reports` med frossen kopi av innholdet; (3) volumet vil være
+tilnærmet null i lukkede lag (Ridabu + testlag i dag). RESTANSE FØR
+EKSTERN TESTFLIGHT (Brage-avhengig, si fra tidlig): e-postvarsel per
+rapport til hello@heiaapp.no via Edge Function + database-webhook —
+trenger en e-posttjeneste (f.eks. Resend, gratis tier; ~15 min å koble
+når nøkkelen finnes). Inntil da er dashboardet sjekken:
+```sql
+-- Åpne rapporter (kjør i SQL-editoren):
+SELECT created_at, entity_type, reason, content_snapshot, team_space_id
+FROM content_reports WHERE status = 'open' ORDER BY created_at;
+-- Lukk en sak:
+UPDATE content_reports SET status = 'resolved', resolved_at = now(),
+  resolution_note = '…' WHERE id = '…';
+```
+
+### 📱 V1-hygiene del 1 — telefontest (⏳ VENTER — Metro-reload holder, migrasjonen ER deployet)
+
+1. **Feeden:** hvert innlegg har en diskré ⋯ øverst til høyre. På ditt
+   eget: «Slett innlegget» (bekreftelse → borte med én gang). På andres
+   (bruk en annen bruker/testkonto): «Rapporter til Heia» (årsaksvalg →
+   «Takk for beskjeden 💚»).
+2. **Som trener/lagleder:** ⋯ på ANDRES innlegg viser BÅDE «Rapporter»
+   og «Slett innlegget» — slett et og se at det forsvinner for alle
+   (den andre brukerens feed oppdaterer seg via realtime).
+3. **Kommentartråden:** ⋯ på innleggskortet øverst OG på hver
+   kommentarboble. Slett en egen kommentar (borte + telleren på
+   feed-kortet går ned). Sletter du selve innlegget fra tråden, går
+   appen tilbake til feeden.
+4. **Slett et BILDE-innlegg** (eget): posten forsvinner; bildet skal
+   ikke dukke opp igjen noe sted (media er soft-slettet + filen fjernes
+   best-effort).
+5. **Rapportér noe som en vanlig bruker**, og verifiser i SQL-editoren
+   at raden ligger i `content_reports` med content_snapshot. Rapportér
+   det SAMME en gang til → fortsatt bare én åpen rad (idempotent).
+6. **Lagoversikt (som trener):** foreldre-/spillerrader har ⋯ →
+   «Fjerne … fra laget?» (teksten nevner barna når personen har barn i
+   laget). Fjern en testbruker: personen forsvinner fra listen, mister
+   tilgangen umiddelbart (testbrukerens app faller ut av laget), og
+   RSVP-ene deres på KOMMENDE hendelser er borte. Din egen rad og andre
+   trenere/lagledere har INGEN ⋯.
+7. **Vaktene:** som forelder (ikke-admin) finnes ingen slette-valg på
+   andres innhold og ingen ⋯ i Lagoversikt — og databasen ville uansett
+   avvist (RPC-vaktene er sannheten, UI-et speiler bare).
 
 ### 📱 Fase 5 del 1 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — «Alt funker fra fase 5»)
 
