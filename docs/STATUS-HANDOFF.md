@@ -2,9 +2,10 @@
 
 _Sist oppdatert: 2026-08-02 (kveld). **NYESTE SPOR: 💳 BETALINGER —
 FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
-bestått, DB-verifisert 8/8) etter to review-justeringer på
-Profil/«Min støtte» (alltid synlig + trykkbar tom-rad → Lagkassa —
-siste justering venter kort blikk på telefon). FASE 4 GODKJENT (E2E
+bestått, DB-verifisert 8/8) etter tre review-justeringer på
+Profil/«Min støtte» + Lagkassa (alltid synlig + trykkbar tom-rad →
+Lagkassa + full skeleton-dekning) — ALT GODKJENT og committet
+(`46e62c9`, pushet). FASE 4 GODKJENT (E2E
 med Apple Pay, pengevei DB-verifisert 7900/1975/5925, webhooks 4/4).**
 Brages
 beslutninger 2026-08-02 (LÅST — PAYMENTS.md §Pris og split + §Åpne
