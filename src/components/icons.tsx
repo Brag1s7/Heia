@@ -33,6 +33,7 @@ export {
   Plus,
   Settings,
   Share2,
+  Trash2,
   Trophy,
   User,
   UserPlus,

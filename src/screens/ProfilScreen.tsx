@@ -36,6 +36,7 @@ import {
   Plus,
   Settings,
   Share2,
+  Trash2,
   UserPlus,
   Users,
 } from '../components/icons';
@@ -48,6 +49,7 @@ import {
   type PushPermission,
 } from '../lib/push';
 import {
+  deleteAccount,
   updateProfile,
   getMySupportOverview,
   openSupportPortal,
@@ -186,6 +188,55 @@ export function ProfilScreen() {
     supportOverviewCache = null;
     signOut();
   }, [signOut]);
+
+  // Kontosletting (Apple 5.1.1(v)). To bekreftelser — dette er den ene
+  // handlingen i appen som ikke kan angres. Serversiden gjør alt
+  // (Stripe-kansellering → anonymisering → auth-sletting); lokal
+  // signOut etterpå tar appen til innloggingen.
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const handleDeleteAccount = useCallback(() => {
+    if (deletingAccount) return;
+    Alert.alert(
+      'Slette kontoen din?',
+      'Dette kan ikke angres. Du fjernes fra lagene dine, aktive ' +
+        'støtteavtaler avsluttes, og profilen din anonymiseres. ' +
+        'Innlegg du har delt med laget blir stående uten navnet ditt.',
+      [
+        {text: 'Avbryt', style: 'cancel'},
+        {
+          text: 'Slett kontoen',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Helt sikker?',
+              'Kontoen og påloggingen din slettes for godt.',
+              [
+                {text: 'Avbryt', style: 'cancel'},
+                {
+                  text: 'Ja, slett kontoen min',
+                  style: 'destructive',
+                  onPress: async () => {
+                    setDeletingAccount(true);
+                    try {
+                      await deleteAccount();
+                      supportOverviewCache = null;
+                      await signOut();
+                    } catch (e: any) {
+                      setDeletingAccount(false);
+                      Alert.alert(
+                        'Kunne ikke slette kontoen',
+                        e?.message ?? 'Prøv igjen om litt.',
+                      );
+                    }
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }, [deletingAccount, signOut]);
 
   const handleNotifications = useCallback(async () => {
     if (pushPerm === 'undetermined') {
@@ -500,6 +551,20 @@ export function ProfilScreen() {
             title="Logg ut"
             subtitle="Logg ut av Heia"
             onPress={handleSignOut}
+          />
+          <ListRow
+            icon={
+              <MenuIcon>
+                <Trash2 size={20} color={colors.textSecondary} />
+              </MenuIcon>
+            }
+            title="Slett konto"
+            subtitle={
+              deletingAccount
+                ? 'Sletter kontoen din …'
+                : 'Fjern kontoen og dataene dine for godt'
+            }
+            onPress={handleDeleteAccount}
           />
           <ListRow
             icon={

@@ -33,6 +33,34 @@ export async function getProfile(): Promise<Profile> {
   return mapProfile(data);
 }
 
+/**
+ * Kontosletting (Apple 5.1.1(v)) — Edge Function-en kansellerer
+ * støtteavtaler hos Stripe, anonymiserer profilen og sletter
+ * auth-brukeren til slutt. Kalleren gjør lokal signOut etterpå.
+ */
+export async function deleteAccount(): Promise<void> {
+  const {error} = await supabase.functions.invoke('delete-account', {
+    body: {},
+  });
+  if (error) {
+    // {error: 'norsk melding'} graves frem så Alert-en sier noe
+    // forståelig — samme mønster som betalings-funksjonene.
+    let message = 'Kunne ikke slette kontoen — prøv igjen om litt.';
+    try {
+      const ctx = (error as {context?: Response}).context;
+      if (ctx) {
+        const body = await ctx.json();
+        if (body?.error) {
+          message = body.error;
+        }
+      }
+    } catch {
+      // behold standardmeldingen
+    }
+    throw new Error(message);
+  }
+}
+
 export async function updateProfile(
   updates: Partial<Pick<Profile, 'displayName' | 'avatarUrl' | 'phone'>>,
 ): Promise<Profile> {

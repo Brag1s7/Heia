@@ -1,4 +1,4 @@
-export {getProfile, updateProfile} from './profile';
+export {getProfile, updateProfile, deleteAccount} from './profile';
 export {
   getUserMemberships,
   lookupInviteCode,

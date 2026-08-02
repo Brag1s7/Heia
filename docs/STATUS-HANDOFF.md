@@ -29,9 +29,18 @@ Lagoversikt; migrasjon `00041` i prod. BESLUTNING samme dag (LÅST):
 INGEN overvåknings-/gjennomgangsplikt på rapporter — kanalen består
 (App Store-krav), men Brage skal kun reagere når et e-postvarsel
 kommer; varselet (Resend-nøkkel, ~15 min) er restanse før EKSTERN
-TestFlight. NESTE SAMTALE: START DEL 2 = kontosletting i appen
-(punkt 4, Apple 5.1.1(v) — hardt review-krav) + vilkårstekstene
-(punkt 5). Fase 6-eksterne ting (AS-stiftelse, Apple-innmelding
+TestFlight. **DEL 2 ER KODET + DEPLOYET 2026-08-02 (kveld) — VENTER
+BRAGES TELEFONTEST + REVIEW:** kontosletting i appen (punkt 4, Apple
+5.1.1(v)): migrasjon `00042` i prod (FK profiles→auth.users droppet;
+`delete_account_data`-RPC, service-role only), Edge Function
+`delete-account` deployet (Stripe-kansellering → anonymisering →
+auth-sletting), «Slett konto» på Profil. Modellen: profilen blir
+anonymt «Slettet bruker»-spøkelse (finansradene + laginnholdet
+består), alt personlig slettes. Vilkår + personvern (punkt 5) ligger
+som UTKAST i `web/vilkar/` + `web/personvern/` — 3 TODO-er i
+HTML-kommentarene trenger Brage (juridisk enhet, aldersgrense,
+refusjonspolicy). Se testlisten i 🧹-seksjonen. Fase 6-eksterne ting
+(AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
 BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
@@ -195,7 +204,7 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
-### 🧹 V1-HYGIENE (✅ DEL 1 GODKJENT 2026-08-02 — «Alt funker fra del 1»; del 2 gjenstår og kreves FØR ekstern TestFlight/lansering)
+### 🧹 V1-HYGIENE (✅ DEL 1 GODKJENT 2026-08-02; 🟡 DEL 2 KODET + DEPLOYET 2026-08-02 kveld — venter Brages telefontest + review; kreves FØR ekstern TestFlight/lansering)
 
 Brages presisering: ikke nye funksjoner, men fullføring — «fjerne
 innlegg osv.» + alt App Store krever. Listen, mappet mot Apples
@@ -227,15 +236,36 @@ retningslinjer — **punkt 1–3 er BYGGET (migrasjon `00041` deployet)**:
    medlemsrader i Lagoversikt (kun for admin, kun på foreldre/spillere).
    KJENT BEGRENSNING (akseptert v1): en fjernet som husker
    invitasjonskoden kan bli med igjen — kode-rotering er backlog.
-4. ⏳ **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav, review-
-   blokkerende). NB kjent spenning: payment_transactions/bokføring vs
-   GDPR (flagget i PAYMENTS.md) → løsning: anonymiser profilen, behold
-   finansradene (bokføringslovens unntak). Trenger egen migrasjon +
-   Edge Function (service role: kanseller aktive Stripe-abonnement +
-   slett auth-brukeren) + «Slett konto»-flyt på Profil. **= DEL 2.**
-5. ⏳ **Vilkår + personvern-URL** (spor C-tekstene, publiseres på
-   heiaapp.no) + privacy nutrition labels (skjema i App Store Connect
-   ved innsending). **= DEL 2/3.**
+4. 🟡 **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav) — KODET
+   + DEPLOYET 2026-08-02 (kveld), venter telefontest. Modellen
+   (spenningen bokføring vs GDPR, flagget i PAYMENTS.md): ANONYMISER,
+   IKKE UTRADER — profilraden består som «Slettet bruker»-spøkelse
+   (payment-radene peker på den med FK uten cascade, og laginnhold
+   består uten navn — samme prinsipp som remove_team_member), alt
+   personlig slettes. Migrasjon `00042` (i prod, verifisert via
+   Management-API: FK profiles→auth.users DROPPET så profilen
+   overlever auth-slettingen; `delete_account_data`-RPC — service-
+   role only, idempotent, én transaksjon: hard-delete av medlemskap/
+   RSVP-er/barn/husstand/enheter/varsler/reaksjoner + anonymisering).
+   Edge Function `delete-account` (deployet, verify_jwt):
+   sikkerhetsrekkefølgen er Stripe FØRST (kanseller levende abonnement
+   + slett kunden — feiler Stripe reelt, avbrytes alt før noe er rørt;
+   4xx tolereres som «allerede borte»), så RPC-en, så auth-brukeren
+   SIST (frem til da kan brukeren prøve igjen). Ny `stripeDelete` +
+   `StripeApiError` i `_shared/stripe.ts`. UI: «Slett konto»-rad på
+   Profil (Innstillinger, mellom Logg ut og Om Heia) → to
+   destructive-bekreftelser → lokal signOut. Verifisert i prod-DB:
+   ingen FK-er mot auth.users utenfor auth-skjemaet (auth-slettingen
+   kan aldri blokkeres av storage e.l.).
+5. 🟡 **Vilkår + personvern-URL** — TEKSTENE SKREVET 2026-08-02 som
+   ferdige sider i `web/vilkar/` + `web/personvern/` (Heia-tonene,
+   lenker til hverandre; publiseres automatisk når heiaapp.no-
+   hostingen deployes i HEIAAPP-NO.md steg 1). UTKAST til Brage
+   godkjenner — 3 TODO-er i HTML-kommentarene: (a) «Heia AS» + orgnr
+   når stiftelsen er registrert, (b) aldersgrense 16 år er FORSLAG,
+   (c) refusjonspolicyen er bevisst nøytral (endelig tekst = fase
+   6-beslutning). Privacy nutrition labels (skjema i App Store
+   Connect) gjenstår til innsendingen. **= DEL 3-resten.**
 ✅ Avklart: auth er e-post+passord (Supabase) uten tredjeparts-login →
 «Sign in with Apple» (4.8) kreves IKKE. Betalingsmodellen er alt
 3.2.2(iv)-kompatibel. Events kan alt avlyses.
@@ -279,6 +309,37 @@ FROM content_reports WHERE status = 'open' ORDER BY created_at;
 UPDATE content_reports SET status = 'resolved', resolved_at = now(),
   resolution_note = '…' WHERE id = '…';
 ```
+
+### 📱 V1-hygiene del 2 — telefontest (⏳ VENTER — Metro-reload holder; bruk en TESTKONTO, ikke Brage-kontoen!)
+
+**NB: kontosletting er ekte og kan ikke angres — test med en
+testbruker.** Testbrukeren bør gjerne ha: et innlegg, en kommentar,
+et RSVP på kommende hendelse, og (valgfritt, beste testen) en aktiv
+støtteavtale i sandbox.
+
+1. **Profil → Innstillinger:** ny rad «Slett konto» (søppelikon)
+   mellom «Logg ut» og «Om Heia» — rolig stil, ingen rød alarm (Heia-
+   språket; dramaet bor i dialogene).
+2. Trykk → «Slette kontoen din?» med konsekvensene → «Slett kontoen»
+   (rød) → «Helt sikker?» → «Ja, slett kontoen min» (rød). Avbryt-
+   veiene skal virke begge steder.
+3. Bekreft → underteksten flipper til «Sletter kontoen din …» → appen
+   logger ut til innloggingsskjermen. Å logge inn igjen med samme
+   e-post/passord skal FEILE (brukeren finnes ikke).
+4. **Fra en annen konto i laget:** personen er borte fra Lagoversikt,
+   RSVP-en deres på kommende hendelser er borte — men innleggene/
+   kommentarene deres står igjen med forfatter **«Slettet bruker»**.
+5. **Hadde testbrukeren en støtteavtale:** sjekk i Stripe-dashboardet
+   (sandbox) at abonnementet er kansellert og kunden slettet; i appen
+   viser Lagkassa én støttespiller mindre når webhookene har bokført
+   kanselleringen.
+6. **SQL-editoren (valgfri DB-sjekk):** profilraden finnes fortsatt
+   med `display_name = 'Slettet bruker'` og `deleted_at` satt;
+   `memberships`/`event_rsvps`/`device_tokens` for brukeren er tomme;
+   `payment_transactions`-radene består urørt.
+7. **Vilkårstekstene:** les utkastene i `web/vilkar/index.html` +
+   `web/personvern/index.html` (åpne filene i nettleser lokalt) og
+   svar på de 3 TODO-ene i HTML-kommentarene.
 
 ### 📱 V1-hygiene del 1 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — «Alt funker fra del 1»)
 

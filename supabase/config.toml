@@ -407,6 +407,13 @@ verify_jwt = false
 enabled = true
 verify_jwt = true
 
+# Kontosletting (Apple 5.1.1(v)) — kun den innloggede brukeren selv;
+# kansellerer Stripe-avtaler, kjører delete_account_data (00042) og
+# sletter auth-brukeren til slutt.
+[functions.delete-account]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327
