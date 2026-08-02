@@ -29,18 +29,25 @@ Lagoversikt; migrasjon `00041` i prod. BESLUTNING samme dag (LÅST):
 INGEN overvåknings-/gjennomgangsplikt på rapporter — kanalen består
 (App Store-krav), men Brage skal kun reagere når et e-postvarsel
 kommer; varselet (Resend-nøkkel, ~15 min) er restanse før EKSTERN
-TestFlight. **DEL 2 ER KODET + DEPLOYET 2026-08-02 (kveld) — VENTER
-BRAGES TELEFONTEST + REVIEW:** kontosletting i appen (punkt 4, Apple
-5.1.1(v)): migrasjon `00042` i prod (FK profiles→auth.users droppet;
+TestFlight. **DEL 2 (KONTOSLETTING) er GODKJENT 2026-08-02 (sen
+kveld) — «Alt funker her nå!»: Brage slettet en testbruker MED aktivt
+abonnement på telefon, og verifiserte selv at abonnementet/kunden var
+borte hos Stripe.** Kontosletting (punkt 4, Apple 5.1.1(v)): migrasjon
+`00042` i prod (FK profiles→auth.users droppet;
 `delete_account_data`-RPC, service-role only), Edge Function
 `delete-account` deployet (Stripe-kansellering → anonymisering →
 auth-sletting), «Slett konto» på Profil. Modellen: profilen blir
 anonymt «Slettet bruker»-spøkelse (finansradene + laginnholdet
 består), alt personlig slettes. Vilkår + personvern (punkt 5) ligger
 som UTKAST i `web/vilkar/` + `web/personvern/` — 3 TODO-er i
-HTML-kommentarene trenger Brage (juridisk enhet, aldersgrense,
-refusjonspolicy). Se testlisten i 🧹-seksjonen. Fase 6-eksterne ting
-(AS-stiftelse, Apple-innmelding
+HTML-kommentarene VENTER FORTSATT PÅ BRAGE (juridisk enhet,
+aldersgrense, refusjonspolicy); svares før/når hostingen deployes.
+**NESTE SAMTALE (Brages valg 2026-08-02): heiaapp.no STEG 1 —
+hosting av `web/`-bunken (HEIAAPP-NO.md) + retur-URL-byttet i Edge
+Functions = betalingsflytens retur-opplevelse blir pen OG
+vilkår/personvern får offentlige URL-er (App Store-krav). Dette er
+STRIPE-sporet (fase 6), IKKE nettside-prosjektet.** Fase 6-eksterne
+ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
 BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
@@ -204,7 +211,7 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
-### 🧹 V1-HYGIENE (✅ DEL 1 GODKJENT 2026-08-02; 🟡 DEL 2 KODET + DEPLOYET 2026-08-02 kveld — venter Brages telefontest + review; kreves FØR ekstern TestFlight/lansering)
+### 🧹 V1-HYGIENE (✅ DEL 1 GODKJENT 2026-08-02; ✅ DEL 2 (KONTOSLETTING) GODKJENT 2026-08-02 sen kveld — «Alt funker her nå!»; gjenstår: vilkårs-TODO-ene + e-postvarselet før ekstern TestFlight)
 
 Brages presisering: ikke nye funksjoner, men fullføring — «fjerne
 innlegg osv.» + alt App Store krever. Listen, mappet mot Apples
@@ -236,8 +243,10 @@ retningslinjer — **punkt 1–3 er BYGGET (migrasjon `00041` deployet)**:
    medlemsrader i Lagoversikt (kun for admin, kun på foreldre/spillere).
    KJENT BEGRENSNING (akseptert v1): en fjernet som husker
    invitasjonskoden kan bli med igjen — kode-rotering er backlog.
-4. 🟡 **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav) — KODET
-   + DEPLOYET 2026-08-02 (kveld), venter telefontest. Modellen
+4. ✅ **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav) — GODKJENT
+   2026-08-02 (sen kveld): Brage slettet en abonnert testbruker på
+   telefon og bekreftet selv i Stripe at abonnement + kunde var borte
+   («Alt funker her nå!»). Modellen
    (spenningen bokføring vs GDPR, flagget i PAYMENTS.md): ANONYMISER,
    IKKE UTRADER — profilraden består som «Slettet bruker»-spøkelse
    (payment-radene peker på den med FK uten cascade, og laginnhold
@@ -310,7 +319,7 @@ UPDATE content_reports SET status = 'resolved', resolved_at = now(),
   resolution_note = '…' WHERE id = '…';
 ```
 
-### 📱 V1-hygiene del 2 — telefontest (⏳ VENTER — Metro-reload holder; bruk en TESTKONTO, ikke Brage-kontoen!)
+### 📱 V1-hygiene del 2 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 sen kveld — «Alt funker her nå!»; testbruker MED abonnement slettet, Stripe-siden verifisert av Brage. Punkt 7, vilkårs-TODO-ene, står ÅPENT)
 
 **NB: kontosletting er ekte og kan ikke angres — test med en
 testbruker.** Testbrukeren bør gjerne ha: et innlegg, en kommentar,
