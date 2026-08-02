@@ -162,9 +162,18 @@ med to justeringer, se testseksjonen under). Delbar lagkassa-lenke er
 omfordelt: web-delen → nettside-prosjektet (etter sporet),
 app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 (PAYMENTS.md §Åpne beslutninger + fasetabellen):
-1. **Brage-avhengig (eksternt, si fra tidlig):** Heia juridisk enhet
-   (ENK/AS — trengs for live Stripe-konto) · regnskapsfører om MVA på
-   Heia-andelen · live-nøkler (aktivere ekte Stripe-konto).
+1. **Brage-avhengig (eksternt, si fra tidlig):** Heia juridisk enhet —
+   **AVGJORT 2026-08-02: AS** (stiftes nå; regnskapsfører velges først
+   og svarer på MVA i samme løp) · live-nøkler (aktivere ekte
+   Stripe-konto — venter på AS-et).
+   **TestFlight-beslutning (2026-08-02): venter IKKE på AS-et** — Apple
+   Developer som privatperson nå (99 USD/år, hello@heiaapp.no),
+   konverteres til Heia AS (D-U-N-S) før offentlig lansering; apper/
+   TestFlight-historikk overlever. Rekkefølgen for TestFlight: native-
+   rundens steg 0 FØRST (bundle-ID `no.heiaapp.heia` — permanent per
+   app-oppføring ved første opplasting!) → Associated Domains + heia://
+   → heiaapp.no steg 1 (AASA med NY bundle-ID) → arkiver + last opp →
+   intern TestFlight (ingen review for interne testere).
 2. **Kode/ops (Claude):** live webhook-endepunkter + secrets · portal-
    konfig i live · re-onboarding av Ridabu med live-KYC · refund-/
    disputepolicy som tekst · statement descriptor-standard ·

@@ -160,11 +160,20 @@ lagmedlemmer, hovedtall = det laget får · «Min støtte» bor på Profil
 («Lagkasse-admin»), ALDRI på personlig profil · domenet er **heiaapp.no**
 (Brage eier det — bunken i `docs/HEIAAPP-NO.md`).
 
+**Avgjort 2026-08-02 (Brage): Heia juridisk enhet = AS.** Stiftes nå
+(regnskapsfører velges først og svarer på MVA-spørsmålet i samme løp).
+**TestFlight-veien (samme dag):** Apple Developer-medlemskap som
+PRIVATPERSON nå (TestFlight venter ikke på AS-et) → konverteres til
+Heia AS (krever D-U-N-S) FØR offentlig App Store-lansering — apper og
+TestFlight-historikk overlever konverteringen; selger-navnet er det
+eneste som bytter.
+
 **Avgjøres før prod (fase 6):** MVA på Heia-andelen (regnskapsfører — kan
-i teorien justere 19-kroners-økonomien, ikke kommunikasjonen) · Heia
-juridisk enhet · refund-/disputepolicy som tekst · vilkår + personvern ·
+i teorien justere 19-kroners-økonomien, ikke kommunikasjonen) ·
+refund-/disputepolicy som tekst · vilkår + personvern ·
 statement descriptor-standard · varslingsflyt ved lagavvikling · endelig
-bundle-ID (placeholder i dag — se HEIAAPP-NO.md steg 0).
+bundle-ID (placeholder i dag — se HEIAAPP-NO.md steg 0; MÅ byttes før
+første TestFlight-opplasting, bundle-ID er permanent per app-oppføring).
 
 **Utsatt:** klubbadmin-domene · klubbmerge-verktøy · Vipps · engangs-
 betalinger · flere land · payout-rapportering.
