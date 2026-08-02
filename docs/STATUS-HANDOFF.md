@@ -63,15 +63,28 @@ commits. GJENSTÅR I FASE 6: native-runden (bundle-ID FØRST, så
 Associated Domains + heia:// + AASA-oppdatering), vilkårs-TODO-ene,
 e-postvarselet (Resend), AS/Apple-løpet hos Brage. Dette er
 STRIPE-sporet (fase 6), IKKE nettside-prosjektet.**
-**APPLE DEVELOPER: BETALT OG SENDT 2026-08-02 (natt) —
-`Enrollment ID 9XA5DFCLD7`, Individual, kr 779/år med auto-fornyelse,
-Apple-konto = hello@heiaapp.no. Status «pending», Apple oppgir inntil
-48 t. Kvittering + godkjenning lander i hello@heiaapp.no. NÅR
-GODKJENNINGEN KOMMER: App Store Connect → Agreements → godta
-GRATIS-app-avtalen; Paid Apps/bank/skatt skal IKKE settes opp (Heia
-tar betalt via Stripe utenfor IAP). Konvertering til Heia AS gjøres
-senere via Apple Developer Support (krever D-U-N-S) — Team ID, apper
-og TestFlight-historikk overlever; reserveløsning er app transfer.**
+**🍎 APPLE DEVELOPER: GODKJENT 2026-08-02 (samme døgn som innsendt!) —
+Individual, hello@heiaapp.no, kr 779/år auto-fornyelse, Enrollment ID
+9XA5DFCLD7. Konvertering til Heia AS senere via Apple Developer
+Support (krever D-U-N-S) — Team ID, apper og TestFlight-historikk
+overlever; reserveløsning er app transfer.**
+**▶️ NESTE SAMTALE = NATIVE-RUNDEN (Brages valg — «vi kan ta dette nå
+i neste samtale»). Rekkefølgen er LÅST (bundle-ID er permanent per
+app-oppføring fra første opplasting!):
+(0) App Store Connect → Agreements → godta GRATIS-app-avtalen først;
+Paid Apps/bank/skatt skal IKKE settes opp (Stripe utenfor IAP).
+(1) Bundle-ID-bytte til `no.heiaapp.heia` (i dag RN-placeholder) —
+se docs/HEIAAPP-NO.md steg 0.
+(2) Associated Domains (applinks:heiaapp.no) + heia://-URL-skjema.
+(3) AASA-filen i web/ oppdateres med EKTE Team ID + ny bundle-ID
+(Team ID finnes nå i Apple-kontoen) → PR til main (AASA serveres fra
+Vercel — MERK: vilkårs-/personvernendringene fra 2026-08-02 ligger
+også på Brage-grenen og går live i samme merge).
+(4) Arkiver + last opp → INTERN TestFlight (ingen review for interne
+testere; V1-hygiene kreves ikke for intern — barene står).
+NB for Claude i neste samtale: native-arbeid = Xcode hos Brage med
+guiding; ALDRI pod install/build i bakgrunnen mens appen kjører
+(se minnet feedback_dev_environment).**
 **VILKÅR + PERSONVERN ER FERDIGE 2026-08-02 (natt) — tre beslutninger
 LÅST av Brage: (a) aldersgrense = 13 ÅR (under 13 via foresattes
 konto); (b) refusjon = 14 DAGERS ANGRERETT på nytegning + ALLTID
