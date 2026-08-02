@@ -35,6 +35,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     return true
   }
 
+  // MARK: - Deep links (heia://-skjemaet + Universal Links fra heiaapp.no)
+
+  // heia:// — «Åpne Heia-appen»-knappen på landingssidene (web/betaling).
+  func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    RCTLinkingManager.application(app, open: url, options: options)
+  }
+
+  // Universal Links — krever applinks:heiaapp.no i entitlements + AASA på domenet.
+  func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    RCTLinkingManager.application(application, continue: userActivity, restorationHandler: restorationHandler)
+  }
+
   // MARK: - Push notifications (APNs → @react-native-community/push-notification-ios)
   //
   // De tre RNCPushNotificationIOS-kallene under speiler klassemetodene i

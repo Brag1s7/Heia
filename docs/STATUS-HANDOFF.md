@@ -68,22 +68,50 @@ Individual, hello@heiaapp.no, kr 779/år auto-fornyelse, Enrollment ID
 9XA5DFCLD7. Konvertering til Heia AS senere via Apple Developer
 Support (krever D-U-N-S) — Team ID, apper og TestFlight-historikk
 overlever; reserveløsning er app transfer.**
-**▶️ NESTE SAMTALE = NATIVE-RUNDEN (Brages valg — «vi kan ta dette nå
-i neste samtale»). Rekkefølgen er LÅST (bundle-ID er permanent per
-app-oppføring fra første opplasting!):
-(0) App Store Connect → Agreements → godta GRATIS-app-avtalen først;
-Paid Apps/bank/skatt skal IKKE settes opp (Stripe utenfor IAP).
-(1) Bundle-ID-bytte til `no.heiaapp.heia` (i dag RN-placeholder) —
-se docs/HEIAAPP-NO.md steg 0.
-(2) Associated Domains (applinks:heiaapp.no) + heia://-URL-skjema.
-(3) AASA-filen i web/ oppdateres med EKTE Team ID + ny bundle-ID
-(Team ID finnes nå i Apple-kontoen) → PR til main (AASA serveres fra
-Vercel — MERK: vilkårs-/personvernendringene fra 2026-08-02 ligger
-også på Brage-grenen og går live i samme merge).
-(4) Arkiver + last opp → INTERN TestFlight (ingen review for interne
-testere; V1-hygiene kreves ikke for intern — barene står).
-NB for Claude i neste samtale: native-arbeid = Xcode hos Brage med
-guiding; ALDRI pod install/build i bakgrunnen mens appen kjører
+**▶️ NATIVE-RUNDEN ER I GANG (fil-siden GJORT 2026-08-02; venter på
+Brages Xcode-/browser-steg). Rekkefølgen er LÅST (bundle-ID er
+permanent per app-oppføring fra første opplasting!):
+✅ FIL-SIDEN (committet på Brage-grenen): bundle-ID
+`no.heiaapp.heia` i project.pbxproj (begge configs), NY
+`ios/Heia2/Heia2.entitlements` (applinks:heiaapp.no +
+aps-environment=development — push var UMULIG med gratiskontoen,
+nå følger den med) koblet via CODE_SIGN_ENTITLEMENTS, `heia://`-
+URL-skjema i Info.plist, RCTLinkingManager-videresending (open url +
+continue userActivity) i AppDelegate.swift, AASA-filens bundle-del
+oppdatert. INGEN pod install nødvendig — null nye pods, bare rebuild.
+✅ XCODE-SIDEN GJORT 2026-08-02 (kveld): hello@heiaapp.no lagt til i
+Xcode, NYTT team valgt på target Heia2 — **Team ID `D86MWL7V3S`**
+(«Brage Lothe Weium», Individual). Bundle-ID + Associated Domains +
+Push vises i Signing & Capabilities, Apple Development-sertifikat
+utstedt, Xcode skrev D86MWL7V3S inn i pbxproj selv. AASA har nå EKTE
+appID `D86MWL7V3S.no.heiaapp.heia` → **PR til main opprettet
+2026-08-02** (Brage merger selv; AASA serveres fra Vercel — MERK:
+vilkårs-/personvern- og e-postsporet-endringene går live i samme
+merge). BESLUTNING (Brage): «Heia2»-navnene internt (target/mappe/
+prosjekt) blir STÅENDE til etter TestFlight — ingen bruker ser dem;
+kun bundle-ID er permanent, og den er ren.
+GJENSTÅR (Brage kjører, Claude guider):
+(a) Xcode viste «Device 'Brage sin iPhone' isn't registered» → trykk
+**Register Device** (trengs for kjøring på egen telefon; ikke for
+TestFlight-opplasting).
+(b) App Store Connect (hello@heiaapp.no) → Agreements → godta
+GRATIS-app-avtalen hvis ikke gjort; Paid Apps/bank/skatt skal IKKE
+settes opp.
+(c) Merge PR-en → verifiser at heiaapp.no serverer AASA med ny appID.
+(d) App-oppføring i App Store Connect (My Apps → + → bundle-ID
+`no.heiaapp.heia`; NB app-NAVNET «Heia» kan være opptatt globalt —
+ha alternativ klar) → Arkiver + last opp → INTERN TestFlight (ingen
+review for interne testere; V1-hygiene kreves ikke for intern).
+NB: ny bundle-ID = NY app på telefonen — gammel placeholder-app kan
+slettes, og innlogging må gjøres på nytt i den nye.
+PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
+NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
+APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for
+Xcode-debug, api.push.apple.com for TestFlight) — se
+`_shared/apns.ts`. JS-Linking-lytteren (naviger til Lagkassa ved
+heia://) er også restanse — ren JS, tas etter TestFlight.
+NB for Claude: native-arbeid = Xcode hos Brage med guiding; ALDRI
+pod install/build i bakgrunnen mens appen kjører
 (se minnet feedback_dev_environment).**
 **VILKÅR + PERSONVERN ER FERDIGE 2026-08-02 (natt) — tre beslutninger
 LÅST av Brage: (a) aldersgrense = 13 ÅR (under 13 via foresattes
