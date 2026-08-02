@@ -39,6 +39,7 @@ import {LagkassaScreen} from '../screens/LagkassaScreen';
 import {CommentsScreen} from '../screens/CommentsScreen';
 import {WelcomeIntentScreen} from '../screens/WelcomeIntentScreen';
 import {AuthScreen} from '../screens/AuthScreen';
+import {VerifyEmailScreen} from '../screens/VerifyEmailScreen';
 import {JoinTeamCodeScreen} from '../screens/JoinTeamCodeScreen';
 import {CreateTeamScreen} from '../screens/CreateTeamScreen';
 import {KalenderScreen} from '../screens/KalenderScreen';
@@ -222,6 +223,10 @@ function OnboardingStackNavigator() {
         options={{contentStyle: {backgroundColor: colors.stadium}}}
       />
       <OnboardingNav.Screen name="Auth" component={AuthScreen} />
+      <OnboardingNav.Screen
+        name="VerifyEmail"
+        component={VerifyEmailScreen}
+      />
       <OnboardingNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}

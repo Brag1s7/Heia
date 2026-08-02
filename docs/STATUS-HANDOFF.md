@@ -80,7 +80,9 @@ refusjon ved feiltrekk + ingen refusjon av gjennomførte måneder;
 avtalepart eller kontaktperson — sidene bruker plassholderne
 `[JURIDISK SELSKAPSNAVN]`, `[ORGANISASJONSNUMMER]`,
 `[FORRETNINGSADRESSE]` til AS-et er registrert. Supabase-regionen ble
-verifisert samtidig (eu-central-1 via `x-sb-edge-region`) → nytt
+verifisert samtidig (West Europe (London) — Storbritannia,
+adekvansbeslutning; RETTET fra eu-central-1: edge-headeren viser bare
+edge-noden, `supabase projects list` er sannheten) → nytt
 avsnitt «Hvor opplysningene lagres». Funn underveis: appen lenket
 INGEN steder til vilkårene — nå er «Vilkår for bruk» + «Personvern»
 egne rader på Profil (over «Om Heia»), og registreringsskjermen har
@@ -88,14 +90,40 @@ samtykkelinjen «Ved å opprette konto godtar du vilkårene og
 personvernerklæringen. Du må være minst 13 år.» med trykkbare lenker
 (ny `src/shared/links.ts`). ENESTE GJENSTÅENDE: de tre plassholderne
 — MÅ erstattes i BEGGE filer før App Store-innsending.**
-**NESTE: (3) RESEND-OPPSETT — Brage oppretter gratis konto +
-API-nøkkel; Claude kobler e-postvarsel per rapport (Edge Function +
-database-webhook på content_reports, ~15 min) TIL hello@heiaapp.no.
-NB: Resend-kontoen skal SENERE også bli Supabase auth-SMTP (innebygd
-mailer er dev-only/rate-limited — MÅ byttes før ekstern TestFlight;
-utsending fra @heiaapp.no krever Resend-DNS-poster i Uniweb-panelet —
-samme øvelse som Vercel-postene). Deretter: native-runden når
-Apple-kontoen er godkjent (bundle-ID `no.heiaapp.heia` FØRST).** Fase 6-eksterne
+**E-POSTSPORET BYGGET OG DEPLOYET 2026-08-02 (natt) — tre ting i én
+runde: (a) RAPPORTVARSEL: migrasjon `00043` i prod (trigger
+`notify_on_content_report` på content_reports — pg_net + vault-idiomet
+fra 00022, gjenbruker `project_url`/`service_role_key`-secretene) +
+Edge Function `report-notify` deployet (Bearer-sjekk mot service key
+som push-fanout; Resend → hello@heiaapp.no; hopper pent over hvis
+RESEND_API_KEY mangler). VENTER KUN på at nøkkelen settes:
+`supabase secrets set RESEND_API_KEY=re_…` (Brage har nøkkelen).
+Virker UTEN domene-DNS (mottaker = Resend-kontoens egen adresse).
+(b) FUNN: appen hadde INGEN «glemt passord»-flyt (permanent utestengt
+ved glemt passord) og INGEN e-post ved registrering
+(mailer_autoconfirm var på). Brages beslutning: BEKREFTELSESKODE ved
+signup. Bygget: `VerifyEmailScreen` (6-sifret OTP — signup-bekreftelse
+OG recovery med nytt passord; ingen deep links nødvendig),
+«Glemt passordet?»-lenke på AuthScreen, 4 nye context-metoder
+(verifyOtp signup/recovery + resend + resetPasswordForEmail).
+(c) AUTH-CONFIG versjonert i config.toml og pushet med
+`supabase config push`: enable_confirmations=true (BEKREFTET i prod:
+mailer_autoconfirm=false), norske OTP-maler i `supabase/templates/`
+({{ .Token }}, ikke lenke), otp_length 8→6, max_frequency 1m0s.
+NB: til SMTP er på gjelder innebygd-mailerens grense ~2 E-POSTER/TIME
+— nok til Brages egen testing, IKKE til ekstern TestFlight.
+GJENSTÅR FØR EKSTERN TESTFLIGHT: (1) RESEND_API_KEY-secreten (2 min),
+(2) verifisere heiaapp.no i Resend (DNS-poster i Uniweb — samme øvelse
+som Vercel-postene) og så avkommentere [auth.email.smtp]-blokken i
+config.toml + heve email_sent-raten og pushe config på nytt — da
+sender auth-e-post fra «Heia <hello@heiaapp.no>».
+TELEFONTEST (Metro-reload; husk 2/t-grensen): (1) registrer NY
+testadresse → «Sjekk e-posten din»-skjerm → kod inn → rett inn i
+appen; (2) «Glemt passordet?» på innlogging (e-post utfylt) →
+kodeskjerm + nytt passord → innlogget; (3) etter nøkkelen er satt:
+rapporter et innlegg → e-post i hello@heiaapp.no.
+DERETTER: native-runden når Apple-kontoen er godkjent (bundle-ID
+`no.heiaapp.heia` FØRST).** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
@@ -325,7 +353,7 @@ retningslinjer — **punkt 1–3 er BYGGET (migrasjon `00041` deployet)**:
    angrerett + alltid feiltrekk-refusjon + ingen refusjon av
    gjennomførte måneder**, og **ingen personnavn** — juridisk enhet
    står som plassholdere til AS-et finnes. Samtidig lukket to hull:
-   Supabase-regionen er verifisert (eu-central-1) så
+   Supabase-regionen er verifisert (London/Storbritannia) så
    «Hvor opplysningene lagres» kunne skrives, og APPEN LENKER NÅ TIL
    SIDENE (Profil-rader + samtykkelinje på registrering — den fantes
    ikke før, og vilkårsteksten påstod at man godtok dem).
