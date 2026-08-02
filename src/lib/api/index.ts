@@ -37,8 +37,14 @@ export {
   getSupportActivationStatus,
   submitClubClaim,
   startStripeOnboarding,
+  getSupportOffering,
+  getMySupportSubscription,
+  startSupportCheckout,
   type SupportActivationState,
   type SupportActivationStatus,
+  type SupportOffering,
+  type MySupportStatus,
+  type MySupportSubscription,
 } from './payments';
 export {
   getSeasonStats,

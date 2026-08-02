@@ -389,6 +389,18 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# Checkout startes kun av innloggede lagmedlemmer — funksjonen
+# sjekker selv medlemskapet mot memberships (fase 4).
+[functions.stripe-checkout]
+enabled = true
+verify_jwt = true
+
+# Landingsside for Checkout-sesjonens success/cancel-redirect
+# (nettleser uten JWT). Statisk tekst, leser ingen data.
+[functions.stripe-checkout-return]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

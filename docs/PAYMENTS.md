@@ -12,7 +12,7 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
 | 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
 | 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ FERDIG + **GODKJENT av Brage 2026-08-01**: DB-verifisert **19/19** + E2E-telefontest bestått **×2** (Ridabu: orgnr-korrigert godkjenning; Stange: avslag → ny søknad → godkjenning → onboarding → AKTIV; Stange-testdata ryddet etterpå). Se «Fase 3» nederst |
-| 4 | Checkout-flyten i appen + Universal Links | ⏳ NESTE — **GO gitt 2026-08-01** |
+| 4 | Checkout-flyten i appen + Universal Links | 🟡 KODET + DEPLOYET + DB-VERIFISERT **11/11** 2026-08-02 — venter Brages telefontest (**første sandbox-checkout = pengevei-verifiseringen fra fase 2-restansen**) + review. Se «Fase 4» nederst |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
 
@@ -395,6 +395,112 @@ retning — nivåene er dokumentert: (1) appens AKTIV-tilstand finnes alt,
 (3) Universal Links med eget domene (fase 4). NB: kun onboardingen kan
 flyttes inn i appen — SELVE BETALINGEN skal forbli ekstern Safari
 (Apple 3.2.2(iv), låst).
+
+## Fase 4 — checkout i appen (2026-08-02) — deployet + DB-verifisert 11/11
+
+**Migrasjon `00039_support_checkout.sql` (✅ deployet):**
+- `create_support_offering(team_space_id, amount_minor, fee_model, fee_bps,
+  club_fixed_minor, created_by)` — **KUN service role/SQL-editor** (REVOKE-
+  regimet fra approve_club_claim; verifisert i test 11). Eneste vei til en
+  offering: arkiverer aktiv versjon + setter inn neste versjon atomisk
+  (advisory-lås per lag vinner versjonsracet). Eksisterende abonnementer
+  beholder sin offering — aldri stille migrering (låst invariant).
+- `get_support_offering_for_team_space(ts_id)` — klient-RPC for
+  SupportScreen, gatet på LAGMEDLEMSKAP (alle medlemmer — foreldrene ER
+  supporterne; ikke-medlem/uinnlogget → NULL, probe-vernet). Returnerer
+  KUN pris/valuta/intervall + mottakerens juridiske navn (offentlig
+  registerinfo — tillitssignal). **Splitten lekker aldri** (test 5 sjekker
+  eksplisitt at fee_*-feltene ikke finnes i svaret). `available=false` med
+  `reason` skiller «klubben ikke aktivert» fra «Heia har ikke priset laget»
+  (ops-restanse) — samme CTA i appen, skilt i data for feilsøking.
+
+**Edge Function `stripe-checkout` (✅ deployet, `verify_jwt = true`):**
+- Gatet på aktivt LAGMEDLEMSKAP (ingen rollegate — alle kan støtte laget
+  sitt) + hele kapabilitetskjeden (aktiv link + verifisert enhet + AKTIV
+  konto med charges_enabled + provider_account_id). Hard vakt: ingen
+  checkout uten entydig aktiv mottaker.
+- **Fase 2-kontrakten implementert:** `support_subscriptions`-raden
+  opprettes FØR redirect (checkout_pending), `metadata.support_subscription_id`
+  settes på BÅDE sesjonen og `subscription_data`, sesjons-id-en skrives på
+  raden før URL-en returneres.
+- Stripe-objekter provisjoneres LAT med Idempotency-Keys bundet til våre
+  rader (aldri doble objekter): product+price per offering (write-once på
+  offering-raden, `heia-offprod-/heia-offprice-<offering_id>`), én
+  plattformkunde per bruker (`heia-cust-<user_id>`, upsert + reselect).
+- Checkout-sesjonen bruker fase 0-spikens eksakte `subscription_data`
+  (on_behalf_of + transfer_data.destination + application_fee_percent =
+  fee_bps/100) — splitten hentes fra AKTIV offering server-side; klienten
+  kan aldri velge pris.
+- **«Prøv igjen»-flyten:** en checkout_pending-rad GJENBRUKES — gammel
+  sesjon utløpes best-effort, ny sesjon skrives BETINGET (fortsatt
+  checkout_pending + uten provider_subscription_id); har den gamle
+  sesjonen rukket å fullføre, utløpes den NYE og brukeren får «du støtter
+  allerede» (aldri dobbel tegning). `incomplete` blokkerer ny checkout
+  (409) til Stripe har konkludert — to levende Stripe-abonnementer skal
+  ikke kunne oppstå.
+- **Webhook-patch (fase 4):** `checkout.session.expired` abandonerer nå
+  KUN når den utløpte sesjonen er radens GJELDENDE sesjon — den gamle
+  sesjonens expiry (funnet via metadata) kan ikke lenger feilmerke en rad
+  som har fått ny sesjon. Redeployet sammen med checkout-funksjonen.
+
+**Edge Function `stripe-checkout-return` (✅ deployet, `verify_jwt = false`):**
+tekst-landingsside for success/cancel (fase 3-funnet: HTML omskrives på
+funksjonsdomenet). Success sier «behandles», aldri «bekreftet» — retur
+beviser ingenting; webhookene flytter status. Røyktestet utenfra med GET
+(charset overlever); checkout uten JWT → 401.
+
+**Appen:**
+- `SupportScreen` er skrevet om fra mockup til ekte data: pris fra
+  offering-RPC-en (49/399-mockupen og «80 % til laget»-baren er FJERNET —
+  splitten er ulåst og aldri offentlig), én månedlig plan, mottakerens
+  juridiske navn under CTA-en. Tilstander: skeleton → «ikke helt klart
+  ennå» (uaktivert klubb) → tegneflate med CTA (kortlevd checkout-URL
+  hentes i klikkøyeblikket, åpnes i EKSTERN Safari — 3.2.2(iv), låst) →
+  «Fullfør betalingen» (påbegynt tegning) → «DU STØTTER LAGET 💚»
+  (active/past_due; past_due forklarer at Stripe prøver igjen).
+  AppState-refetch når appen våkner fra Safari + pull-to-refresh.
+- `payments.ts`: `getSupportOffering`, `getMySupportSubscription` (RLS:
+  egne rader), `startSupportCheckout` (felles invokeForUrl-hjelper med
+  onboarding).
+
+**Pilot-offering (ops, 2026-08-02):** Ridabu G10
+(`43968783-1c03-456d-8de0-7a90913eab93`) har offering v1: 7900 øre/mnd,
+`bps`/2500 (75/25 — spike-rapportens robuste mekanikk). **PLASSHOLDER:
+endelig split er fortsatt ULÅST (fase 6) — endring = ny versjon via
+`create_support_offering`, aldri redigering.**
+
+**Ops-runbook (prising av lag — SQL-editor/service role):**
+```sql
+-- ny/endret pris eller split for et lag (arkiverer aktiv versjon):
+select create_support_offering('<team_space_id>', 7900, 'bps', 2500);
+-- fast klubbandel-modellen (dokumenterer intensjonen):
+select create_support_offering('<team_space_id>', 7900, 'fixed_club_amount', 2405, 6000);
+```
+NB: nytt PRISPUNKT krever ny avrundingssjekk i sandbox først (fase 0-funn:
+2405 bps × 7900 rundet OPP — kun verifisert for 79 kr).
+
+**DB-verifisering (2026-08-02): 11/11 PASS** — `verify-00039.sql` i
+`~/Documents/Heia-Stripe-Spike/` (selvforsynt, ruller alltid tilbake; kjørt
+mot prod-DB via management-API-ets query-endepunkt). Dekker: versjonering
+(v2 arkiverer v1, maks én aktiv), pris-oppslagets alle grener (medlem/
+ikke-medlem/uinnlogget/uaktivert/charges av/uten offering), split-lekkasje-
+sjekken og grants-vakten.
+
+**GJENSTÅR i fase 4 (før review):**
+1. **E2E-telefontest = pengevei-verifiseringen (fase 2-restansen, BESLUTTET):**
+   Brage åpner Støtt laget på Ridabu G10 → betaler med testkort
+   `4242 4242 4242 4242` i Safari → verifiser: transaksjonsrad med korrekt
+   frossen splitt (1975 øre fee / 5925 øre klubb), `provider_fee_minor` fra
+   balance transaction, abonnement → `active`, og at SupportScreen viser
+   «DU STØTTER LAGET» når appen våkner.
+2. **Domenet (Brages beslutning/kjøp — eneste eksterne blokkering):** trengs
+   for Universal Links + ordentlige landingssider. **Funn: Apple Pay krever
+   IKKE eget domene på Stripes hostede checkout** (domeneverifisering
+   gjelder kun innbygging på egen side) — domenet er dermed UX/lenke-sak,
+   ikke betalingsblokkering.
+3. **In-app-browser for onboarding (vurdering):** krever native rebuild
+   (ny dependency) — anbefaling: VENT til neste native-runde; ekstern
+   Safari fungerer og betalingen SKAL uansett være ekstern (låst).
 
 ## Miljøer og sikkerhet
 

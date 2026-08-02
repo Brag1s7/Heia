@@ -1,17 +1,36 @@
-import React, {useState} from 'react';
-import {View, Text, ScrollView, Pressable, StyleSheet, Image} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Image,
+  Alert,
+  AppState,
+  Linking,
+  RefreshControl,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
-import {BackBar, Button} from '../components';
+import {colors, typography, spacing, radius, fonts} from '../theme';
+import {BackBar, Button, Skeleton} from '../components';
 import {Check} from '../components/icons';
 import {useActiveTeam} from '../context';
+import {
+  getSupportOffering,
+  getMySupportSubscription,
+  startSupportCheckout,
+  type SupportOffering,
+  type MySupportSubscription,
+} from '../lib/api';
 
-type Plan = 'monthly' | 'yearly';
-
-const plans = {
-  monthly: {price: 49, label: 'Månedlig', period: '/mnd'},
-  yearly: {price: 399, label: 'Årlig', period: '/år', savings: 'Spar 33%'},
-} as const;
+/**
+ * «Støtt laget» (betalingssporet fase 4) — for ALLE lagmedlemmer.
+ * Prisen er data fra lagets aktive offering (aldri hardkodet, aldri
+ * split-tall — den er en ulåst kommersiell beslutning som bor server-side).
+ * Betalingen skjer i EKSTERN Safari på Stripes hostede checkout
+ * (Apple 3.2.2(iv), låst); status flyttes kun av webhookene, så skjermen
+ * refetcher når appen våkner igjen (retur beviser ingenting).
+ */
 
 const benefits = [
   'Støtter utstyr, cuper og sosiale arrangementer',
@@ -20,149 +39,246 @@ const benefits = [
   'Enkelt å starte, enkelt å avslutte',
 ];
 
+function formatAmount(amountMinor: number): string {
+  const kroner = Math.floor(amountMinor / 100);
+  const ore = amountMinor % 100;
+  return ore === 0 ? `${kroner} kr` : `${kroner},${String(ore).padStart(2, '0')} kr`;
+}
+
+function formatRenewal(iso: string): string {
+  return new Date(iso).toLocaleDateString('nb-NO', {
+    day: 'numeric',
+    month: 'long',
+  });
+}
+
 export function SupportScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedPlan, setSelectedPlan] = useState<Plan>('yearly');
-  const [loading, setLoading] = useState(false);
-  const {activeTeamSpace} = useActiveTeam();
+  const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
 
-  const teamName = activeTeamSpace?.displayName ?? 'Laget';
+  const [offering, setOffering] = useState<SupportOffering | null>(null);
+  const [mySub, setMySub] = useState<MySupportSubscription | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
-  const handleStart = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 1500);
+  const teamName = activeTeamSpace?.displayName ?? 'laget';
+
+  const load = useCallback(async () => {
+    if (!activeTeamSpaceId) return;
+    try {
+      const [off, sub] = await Promise.all([
+        getSupportOffering(activeTeamSpaceId),
+        getMySupportSubscription(activeTeamSpaceId),
+      ]);
+      setOffering(off);
+      setMySub(sub);
+      setLoadError(false);
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTeamSpaceId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Tilbake fra Safari (Stripe Checkout) → fersk status; webhooken rekker
+  // som regel å flytte abonnementet til active før brukeren er tilbake.
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') loadRef.current();
+    });
+    return () => sub.remove();
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
+  // Checkout-URL-en er kortlevd — hentes alltid fersk i klikkøyeblikket.
+  const handleSupport = useCallback(async () => {
+    if (!activeTeamSpaceId || checkoutLoading) return;
+    setCheckoutLoading(true);
+    try {
+      const {url} = await startSupportCheckout(activeTeamSpaceId);
+      Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Kunne ikke starte betalingen', e?.message ?? 'Prøv igjen om litt.');
+      // «Du støtter allerede»-svaret betyr at statusen vår er utdatert.
+      loadRef.current();
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }, [activeTeamSpaceId, checkoutLoading]);
+
+  const priceLabel =
+    offering?.available ? `${formatAmount(offering.amountMinor)}/mnd` : '';
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <View style={styles.section}>
+          <View style={styles.skeletonCard}>
+            <Skeleton width={160} height={14} />
+            <Skeleton height={14} />
+            <Skeleton width="70%" height={14} />
+          </View>
+        </View>
+      );
+    }
+
+    if (loadError) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.stateTitle}>Fikk ikke hentet statusen</Text>
+          <Text style={styles.stateBody}>Sjekk nettet og prøv igjen.</Text>
+          <Button title="Prøv igjen" variant="secondary" onPress={load} />
+        </View>
+      );
+    }
+
+    // Du støtter alt laget — takke-tilstanden eier skjermen.
+    if (mySub?.status === 'active' || mySub?.status === 'past_due') {
+      return (
+        <View style={styles.section}>
+          <View style={styles.activeCard}>
+            <Text style={styles.activePill}>DU STØTTER LAGET</Text>
+            <Text style={styles.activeTitle}>Tusen takk! 💚</Text>
+            <Text style={styles.stateBody}>
+              Du gir {teamName} et fast bidrag
+              {offering?.available ? ` på ${priceLabel}` : ''}. Det betyr mer
+              enn du tror — både på og utenfor banen.
+            </Text>
+            {mySub.status === 'past_due' ? (
+              <Text style={styles.pastDueText}>
+                Siste betaling gikk ikke gjennom. Stripe prøver igjen
+                automatisk — sjekk gjerne kortet ditt.
+              </Text>
+            ) : mySub.currentPeriodEnd ? (
+              <Text style={styles.renewalText}>
+                Fornyes {formatRenewal(mySub.currentPeriodEnd)}
+              </Text>
+            ) : null}
+            <Text style={styles.hint}>
+              Endring og avslutning av støtten kommer i neste oppdatering av
+              Heia.
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    // Klubben er ikke koblet til utbetaling (eller mangler pris) ennå.
+    if (!offering || !offering.available) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.stateTitle}>Ikke helt klart ennå</Text>
+          <Text style={styles.stateBody}>
+            Klubben er ikke koblet til utbetaling ennå, så støtten kan ikke
+            starte riktig enda. Trenere og lagledere kan sette det i gang fra
+            Laginnstillinger → «Støtte fra supportere».
+          </Text>
+        </View>
+      );
+    }
+
+    // Vanlig tegneflate (også «fullfør betalingen» for en påbegynt tegning).
+    const pending =
+      mySub?.status === 'checkout_pending' || mySub?.status === 'incomplete';
+
+    return (
+      <>
+        {/* Fordeler */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Hvorfor støtte?</Text>
+          {benefits.map((b, i) => (
+            <View key={i} style={styles.benefitRow}>
+              <Check size={17} color={colors.heiaInk} strokeWidth={2.4} />
+              <Text style={styles.benefitText}>{b}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Prisen — ett månedlig beløp, rett fra offeringen */}
+        <View style={styles.section}>
+          <View style={styles.priceCard}>
+            <Text style={styles.priceLabel}>Månedlig støtte</Text>
+            <Text style={styles.priceValue}>{formatAmount(offering.amountMinor)}</Text>
+            <Text style={styles.pricePeriod}>per måned</Text>
+          </View>
+        </View>
+
+        {/* CTA */}
+        <View style={styles.ctaSection}>
+          {pending && (
+            <Text style={styles.pendingNote}>
+              Har du nettopp betalt? Da oppdaterer statusen seg her om et lite
+              øyeblikk.
+            </Text>
+          )}
+          <Button
+            title={
+              pending
+                ? 'Fullfør betalingen'
+                : `Støtt laget · ${priceLabel}`
+            }
+            variant="primary"
+            size="lg"
+            onPress={handleSupport}
+            loading={checkoutLoading}
+            style={styles.ctaButton}
+          />
+          <Text style={styles.trustLine}>
+            Avslutt når som helst. Ingen binding.
+          </Text>
+          <Text style={styles.recipientLine}>
+            Betales trygt hos Stripe i Safari · utbetales til{' '}
+            {offering.recipientLegalName}
+          </Text>
+        </View>
+      </>
+    );
   };
-
-  const plan = plans[selectedPlan];
 
   return (
     <View style={styles.screen}>
       <BackBar title="Støtt laget" />
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.heia}
+          />
+        }
       >
-      {/* Illustrasjon */}
-      <View style={styles.hero}>
-        <View style={styles.iconCircle}>
-          <Image
-            source={require('../assets/images/logo-icon.png')}
-            style={styles.logoIcon}
-            resizeMode="contain"
-          />
-        </View>
-        <Text style={styles.heading}>Støtt {teamName}</Text>
-        <Text style={styles.subheading}>
-          Mesteparten av ditt bidrag går direkte til laget
-        </Text>
-      </View>
-
-      {/* Fordeling */}
-      <View style={styles.section}>
-        <View style={styles.splitBar}>
-          <View style={styles.splitTeam}>
-            <Text style={styles.splitTeamText}>80% til laget</Text>
+        {/* Illustrasjon */}
+        <View style={styles.hero}>
+          <View style={styles.iconCircle}>
+            <Image
+              source={require('../assets/images/logo-icon.png')}
+              style={styles.logoIcon}
+              resizeMode="contain"
+            />
           </View>
-          <View style={styles.splitHeia}>
-            <Text style={styles.splitHeiaText}>20%</Text>
-          </View>
+          <Text style={styles.heading}>Støtt {teamName}</Text>
+          <Text style={styles.subheading}>
+            Mesteparten av ditt bidrag går direkte til laget
+          </Text>
         </View>
-        <Text style={styles.splitCaption}>
-          {teamName} mottar størstedelen av bidraget ditt. Resten dekker drift av
-          Heia-plattformen.
-        </Text>
-      </View>
 
-      {/* Fordeler */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Hvorfor støtte?</Text>
-        {benefits.map((b, i) => (
-          <View key={i} style={styles.benefitRow}>
-            <Check size={17} color={colors.heiaInk} strokeWidth={2.4} />
-            <Text style={styles.benefitText}>{b}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Plan-valg */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Velg plan</Text>
-        <View style={styles.planRow}>
-          <PlanCard
-            label={plans.monthly.label}
-            price={`${plans.monthly.price} kr`}
-            period={plans.monthly.period}
-            selected={selectedPlan === 'monthly'}
-            onPress={() => setSelectedPlan('monthly')}
-          />
-          <PlanCard
-            label={plans.yearly.label}
-            price={`${plans.yearly.price} kr`}
-            period={plans.yearly.period}
-            badge={plans.yearly.savings}
-            selected={selectedPlan === 'yearly'}
-            onPress={() => setSelectedPlan('yearly')}
-          />
-        </View>
-      </View>
-
-      {/* CTA */}
-      <View style={styles.ctaSection}>
-        <Button
-          title={`Start støtte · ${plan.price} kr${plan.period}`}
-          variant="primary"
-          size="lg"
-          onPress={handleStart}
-          loading={loading}
-          style={styles.ctaButton}
-        />
-        <Text style={styles.trustLine}>
-          Avslutt når som helst. Ingen binding.
-        </Text>
-      </View>
+        {renderContent()}
       </ScrollView>
     </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Plan-kort
-// ---------------------------------------------------------------------------
-function PlanCard({
-  label,
-  price,
-  period,
-  badge,
-  selected,
-  onPress,
-}: {
-  label: string;
-  price: string;
-  period: string;
-  badge?: string;
-  selected: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        styles.planCard,
-        selected && styles.planCardSelected,
-      ]}
-    >
-      {badge && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
-        </View>
-      )}
-      <Text style={[styles.planLabel, selected && styles.planLabelSelected]}>
-        {label}
-      </Text>
-      <Text style={[styles.planPrice, selected && styles.planPriceSelected]}>
-        {price}
-      </Text>
-      <Text style={styles.planPeriod}>{period}</Text>
-    </Pressable>
   );
 }
 
@@ -212,40 +328,19 @@ const styles = StyleSheet.create({
     ...typography.heading3,
     marginBottom: spacing.lg,
   },
+  skeletonCard: {
+    gap: spacing.md,
+  },
 
-  // Fordelings-bar
-  splitBar: {
-    flexDirection: 'row',
-    height: 40,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
+  // Tilstandstekster (feil / ikke aktivert)
+  stateTitle: {
+    ...typography.heading3,
+    marginBottom: spacing.sm,
   },
-  splitTeam: {
-    flex: 80,
-    backgroundColor: colors.heia,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // A v2-regel: mintfyll bærer heiaDeep-tekst.
-  splitTeamText: {
-    ...typography.bodySmall,
-    fontWeight: '700',
-    color: colors.heiaDeep,
-  },
-  splitHeia: {
-    flex: 20,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  splitHeiaText: {
-    ...typography.caption,
+  stateBody: {
+    ...typography.body,
     color: colors.textSecondary,
-  },
-  splitCaption: {
-    ...typography.bodySmall,
-    color: colors.textTertiary,
+    marginBottom: spacing.md,
   },
 
   // Fordeler
@@ -260,59 +355,67 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Plan-kort
-  planRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  planCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
+  // Pris — mint tegneflate, prisen som display-tall (A v2)
+  priceCard: {
+    backgroundColor: colors.heiaSoft,
     borderRadius: radius.lg,
     borderWidth: 2,
-    borderColor: colors.borderSubtle,
+    borderColor: colors.heia,
     padding: spacing.xl,
     alignItems: 'center',
-    ...shadows.card,
   },
-  planCardSelected: {
-    borderColor: colors.heia,
-    backgroundColor: colors.heiaSoft,
-  },
-  badge: {
-    backgroundColor: colors.heia,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-    marginBottom: spacing.sm,
-  },
-  badgeText: {
-    ...typography.caption,
-    color: colors.heiaDeep,
-    fontWeight: '700',
-  },
-  planLabel: {
+  priceLabel: {
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginBottom: spacing.xs,
   },
-  planLabelSelected: {
-    color: colors.textPrimary,
-  },
-  // Prisen er et display-tall (A v2): Nunito, vekten ligger i fontfila.
-  planPrice: {
-    fontSize: 22,
-    letterSpacing: -0.3,
+  priceValue: {
+    fontSize: 34,
+    letterSpacing: -0.5,
     fontFamily: fonts.display,
-    color: colors.textPrimary,
+    color: colors.heiaDeep,
   },
-  planPriceSelected: {
-    color: colors.textPrimary,
-  },
-  planPeriod: {
+  pricePeriod: {
     ...typography.caption,
     color: colors.textTertiary,
     marginTop: spacing.xs,
+  },
+
+  // Aktiv støtte
+  activeCard: {
+    backgroundColor: colors.heiaSoft,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  activePill: {
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    color: colors.heiaDeep,
+    backgroundColor: colors.heia,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  activeTitle: {
+    ...typography.heading2,
+  },
+  renewalText: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.heiaDeep,
+  },
+  pastDueText: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  hint: {
+    ...typography.bodySmall,
+    color: colors.textTertiary,
   },
 
   // CTA
@@ -324,9 +427,20 @@ const styles = StyleSheet.create({
   ctaButton: {
     width: '100%',
   },
+  pendingNote: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
   trustLine: {
     ...typography.bodySmall,
     color: colors.textTertiary,
     textAlign: 'center',
+  },
+  recipientLine: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
   },
 });

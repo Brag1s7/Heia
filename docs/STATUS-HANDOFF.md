@@ -1,21 +1,24 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-01 (natt). **NYESTE SPOR: 💳 BETALINGER — FASE 3
-ER FERDIG + GODKJENT (review tatt 2026-08-01: DB-verifisert 19/19 + E2E
-bestått ×2 — Ridabu IL aktivert med ekte orgnr 875661582 og består som
-pilotklubb; Stange-testrunden beviste avslagsgrenen og er RYDDET).
-NESTE: FASE 4 — checkout-flyten i appen. GO ER GITT — ny samtale kan
-starte rett på fase 4-arbeidet. Fase 4 åpner med: (1) domenebeslutningen
-(Universal Links + Apple Pay + landingsside — Brage velger/kjøper domene),
-(2) offering-oppsett + checkout (KONTRAKTEN i PAYMENTS.md §Fase 2 er
-bindende: subscription-rad FØR redirect + metadata på sesjon OG
-subscription_data), (3) pengevei-verifiseringen fra fase 2-restansen
-(invoice.paid → transaksjonsrad — første sandbox-checkout), (4) vurdere
-in-app-browser for onboarding (native rebuild; selve BETALINGEN forblir
-ekstern Safari — Apple 3.2.2(iv), låst). SupportScreen-mockupen (49/399 kr)
-skal ENDELIG få ekte offering-data i denne fasen.** Se «💳 BETALINGSSPORET»
-rett under + `docs/PAYMENTS.md` (sannhetskilden for alle
-betalingsbeslutninger, inkl. ops-runbooken for manuell claim-godkjenning).**
+_Sist oppdatert: 2026-08-02. **NYESTE SPOR: 💳 BETALINGER — FASE 4
+(CHECKOUT I APPEN) ER KODET + DEPLOYET + DB-VERIFISERT 11/11 — VENTER
+BRAGES TELEFONTEST + REVIEW.** Bygget 2026-08-02: migrasjon `00039`
+(offering-versjonering ops-only + pris-oppslag for medlemmer — splitten
+lekker aldri), Edge Functions `stripe-checkout` (fase 2-KONTRAKTEN
+implementert: rad FØR redirect + metadata på sesjon OG subscription_data;
+lat provisjonering av product/price/kunde med Idempotency-Keys; «prøv
+igjen» gjenbruker raden trygt) + `stripe-checkout-return` (tekstside),
+webhook-patch (expired-sesjons-vakt), og **SupportScreen har ENDELIG ekte
+offering-data** (49/399-mockupen + 80/20-baren er fjernet — splitten er
+ulåst og aldri offentlig). Ridabu G10 har pilot-offering: 79 kr/mnd,
+bps 2500 (PLASSHOLDER — fase 6 låser splitten). **TELEFONTESTEN ER SELVE
+PENGEVEI-VERIFISERINGEN fra fase 2-restansen** (testkort 4242… →
+transaksjonsrad med frossen splitt + abonnement active) — se «📱 Fase 4 —
+telefontest» under. Domenet (Universal Links + pene landingssider) er
+Brages kjøp/beslutning — **funn: Apple Pay virker UTEN eget domene på
+Stripes hostede checkout**, så domenet blokkerer ikke betaling. Se
+«💳 BETALINGSSPORET» rett under + `docs/PAYMENTS.md` (sannhetskilden,
+inkl. ops-runbooken for claim-godkjenning OG prising av lag).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
@@ -93,8 +96,8 @@ låste invariants og fase 0-funnene. Kortversjonen:
   checkout** — detaljer og fase 4-KONTRAKTEN (metadata på sesjon +
   subscription_data) i PAYMENTS.md §Fase 2. **REVIEW TATT 2026-08-01:
   GODKJENT uten justeringer; pengevei-testen i fase 4 er BESLUTTET.**
-- **Fase 3 (✅ KODET + DEPLOYET + DB-VERIFISERT 19/19 2026-08-01 — venter
-  Brages telefontest + review):** migrasjon `00038_club_claiming.sql`
+- **Fase 3 (✅ FERDIG + GODKJENT 2026-08-01 — E2E-telefontest bestått ×2,
+  se seksjonen under):** migrasjon `00038_club_claiming.sql`
   (`submit_club_claim` med mod 11-orgnr-sjekk + én-åpen-claim-index;
   `approve_club_claim`/`reject_club_claim` som service-role-only ops-
   funksjoner — godkjenning skaper enhet+link+konto atomisk og GJENBRUKER
@@ -108,11 +111,48 @@ låste invariants og fase 0-funnene. Kortversjonen:
   «Del lenken» → AKTIV). `verify-00038.sql` i spike-mappen: **19/19 PASS**
   mot prod-DB (ruller alltid tilbake). Ops-runbook for manuell godkjenning:
   PAYMENTS.md §Fase 3.
+- **Fase 4 (🟡 KODET + DEPLOYET + DB-VERIFISERT 11/11 2026-08-02 — venter
+  Brages telefontest + review):** migrasjon `00039_support_checkout.sql`
+  (`create_support_offering` — ops-only versjonering, arkiverer aktiv +
+  ny versjon atomisk; `get_support_offering_for_team_space` — pris +
+  mottakernavn til LAGMEDLEMMER, splitten lekker aldri, verifisert i
+  test 5). Edge Function `stripe-checkout` (medlemsgatet; fase 2-
+  KONTRAKTEN: rad før redirect + metadata begge steder; lat product/
+  price/kunde-provisjonering med Idempotency-Keys; «prøv igjen»
+  gjenbruker pending-raden med betinget sesjonsskriving — aldri dobbel
+  tegning; `incomplete` sperrer til Stripe har konkludert) +
+  `stripe-checkout-return` (tekstside, GET-røyktestet). Webhook-patch:
+  expired-event abandonerer kun radens GJELDENDE sesjon. App:
+  SupportScreen omskrevet til ekte data (pris fra RPC, én månedlig plan,
+  mottakerens juridiske navn, AppState-refetch fra Safari, «DU STØTTER
+  LAGET 💚»-tilstand). **Ridabu G10 har pilot-offering 79 kr/mnd
+  (bps 2500 — PLASSHOLDER, fase 6 låser splitten; endring = ny versjon).**
+  `verify-00039.sql` i spike-mappen: **11/11 PASS** mot prod-DB.
 - **Gate-regel (LÅST): hver fase stopper for Brages review før neste.**
-  Fase 4 (checkout i appen) venter på fase 3-reviewen.
-- SupportScreen-mockupen (49/399 kr + «80 % til laget») er fortsatt BEVISST
-  urørt til fase 4 — tallene der er feil med vilje inntil offering-data
-  finnes.
+  Fase 5 (Customer Portal + lagaggregater) venter på fase 4-reviewen.
+- SupportScreen-mockupen er HISTORIE — skjermen viser nå ekte
+  offering-data (fase 4). 80/20-baren er fjernet med vilje: splitten er
+  en ulåst kommersiell beslutning og kommuniseres ikke offentlig.
+
+### 📱 Fase 4 — telefontest (⏳ DIN TUR — dette ER pengevei-verifiseringen)
+
+Metro-reload holder (ingen native-endringer). Kjør på Ridabu G10:
+1. Hjem → «Støtt laget»-kortet → skjermen viser **79 kr/mnd** (fra
+   offeringen, ikke mockup) + «utbetales til RIDABU IDRETTSLAG».
+2. Trykk CTA-en → Safari åpner Stripe Checkout. Betal med testkortet
+   `4242 4242 4242 4242` (utløp frem i tid, CVC 123, norsk postnr).
+   Sjekk gjerne om **Apple Pay**-knappen vises (funn: skal virke uten
+   eget domene på hosted checkout).
+3. Suksess-siden er ren tekst («💚 Tusen takk for støtten!») → gå
+   tilbake til appen → skjermen skal flippe til «DU STØTTER LAGET 💚»
+   (webhooken rekker det som regel før du er tilbake; ellers dra ned).
+4. **Pengeveien (fase 2-restansen — si fra når du har betalt, så
+   verifiserer Claude i DB):** transaksjonsrad med frossen splitt
+   (gross 7900 / fee 1975 / klubb 5925), `provider_fee_minor` fra
+   balance transaction, abonnement `active` med periode-slutt.
+5. Avbryt-grenen: start en ny checkout fra et annet medlem (eller
+   testklubb), trykk tilbake i Safari → cancel-siden → appen viser
+   fortsatt tegneflaten, og «prøv igjen» fungerer.
 
 ### 📱 Fase 3 — E2E-telefontest ✅ BESTÅTT ×2 + REVIEW GODKJENT 2026-08-01
 **Runde 1 (Ridabu IL):** claim fra appen med orgnr `000000000` → reviewen

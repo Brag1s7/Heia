@@ -99,13 +99,108 @@ export async function submitClubClaim(input: {
 export async function startStripeOnboarding(
   teamSpaceId: string,
 ): Promise<{url: string}> {
-  const {data, error} = await supabase.functions.invoke('stripe-onboarding', {
+  return invokeForUrl('stripe-onboarding', teamSpaceId, 'onboarding-lenke');
+}
+
+// ---------------------------------------------------------------------------
+// Fase 4: «Støtt laget» for medlemmene. Prisen er DATA fra aktiv offering
+// (kun pris/valuta — splitten forlater aldri serveren); selve betalingen
+// skjer i ekstern Safari via en kortlevd Checkout-URL, og statusen flyttes
+// utelukkende av webhookene (retur fra checkout beviser ingenting).
+// ---------------------------------------------------------------------------
+
+export type SupportOffering =
+  | {
+      available: true;
+      amountMinor: number;
+      currency: string;
+      billingInterval: 'month';
+      recipientLegalName: string;
+    }
+  | {available: false; reason: 'not_activated' | 'no_offering'};
+
+/** RPC-en returnerer NULL for alle som ikke er medlem av laget. */
+export async function getSupportOffering(
+  teamSpaceId: string,
+): Promise<SupportOffering | null> {
+  const {data, error} = await supabase.rpc(
+    'get_support_offering_for_team_space',
+    {ts_id: teamSpaceId},
+  );
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    return null;
+  }
+  if (!data.available) {
+    return {available: false, reason: data.reason};
+  }
+  return {
+    available: true,
+    amountMinor: data.amount_minor,
+    currency: data.currency,
+    billingInterval: data.billing_interval,
+    recipientLegalName: data.recipient_legal_name,
+  };
+}
+
+export type MySupportStatus = 'checkout_pending' | 'incomplete' | 'active' | 'past_due';
+
+export interface MySupportSubscription {
+  status: MySupportStatus;
+  currentPeriodEnd: string | null;
+}
+
+/**
+ * Brukerens egen, levende støtteavtale for laget (RLS: kun egne rader).
+ * canceled/abandoned regnes ikke — da kan man tegne på nytt.
+ */
+export async function getMySupportSubscription(
+  teamSpaceId: string,
+): Promise<MySupportSubscription | null> {
+  const {data, error} = await supabase
+    .from('support_subscriptions')
+    .select('status, current_period_end')
+    .eq('team_space_id', teamSpaceId)
+    .in('status', ['checkout_pending', 'incomplete', 'active', 'past_due'])
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    return null;
+  }
+  return {
+    status: data.status as MySupportStatus,
+    currentPeriodEnd: data.current_period_end ?? null,
+  };
+}
+
+/**
+ * Henter en FERSK Checkout-URL (kortlevd — aldri lagret). Åpnes i ekstern
+ * Safari (Apple 3.2.2(iv), låst): gratis app + innsamling utenfor appen.
+ */
+export async function startSupportCheckout(
+  teamSpaceId: string,
+): Promise<{url: string}> {
+  return invokeForUrl('stripe-checkout', teamSpaceId, 'betalingslenke');
+}
+
+// Felles for de to URL-funksjonene: {error: 'norsk melding'} på 4xx/5xx
+// graves frem så Alert-en i skjermen sier noe forståelig.
+async function invokeForUrl(
+  fn: 'stripe-onboarding' | 'stripe-checkout',
+  teamSpaceId: string,
+  what: string,
+): Promise<{url: string}> {
+  const {data, error} = await supabase.functions.invoke(fn, {
     body: {team_space_id: teamSpaceId},
   });
 
   if (error) {
-    // Funksjonen svarer alltid {error: 'norsk melding'} på 4xx/5xx —
-    // grav den frem så Alert-en i skjermen sier noe forståelig.
     let message = 'Noe gikk galt — prøv igjen om litt.';
     try {
       const ctx = (error as {context?: Response}).context;
@@ -119,7 +214,7 @@ export async function startStripeOnboarding(
     throw new Error(message);
   }
   if (!data?.url) {
-    throw new Error('Fikk ingen onboarding-lenke — prøv igjen om litt.');
+    throw new Error(`Fikk ingen ${what} — prøv igjen om litt.`);
   }
   return {url: data.url};
 }
