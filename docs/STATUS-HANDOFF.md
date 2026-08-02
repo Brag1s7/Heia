@@ -122,7 +122,14 @@ knappen på web/betaling kan nå AKTIVERES (heia://-skjemaet finnes i
 bygget); (ii) JS-Linking-lytteren (naviger til Lagkassa); (iii) evt.
 Heia2→Heia-intern-omdøping (Brages «useriøst»-innvending — besluttet
 utsatt til etter TestFlight; kun kosmetisk, ingen bruker ser det);
-(iv) APNs-nøkkelen (push-restansen under).
+(iv) APNs-nøkkelen (push-restansen under); (v) SUPPORT-OFFERING FOR
+BRAGES NYE LAG: Brage opprettet et nytt lag under Ridabu-klubben i
+TestFlight-bygget — klubben er aktiv (konto per KLUBB), men
+offering (pris/splitt) opprettes PER LAG og er ops-only
+(`create_support_offering`, fase 4-design), så SupportScreen viser
+den planlagte fallbacken «Ikke helt klart ennå». IKKE en bug.
+▶️ NESTE SAMTALE (Brages valg 2026-08-02): APNs-PUSH + offering-rad
+for det nye laget (Brage oppgir lagnavnet).
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
 NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
 APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for
