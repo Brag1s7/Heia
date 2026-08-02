@@ -10,9 +10,10 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
 import {
   BackBar,
+  HeroSurface,
   ListRowSkeleton,
   ScoreChip,
   Skeleton,
@@ -28,6 +29,11 @@ import {
   type SeasonStats,
   type SeasonView,
 } from '../lib/api/stats';
+import {
+  getTeamSupportSummary,
+  type TeamSupportSummary,
+} from '../lib/api/payments';
+import {formatKr} from '../lib/money';
 import type {HomeStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Season'>;
@@ -106,10 +112,17 @@ export function SeasonScreen() {
   const [error, setError] = useState<string | null>(null);
   // null = «serverens valg» (inneværende halvår). Settes av velgeren.
   const [selected, setSelected] = useState<SeasonView | null>(null);
+  // Lagkassa (fase 5) — den permanente inngangen ved siden av lagets tall.
+  const [supportSummary, setSupportSummary] =
+    useState<TeamSupportSummary | null>(null);
 
   const loadStats = useCallback(async () => {
     if (!activeTeamSpaceId) return;
     setError(null);
+    // Lagkassa-kortet er sekundært — feiler oppslaget, skjules kortet.
+    getTeamSupportSummary(activeTeamSpaceId)
+      .then(setSupportSummary)
+      .catch(() => setSupportSummary(null));
     try {
       setStats(await getSeasonStats(activeTeamSpaceId, selected ?? undefined));
     } catch {
@@ -433,6 +446,42 @@ export function SeasonScreen() {
                 )}
               </>
             )}
+
+            {/* Lagkassa — den permanente inngangen ved siden av lagets
+                stolthet og tall (fase 5). Vises for alle medlemmer. */}
+            {supportSummary && (
+              <Pressable
+                onPress={() => navigation.navigate('Lagkassa')}
+                accessibilityRole="button"
+                accessibilityLabel="Åpne lagkassa"
+                style={({pressed}) => pressed && styles.lagkassaPressed}>
+                <HeroSurface style={styles.lagkassaCard}>
+                  <Text style={styles.lagkassaPill}>💚 LAGKASSA</Text>
+                  {supportSummary.supporters > 0 ? (
+                    <>
+                      <Text style={styles.lagkassaAmount}>
+                        {formatKr(supportSummary.monthlyToClubMinor)}
+                      </Text>
+                      <Text style={styles.lagkassaCaption}>
+                        til laget hver måned ·{' '}
+                        {supportSummary.supporters === 1
+                          ? '1 støttespiller'
+                          : `${supportSummary.supporters} støttespillere`}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.lagkassaEmpty}>
+                        Bli lagets første støttespiller
+                      </Text>
+                      <Text style={styles.lagkassaCaption}>
+                        Hver krone gjør lagfølelsen større
+                      </Text>
+                    </>
+                  )}
+                </HeroSurface>
+              </Pressable>
+            )}
           </>
         )}
       </ScrollView>
@@ -632,5 +681,42 @@ const styles = StyleSheet.create({
   matchMeta: {
     ...typography.bodySmall,
     color: colors.textSecondary,
+  },
+  // Lagkassa-kortet — hero-flaten som lys kontrast på stadionmørket.
+  lagkassaPressed: {
+    opacity: 0.93,
+  },
+  lagkassaCard: {
+    marginTop: spacing.xl,
+    padding: spacing.xl,
+    gap: 2,
+  },
+  lagkassaPill: {
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+    color: colors.heiaDeep,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+    marginBottom: spacing.sm,
+  },
+  lagkassaAmount: {
+    fontSize: 30,
+    letterSpacing: -0.5,
+    fontFamily: fonts.display,
+    color: colors.heiaDeep,
+  },
+  lagkassaEmpty: {
+    ...typography.heading3,
+    color: colors.heiaDeep,
+  },
+  lagkassaCaption: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
 });

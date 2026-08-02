@@ -278,13 +278,17 @@ async function onCheckoutExpired(
     return {outcome: 'skipped', note: `ukjent checkout-session ${session.id}`};
   }
   // Kun den som aldri kom videre skal merkes — en fullført tegning har
-  // alt fått status fra abonnementshendelsene.
+  // alt fått status fra abonnementshendelsene. Sesjons-id-vakten
+  // (fase 4): «prøv igjen» gjenbruker raden med en NY sesjon — den
+  // gamle sesjonens expiry (funnet via metadata) skal da ikke røre
+  // raden, for den nye sesjonen lever fortsatt.
   if (row.status === 'checkout_pending') {
     const {error} = await admin
       .from('support_subscriptions')
       .update({status: 'abandoned', ended_at: new Date().toISOString()})
       .eq('id', row.id)
-      .eq('status', 'checkout_pending');
+      .eq('status', 'checkout_pending')
+      .eq('provider_checkout_session_id', session.id);
     if (error) throw new Error(`abandonering: ${error.message}`);
   }
   return {outcome: 'processed'};

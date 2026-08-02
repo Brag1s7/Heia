@@ -12,8 +12,8 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 1 | Datadomenet: 9 tabeller + RLS + invariants (`00037`) | ✅ DEPLOYET + VERIFISERT 2026-08-01 — **28/28 PASS** (se «Fase 1-verifisering» nederst) |
 | 2 | `stripe-webhook` Edge Function + idempotent prosessering | ✅ FERDIG + GODKJENT av Brage 2026-08-01 (se «Fase 2» nederst) |
 | 3 | Claiming + manuell godkjenning + Stripe-onboarding | ✅ FERDIG + **GODKJENT av Brage 2026-08-01**: DB-verifisert **19/19** + E2E-telefontest bestått **×2** (Ridabu: orgnr-korrigert godkjenning; Stange: avslag → ny søknad → godkjenning → onboarding → AKTIV; Stange-testdata ryddet etterpå). Se «Fase 3» nederst |
-| 4 | Checkout-flyten i appen + Universal Links | ⏳ NESTE — **GO gitt 2026-08-01** |
-| 5 | Selvbetjening (Customer Portal) + lagaggregater | ⏳ |
+| 4 | Checkout-flyten i appen | ✅ FERDIG + **GODKJENT 2026-08-02** — E2E med **Apple Pay** (privat kort i sandbox), pengeveien DB-verifisert (7900/1975/5925), webhooks 4/4. Se «Fase 4» nederst |
+| 5 | Selvbetjening (Customer Portal) + lagaggregater | 🟡 DEL 1 KODET + DEPLOYET + DB-VERIFISERT **8/8** 2026-08-02 (Lagkassa + «Min støtte» + portal + fast-60-kommunikasjonen) — venter Brages telefontest + review. Universal Links-bunken (heiaapp.no) forberedt: `docs/HEIAAPP-NO.md`. Se «Fase 5» nederst |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
 
 **Gate-regel: hver fase stopper for Brages review før neste starter.**
@@ -69,16 +69,26 @@ user → payment_customers (én per provider)
     → payment_transactions (frossen økonomi per trekk, append-only)
 ```
 
-## Pris og split (ULÅST kommersiell beslutning)
+## Pris og split (BESLUTTET av Brage 2026-08-02 — kommunikasjonen er LÅST)
 
-79 kr/mnd er produktretningen. **75/25 vs. fast 60 kr til klubben er IKKE
-besluttet** — avgjøres når Stripes reelle Norge-priser + MVA er avklart
-(fase 6-input). Aldri hardkodet, aldri offentlig kommunisert ennå.
-Datamodellen bærer begge: `fee_model` (`bps`/`fixed_club_amount`),
-`fee_bps` (ALLTID satt — det som sendes til Stripe), `club_fixed_minor`
-(intensjonen ved fast beløp). Fase 0-fakta: 2405 bps × 7900 øre = 1899,95
-→ Stripe rundet OPP til 1900 (klubb nøyaktig 60,00) — verifisert KUN for
-dette prispunktet; nye prispunkter krever ny avrundingssjekk i sandbox.
+79 kr/mnd, **fast 60 kr til laget** (`fixed_club_amount`, 2405 bps —
+fase 0-verifisert avrunding for akkurat dette prispunktet: 1899,95 →
+Stripe runder OPP til 1900 → klubb NØYAKTIG 6000 øre).
+**Fordelingen er OFFENTLIG og brukes som positivt tillits- og
+markedsføringspoeng (LÅST):**
+- «79 kr i måneden — 60 kr går direkte til laget»
+- «Mer enn 3 av 4 kroner går tilbake til laget»
+- De resterende 19 kronene dekker Heia, betalingsbehandling og drift.
+- **Aldri presentert primært som prosent-splitt** — alltid kronebeløpet.
+- Hovedtall på lagflater = det LAGET får/mottar, ALDRI brutto volum.
+
+Tallene er fortsatt DATA (aldri hardkodet): klientflater viser
+`club_amount_minor` avledet fra offeringen (`support_offering_club_minor`,
+00040); «mer enn 3 av 4»-linjen rendres kun når dataene faktisk sier det.
+Datamodellen bærer fortsatt begge modeller; nye prispunkter krever ny
+avrundingssjekk i sandbox FØR offering opprettes. MVA/endelig økonomi på
+Heia-andelen verifiseres fortsatt i fase 6 (regnskapsfører) — men
+supporterkommunikasjonen over ligger fast.
 
 **Offerings er VERSJONERTE og økonomisk immutable (LÅST + trigger-håndhevet):**
 endring = ny versjon; nye abonnementer får nyeste versjon; eksisterende
@@ -143,12 +153,18 @@ løpende abonnementer · staging-miljø (vurderes før prod).
 
 ## Åpne beslutninger
 
-**Avgjøres før prod (fase 6):** endelig split (etter Norge-priser + MVA) ·
-MVA på Heia-andelen (regnskapsfører) · Heia juridisk enhet · domene
-(Universal Links/Apple Pay/redirect — uavklart om Heia har et; trengs senest
-fase 4) · refund-/disputepolicy som tekst · vilkår + personvern ·
-statement descriptor-standard · varslingsflyt ved lagavvikling · om vanlige
-medlemmer ser lagaggregatet (sosialt bevis) eller kun lagadmin.
+**Avgjort 2026-08-02 (Brage):** splitten = FAST 60 kr til laget, offentlig
+kommunisert (se «Pris og split») · lagaggregatet er synlig for ALLE
+lagmedlemmer, hovedtall = det laget får · «Min støtte» bor på Profil
+(liste, flerlags-klar); klubbens onboarding/økonomi bor i Laginnstillinger
+(«Lagkasse-admin»), ALDRI på personlig profil · domenet er **heiaapp.no**
+(Brage eier det — bunken i `docs/HEIAAPP-NO.md`).
+
+**Avgjøres før prod (fase 6):** MVA på Heia-andelen (regnskapsfører — kan
+i teorien justere 19-kroners-økonomien, ikke kommunikasjonen) · Heia
+juridisk enhet · refund-/disputepolicy som tekst · vilkår + personvern ·
+statement descriptor-standard · varslingsflyt ved lagavvikling · endelig
+bundle-ID (placeholder i dag — se HEIAAPP-NO.md steg 0).
 
 **Utsatt:** klubbadmin-domene · klubbmerge-verktøy · Vipps · engangs-
 betalinger · flere land · payout-rapportering.
@@ -395,6 +411,202 @@ retning — nivåene er dokumentert: (1) appens AKTIV-tilstand finnes alt,
 (3) Universal Links med eget domene (fase 4). NB: kun onboardingen kan
 flyttes inn i appen — SELVE BETALINGEN skal forbli ekstern Safari
 (Apple 3.2.2(iv), låst).
+
+## Fase 4 — checkout i appen (2026-08-02) — deployet + DB-verifisert 11/11
+
+**Migrasjon `00039_support_checkout.sql` (✅ deployet):**
+- `create_support_offering(team_space_id, amount_minor, fee_model, fee_bps,
+  club_fixed_minor, created_by)` — **KUN service role/SQL-editor** (REVOKE-
+  regimet fra approve_club_claim; verifisert i test 11). Eneste vei til en
+  offering: arkiverer aktiv versjon + setter inn neste versjon atomisk
+  (advisory-lås per lag vinner versjonsracet). Eksisterende abonnementer
+  beholder sin offering — aldri stille migrering (låst invariant).
+- `get_support_offering_for_team_space(ts_id)` — klient-RPC for
+  SupportScreen, gatet på LAGMEDLEMSKAP (alle medlemmer — foreldrene ER
+  supporterne; ikke-medlem/uinnlogget → NULL, probe-vernet). Returnerer
+  KUN pris/valuta/intervall + mottakerens juridiske navn (offentlig
+  registerinfo — tillitssignal). **Splitten lekker aldri** (test 5 sjekker
+  eksplisitt at fee_*-feltene ikke finnes i svaret). `available=false` med
+  `reason` skiller «klubben ikke aktivert» fra «Heia har ikke priset laget»
+  (ops-restanse) — samme CTA i appen, skilt i data for feilsøking.
+
+**Edge Function `stripe-checkout` (✅ deployet, `verify_jwt = true`):**
+- Gatet på aktivt LAGMEDLEMSKAP (ingen rollegate — alle kan støtte laget
+  sitt) + hele kapabilitetskjeden (aktiv link + verifisert enhet + AKTIV
+  konto med charges_enabled + provider_account_id). Hard vakt: ingen
+  checkout uten entydig aktiv mottaker.
+- **Fase 2-kontrakten implementert:** `support_subscriptions`-raden
+  opprettes FØR redirect (checkout_pending), `metadata.support_subscription_id`
+  settes på BÅDE sesjonen og `subscription_data`, sesjons-id-en skrives på
+  raden før URL-en returneres.
+- Stripe-objekter provisjoneres LAT med Idempotency-Keys bundet til våre
+  rader (aldri doble objekter): product+price per offering (write-once på
+  offering-raden, `heia-offprod-/heia-offprice-<offering_id>`), én
+  plattformkunde per bruker (`heia-cust-<user_id>`, upsert + reselect).
+- Checkout-sesjonen bruker fase 0-spikens eksakte `subscription_data`
+  (on_behalf_of + transfer_data.destination + application_fee_percent =
+  fee_bps/100) — splitten hentes fra AKTIV offering server-side; klienten
+  kan aldri velge pris.
+- **«Prøv igjen»-flyten:** en checkout_pending-rad GJENBRUKES — gammel
+  sesjon utløpes best-effort, ny sesjon skrives BETINGET (fortsatt
+  checkout_pending + uten provider_subscription_id); har den gamle
+  sesjonen rukket å fullføre, utløpes den NYE og brukeren får «du støtter
+  allerede» (aldri dobbel tegning). `incomplete` blokkerer ny checkout
+  (409) til Stripe har konkludert — to levende Stripe-abonnementer skal
+  ikke kunne oppstå.
+- **Webhook-patch (fase 4):** `checkout.session.expired` abandonerer nå
+  KUN når den utløpte sesjonen er radens GJELDENDE sesjon — den gamle
+  sesjonens expiry (funnet via metadata) kan ikke lenger feilmerke en rad
+  som har fått ny sesjon. Redeployet sammen med checkout-funksjonen.
+
+**Edge Function `stripe-checkout-return` (✅ deployet, `verify_jwt = false`):**
+tekst-landingsside for success/cancel (fase 3-funnet: HTML omskrives på
+funksjonsdomenet). Success sier «behandles», aldri «bekreftet» — retur
+beviser ingenting; webhookene flytter status. Røyktestet utenfra med GET
+(charset overlever); checkout uten JWT → 401.
+
+**Appen:**
+- `SupportScreen` er skrevet om fra mockup til ekte data: pris fra
+  offering-RPC-en (49/399-mockupen og «80 % til laget»-baren er FJERNET —
+  splitten er ulåst og aldri offentlig), én månedlig plan, mottakerens
+  juridiske navn under CTA-en. Tilstander: skeleton → «ikke helt klart
+  ennå» (uaktivert klubb) → tegneflate med CTA (kortlevd checkout-URL
+  hentes i klikkøyeblikket, åpnes i EKSTERN Safari — 3.2.2(iv), låst) →
+  «Fullfør betalingen» (påbegynt tegning) → «DU STØTTER LAGET 💚»
+  (active/past_due; past_due forklarer at Stripe prøver igjen).
+  AppState-refetch når appen våkner fra Safari + pull-to-refresh.
+- `payments.ts`: `getSupportOffering`, `getMySupportSubscription` (RLS:
+  egne rader), `startSupportCheckout` (felles invokeForUrl-hjelper med
+  onboarding).
+
+**Pilot-offering (ops, 2026-08-02):** Ridabu G10
+(`43968783-1c03-456d-8de0-7a90913eab93`) har offering v1: 7900 øre/mnd,
+`bps`/2500 (75/25 — spike-rapportens robuste mekanikk). **PLASSHOLDER:
+endelig split er fortsatt ULÅST (fase 6) — endring = ny versjon via
+`create_support_offering`, aldri redigering.**
+
+**Ops-runbook (prising av lag — SQL-editor/service role):**
+```sql
+-- ny/endret pris eller split for et lag (arkiverer aktiv versjon):
+select create_support_offering('<team_space_id>', 7900, 'bps', 2500);
+-- fast klubbandel-modellen (dokumenterer intensjonen):
+select create_support_offering('<team_space_id>', 7900, 'fixed_club_amount', 2405, 6000);
+```
+NB: nytt PRISPUNKT krever ny avrundingssjekk i sandbox først (fase 0-funn:
+2405 bps × 7900 rundet OPP — kun verifisert for 79 kr).
+
+**DB-verifisering (2026-08-02): 11/11 PASS** — `verify-00039.sql` i
+`~/Documents/Heia-Stripe-Spike/` (selvforsynt, ruller alltid tilbake; kjørt
+mot prod-DB via management-API-ets query-endepunkt). Dekker: versjonering
+(v2 arkiverer v1, maks én aktiv), pris-oppslagets alle grener (medlem/
+ikke-medlem/uinnlogget/uaktivert/charges av/uten offering), split-lekkasje-
+sjekken og grants-vakten.
+
+**✅ PENGEVEIEN VERIFISERT 2026-08-02 (fase 2-restansen LUKKET):** Brage
+betalte i sandbox med PRIVAT KORT via **Apple Pay** i Safari-checkouten
+(bekrefter funnet: Apple Pay virker på hosted checkout uten eget domene;
+sandbox belaster aldri ekte kort — walleten tokeniserer, test-charge).
+DB-verifisert: abonnement `active` (provider_status active, sub-id +
+sesjons-id satt, periode → 2026-09-02); transaksjonsrad `succeeded` med
+KORREKT FROSSEN SPLITT **7900 gross / 1975 fee / 5925 klubb** (bps 2500),
+`provider_fee_minor` 488 fra balance transaction (NB: lavere enn fase 0s
+571 — gebyret varierer med betalingsmiddel; feltet er observert data),
+charge + transfer-id satt. Webhook-løpet: 4 events, alle `processed`
+med attempts=1 — inkl. et `checkout.session.expired` for en FORLATT
+førstesesjon som traff raden via metadata UTEN å skade den (fase 4-
+sesjonsvakten virket i første reelle kjøring). Rekkefølgen ankom
+u-intuitivt (subscription.created SIST) — konvergent prosessering holdt.
+
+**GJENSTÅR i fase 4 (før review):**
+1. **Brages bekreftelse fra telefonen:** at SupportScreen flippet til
+   «DU STØTTER LAGET 💚» + resten av testlisten i STATUS-HANDOFF
+   (avbryt-grenen). Deretter fase 4-review + ev. GO for fase 5.
+2. **Domenet (Brages beslutning/kjøp — eneste eksterne blokkering):** trengs
+   for Universal Links + ordentlige landingssider. **Funn: Apple Pay krever
+   IKKE eget domene på Stripes hostede checkout** (domeneverifisering
+   gjelder kun innbygging på egen side) — domenet er dermed UX/lenke-sak,
+   ikke betalingsblokkering.
+3. **In-app-browser for onboarding (vurdering):** krever native rebuild
+   (ny dependency) — anbefaling: VENT til neste native-runde; ekstern
+   Safari fungerer og betalingen SKAL uansett være ekstern (låst).
+
+## Fase 5 — del 1: Lagkassa + «Min støtte» + portal (2026-08-02) — deployet + DB-verifisert 8/8
+
+**Fase 4 ble GODKJENT samme dag** (Brage bekreftet «DU STØTTER LAGET»-
+flippen på telefonen; pengeveien var alt DB-verifisert). Brages
+fase 5-bestilling (og beslutningene den låste) kom i samme melding —
+se «Pris og split» og «Åpne beslutninger».
+
+**Migrasjon `00040_lagkassa.sql` (✅ deployet):**
+- `support_offering_club_minor()` — ÉN avledning av kommunisert
+  klubbandel (fixed → intensjonen; bps → brutto minus avrundet fee).
+- `get_support_offering_for_team_space` utvidet med `club_amount_minor`
+  (fordelingen er offentlig nå) — fee-mekanikken (bps/modell) lekker
+  fortsatt aldri (test 3).
+- `get_team_support_summary(ts_id)` — lagkassa for ALLE medlemmer:
+  `monthly_to_club_minor` (sum av hver levende avtales EGEN offerings
+  klubbandel — aldri «dagens pris × antall», test 4),
+  `supporters` (active + past_due), `total_to_club_minor` (kun stående
+  penger: refunded/dispute_lost ekskludert; delrefusjon regnes fullt i
+  v1 — dokumentert forenkling), `since`.
+- `get_my_support_overview()` — «Min støtte» som LISTE (flerlags-klar):
+  lagnavn, status, neste betaling, cancel_at, pris + klubbandel per
+  avtalens egen offering.
+
+**Edge Function `stripe-portal` (✅ deployet, `verify_jwt = true`):**
+Customer Portal-sesjon i klikkøyeblikket, alltid mot brukerens EGEN
+payment_customers-rad. Portalen ER selvbetjeningen i v1 (låst):
+betalingsmåte, kvitteringer, oppsigelse. Kanselleringer bokføres av
+fase 2-webhooken. Portal-konfigen i sandbox står fra fase 0 (steg 10).
+`stripe-checkout-return` fikk `flow=portal`-tekst.
+
+**Ops (2026-08-02):** Ridabu G10 offering **v2**: 7900 øre,
+`fixed_club_amount`, club 6000, 2405 bps (v1 bps/2500 arkivert).
+**Brages levende sandbox-abonnement ble EKSPLISITT P16-migrert** (bevisst
+ops-handling, aldri stille): Stripe `application_fee_percent` 25 → 24,05
+(gjelder fra NESTE faktura; logs/p16-fee-2405.json i spiken) + raden
+repekt til v2. Historikken urørt — første transaksjon står frosset på
+75/25 (5925), derfor viser lagkassa i dag 5925 samlet / 6000 per måned.
+
+**Appen (kun Metro-reload):**
+- **Ny `LagkassaScreen`** (HomeStack): hero-flaten med hovedtallet
+  «X kr til laget hver måned», støttespillere, totalt samlet (alltid
+  klubb-perspektiv), fordelingskortet («79 kr — 60 kr direkte til
+  laget» + 3-av-4-linjen, datadrevet), varm «hva støtten betyr»-tekst,
+  CTA → SupportScreen. Supportere ser «Du er en av dem 💚».
+- **Inngangene (Brages valg):** lagkassa-KORT som egen side i
+  hero-karusellen på Hjem (den emosjonelle inngangen; vises også uten
+  kommende hendelser) + kort nederst på Sesong-siden (den permanente,
+  ved lagets stolthet). **Bunnkortet på Hjem-feeden er FJERNET.**
+  Ingen inngang på Profil (bevisst).
+- **SupportScreen:** priskortet bærer nå «60 kr går direkte til laget» +
+  3-av-4-linjen; 19-kroners-forklaringen diskret under CTA-en.
+- **Profil → «MIN STØTTE»:** listekort (HandHeart-ikon) per avtale med
+  pris, klubbandel og statuslinje («Aktiv · fornyes 2. september» /
+  «Avsluttes …» ved cancel_at / purreforklaring ved past_due). Trykk →
+  fersk portal-lenke i Safari; AppState-refetch når appen våkner.
+
+**DB-verifisering: 8/8 PASS** — `verify-00040.sql` i spike-mappen
+(avledningen begge modeller, aktiv-versjon-oppslag, lekkasjevakt,
+per-avtale-månedssum, refundert ekskludert, probe-vern, oversiktens
+innhold + fremmed bruker tom). Røyktest: portal uten JWT → 401.
+NB testdata-læring: invite_code-CHECK-en avviser tegnet «0».
+
+**heiaapp.no-bunken (forberedt — `docs/HEIAAPP-NO.md`):** AASA-fil +
+landingsside (`web/`) ligger i repo; sjekklisten dekker hosting/DNS,
+native-runden (bundle-ID-bytte FØRST — dagens er RN-placeholder;
+Associated Domains; `heia://`-skjema; ev. in-app-browser for KYC-
+onboardingen) og retur-URL-byttet i Edge Functions. Forventning: ved
+server-redirect viser Safari ofte «Åpne i Heia»-banner/knapp fremfor
+auto-hopp — landingssiden er opplevelsen. **Delbar lagkassa-lenke:
+v1-scoping = åpne appen / App Store-side UTEN lagets tall på web**
+(aggregat på åpen web er en egen personvernbeslutning; web-checkout
+står fortsatt på «bygger bevisst ikke»-listen).
+
+**GJENSTÅR i fase 5:** Brages telefontest av del 1 (testliste i
+STATUS-HANDOFF) + review · heiaapp.no steg 1–3 (hosting → native-runde →
+URL-bytte) · delbar lenke-siden · ev. churn-innsikt fra portalens
+kanselleringsskjema (fase 0-funn #9).
 
 ## Miljøer og sikkerhet
 
