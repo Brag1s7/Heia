@@ -486,13 +486,25 @@ mot prod-DB via management-API-ets query-endepunkt). Dekker: versjonering
 ikke-medlem/uinnlogget/uaktivert/charges av/uten offering), split-lekkasje-
 sjekken og grants-vakten.
 
+**✅ PENGEVEIEN VERIFISERT 2026-08-02 (fase 2-restansen LUKKET):** Brage
+betalte i sandbox med PRIVAT KORT via **Apple Pay** i Safari-checkouten
+(bekrefter funnet: Apple Pay virker på hosted checkout uten eget domene;
+sandbox belaster aldri ekte kort — walleten tokeniserer, test-charge).
+DB-verifisert: abonnement `active` (provider_status active, sub-id +
+sesjons-id satt, periode → 2026-09-02); transaksjonsrad `succeeded` med
+KORREKT FROSSEN SPLITT **7900 gross / 1975 fee / 5925 klubb** (bps 2500),
+`provider_fee_minor` 488 fra balance transaction (NB: lavere enn fase 0s
+571 — gebyret varierer med betalingsmiddel; feltet er observert data),
+charge + transfer-id satt. Webhook-løpet: 4 events, alle `processed`
+med attempts=1 — inkl. et `checkout.session.expired` for en FORLATT
+førstesesjon som traff raden via metadata UTEN å skade den (fase 4-
+sesjonsvakten virket i første reelle kjøring). Rekkefølgen ankom
+u-intuitivt (subscription.created SIST) — konvergent prosessering holdt.
+
 **GJENSTÅR i fase 4 (før review):**
-1. **E2E-telefontest = pengevei-verifiseringen (fase 2-restansen, BESLUTTET):**
-   Brage åpner Støtt laget på Ridabu G10 → betaler med testkort
-   `4242 4242 4242 4242` i Safari → verifiser: transaksjonsrad med korrekt
-   frossen splitt (1975 øre fee / 5925 øre klubb), `provider_fee_minor` fra
-   balance transaction, abonnement → `active`, og at SupportScreen viser
-   «DU STØTTER LAGET» når appen våkner.
+1. **Brages bekreftelse fra telefonen:** at SupportScreen flippet til
+   «DU STØTTER LAGET 💚» + resten av testlisten i STATUS-HANDOFF
+   (avbryt-grenen). Deretter fase 4-review + ev. GO for fase 5.
 2. **Domenet (Brages beslutning/kjøp — eneste eksterne blokkering):** trengs
    for Universal Links + ordentlige landingssider. **Funn: Apple Pay krever
    IKKE eget domene på Stripes hostede checkout** (domeneverifisering

@@ -134,9 +134,20 @@ låste invariants og fase 0-funnene. Kortversjonen:
   offering-data (fase 4). 80/20-baren er fjernet med vilje: splitten er
   en ulåst kommersiell beslutning og kommuniseres ikke offentlig.
 
-### 📱 Fase 4 — telefontest (⏳ DIN TUR — dette ER pengevei-verifiseringen)
+### 📱 Fase 4 — telefontest (🟢 BETALT 2026-08-02 — PENGEVEIEN ER DB-VERIFISERT)
 
-Metro-reload holder (ingen native-endringer). Kjør på Ridabu G10:
+**Brage betalte med privat kort via APPLE PAY i sandbox** (ekte kort
+belastes aldri i sandbox — tokenisert test-charge; Apple Pay-funnet
+bekreftet: virker uten eget domene). **Claude verifiserte i prod-DB:**
+abonnement `active` (periode → 2026-09-02), transaksjonsrad `succeeded`
+med frossen splitt **7900/1975/5925** (bps 2500), provider-gebyr 488 øre
+fra balance transaction, charge+transfer-id satt. Webhookene: 4/4
+`processed`, attempts=1 — og expired-vakten fra samme morgen reddet en
+forlatt førstesesjon i første reelle kjøring. **Gjenstår av testlisten:
+punkt 1/3/5 bekreftes av Brage (pris-visningen, «DU STØTTER LAGET 💚»-
+flippen, avbryt-grenen) → deretter fase 4-review.**
+
+Opprinnelig testliste (Metro-reload holder), på Ridabu G10:
 1. Hjem → «Støtt laget»-kortet → skjermen viser **79 kr/mnd** (fra
    offeringen, ikke mockup) + «utbetales til RIDABU IDRETTSLAG».
 2. Trykk CTA-en → Safari åpner Stripe Checkout. Betal med testkortet
