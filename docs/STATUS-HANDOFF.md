@@ -187,6 +187,37 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
+### 🧹 V1-HYGIENE (BESLUTTET 2026-08-02 — kreves FØR ekstern TestFlight/lansering)
+
+Brages presisering: ikke nye funksjoner, men fullføring — «fjerne
+innlegg osv.» + alt App Store krever. Kodekartlagt 2026-08-02: INGENTING
+av dette finnes ennå (grep på api-laget + skjermene). Listen, mappet mot
+Apples retningslinjer:
+1. **Slette eget innlegg** + **admin (trener/lagleder) sletter alt i
+   laget** — UGC-moderasjon (Apple 1.2). Gjelder feed-innlegg OG
+   kommentarer (comments.ts har ingen delete i dag).
+2. **Rapportere innhold** (innlegg/kommentar → rapport til Heia) —
+   eksplisitt 1.2-krav for UGC-apper.
+3. **Fjerne medlem fra laget** (admin, fra Lagoversikt) — «block
+   abusive users»-kravet i lukket lag-kontekst (TeamMembersScreen har
+   ingen fjerning i dag).
+4. **Slette konto I APPEN** (Apple 5.1.1(v) — HARDT krav, review-
+   blokkerende). NB kjent spenning: payment_transactions/bokføring vs
+   GDPR (flagget i PAYMENTS.md) → løsning: anonymiser profilen, behold
+   finansradene (bokføringslovens unntak). Trenger egen migrasjon +
+   design av «Slett konto»-flyt på Profil.
+5. **Vilkår + personvern-URL** (spor C-tekstene, publiseres på
+   heiaapp.no) + privacy nutrition labels (skjema i App Store Connect
+   ved innsending).
+✅ Avklart: auth er e-post+passord (Supabase) uten tredjeparts-login →
+«Sign in with Apple» (4.8) kreves IKKE. Betalingsmodellen er alt
+3.2.2(iv)-kompatibel. Events kan alt avlyses.
+
+**Barene (LÅST):** intern TestFlight (Brage selv) trenger IKKE V1-
+hygiene — start så snart native-runden er gjort. Ekstern TestFlight
+(Ridabu-foreldrene), nettsiden og App Store-innsending VENTER på
+V1-hygienelisten.
+
 ### 📱 Fase 5 del 1 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — «Alt funker fra fase 5»)
 
 1. **Hjem:** bunnkortet «Støtt laget» er BORTE. Bla i hero-karusellen →
