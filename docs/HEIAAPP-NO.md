@@ -28,11 +28,14 @@ ekstern Safari (Apple 3.2.2(iv), låst) — dette er retur-opplevelsen._
 hvorfor ikke Cloudflare: **DNSSec er AKTIV hos Uniweb + SPF/DMARC-
 oppføringer finnes — navnetjenerne skal ALDRI flyttes**; vi legger kun
 to oppføringer i Uniwebs DNS-panel):
-1. Sørg for at `web/vercel.json` + `web/index.html` er på `main`
-   (PR fra Brage-branchen — Vercel deployer produksjon fra main).
-2. vercel.com → logg inn med GitHub (yps1lon) → Add New → Project →
-   importer `Heia`-repoet → **Root Directory = `web`**, Framework
-   Preset = «Other», ingen build command → Deploy.
+1. ✅ `web/vercel.json` + `web/index.html` er på `main` (PR #28,
+   merget 2026-08-02). Repoet bor hos **Brag1s7/Heia** (overført fra
+   yps1lon samme dag); Vercel-kontoen er hello@heiaapp.no.
+2. vercel.com → Add New → Project → koble GitHub-kontoen **Brag1s7**
+   og installer Vercel-appen med tilgang til `Heia` (repo-overføring
+   tar IKKE med app-installasjoner — mangler Heia i listen, er det
+   dette som mangler) → importer `Heia` → **Root Directory = `web`**,
+   Framework Preset = «Other», ingen build command → Deploy.
 3. Project → Settings → Domains → legg til `heiaapp.no` (primær) og
    `www.heiaapp.no` (redirect til heiaapp.no).
 4. Vercel viser nå de EKSAKTE DNS-verdiene — bruk dem (typisk: A-post
