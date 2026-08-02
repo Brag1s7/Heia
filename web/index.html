@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Heia</title>
+  <!-- PLASSHOLDER: hindrer 404 på rotdomenet til markedssiden bygges
+       (eget prosjekt etter Stripe-sporet — se website_project). -->
+  <style>
+    /* Heia A v2-tonene — samme flate som /betaling. */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "SF Pro Text", system-ui, sans-serif;
+      background: #FBF7EC;
+      color: #08392E;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: linear-gradient(140deg, #DFFBEA 0%, #F4F9E6 70%, #FAF4DC 100%);
+      border: 1px solid #CDEEDA;
+      border-radius: 24px;
+      padding: 40px 28px;
+      max-width: 420px;
+      width: 100%;
+      text-align: center;
+    }
+    .emoji { font-size: 44px; }
+    h1 { font-size: 24px; margin: 16px 0 10px; letter-spacing: -0.3px; }
+    p { font-size: 16px; line-height: 1.5; color: #3C5A50; margin-bottom: 8px; }
+    .links { margin-top: 20px; font-size: 14px; }
+    .links a { color: #08392E; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="emoji">💚</div>
+    <h1>Heia</h1>
+    <p>Appen for ungdomslaget. Mer her snart.</p>
+    <p>Kontakt: <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a></p>
+    <p class="links">
+      <a href="/vilkar/">Vilkår</a> &nbsp;·&nbsp;
+      <a href="/personvern/">Personvern</a>
+    </p>
+  </div>
+</body>
+</html>

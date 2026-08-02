@@ -14,19 +14,37 @@ ekstern Safari (Apple 3.2.2(iv), låst) — dette er retur-opplevelsen._
 - `web/betaling/index.html` — én side for alle flows
   (`?flow=success|cancel|portal|onboarding|refresh`), Heia-tonene,
   «Åpne Heia-appen»-knapp (skjult til URL-skjemaet finnes).
+- `web/vilkar/` + `web/personvern/` — vilkår/personvern (App Store-krav;
+  3 TODO-er venter på Brage, se STATUS-HANDOFF §V1-hygiene punkt 5).
+- `web/index.html` — minimal plassholder-rotside (hindrer 404 på
+  domenet; markedssiden er nettside-prosjektet, ETTER sporet).
+- `web/vercel.json` — header-konfig som gir AASA-filen
+  `Content-Type: application/json` (Apples krav).
 
 ## Sjekklisten (i rekkefølge)
 
-### 1. Hosting (Brage eller Claude m/ tilgang — 15 min)
-Cloudflare Pages (gratis) eller tilsvarende statisk host:
-1. Koble heiaapp.no til hosten (DNS: CNAME/ALIAS på rot + www).
-2. Deploy `web/`-mappen som site-rot.
-3. Krav til AASA-filen: serveres på
-   `https://heiaapp.no/.well-known/apple-app-site-association`,
-   `Content-Type: application/json`, INGEN redirect, gyldig TLS.
-   (Cloudflare Pages gjør alt dette riktig ut av boksen.)
-4. Røyktest ETTER deploy: `curl -i https://heiaapp.no/.well-known/apple-app-site-association`
-   og `https://heiaapp.no/betaling?flow=success` i Safari.
+### 1. Hosting (Brage — ~15 min; VERCEL + Uniweb-DNS)
+**Valget er Vercel** (gratis Hobby-plan; se website_project-minnet for
+hvorfor ikke Cloudflare: **DNSSec er AKTIV hos Uniweb + SPF/DMARC-
+oppføringer finnes — navnetjenerne skal ALDRI flyttes**; vi legger kun
+to oppføringer i Uniwebs DNS-panel):
+1. Sørg for at `web/vercel.json` + `web/index.html` er på `main`
+   (PR fra Brage-branchen — Vercel deployer produksjon fra main).
+2. vercel.com → logg inn med GitHub (yps1lon) → Add New → Project →
+   importer `Heia`-repoet → **Root Directory = `web`**, Framework
+   Preset = «Other», ingen build command → Deploy.
+3. Project → Settings → Domains → legg til `heiaapp.no` (primær) og
+   `www.heiaapp.no` (redirect til heiaapp.no).
+4. Vercel viser nå de EKSAKTE DNS-verdiene — bruk dem (typisk: A-post
+   på rot/`@` → `76.76.21.21`, CNAME på `www` →
+   `cname.vercel-dns.com`). Legg inn i Uniwebs DNS-panel
+   (home.uniweb.no). Rør ingenting annet der.
+5. Vent til Vercel-domenene viser «Valid Configuration» og sertifikatet
+   er utstedt (minutter–timer, DNS-propagering).
+6. **Si fra til Claude: «hostingen er live»** → Claude røyktester
+   (`curl -i https://heiaapp.no/.well-known/apple-app-site-association`
+   = 200 + `application/json` uten redirect; `/betaling?flow=success` i
+   Safari) og vipper retur-URL-bryteren (steg 3 — forhåndskodet).
 
 ### 2. Native-runden (Brage kjører — Xcode åpen, appen IKKE på Metro)
 **Steg 0 — bundle-ID (VIKTIG, gjør først):** dagens
@@ -47,11 +65,16 @@ ellers må filen redeployes.
 5. Appen: lytteren for Universal Links/URL-skjema (`Linking`-håndtering →
    naviger til Lagkassa/Support) — kodes når skjemaet finnes.
 
-### 3. Bytt retur-URL-ene i Edge Functions (Claude — 5 min etter steg 1)
-- `stripe-checkout`: success/cancel → `https://heiaapp.no/betaling?flow=…`
-- `stripe-onboarding`: return/refresh → `…?flow=onboarding|refresh`
-- `stripe-portal`: return → `…?flow=portal`
-- Redeploy funksjonene. De gamle tekstsidene består som fallback.
+### 3. Retur-URL-ene i Edge Functions (✅ FORHÅNDSKODET + DEPLOYET 2026-08-02)
+Alle tre funksjonene (`stripe-checkout`, `stripe-onboarding`,
+`stripe-portal`) går via `_shared/web.ts` → `landingUrl(flow)`: med
+secreten **`WEB_BASE_URL`** satt lander alt på
+`https://heiaapp.no/betaling?flow=…`; uten den består dagens
+tekstsider (deployet 2026-08-02 — null atferdsendring til secreten
+settes). Byttet når steg 1 er live (Claude, én kommando):
+`supabase secrets set WEB_BASE_URL=https://heiaapp.no`
+— secrets når kjørende funksjoner uten redeploy, og tekstside-
+funksjonene består som fallback (fjern secreten = tilbake).
 
 ### 4. Delbar lagkassa-lenke (neste skive — krever 1–3)
 `https://heiaapp.no/lag?kode=INVITEKODE` → åpner appen på laget (installert)
