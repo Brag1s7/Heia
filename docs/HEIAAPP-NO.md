@@ -56,8 +56,12 @@ to oppføringer i Uniwebs DNS-panel):
 `org.reactjs.native.example.Heia2` er RN-malens placeholder og må uansett
 byttes før App Store. Velg endelig ID (forslag: `no.heiaapp.heia`) i
 Xcode → Target Heia2 → Signing & Capabilities. AASA-filen binder seg til
-`TEAMID.BUNDLEID` (team: `Q5A6QMRZ4A`) — bytt ID her FØR AASA deployes,
-ellers må filen redeployes.
+`TEAMID.BUNDLEID` (team: `D86MWL7V3S` — det betalte Individual-teamet
+(hello@heiaapp.no), byttet fra gratis-teamet 2026-08-02) — bytt ID her
+FØR AASA deployes, ellers må filen redeployes.
+**✅ Steg 0–2 GJORT 2026-08-02:** bundle-ID `no.heiaapp.heia`,
+Associated Domains + heia://-skjema + RCTLinkingManager i AppDelegate,
+team D86MWL7V3S valgt i Xcode. Punkt 3 (in-app-browser) ble IKKE tatt.
 1. Signing & Capabilities → «+ Capability» → **Associated Domains** →
    legg til `applinks:heiaapp.no`.
 2. Info → URL Types → legg til skjema **`heia`** (for «Åpne appen»-knappen
