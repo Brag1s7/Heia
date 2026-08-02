@@ -11,7 +11,7 @@ import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, fonts} from '../theme';
 import {BackBar, Button, HeroSurface, Skeleton} from '../components';
-import {useActiveTeam} from '../context';
+import {useActiveTeam, useAuth} from '../context';
 import {
   getTeamSupportSummary,
   getSupportOffering,
@@ -24,6 +24,17 @@ import type {HomeStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Lagkassa'>;
 
+// Siste kjente svar per (bruker, lag) — samme mønster som «Min støtte» på
+// Profil: den som kommer tilbake ser tallene umiddelbart, og første besøk
+// får full skeleton-dekning i stedet for kort som popper inn når svaret
+// lander. Nøkkelen bærer bruker-id fordi iSupport er personlig.
+type LagkassaData = {
+  summary: TeamSupportSummary | null;
+  offering: SupportOffering | null;
+  iSupport: boolean;
+};
+const lagkassaCache = new Map<string, LagkassaData>();
+
 /**
  * Lagkassa (betalingssporet fase 5) — lagets støtteside for ALLE medlemmer.
  * Hovedtallet er alltid det LAGET får (låst 2026-08-02) — aldri brutto.
@@ -34,11 +45,18 @@ export function LagkassaScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
+  const {profile} = useAuth();
 
-  const [summary, setSummary] = useState<TeamSupportSummary | null>(null);
-  const [offering, setOffering] = useState<SupportOffering | null>(null);
-  const [iSupport, setISupport] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `${profile?.id ?? 'anon'}:${activeTeamSpaceId ?? ''}`;
+  const cached = lagkassaCache.get(cacheKey);
+  const [summary, setSummary] = useState<TeamSupportSummary | null>(
+    cached?.summary ?? null,
+  );
+  const [offering, setOffering] = useState<SupportOffering | null>(
+    cached?.offering ?? null,
+  );
+  const [iSupport, setISupport] = useState(cached?.iSupport ?? false);
+  const [loading, setLoading] = useState(!cached);
   const [refreshing, setRefreshing] = useState(false);
 
   const teamName = activeTeamSpace?.displayName ?? 'laget';
@@ -51,15 +69,22 @@ export function LagkassaScreen() {
         getSupportOffering(activeTeamSpaceId),
         getMySupportSubscription(activeTeamSpaceId).catch(() => null),
       ]);
+      const supports =
+        mySub?.status === 'active' || mySub?.status === 'past_due';
+      lagkassaCache.set(cacheKey, {
+        summary: sum,
+        offering: off,
+        iSupport: supports,
+      });
       setSummary(sum);
       setOffering(off);
-      setISupport(mySub?.status === 'active' || mySub?.status === 'past_due');
+      setISupport(supports);
     } catch {
       // Pull-to-refresh er retry-veien; skjermen viser skeleton/nuller.
     } finally {
       setLoading(false);
     }
-  }, [activeTeamSpaceId]);
+  }, [activeTeamSpaceId, cacheKey]);
 
   useEffect(() => {
     load();
@@ -143,8 +168,16 @@ export function LagkassaScreen() {
           )}
         </HeroSurface>
 
-        {/* Fordelingen — offentlig og positiv, rett fra offeringen */}
-        {available && (
+        {/* Fordelingen — offentlig og positiv, rett fra offeringen.
+            Under lasting: skeleton med kortets form, så flaten står stabilt
+            fra første frame i stedet for å poppe inn når svaret lander. */}
+        {loading ? (
+          <View style={styles.splitCard}>
+            <Skeleton width="88%" height={16} />
+            <Skeleton width="60%" height={12} />
+            <Skeleton width="92%" height={12} style={styles.splitSkeletonHint} />
+          </View>
+        ) : available ? (
           <View style={styles.splitCard}>
             <Text style={styles.splitHeadline}>
               {formatKr(offering.amountMinor)} i måneden —{' '}
@@ -158,7 +191,7 @@ export function LagkassaScreen() {
               {offering.recipientLegalName}.
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* Hva pengene går til */}
         <View style={styles.whyCard}>
@@ -170,9 +203,15 @@ export function LagkassaScreen() {
           </Text>
         </View>
 
-        {/* CTA */}
+        {/* CTA — skeleton i knappens form under lasting, så bunnen av siden
+            ikke hopper når tegneflaten (eller supporter-tilstanden) kommer. */}
         <View style={styles.ctaSection}>
-          {iSupport ? (
+          {loading ? (
+            <>
+              <Skeleton height={56} style={styles.ctaSkeleton} />
+              <Skeleton width={180} height={12} />
+            </>
+          ) : iSupport ? (
             <>
               <Text style={styles.iSupportText}>Du er en av dem 💚</Text>
               <Text style={styles.ctaHint}>
@@ -192,12 +231,12 @@ export function LagkassaScreen() {
                 Avslutt når som helst. Ingen binding.
               </Text>
             </>
-          ) : !loading ? (
+          ) : (
             <Text style={styles.ctaHint}>
               Klubben er ikke koblet til utbetaling ennå. Trenere og
               lagledere kan sette det i gang fra Laginnstillinger.
             </Text>
-          ) : null}
+          )}
         </View>
       </ScrollView>
     </View>
@@ -282,6 +321,13 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textTertiary,
     marginTop: spacing.xs,
+  },
+  splitSkeletonHint: {
+    marginTop: spacing.xs,
+  },
+  ctaSkeleton: {
+    width: '100%',
+    borderRadius: radius.lg,
   },
 
   whyCard: {
