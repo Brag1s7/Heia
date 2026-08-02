@@ -104,11 +104,19 @@ App Store Connect → Upload FULLFØRT — bygg 1.0 (1) «Uploaded to
 Apple» 2026-08-02 kl. 21:25.** «Upload Symbols Failed» for
 hermesvm.framework = KJENT RN/Hermes-kosmetikk (prebuilt uten dSYM →
 usymboliserte Hermes-frames i kræsjlogger); ufarlig, backlog.
-GJENSTÅR (Brage, minutter — trolig alt gjort): TestFlight-fanen →
-bygget ferdig «Processing» (5–15 min) → Internal Testing-gruppe →
-legg til seg selv → TestFlight-appen på telefonen (hello@heiaapp.no)
-→ installer Heia. NB: ny bundle-ID = NY app på telefonen — gammel
-placeholder-app kan slettes, innlogging må gjøres på nytt.
+✅✅ **INSTALLERT PÅ TELEFONEN 2026-08-02 (sen kveld)** — intern
+gruppe opprettet, bygg 1.0 (1) installert via TestFlight-appen.
+**NATIVE-RUNDEN + FØRSTE TESTFLIGHT ER 100 % I MÅL.** Praktisk å
+huske: dev-bygg fra Xcode og TestFlight-bygget deler bundle-ID og
+OVERSKRIVER hverandre på telefonen (én app på hjemskjermen; gul
+prikk foran navnet = TestFlight-versjonen står der). Simulator er
+uendret. Gamle placeholder-appen slettes manuelt.
+MERK OM BARENE: V1-hygienelisten er reelt FERDIG → EKSTERN
+TestFlight (Ridabu-foreldrene) er ikke lenger blokkert av hygiene —
+den krever kun: ekstern gruppe i TestFlight + Apples Beta App Review
+av første eksterne bygg (~1 døgn; trenger demo-konto til reviewer) +
+Brages GO. Anbefalt først: APNs-push + deep-link-restansene under,
+så foreldrenes førsteinntrykk er komplett.
 ETTER TESTFLIGHT (nye restanser fra runden): (i) «Åpne Heia-appen»-
 knappen på web/betaling kan nå AKTIVERES (heia://-skjemaet finnes i
 bygget); (ii) JS-Linking-lytteren (naviger til Lagkassa); (iii) evt.
