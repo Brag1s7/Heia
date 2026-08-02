@@ -68,9 +68,10 @@ Individual, hello@heiaapp.no, kr 779/år auto-fornyelse, Enrollment ID
 9XA5DFCLD7. Konvertering til Heia AS senere via Apple Developer
 Support (krever D-U-N-S) — Team ID, apper og TestFlight-historikk
 overlever; reserveløsning er app transfer.**
-**▶️ NATIVE-RUNDEN ER I GANG (fil-siden GJORT 2026-08-02; venter på
-Brages Xcode-/browser-steg). Rekkefølgen er LÅST (bundle-ID er
-permanent per app-oppføring fra første opplasting!):
+**▶️ NATIVE-RUNDEN: ✅ FULLFØRT TIL OG MED OPPLASTING 2026-08-02
+(kveld) — bygg 1.0 (1) «Uploaded to Apple» kl. 21:25! Gjenstår kun
+TestFlight-minuttene hos Brage (se GJENSTÅR nederst i blokken).
+Historikken:
 ✅ FIL-SIDEN (committet på Brage-grenen): bundle-ID
 `no.heiaapp.heia` i project.pbxproj (begge configs), NY
 `ios/Heia2/Heia2.entitlements` (applinks:heiaapp.no +
@@ -90,20 +91,30 @@ vilkårs-/personvern- og e-postsporet-endringene går live i samme
 merge). BESLUTNING (Brage): «Heia2»-navnene internt (target/mappe/
 prosjekt) blir STÅENDE til etter TestFlight — ingen bruker ser dem;
 kun bundle-ID er permanent, og den er ren.
-GJENSTÅR (Brage kjører, Claude guider):
-(a) Xcode viste «Device 'Brage sin iPhone' isn't registered» → trykk
-**Register Device** (trengs for kjøring på egen telefon; ikke for
-TestFlight-opplasting).
-(b) App Store Connect (hello@heiaapp.no) → Agreements → godta
-GRATIS-app-avtalen hvis ikke gjort; Paid Apps/bank/skatt skal IKKE
-settes opp.
-(c) Merge PR-en → verifiser at heiaapp.no serverer AASA med ny appID.
-(d) App-oppføring i App Store Connect (My Apps → + → bundle-ID
-`no.heiaapp.heia`; NB app-NAVNET «Heia» kan være opptatt globalt —
-ha alternativ klar) → Arkiver + last opp → INTERN TestFlight (ingen
-review for interne testere; V1-hygiene kreves ikke for intern).
-NB: ny bundle-ID = NY app på telefonen — gammel placeholder-app kan
-slettes, og innlogging må gjøres på nytt i den nye.
+✅ RESTEN AV LØPET GJENNOMFØRT SAMME KVELD: Register Device gjort;
+**PR #32 MERGET** → AASA røyktestet LIVE på heiaapp.no med appID
+`D86MWL7V3S.no.heiaapp.heia` (200 + application/json — verifisert
+med curl); app-oppføring opprettet i App Store Connect —
+**App Store-NAVN (Brages valg): «Heia – Idrettsglede for alle»**
+(appens egen tagline fra velkomstskjermen; hjemskjermen viser
+fortsatt bare «Heia»), SKU heia-001, norsk primærspråk, Full Access;
+`ITSAppUsesNonExemptEncryption=false` lagt i Info.plist (kun HTTPS —
+slipper eksport-spørsmålet per bygg); **Archive + Distribute →
+App Store Connect → Upload FULLFØRT — bygg 1.0 (1) «Uploaded to
+Apple» 2026-08-02 kl. 21:25.** «Upload Symbols Failed» for
+hermesvm.framework = KJENT RN/Hermes-kosmetikk (prebuilt uten dSYM →
+usymboliserte Hermes-frames i kræsjlogger); ufarlig, backlog.
+GJENSTÅR (Brage, minutter — trolig alt gjort): TestFlight-fanen →
+bygget ferdig «Processing» (5–15 min) → Internal Testing-gruppe →
+legg til seg selv → TestFlight-appen på telefonen (hello@heiaapp.no)
+→ installer Heia. NB: ny bundle-ID = NY app på telefonen — gammel
+placeholder-app kan slettes, innlogging må gjøres på nytt.
+ETTER TESTFLIGHT (nye restanser fra runden): (i) «Åpne Heia-appen»-
+knappen på web/betaling kan nå AKTIVERES (heia://-skjemaet finnes i
+bygget); (ii) JS-Linking-lytteren (naviger til Lagkassa); (iii) evt.
+Heia2→Heia-intern-omdøping (Brages «useriøst»-innvending — besluttet
+utsatt til etter TestFlight; kun kosmetisk, ingen bruker ser det);
+(iv) APNs-nøkkelen (push-restansen under).
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
 NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
 APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for
