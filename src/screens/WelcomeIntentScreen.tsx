@@ -1,10 +1,11 @@
-import React, {useEffect} from 'react';
+import React, {useEffect, useState} from 'react';
 import {View, Text, Pressable, StyleSheet, Image} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {StadiumSurface} from '../components';
 import {useAuth, useOnboarding} from '../context';
+import {confirmDeleteAccount} from '../lib/account';
 import {getSports} from '../lib/api/teams';
 import type {OnboardingStackParamList} from '../shared/types';
 
@@ -12,8 +13,9 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'WelcomeIntent'>;
 
 export function WelcomeIntentScreen({navigation}: Props) {
   const insets = useSafeAreaInsets();
-  const {session} = useAuth();
+  const {session, signOut} = useAuth();
   const {lastError, setLastError} = useOnboarding();
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Forhåndslast idretter (cachet) så CreateTeam-velgeren er klar uten spinner.
   useEffect(() => {
@@ -51,6 +53,15 @@ export function WelcomeIntentScreen({navigation}: Props) {
           </View>
         )}
 
+        {/* Innlogget uten lag: skjermen må forklare seg selv — ellers er
+            den identisk med utlogget-tilstanden og ser ut som om
+            innloggingen ikke virket. */}
+        {session && (
+          <Text style={styles.signedInText}>
+            Innlogget som {session.user.email} — nå mangler bare laget.
+          </Text>
+        )}
+
         <Pressable
           style={({pressed}) => [
             styles.button,
@@ -78,6 +89,33 @@ export function WelcomeIntentScreen({navigation}: Props) {
             <Text style={styles.loginText}>Jeg har konto · Logg inn</Text>
           </Pressable>
         )}
+
+        {/* Kontosletting MÅ være nåbar også uten lag (Apple 5.1.1(v) —
+            reviewere tester med fersk, lagløs konto). Rolig stil her,
+            dramaet bor i dialogene (delt flyt med Profil). */}
+        {session &&
+          (deletingAccount ? (
+            <Text style={styles.accountStatus}>Sletter kontoen din …</Text>
+          ) : (
+            <View style={styles.accountRow}>
+              <Pressable
+                onPress={() => go(() => signOut())}
+                disabled={deletingAccount}>
+                <Text style={styles.accountLink}>Logg ut</Text>
+              </Pressable>
+              <Text style={styles.accountDot}>·</Text>
+              <Pressable
+                onPress={() =>
+                  confirmDeleteAccount({
+                    setDeleting: setDeletingAccount,
+                    signOut,
+                  })
+                }
+                disabled={deletingAccount}>
+                <Text style={styles.accountLink}>Slett konto</Text>
+              </Pressable>
+            </View>
+          ))}
       </View>
     </StadiumSurface>
   );
@@ -155,5 +193,41 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.surface,
     opacity: 0.7,
+  },
+  // Innlogget-uten-lag: identitet + hva som mangler, i loginText-språket.
+  signedInText: {
+    ...typography.bodySmall,
+    color: colors.surface,
+    opacity: 0.7,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+  },
+  accountStatus: {
+    ...typography.bodySmall,
+    color: colors.surface,
+    opacity: 0.7,
+    textAlign: 'center',
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+  },
+  accountLink: {
+    ...typography.bodySmall,
+    color: colors.surface,
+    opacity: 0.7,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  accountDot: {
+    ...typography.bodySmall,
+    color: colors.surface,
+    opacity: 0.5,
   },
 });

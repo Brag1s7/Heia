@@ -16,13 +16,29 @@ interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /**
+   * `needsConfirmation`: e-postbekreftelse er PÅ og brukeren må taste
+   * koden fra e-posten før kontoen virker (VerifyEmailScreen).
+   */
   signUp: (
     email: string,
     password: string,
     displayName: string,
-  ) => Promise<void>;
+  ) => Promise<{needsConfirmation: boolean}>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Bekreft ny konto med 6-sifret kode fra e-posten. Gir session. */
+  confirmSignup: (email: string, code: string) => Promise<void>;
+  /** Send ny bekreftelseskode (registrering). */
+  resendSignupCode: (email: string) => Promise<void>;
+  /** Send passord-reset-kode til e-posten. */
+  requestPasswordReset: (email: string) => Promise<void>;
+  /** Verifiser reset-koden og sett nytt passord. Gir session. */
+  confirmPasswordReset: (
+    email: string,
+    code: string,
+    newPassword: string,
+  ) => Promise<void>;
   /** Leser profilen på nytt — etter at du har endret navn eller telefon. */
   refreshProfile: () => Promise<void>;
 }
@@ -68,7 +84,7 @@ export function AuthProvider({children}: PropsWithChildren) {
 
   const signUp = useCallback(
     async (email: string, password: string, displayName: string) => {
-      const {error} = await supabase.auth.signUp({
+      const {data, error} = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -77,6 +93,61 @@ export function AuthProvider({children}: PropsWithChildren) {
       });
       if (error) {
         throw error;
+      }
+      // Med e-postbekreftelse PÅ kommer ingen session før koden er
+      // tastet. (NB: finnes e-posten fra før, «lykkes» kallet også —
+      // uten at noen kode sendes. Anti-enumerering fra Supabase;
+      // VerifyEmailScreen har hintet «prøv å logge inn».)
+      return {needsConfirmation: data.session == null};
+    },
+    [],
+  );
+
+  const confirmSignup = useCallback(async (email: string, code: string) => {
+    const {error} = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: 'signup',
+    });
+    if (error) {
+      throw error;
+    }
+  }, []);
+
+  const resendSignupCode = useCallback(async (email: string) => {
+    const {error} = await supabase.auth.resend({type: 'signup', email});
+    if (error) {
+      throw error;
+    }
+  }, []);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    // Ingen redirectTo: malen sender en 6-sifret kode ({{ .Token }}),
+    // ikke en lenke — appen har ingen deep links før native-runden.
+    const {error} = await supabase.auth.resetPasswordForEmail(email);
+    if (error) {
+      throw error;
+    }
+  }, []);
+
+  const confirmPasswordReset = useCallback(
+    async (email: string, code: string, newPassword: string) => {
+      const {error} = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: 'recovery',
+      });
+      if (error) {
+        throw error;
+      }
+      // verifyOtp ga session — skjermen under oss byttes til appen, men
+      // denne kjeden fullfører uansett. Feiler passordbyttet, er brukeren
+      // likevel innlogget og kan prøve på nytt fra Profil senere.
+      const {error: pwError} = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (pwError) {
+        throw pwError;
       }
     },
     [],
@@ -119,6 +190,10 @@ export function AuthProvider({children}: PropsWithChildren) {
         signUp,
         signIn,
         signOut,
+        confirmSignup,
+        resendSignupCode,
+        requestPasswordReset,
+        confirmPasswordReset,
         refreshProfile,
       }}>
       {children}

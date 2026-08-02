@@ -23,9 +23,9 @@ type Mode = 'login' | 'register';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Auth'>;
 
-export function AuthScreen({route}: Props) {
+export function AuthScreen({route, navigation}: Props) {
   const insets = useSafeAreaInsets();
-  const {signIn, signUp} = useAuth();
+  const {signIn, signUp, requestPasswordReset} = useAuth();
   const [mode, setMode] = useState<Mode>(route.params?.mode ?? 'login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,12 +43,45 @@ export function AuthScreen({route}: Props) {
           setSubmitting(false);
           return;
         }
-        await signUp(email.trim(), password, displayName.trim());
+        const {needsConfirmation} = await signUp(
+          email.trim(),
+          password,
+          displayName.trim(),
+        );
+        if (needsConfirmation) {
+          navigation.navigate('VerifyEmail', {
+            flow: 'signup',
+            email: email.trim(),
+          });
+        }
       } else {
         await signIn(email.trim(), password);
       }
     } catch (e: any) {
       setError(e.message || 'Noe gikk galt');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Koden sendes FØR navigeringen — kodeskjermen skal aldri vise
+  // «vi har sendt …» uten at det stemmer.
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Skriv inn e-posten din først, så sender vi deg en kode');
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      await requestPasswordReset(email.trim());
+      navigation.navigate('VerifyEmail', {
+        flow: 'recovery',
+        email: email.trim(),
+      });
+    } catch {
+      // Typisk rate limit — Supabase-teksten er engelsk og kryptisk.
+      setError('Fikk ikke sendt kode akkurat nå — prøv igjen om litt');
     } finally {
       setSubmitting(false);
     }
@@ -159,6 +192,11 @@ export function AuthScreen({route}: Props) {
                 mode === 'login' ? 'current-password' : 'new-password'
               }
             />
+            {mode === 'login' && (
+              <Pressable onPress={handleForgotPassword} disabled={submitting}>
+                <Text style={styles.forgotLink}>Glemt passordet?</Text>
+              </Pressable>
+            )}
           </View>
 
           {error && <Text style={styles.error}>{error}</Text>}
@@ -297,5 +335,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '600',
     textDecorationLine: 'underline',
+  },
+  forgotLink: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    alignSelf: 'flex-end',
+    marginTop: spacing.xs,
   },
 });

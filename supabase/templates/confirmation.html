@@ -1,0 +1,25 @@
+<!-- Bekreftelseskode ved registrering (Supabase auth-mal, config.toml
+     [auth.email.template.confirmation]). OTP-kode, IKKE lenke: appen
+     har ingen deep links før native-runden, og en 6-sifret kode i
+     appen er uansett den enkleste flyten på telefon. -->
+<div style="font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; background: #FBF7EC; padding: 32px 24px; color: #08392E;">
+  <div style="max-width: 480px; margin: 0 auto;">
+    <h1 style="font-size: 24px; margin: 0 0 8px;">Velkommen til Heia! 💚</h1>
+    <p style="font-size: 16px; color: #3C5A50; line-height: 1.6; margin: 0 0 24px;">
+      Tast inn denne koden i appen for å bekrefte e-posten din:
+    </p>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 20px; text-align: center; margin: 0 0 24px;">
+      <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px;">{{ .Token }}</span>
+    </div>
+    <p style="font-size: 14px; color: #3C5A50; line-height: 1.6; margin: 0 0 8px;">
+      Koden gjelder i én time. Ikke del den med noen.
+    </p>
+    <p style="font-size: 14px; color: #7A8F87; line-height: 1.6; margin: 0;">
+      Var det ikke deg som registrerte deg? Da kan du trygt se bort fra
+      denne e-posten.
+    </p>
+    <p style="font-size: 13px; color: #7A8F87; margin: 32px 0 0;">
+      Heia · Idrettsglede for alle · <a href="mailto:hello@heiaapp.no" style="color: #7A8F87;">hello@heiaapp.no</a>
+    </p>
+  </div>
+</div>

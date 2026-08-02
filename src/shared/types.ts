@@ -221,6 +221,9 @@ export type HomeStackParamList = {
 export type OnboardingStackParamList = {
   WelcomeIntent: undefined;
   Auth: {mode?: 'login' | 'register'} | undefined;
+  // 6-sifret kode fra e-post: 'signup' = bekreft ny konto,
+  // 'recovery' = kode + nytt passord. Ingen deep links — koden ER broen.
+  VerifyEmail: {flow: 'signup' | 'recovery'; email: string};
   JoinTeamCode: {prefillCode?: string} | undefined;
   CreateTeam: undefined;
 };

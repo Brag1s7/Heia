@@ -1,0 +1,25 @@
+<!-- Passord-reset (Supabase auth-mal, config.toml
+     [auth.email.template.recovery]). Samme kode-flyt som
+     confirmation.html — se kommentaren der. -->
+<div style="font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; background: #FBF7EC; padding: 32px 24px; color: #08392E;">
+  <div style="max-width: 480px; margin: 0 auto;">
+    <h1 style="font-size: 24px; margin: 0 0 8px;">Nytt passord i Heia</h1>
+    <p style="font-size: 16px; color: #3C5A50; line-height: 1.6; margin: 0 0 24px;">
+      Tast inn denne koden i appen, så velger du et nytt passord rett
+      etterpå:
+    </p>
+    <div style="background: #FFFFFF; border-radius: 16px; padding: 20px; text-align: center; margin: 0 0 24px;">
+      <span style="font-size: 36px; font-weight: 800; letter-spacing: 8px;">{{ .Token }}</span>
+    </div>
+    <p style="font-size: 14px; color: #3C5A50; line-height: 1.6; margin: 0 0 8px;">
+      Koden gjelder i én time. Ikke del den med noen.
+    </p>
+    <p style="font-size: 14px; color: #7A8F87; line-height: 1.6; margin: 0;">
+      Har du ikke bedt om nytt passord? Da kan du se bort fra denne
+      e-posten — passordet ditt er uendret.
+    </p>
+    <p style="font-size: 13px; color: #7A8F87; margin: 32px 0 0;">
+      Heia · Idrettsglede for alle · <a href="mailto:hello@heiaapp.no" style="color: #7A8F87;">hello@heiaapp.no</a>
+    </p>
+  </div>
+</div>

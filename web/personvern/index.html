@@ -8,9 +8,11 @@
        Brages beslutninger 2026-08-02 (LÅST): aldersgrense 13 år;
        ingen personnavn som behandlingsansvarlig — plassholdere til
        AS-et finnes.
-       Supabase-regionen er VERIFISERT 2026-08-02: eu-central-1
-       (Frankfurt) via `x-sb-edge-region`-headeren → §«Hvor
-       opplysningene lagres» kan stå som den gjør.
+       Supabase-regionen er VERIFISERT 2026-08-02 via
+       `supabase projects list`: West Europe (London) — dvs.
+       STORBRITANNIA (adekvansbeslutning), ikke EU. §«Hvor
+       opplysningene lagres» sier det. (`x-sb-edge-region`-headeren
+       viser bare edge-noden, IKKE databasen — ikke gå i den fella.)
        ENESTE GJENSTÅENDE TODO — de tre plassholderne under skal
        erstattes når Heia AS er registrert (orgnr fra Brønnøysund):
          [JURIDISK SELSKAPSNAVN] · [ORGANISASJONSNUMMER] ·
@@ -111,7 +113,9 @@
 
     <h2>Hvor opplysningene lagres</h2>
     <p>Databasen, innloggingen og bildene ligger hos Supabase på
-    servere i EU. Stripe (betaling) og Apple (varsler) er amerikanske
+    servere i London. Storbritannia er forhåndsgodkjent av
+    EU-kommisjonen som trygt mottakerland, så GDPR-vernet gjelder
+    fullt ut. Stripe (betaling) og Apple (varsler) er amerikanske
     selskaper som også behandler opplysninger utenfor EØS — de
     overføringene skjer på EU-kommisjonens godkjente
     overføringsgrunnlag.</p>

@@ -63,15 +63,28 @@ commits. GJENSTÅR I FASE 6: native-runden (bundle-ID FØRST, så
 Associated Domains + heia:// + AASA-oppdatering), vilkårs-TODO-ene,
 e-postvarselet (Resend), AS/Apple-løpet hos Brage. Dette er
 STRIPE-sporet (fase 6), IKKE nettside-prosjektet.**
-**APPLE DEVELOPER: BETALT OG SENDT 2026-08-02 (natt) —
-`Enrollment ID 9XA5DFCLD7`, Individual, kr 779/år med auto-fornyelse,
-Apple-konto = hello@heiaapp.no. Status «pending», Apple oppgir inntil
-48 t. Kvittering + godkjenning lander i hello@heiaapp.no. NÅR
-GODKJENNINGEN KOMMER: App Store Connect → Agreements → godta
-GRATIS-app-avtalen; Paid Apps/bank/skatt skal IKKE settes opp (Heia
-tar betalt via Stripe utenfor IAP). Konvertering til Heia AS gjøres
-senere via Apple Developer Support (krever D-U-N-S) — Team ID, apper
-og TestFlight-historikk overlever; reserveløsning er app transfer.**
+**🍎 APPLE DEVELOPER: GODKJENT 2026-08-02 (samme døgn som innsendt!) —
+Individual, hello@heiaapp.no, kr 779/år auto-fornyelse, Enrollment ID
+9XA5DFCLD7. Konvertering til Heia AS senere via Apple Developer
+Support (krever D-U-N-S) — Team ID, apper og TestFlight-historikk
+overlever; reserveløsning er app transfer.**
+**▶️ NESTE SAMTALE = NATIVE-RUNDEN (Brages valg — «vi kan ta dette nå
+i neste samtale»). Rekkefølgen er LÅST (bundle-ID er permanent per
+app-oppføring fra første opplasting!):
+(0) App Store Connect → Agreements → godta GRATIS-app-avtalen først;
+Paid Apps/bank/skatt skal IKKE settes opp (Stripe utenfor IAP).
+(1) Bundle-ID-bytte til `no.heiaapp.heia` (i dag RN-placeholder) —
+se docs/HEIAAPP-NO.md steg 0.
+(2) Associated Domains (applinks:heiaapp.no) + heia://-URL-skjema.
+(3) AASA-filen i web/ oppdateres med EKTE Team ID + ny bundle-ID
+(Team ID finnes nå i Apple-kontoen) → PR til main (AASA serveres fra
+Vercel — MERK: vilkårs-/personvernendringene fra 2026-08-02 ligger
+også på Brage-grenen og går live i samme merge).
+(4) Arkiver + last opp → INTERN TestFlight (ingen review for interne
+testere; V1-hygiene kreves ikke for intern — barene står).
+NB for Claude i neste samtale: native-arbeid = Xcode hos Brage med
+guiding; ALDRI pod install/build i bakgrunnen mens appen kjører
+(se minnet feedback_dev_environment).**
 **VILKÅR + PERSONVERN ER FERDIGE 2026-08-02 (natt) — tre beslutninger
 LÅST av Brage: (a) aldersgrense = 13 ÅR (under 13 via foresattes
 konto); (b) refusjon = 14 DAGERS ANGRERETT på nytegning + ALLTID
@@ -80,7 +93,9 @@ refusjon ved feiltrekk + ingen refusjon av gjennomførte måneder;
 avtalepart eller kontaktperson — sidene bruker plassholderne
 `[JURIDISK SELSKAPSNAVN]`, `[ORGANISASJONSNUMMER]`,
 `[FORRETNINGSADRESSE]` til AS-et er registrert. Supabase-regionen ble
-verifisert samtidig (eu-central-1 via `x-sb-edge-region`) → nytt
+verifisert samtidig (West Europe (London) — Storbritannia,
+adekvansbeslutning; RETTET fra eu-central-1: edge-headeren viser bare
+edge-noden, `supabase projects list` er sannheten) → nytt
 avsnitt «Hvor opplysningene lagres». Funn underveis: appen lenket
 INGEN steder til vilkårene — nå er «Vilkår for bruk» + «Personvern»
 egne rader på Profil (over «Om Heia»), og registreringsskjermen har
@@ -88,14 +103,59 @@ samtykkelinjen «Ved å opprette konto godtar du vilkårene og
 personvernerklæringen. Du må være minst 13 år.» med trykkbare lenker
 (ny `src/shared/links.ts`). ENESTE GJENSTÅENDE: de tre plassholderne
 — MÅ erstattes i BEGGE filer før App Store-innsending.**
-**NESTE: (3) RESEND-OPPSETT — Brage oppretter gratis konto +
-API-nøkkel; Claude kobler e-postvarsel per rapport (Edge Function +
-database-webhook på content_reports, ~15 min) TIL hello@heiaapp.no.
-NB: Resend-kontoen skal SENERE også bli Supabase auth-SMTP (innebygd
-mailer er dev-only/rate-limited — MÅ byttes før ekstern TestFlight;
-utsending fra @heiaapp.no krever Resend-DNS-poster i Uniweb-panelet —
-samme øvelse som Vercel-postene). Deretter: native-runden når
-Apple-kontoen er godkjent (bundle-ID `no.heiaapp.heia` FØRST).** Fase 6-eksterne
+**E-POSTSPORET BYGGET OG DEPLOYET 2026-08-02 (natt) — tre ting i én
+runde: (a) RAPPORTVARSEL: migrasjon `00043` i prod (trigger
+`notify_on_content_report` på content_reports — pg_net + vault-idiomet
+fra 00022, gjenbruker `project_url`/`service_role_key`-secretene) +
+Edge Function `report-notify` deployet (Bearer-sjekk mot service key
+som push-fanout; Resend → hello@heiaapp.no; hopper pent over hvis
+RESEND_API_KEY mangler). VENTER KUN på at nøkkelen settes:
+`supabase secrets set RESEND_API_KEY=re_…` (Brage har nøkkelen).
+Virker UTEN domene-DNS (mottaker = Resend-kontoens egen adresse).
+(b) FUNN: appen hadde INGEN «glemt passord»-flyt (permanent utestengt
+ved glemt passord) og INGEN e-post ved registrering
+(mailer_autoconfirm var på). Brages beslutning: BEKREFTELSESKODE ved
+signup. Bygget: `VerifyEmailScreen` (6-sifret OTP — signup-bekreftelse
+OG recovery med nytt passord; ingen deep links nødvendig),
+«Glemt passordet?»-lenke på AuthScreen, 4 nye context-metoder
+(verifyOtp signup/recovery + resend + resetPasswordForEmail).
+(c) AUTH-CONFIG versjonert i config.toml og pushet med
+`supabase config push`: enable_confirmations=true (BEKREFTET i prod:
+mailer_autoconfirm=false), norske OTP-maler i `supabase/templates/`
+({{ .Token }}, ikke lenke), otp_length 8→6, max_frequency 1m0s.
+✅ SMTP-BYTTET ER FULLFØRT SAMME KVELD — se avsnittet under.
+TELEFONTEST (Metro-reload): (1) registrer NY
+testadresse → «Sjekk e-posten din»-skjerm → kod inn → rett inn i
+appen; (2) «Glemt passordet?» på innlogging (e-post utfylt) →
+kodeskjerm + nytt passord → innlogget; (3) etter nøkkelen er satt:
+rapporter et innlegg → e-post i hello@heiaapp.no.
+DERETTER: native-runden når Apple-kontoen er godkjent (bundle-ID
+`no.heiaapp.heia` FØRST).**
+**TELEFONTEST BESTÅTT samme kveld («Det funker med både signup og
+reset passord!») + BRAGES PRODUKTFUNN FIKSET: innlogget bruker UTEN
+lag møtte en skjerm identisk med utlogget-tilstanden — ingen tegn på
+innlogging, ingen utlogging, og INGEN vei til kontosletting (ekte
+Apple 5.1.1(v)-hull: reviewere tester med fersk, lagløs konto).
+Nå viser WelcomeIntent ved session: «Innlogget som {e-post} — nå
+mangler bare laget.» over knappene + rolige lenker «Logg ut · Slett
+konto» nederst (delt bekreftelsesflyt med Profil via ny
+`src/lib/account.ts` — én kilde til dialogtekstene). BESLUTNING
+(produktanbefaling akseptert): IKKE mer kontoadministrasjon for
+lagløse brukere (e-postbytte o.l.) — laget er produktet.
+✅ E-POSTSPORET ER 100 % FERDIG 2026-08-02 (sen kveld): Brage la
+heiaapp.no inn i Resend (EU-region, Sending PÅ, Receiving AV — skal
+FORBLI av, innboksen bor hos Uniweb), la de 3 DNS-postene (DKIM-TXT +
+MX/TXT på `send`) i Uniweb-panelet — Claude verifiserte alle tre mot
+autoritativ NS (ns02.no.brand.one.com) FØR «I've added the records».
+Domenet ble verifisert, og Brage kjørte
+`RESEND_API_KEY=re_… supabase config push` selv («Ferdig nå!»):
+[auth.email.smtp] = smtp.resend.com/465 med avsender
+«Heia <hello@heiaapp.no>», email_sent 2→100/t. RESEND_API_KEY +
+RESEND_FROM står som funksjonssecrets (samme nøkkel overalt) →
+rapportvarselet sender også fra hello@heiaapp.no. HELE KJEDEN LIVE:
+signup-kode + passord-reset + rapportvarsel, alt fra @heiaapp.no,
+ingen dev-grense. Røyktest ved anledning: be om passord-reset — 
+e-posten skal komme fra «Heia <hello@heiaapp.no>».** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
@@ -325,7 +385,7 @@ retningslinjer — **punkt 1–3 er BYGGET (migrasjon `00041` deployet)**:
    angrerett + alltid feiltrekk-refusjon + ingen refusjon av
    gjennomførte måneder**, og **ingen personnavn** — juridisk enhet
    står som plassholdere til AS-et finnes. Samtidig lukket to hull:
-   Supabase-regionen er verifisert (eu-central-1) så
+   Supabase-regionen er verifisert (London/Storbritannia) så
    «Hvor opplysningene lagres» kunne skrives, og APPEN LENKER NÅ TIL
    SIDENE (Profil-rader + samtykkelinje på registrering — den fantes
    ikke før, og vilkårsteksten påstod at man godtok dem).
