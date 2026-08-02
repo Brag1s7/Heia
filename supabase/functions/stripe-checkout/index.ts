@@ -38,6 +38,7 @@
 // ============================================================
 import {createClient, type SupabaseClient} from 'jsr:@supabase/supabase-js@2';
 import {stripePost} from '../_shared/stripe.ts';
+import {landingUrl} from '../_shared/web.ts';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -294,7 +295,6 @@ Deno.serve(async (req) => {
     }
 
     // --- Checkout-sesjonen (fase 0-spikens eksakte subscription_data) ---
-    const landing = `${supabaseUrl}/functions/v1/stripe-checkout-return`;
     const feePercent = (offering.fee_bps / 100).toFixed(2);
     const session = await stripePost('/v1/checkout/sessions', {
       mode: 'subscription',
@@ -306,8 +306,8 @@ Deno.serve(async (req) => {
       'subscription_data[application_fee_percent]': feePercent,
       'metadata[support_subscription_id]': subRow.id,
       'subscription_data[metadata][support_subscription_id]': subRow.id,
-      success_url: `${landing}?flow=success`,
-      cancel_url: `${landing}?flow=cancel`,
+      success_url: landingUrl('success'),
+      cancel_url: landingUrl('cancel'),
     });
 
     // Betinget skriving av sesjons-id: har den gamle sesjonen rukket å

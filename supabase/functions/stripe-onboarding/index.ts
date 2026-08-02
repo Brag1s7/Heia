@@ -28,6 +28,7 @@
 // ============================================================
 import {createClient} from 'jsr:@supabase/supabase-js@2';
 import {stripePost} from '../_shared/stripe.ts';
+import {landingUrl} from '../_shared/web.ts';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -169,14 +170,13 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Kortlevd lenke, generert nå — landingssiden er en liten offentlig
-    // søsterfunksjon (domene for Universal Links er en fase 4/6-sak).
-    const landing = `${supabaseUrl}/functions/v1/stripe-onboarding-return`;
+    // Kortlevd lenke, generert nå — landingssiden er heiaapp.no når
+    // WEB_BASE_URL er satt, ellers tekstside-søsterfunksjonen.
     const linkObj = await stripePost('/v1/account_links', {
       account: stripeAccountId!,
       type: 'account_onboarding',
-      return_url: `${landing}?flow=return`,
-      refresh_url: `${landing}?flow=refresh`,
+      return_url: landingUrl('onboarding'),
+      refresh_url: landingUrl('refresh'),
     });
 
     return json({url: linkObj.url, expires_at: linkObj.expires_at ?? null});

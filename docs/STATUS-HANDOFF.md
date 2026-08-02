@@ -42,11 +42,20 @@ består), alt personlig slettes. Vilkår + personvern (punkt 5) ligger
 som UTKAST i `web/vilkar/` + `web/personvern/` — 3 TODO-er i
 HTML-kommentarene VENTER FORTSATT PÅ BRAGE (juridisk enhet,
 aldersgrense, refusjonspolicy); svares før/når hostingen deployes.
-**NESTE SAMTALE (Brages valg 2026-08-02): heiaapp.no STEG 1 —
-hosting av `web/`-bunken (HEIAAPP-NO.md) + retur-URL-byttet i Edge
-Functions = betalingsflytens retur-opplevelse blir pen OG
-vilkår/personvern får offentlige URL-er (App Store-krav). Dette er
-STRIPE-sporet (fase 6), IKKE nettside-prosjektet.** Fase 6-eksterne
+**heiaapp.no STEG 1: CLAUDE-DELEN ER GJORT 2026-08-02 (sen kveld) —
+retur-URL-ene i `stripe-checkout`/`stripe-onboarding`/`stripe-portal`
+er miljøstyrte via ny `_shared/web.ts` (secreten `WEB_BASE_URL` →
+`heiaapp.no/betaling?flow=…`; usatt = dagens tekstsider — DEPLOYET,
+null atferdsendring), `web/vercel.json` (AASA = application/json) +
+plassholder-rotside `web/index.html` ligger klare, og HEIAAPP-NO.md
+steg 1 er en konkret Vercel+Uniweb-runbook. RESTEN ER BRAGE-AVHENGIG
+(~15 min): PR til main → Vercel-import (Root Directory = `web`) → to
+DNS-poster i Uniwebs panel (ALDRI navnetjener-flytt — DNSSec er
+aktiv!) → si «hostingen er live» i en Claude-samtale → Claude
+røyktester AASA + /betaling og setter `WEB_BASE_URL` (én kommando,
+ingen redeploy). Da får vilkår/personvern samtidig offentlige URL-er
+(App Store-krav). Dette er STRIPE-sporet (fase 6), IKKE
+nettside-prosjektet.** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
@@ -204,7 +213,9 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
    varslingsflyt ved lagavvikling.
 3. **Vilkår + personvern** (App Store-krav: offentlig URL) — trenger
    minimal heiaapp.no-hosting (HEIAAPP-NO.md steg 1); dette hører til
-   STRIPE-sporet. Retur-URL-byttet (steg 3) tas samtidig.
+   STRIPE-sporet. Retur-URL-byttet (steg 3) er FORHÅNDSKODET +
+   deployet 2026-08-02 (`WEB_BASE_URL`-secreten er bryteren — settes
+   når hostingen er live; se HEIAAPP-NO.md steg 3).
 4. **Native-runden** (Brage kjører): bundle-ID-bytte (placeholder i
    dag!) + Associated Domains + heia://-skjema — kreves uansett før
    TestFlight/App Store.

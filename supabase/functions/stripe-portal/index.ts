@@ -15,6 +15,7 @@
 // ============================================================
 import {createClient} from 'jsr:@supabase/supabase-js@2';
 import {stripePost} from '../_shared/stripe.ts';
+import {landingUrl} from '../_shared/web.ts';
 
 function json(body: Record<string, unknown>, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
   try {
     const session = await stripePost('/v1/billing_portal/sessions', {
       customer: pc.provider_customer_id as string,
-      return_url: `${supabaseUrl}/functions/v1/stripe-checkout-return?flow=portal`,
+      return_url: landingUrl('portal'),
     });
     return json({url: session.url});
   } catch (e) {
