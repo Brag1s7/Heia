@@ -233,8 +233,8 @@ export function LagkassaScreen() {
             </>
           ) : (
             <Text style={styles.ctaHint}>
-              Klubben er ikke koblet til utbetaling ennå. Trenere og
-              lagledere kan sette det i gang fra Laginnstillinger.
+              Støtten for dette laget er ikke satt opp ennå. Trenere og
+              lagledere finner status i Laginnstillinger.
             </Text>
           )}
         </View>

@@ -177,9 +177,10 @@ export function SupportScreen() {
         <View style={styles.section}>
           <Text style={styles.stateTitle}>Ikke helt klart ennå</Text>
           <Text style={styles.stateBody}>
-            Klubben er ikke koblet til utbetaling ennå, så støtten kan ikke
-            starte riktig enda. Trenere og lagledere kan sette det i gang fra
-            Laginnstillinger → «Støtte fra supportere».
+            Støtten for dette laget er ikke satt opp ennå — enten venter
+            klubben på kobling til utbetaling, eller så mangler prisen for
+            laget. Trenere og lagledere finner status i Laginnstillinger →
+            «Støtte fra supportere».
           </Text>
         </View>
       );
