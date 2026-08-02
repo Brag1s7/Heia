@@ -123,7 +123,25 @@ appen; (2) «Glemt passordet?» på innlogging (e-post utfylt) →
 kodeskjerm + nytt passord → innlogget; (3) etter nøkkelen er satt:
 rapporter et innlegg → e-post i hello@heiaapp.no.
 DERETTER: native-runden når Apple-kontoen er godkjent (bundle-ID
-`no.heiaapp.heia` FØRST).** Fase 6-eksterne
+`no.heiaapp.heia` FØRST).**
+**TELEFONTEST BESTÅTT samme kveld («Det funker med både signup og
+reset passord!») + BRAGES PRODUKTFUNN FIKSET: innlogget bruker UTEN
+lag møtte en skjerm identisk med utlogget-tilstanden — ingen tegn på
+innlogging, ingen utlogging, og INGEN vei til kontosletting (ekte
+Apple 5.1.1(v)-hull: reviewere tester med fersk, lagløs konto).
+Nå viser WelcomeIntent ved session: «Innlogget som {e-post} — nå
+mangler bare laget.» over knappene + rolige lenker «Logg ut · Slett
+konto» nederst (delt bekreftelsesflyt med Profil via ny
+`src/lib/account.ts` — én kilde til dialogtekstene). BESLUTNING
+(produktanbefaling akseptert): IKKE mer kontoadministrasjon for
+lagløse brukere (e-postbytte o.l.) — laget er produktet.
+RESEND-DNS: Brage la heiaapp.no inn i Resend (EU-region, Sending PÅ,
+Receiving AV — riktig; Receiving skal FORBLI av, innboksen bor hos
+Uniweb) og fikk de 3 postene (DKIM-TXT + MX/TXT på `send`) til
+Uniweb-panelet. NÅR RESEND VISER «VERIFIED»: avkommenter
+[auth.email.smtp]-blokken i config.toml, hev email_sent-raten,
+`RESEND_API_KEY=re_… supabase config push`, og sett
+`RESEND_FROM="Heia <hello@heiaapp.no>"` som funksjonssecret.** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er

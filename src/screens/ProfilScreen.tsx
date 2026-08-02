@@ -52,12 +52,12 @@ import {
   type PushPermission,
 } from '../lib/push';
 import {
-  deleteAccount,
   updateProfile,
   getMySupportOverview,
   openSupportPortal,
   type MySupportItem,
 } from '../lib/api';
+import {confirmDeleteAccount} from '../lib/account';
 import {formatKr} from '../lib/money';
 import type {ProfilStackParamList, RootTabParamList} from '../shared/types';
 
@@ -199,46 +199,14 @@ export function ProfilScreen() {
   const [deletingAccount, setDeletingAccount] = useState(false);
   const handleDeleteAccount = useCallback(() => {
     if (deletingAccount) return;
-    Alert.alert(
-      'Slette kontoen din?',
-      'Dette kan ikke angres. Du fjernes fra lagene dine, aktive ' +
-        'støtteavtaler avsluttes, og profilen din anonymiseres. ' +
-        'Innlegg du har delt med laget blir stående uten navnet ditt.',
-      [
-        {text: 'Avbryt', style: 'cancel'},
-        {
-          text: 'Slett kontoen',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Helt sikker?',
-              'Kontoen og påloggingen din slettes for godt.',
-              [
-                {text: 'Avbryt', style: 'cancel'},
-                {
-                  text: 'Ja, slett kontoen min',
-                  style: 'destructive',
-                  onPress: async () => {
-                    setDeletingAccount(true);
-                    try {
-                      await deleteAccount();
-                      supportOverviewCache = null;
-                      await signOut();
-                    } catch (e: any) {
-                      setDeletingAccount(false);
-                      Alert.alert(
-                        'Kunne ikke slette kontoen',
-                        e?.message ?? 'Prøv igjen om litt.',
-                      );
-                    }
-                  },
-                },
-              ],
-            );
-          },
-        },
-      ],
-    );
+    // Delt flyt med velkomstskjermen (lagløs bruker) — src/lib/account.ts.
+    confirmDeleteAccount({
+      setDeleting: setDeletingAccount,
+      signOut,
+      onDeleted: () => {
+        supportOverviewCache = null;
+      },
+    });
   }, [deletingAccount, signOut]);
 
   const handleNotifications = useCallback(async () => {
