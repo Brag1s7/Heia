@@ -159,3 +159,17 @@ export async function createComment(
     throw error;
   }
 }
+
+/**
+ * Sletter en kommentar (soft delete). RPC-en `soft_delete_comment` (00041)
+ * slipper gjennom forfatteren og trener/lagleder — se `deletePost` for
+ * hvorfor dette er en RPC og ikke en direkte UPDATE.
+ */
+export async function deleteComment(commentId: string): Promise<void> {
+  const {error} = await supabase.rpc('soft_delete_comment', {
+    p_comment_id: commentId,
+  });
+  if (error) {
+    throw error;
+  }
+}

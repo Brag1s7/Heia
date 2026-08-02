@@ -64,3 +64,24 @@ export async function getTeamMembers(
 
   return [...byUser.values()];
 }
+
+/**
+ * Fjerner et medlem fra laget (kun trener/lagleder — «block abusive
+ * users»-kravet i lukket lag-kontekst, Apple 1.2). RPC-en `remove_team_member`
+ * (00041) setter status='removed' på ALLE personens medlemskap i laget (en
+ * forelder med to barn har to rader), sletter RSVP-ene deres på fremtidige
+ * hendelser, og avviser fjerning av deg selv og av andre admins — vaktene bor
+ * i databasen, ikke her.
+ */
+export async function removeTeamMember(
+  teamSpaceId: string,
+  userId: string,
+): Promise<void> {
+  const {error} = await supabase.rpc('remove_team_member', {
+    p_team_space_id: teamSpaceId,
+    p_user_id: userId,
+  });
+  if (error) {
+    throw error;
+  }
+}

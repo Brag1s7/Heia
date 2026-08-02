@@ -10,13 +10,23 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  type AlertButton,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar, BackBar, Button, Skeleton} from '../components';
-import {getComments, createComment, getFeedPost} from '../lib/api/comments';
-import {toggleReaction} from '../lib/api/feed';
+import {MoreHorizontal} from '../components/icons';
+import {useAuth, useActiveTeam} from '../context';
+import {isTeamAdmin} from '../shared/roles';
+import {
+  getComments,
+  createComment,
+  deleteComment,
+  getFeedPost,
+} from '../lib/api/comments';
+import {toggleReaction, deletePost} from '../lib/api/feed';
+import {promptReport} from '../lib/moderation';
 import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Comments'>;
@@ -33,9 +43,16 @@ function timeAgo(date: Date): string {
   return date.toLocaleDateString('nb-NO', {day: 'numeric', month: 'short'});
 }
 
-export function CommentsScreen({route}: Props) {
+export function CommentsScreen({route, navigation}: Props) {
   const {postId, teamSpaceId} = route.params;
   const insets = useSafeAreaInsets();
+  const {session} = useAuth();
+  const {activeTeamSpaceId, activeRole} = useActiveTeam();
+
+  const myId = session?.user?.id;
+  // Tråden hører alltid til aktivt lag i praksis, men rollen gjelder KUN
+  // der — et varsel fra et annet lag skal ikke arve admin-rettigheter.
+  const amAdmin = teamSpaceId === activeTeamSpaceId && isTeamAdmin(activeRole);
 
   const [post, setPost] = useState<FeedItem | null>(null);
   const [comments, setComments] = useState<FeedComment[]>([]);
@@ -90,6 +107,103 @@ export function CommentsScreen({route}: Props) {
     }
   }, [post]);
 
+  // ⋯ på innleggskortet — samme meny som i feeden. Slettes innlegget er
+  // tråden borte med det, så vi går tilbake (feeden refetcher via realtime).
+  const handlePostActions = useCallback(() => {
+    if (!post) return;
+    const own = !!myId && post.author.id === myId;
+    const buttons: AlertButton[] = [];
+    if (!own) {
+      buttons.push({
+        text: 'Rapporter til Heia',
+        onPress: () => promptReport('feed_post', post.id),
+      });
+    }
+    if (own || amAdmin) {
+      buttons.push({
+        text: 'Slett innlegget',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert(
+            'Slette innlegget?',
+            'Innlegget og kommentarene fjernes for hele laget.',
+            [
+              {text: 'Avbryt', style: 'cancel'},
+              {
+                text: 'Slett',
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await deletePost(post.id);
+                    navigation.goBack();
+                  } catch {
+                    Alert.alert('Kunne ikke slette', 'Prøv igjen om litt.');
+                  }
+                },
+              },
+            ],
+          ),
+      });
+    }
+    buttons.push({text: 'Avbryt', style: 'cancel'});
+    Alert.alert(
+      own ? 'Innlegget ditt' : `Innlegg fra ${post.author.name}`,
+      undefined,
+      buttons,
+    );
+  }, [post, myId, amAdmin, navigation]);
+
+  // ⋯ på en kommentar: egen → slett, andres → rapporter, admin → begge.
+  const handleCommentActions = useCallback(
+    (comment: FeedComment) => {
+      const own = !!myId && comment.author.id === myId;
+      const buttons: AlertButton[] = [];
+      if (!own) {
+        buttons.push({
+          text: 'Rapporter til Heia',
+          onPress: () => promptReport('comment', comment.id),
+        });
+      }
+      if (own || amAdmin) {
+        buttons.push({
+          text: 'Slett kommentaren',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'Slette kommentaren?',
+              'Kommentaren fjernes for hele laget.',
+              [
+                {text: 'Avbryt', style: 'cancel'},
+                {
+                  text: 'Slett',
+                  style: 'destructive',
+                  onPress: async () => {
+                    // Optimistisk — refetch rydder opp uansett utfall.
+                    setComments(prev =>
+                      prev.filter(c => c.id !== comment.id),
+                    );
+                    try {
+                      await deleteComment(comment.id);
+                    } catch {
+                      Alert.alert('Kunne ikke slette', 'Prøv igjen om litt.');
+                    }
+                    await load();
+                  },
+                },
+              ],
+            ),
+        });
+      }
+      buttons.push({text: 'Avbryt', style: 'cancel'});
+      Alert.alert(
+        own ? 'Kommentaren din' : `Kommentar fra ${comment.author.name}`,
+        undefined,
+        buttons,
+      );
+    },
+    [myId, amAdmin, load],
+  );
+
   const handleSend = useCallback(async () => {
     if (text.trim().length === 0 || sending) return;
     setSending(true);
@@ -125,6 +239,17 @@ export function CommentsScreen({route}: Props) {
                 <Text style={styles.postAuthor}>{post.author.name}</Text>
                 <Text style={styles.postTime}>{timeAgo(post.createdAt)}</Text>
               </View>
+              <Pressable
+                onPress={handlePostActions}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Flere valg"
+                style={({pressed}) => [
+                  styles.more,
+                  pressed && styles.morePressed,
+                ]}>
+                <MoreHorizontal size={18} color={colors.textTertiary} />
+              </Pressable>
             </View>
             {post.content.trim().length > 0 && (
               <Text style={styles.postContent}>{post.content}</Text>
@@ -209,6 +334,18 @@ export function CommentsScreen({route}: Props) {
                   <Text style={styles.commentTime}>
                     {timeAgo(c.createdAt)}
                   </Text>
+                  <Pressable
+                    onPress={() => handleCommentActions(c)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Flere valg"
+                    style={({pressed}) => [
+                      styles.more,
+                      styles.commentMore,
+                      pressed && styles.morePressed,
+                    ]}>
+                    <MoreHorizontal size={16} color={colors.textTertiary} />
+                  </Pressable>
                 </View>
                 <Text style={styles.commentText}>{c.content}</Text>
               </View>
@@ -357,6 +494,15 @@ const styles = StyleSheet.create({
   commentTime: {
     ...typography.caption,
     color: colors.textTertiary,
+  },
+  more: {
+    padding: 2,
+  },
+  morePressed: {
+    opacity: 0.5,
+  },
+  commentMore: {
+    marginLeft: 'auto',
   },
   commentText: {
     ...typography.body,

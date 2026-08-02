@@ -14,9 +14,14 @@ import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar, BackBar, ListRowSkeleton, Skeleton} from '../components';
+import {MoreHorizontal} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
-import {getTeamMembers, type TeamMember} from '../lib/api/members';
+import {
+  getTeamMembers,
+  removeTeamMember,
+  type TeamMember,
+} from '../lib/api/members';
 import type {ProfilStackParamList, UserRole} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<ProfilStackParamList, 'TeamMembers'>;
@@ -95,6 +100,38 @@ export function TeamMembersScreen() {
     [members],
   );
 
+  // Fjerning (Apple 1.2, «block abusive users» i lukket lag): kun
+  // trener/lagleder, aldri deg selv, aldri andre admins — RPC-en (00041) er
+  // vakten, UI-et speiler den. Innholdet personen har delt blir stående.
+  const handleRemove = useCallback(
+    (member: TeamMember) => {
+      if (!activeTeamSpaceId) return;
+      const teamName = activeTeamSpace?.displayName ?? 'laget';
+      const childPart =
+        member.childNames.length > 0 ? ' Barna deres fjernes også.' : '';
+      Alert.alert(
+        `Fjerne ${member.name} fra laget?`,
+        `${member.name} mister tilgangen til ${teamName} med en gang.${childPart} Innlegg og kommentarer de har delt blir stående.`,
+        [
+          {text: 'Avbryt', style: 'cancel'},
+          {
+            text: 'Fjern fra laget',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await removeTeamMember(activeTeamSpaceId, member.id);
+              } catch {
+                Alert.alert('Kunne ikke fjerne', 'Prøv igjen om litt.');
+              }
+              load();
+            },
+          },
+        ],
+      );
+    },
+    [activeTeamSpaceId, activeTeamSpace, load],
+  );
+
   const handleContact = useCallback((member: TeamMember) => {
     const phone = member.phone;
     if (!phone) return;
@@ -166,6 +203,9 @@ export function TeamMembersScreen() {
             {section.data.map((member, i) => {
               const isMe = member.id === myId;
               const canContact = !!member.phone && !isMe;
+              // Speiler RPC-vaktene: aldri deg selv, aldri trener/lagleder.
+              const canRemove =
+                amAdmin && !isMe && !isTeamAdmin(member.role);
               return (
                 <Pressable
                   key={member.id}
@@ -194,6 +234,22 @@ export function TeamMembersScreen() {
                     </View>
                   )}
                   {canContact && <Text style={styles.contactIcon}>📞</Text>}
+                  {canRemove && (
+                    <Pressable
+                      onPress={() => handleRemove(member)}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Flere valg for ${member.name}`}
+                      style={({pressed}) => [
+                        styles.moreBtn,
+                        pressed && styles.morePressed,
+                      ]}>
+                      <MoreHorizontal
+                        size={18}
+                        color={colors.textTertiary}
+                      />
+                    </Pressable>
+                  )}
                 </Pressable>
               );
             })}
@@ -332,6 +388,12 @@ const styles = StyleSheet.create({
   },
   contactIcon: {
     fontSize: 18,
+  },
+  moreBtn: {
+    padding: 2,
+  },
+  morePressed: {
+    opacity: 0.5,
   },
   inviteCard: {
     flexDirection: 'row',

@@ -9,6 +9,7 @@ import {
   StyleSheet,
   TextInput,
   Alert,
+  type AlertButton,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -44,10 +45,12 @@ import {
   createImagePost,
   toggleReaction,
   unpinPost,
+  deletePost,
   subscribeToFeed,
   type MatchPhoto,
 } from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
+import {promptReport} from '../lib/moderation';
 import type {
   FeedItem,
   HeiaEvent,
@@ -129,9 +132,10 @@ export function TeamHomeScreen() {
   const composeRef = useRef<TextInput>(null);
   const [refreshing, setRefreshing] = useState(false);
   const {activeTeamSpace, activeTeamSpaceId, activeRole} = useActiveTeam();
-  const {profile} = useAuth();
+  const {profile, session} = useAuth();
   const {justCreatedTeamSpaceId, clearJustCreated} = useOnboarding();
   const canBroadcast = isTeamAdmin(activeRole);
+  const myId = session?.user?.id;
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
@@ -319,6 +323,63 @@ export function TeamHomeScreen() {
       );
     },
     [loadFeed],
+  );
+
+  // Sletting er soft delete i DB-en (00041) — forfatter eller trener/lagleder.
+  // Optimistisk: posten forsvinner med én gang, refetch rydder uansett opp.
+  const handleDeletePost = useCallback(
+    (post: FeedItem) => {
+      Alert.alert(
+        'Slette innlegget?',
+        'Innlegget fjernes fra feeden for hele laget.',
+        [
+          {text: 'Avbryt', style: 'cancel'},
+          {
+            text: 'Slett',
+            style: 'destructive',
+            onPress: async () => {
+              setFeed(prev => prev.filter(p => p.id !== post.id));
+              try {
+                await deletePost(post.id);
+              } catch {
+                Alert.alert('Kunne ikke slette', 'Prøv igjen om litt.');
+              }
+              await loadFeed();
+            },
+          },
+        ],
+      );
+    },
+    [loadFeed],
+  );
+
+  // ⋯-menyen (Apple 1.2): eget innlegg → slett; andres → rapporter;
+  // trener/lagleder → begge. Databasen er vakten — menyen bare speiler den.
+  const handlePostActions = useCallback(
+    (post: FeedItem) => {
+      const own = !!myId && post.author.id === myId;
+      const buttons: AlertButton[] = [];
+      if (!own) {
+        buttons.push({
+          text: 'Rapporter til Heia',
+          onPress: () => promptReport('feed_post', post.id),
+        });
+      }
+      if (own || canBroadcast) {
+        buttons.push({
+          text: 'Slett innlegget',
+          style: 'destructive',
+          onPress: () => handleDeletePost(post),
+        });
+      }
+      buttons.push({text: 'Avbryt', style: 'cancel'});
+      Alert.alert(
+        own ? 'Innlegget ditt' : `Innlegg fra ${post.author.name}`,
+        undefined,
+        buttons,
+      );
+    },
+    [myId, canBroadcast, handleDeletePost],
   );
 
   // «Del med laget» i +-valgarket sender en ny nonce hit for hvert trykk,
@@ -527,6 +588,7 @@ export function TeamHomeScreen() {
                   ? () => handleUnpin(item)
                   : undefined
               }
+              onMore={() => handlePostActions(item)}
             />
           </View>
           );

@@ -109,6 +109,44 @@ export async function stripeGet(
   return body;
 }
 
+// Kaster fra stripeDelete med Stripes error.code, så kalleren kan
+// skille «finnes ikke lenger» (idempotent OK ved gjentak) fra
+// reelle feil som skal stoppe flyten.
+export class StripeApiError extends Error {
+  status: number;
+  code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+// DELETE — kansellerer abonnement / sletter kunder (kontosletting).
+// Flytter aldri penger: å AVSLUTTE et trekk er tilgangsstyring, ikke
+// en pengebevegelse (refusjoner er fortsatt bevisste ops-handlinger).
+export async function stripeDelete(path: string): Promise<StripeObject> {
+  const key = Deno.env.get('STRIPE_SECRET_KEY');
+  if (!key) throw new Error('STRIPE_SECRET_KEY mangler i miljøet');
+
+  const res = await fetch(`https://api.stripe.com${path}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Stripe-Version': STRIPE_API_VERSION,
+    },
+  });
+  const body = await res.json();
+  if (!res.ok) {
+    throw new StripeApiError(
+      `Stripe DELETE ${path} → ${res.status}: ${body?.error?.message ?? 'ukjent feil'}`,
+      res.status,
+      body?.error?.code,
+    );
+  }
+  return body;
+}
+
 // Form-enkodet POST (Stripes eneste format). Nøstede felter skrives
 // med bracket-nøkler («controller[fees][payer]») — samme form som
 // spike-RUNBOOK-ens curl-kall, så parameterne kan sammenlignes 1:1.
