@@ -29,6 +29,7 @@ import {
   Bell,
   Check,
   ChevronRight,
+  FileText,
   HandHeart,
   Info,
   LogOut,
@@ -36,11 +37,13 @@ import {
   Plus,
   Settings,
   Share2,
+  ShieldCheck,
   Trash2,
   UserPlus,
   Users,
 } from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
+import {TERMS_URL, PRIVACY_URL} from '../shared/links';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
 import {
   isPushAvailable,
@@ -565,6 +568,26 @@ export function ProfilScreen() {
                 : 'Fjern kontoen og dataene dine for godt'
             }
             onPress={handleDeleteAccount}
+          />
+          <ListRow
+            icon={
+              <MenuIcon>
+                <FileText size={20} color={colors.textSecondary} />
+              </MenuIcon>
+            }
+            title="Vilkår for bruk"
+            onPress={() => Linking.openURL(TERMS_URL)}
+            right={<RowChevron />}
+          />
+          <ListRow
+            icon={
+              <MenuIcon>
+                <ShieldCheck size={20} color={colors.textSecondary} />
+              </MenuIcon>
+            }
+            title="Personvern"
+            onPress={() => Linking.openURL(PRIVACY_URL)}
+            right={<RowChevron />}
           />
           <ListRow
             icon={

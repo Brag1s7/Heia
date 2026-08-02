@@ -168,10 +168,35 @@ Heia AS (krever D-U-N-S) FØR offentlig App Store-lansering — apper og
 TestFlight-historikk overlever konverteringen; selger-navnet er det
 eneste som bytter.
 
+**Avgjort 2026-08-02 (Brage) — REFUSJONSPOLICYEN, publisert i vilkårene:**
+1. **14 dagers angrerett på nytegning** — sier supporteren opp innen 14
+   dager etter at avtalen ble tegnet, refunderes det FØRSTE trekket
+   (norsk angrerett; kanalen er hello@heiaapp.no, ikke automatikk i
+   appen).
+2. **Feiltrekk refunderes ALLTID** — dobbeltbelastning, feil beløp,
+   trekk etter oppsigelse.
+3. **Gjennomførte måneder refunderes ellers ikke.** Oppsigelse stopper
+   fremtidige trekk og støtten løper ut betalt periode.
+Mekanikken er uendret (fase 0-funn 2): enhver refusjon kjøres med
+`reverse_transfer=true` + `refund_application_fee=true`, ellers tar Heia
+hele tapet. Konsekvens å være klar over: refusjon henter klubbens 60 kr
+tilbake fra klubben. Volumet er null i praksis, men policyen er nå
+skriftlig og offentlig.
+
+**Avgjort 2026-08-02 (Brage) — ALDERSGRENSE = 13 år** (norsk
+samtykkealder for digitale tjenester). Under 13 deltar via foresattes
+konto. Står i vilkårene + personvern + registreringsskjermen.
+
+**Avgjort 2026-08-02 (Brage) — JURIDISK ENHET I TEKSTENE:** Brages
+personnavn skal ALDRI stå som behandlingsansvarlig, avtalepart eller
+kontaktperson. Sidene bruker plassholderne `[JURIDISK SELSKAPSNAVN]`,
+`[ORGANISASJONSNUMMER]`, `[FORRETNINGSADRESSE]` til AS-et er registrert
+— erstattes i begge filer, MÅ være gjort før App Store-innsending.
+
 **Avgjøres før prod (fase 6):** MVA på Heia-andelen (regnskapsfører — kan
 i teorien justere 19-kroners-økonomien, ikke kommunikasjonen) ·
-refund-/disputepolicy som tekst · vilkår + personvern ·
-statement descriptor-standard · varslingsflyt ved lagavvikling · endelig
+disputepolicy som tekst · statement descriptor-standard ·
+varslingsflyt ved lagavvikling · endelig
 bundle-ID (placeholder i dag — se HEIAAPP-NO.md steg 0; MÅ byttes før
 første TestFlight-opplasting, bundle-ID er permanent per app-oppføring).
 

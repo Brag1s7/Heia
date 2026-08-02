@@ -63,27 +63,39 @@ commits. GJENSTÅR I FASE 6: native-runden (bundle-ID FØRST, så
 Associated Domains + heia:// + AASA-oppdatering), vilkårs-TODO-ene,
 e-postvarselet (Resend), AS/Apple-løpet hos Brage. Dette er
 STRIPE-sporet (fase 6), IKKE nettside-prosjektet.**
-**NESTE SAMTALE (Brages valg 2026-08-02 natt) — tre ting, i denne
-rekkefølgen: (1) APPLE DEVELOPER-INNMELDING som privatperson med
-hello@heiaapp.no (Claude guider steg for steg; 99 USD/år; kontoen
-konverteres til Heia AS før offentlig lansering — låst beslutning).
-(2) VILKÅRS-TODO-ENE besvares i samme samtale: aldersgrense —
-Claudes anbefaling er 13 ÅR (norsk samtykkealder for digitale
-tjenester; 13–15-åringene er kjernebrukerne, under 13 dekkes av
-foreldre-administrerte profiler) — Brage bekrefter/velger;
-refusjonspolicy — Claude stiller Brage de konkrete spørsmålene
-direkte; juridisk enhet/orgnr — VENTER på AS-et (forhåpentligvis
-uken etter 2026-08-02), skriv «Heia (enkeltperson under stiftelse av
-AS)»-variant eller la TODO stå til orgnr finnes. Sidene oppdateres og
-auto-deployes ved push til main. (3) RESEND-OPPSETT: Brage oppretter
-gratis konto + API-nøkkel; Claude kobler e-postvarsel per rapport
-(Edge Function + database-webhook på content_reports, ~15 min) TIL
-hello@heiaapp.no. NB: Resend-kontoen skal SENERE også bli Supabase
-auth-SMTP (innebygd mailer er dev-only/rate-limited — MÅ byttes før
-ekstern TestFlight; utsending fra @heiaapp.no krever Resend-DNS-
-poster i Uniweb-panelet — samme øvelse som Vercel-postene).
-Apple-godkjenningen kan ta dager — start innmeldingen FØRST i
-samtalen, gjør resten mens den venter.** Fase 6-eksterne
+**APPLE DEVELOPER: BETALT OG SENDT 2026-08-02 (natt) —
+`Enrollment ID 9XA5DFCLD7`, Individual, kr 779/år med auto-fornyelse,
+Apple-konto = hello@heiaapp.no. Status «pending», Apple oppgir inntil
+48 t. Kvittering + godkjenning lander i hello@heiaapp.no. NÅR
+GODKJENNINGEN KOMMER: App Store Connect → Agreements → godta
+GRATIS-app-avtalen; Paid Apps/bank/skatt skal IKKE settes opp (Heia
+tar betalt via Stripe utenfor IAP). Konvertering til Heia AS gjøres
+senere via Apple Developer Support (krever D-U-N-S) — Team ID, apper
+og TestFlight-historikk overlever; reserveløsning er app transfer.**
+**VILKÅR + PERSONVERN ER FERDIGE 2026-08-02 (natt) — tre beslutninger
+LÅST av Brage: (a) aldersgrense = 13 ÅR (under 13 via foresattes
+konto); (b) refusjon = 14 DAGERS ANGRERETT på nytegning + ALLTID
+refusjon ved feiltrekk + ingen refusjon av gjennomførte måneder;
+(c) BRAGES PERSONNAVN SKAL ALDRI STÅ som behandlingsansvarlig,
+avtalepart eller kontaktperson — sidene bruker plassholderne
+`[JURIDISK SELSKAPSNAVN]`, `[ORGANISASJONSNUMMER]`,
+`[FORRETNINGSADRESSE]` til AS-et er registrert. Supabase-regionen ble
+verifisert samtidig (eu-central-1 via `x-sb-edge-region`) → nytt
+avsnitt «Hvor opplysningene lagres». Funn underveis: appen lenket
+INGEN steder til vilkårene — nå er «Vilkår for bruk» + «Personvern»
+egne rader på Profil (over «Om Heia»), og registreringsskjermen har
+samtykkelinjen «Ved å opprette konto godtar du vilkårene og
+personvernerklæringen. Du må være minst 13 år.» med trykkbare lenker
+(ny `src/shared/links.ts`). ENESTE GJENSTÅENDE: de tre plassholderne
+— MÅ erstattes i BEGGE filer før App Store-innsending.**
+**NESTE: (3) RESEND-OPPSETT — Brage oppretter gratis konto +
+API-nøkkel; Claude kobler e-postvarsel per rapport (Edge Function +
+database-webhook på content_reports, ~15 min) TIL hello@heiaapp.no.
+NB: Resend-kontoen skal SENERE også bli Supabase auth-SMTP (innebygd
+mailer er dev-only/rate-limited — MÅ byttes før ekstern TestFlight;
+utsending fra @heiaapp.no krever Resend-DNS-poster i Uniweb-panelet —
+samme øvelse som Vercel-postene). Deretter: native-runden når
+Apple-kontoen er godkjent (bundle-ID `no.heiaapp.heia` FØRST).** Fase 6-eksterne
 ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
@@ -239,10 +251,12 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
    konfig i live · re-onboarding av Ridabu med live-KYC · refund-/
    disputepolicy som tekst · statement descriptor-standard ·
    varslingsflyt ved lagavvikling.
-3. ✅ **Vilkår + personvern har OFFENTLIGE URL-er** (App Store-kravet)
-   — heiaapp.no-hostingen + retur-URL-byttet gikk LIVE 2026-08-02
-   (HEIAAPP-NO.md steg 1+3; `WEB_BASE_URL` er satt). Gjenstår: de 3
-   vilkårs-TODO-ene (Brage) + privacy nutrition labels ved
+3. ✅ **Vilkår + personvern har OFFENTLIGE URL-er OG ER FERDIGSKREVET**
+   (App Store-kravet) — heiaapp.no-hostingen + retur-URL-byttet gikk
+   LIVE 2026-08-02 (HEIAAPP-NO.md steg 1+3; `WEB_BASE_URL` er satt),
+   og de 3 TODO-ene ble besvart samme natt (13 år · 14 dagers
+   angrerett · plassholdere i stedet for personnavn). Gjenstår kun:
+   plassholderne når orgnr finnes + privacy nutrition labels ved
    innsendingen.
 4. **Native-runden** (Brage kjører): bundle-ID-bytte (placeholder i
    dag!) + Associated Domains + heia://-skjema — kreves uansett før
@@ -305,15 +319,20 @@ retningslinjer — **punkt 1–3 er BYGGET (migrasjon `00041` deployet)**:
    destructive-bekreftelser → lokal signOut. Verifisert i prod-DB:
    ingen FK-er mot auth.users utenfor auth-skjemaet (auth-slettingen
    kan aldri blokkeres av storage e.l.).
-5. 🟡 **Vilkår + personvern-URL** — TEKSTENE SKREVET 2026-08-02 som
-   ferdige sider i `web/vilkar/` + `web/personvern/` (Heia-tonene,
-   lenker til hverandre; publiseres automatisk når heiaapp.no-
-   hostingen deployes i HEIAAPP-NO.md steg 1). UTKAST til Brage
-   godkjenner — 3 TODO-er i HTML-kommentarene: (a) «Heia AS» + orgnr
-   når stiftelsen er registrert, (b) aldersgrense 16 år er FORSLAG,
-   (c) refusjonspolicyen er bevisst nøytral (endelig tekst = fase
-   6-beslutning). Privacy nutrition labels (skjema i App Store
-   Connect) gjenstår til innsendingen. **= DEL 3-resten.**
+5. ✅ **Vilkår + personvern-URL** — LIVE på heiaapp.no/vilkar/ og
+   /personvern/, og FERDIGSTILT 2026-08-02 (natt) med Brages tre
+   beslutninger: aldersgrense **13 år**, refusjon = **14 dagers
+   angrerett + alltid feiltrekk-refusjon + ingen refusjon av
+   gjennomførte måneder**, og **ingen personnavn** — juridisk enhet
+   står som plassholdere til AS-et finnes. Samtidig lukket to hull:
+   Supabase-regionen er verifisert (eu-central-1) så
+   «Hvor opplysningene lagres» kunne skrives, og APPEN LENKER NÅ TIL
+   SIDENE (Profil-rader + samtykkelinje på registrering — den fantes
+   ikke før, og vilkårsteksten påstod at man godtok dem).
+   ⚠️ **GJENSTÅR:** `[JURIDISK SELSKAPSNAVN]` /
+   `[ORGANISASJONSNUMMER]` / `[FORRETNINGSADRESSE]` i BEGGE filer +
+   privacy nutrition labels (skjema i App Store Connect) — begge MÅ
+   være gjort før App Store-innsending.
 ✅ Avklart: auth er e-post+passord (Supabase) uten tredjeparts-login →
 «Sign in with Apple» (4.8) kreves IKKE. Betalingsmodellen er alt
 3.2.2(iv)-kompatibel. Events kan alt avlyses.

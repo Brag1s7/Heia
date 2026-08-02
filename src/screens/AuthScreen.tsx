@@ -9,12 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {BackBar, Button} from '../components';
 import {useAuth} from '../context';
+import {TERMS_URL, PRIVACY_URL} from '../shared/links';
 import type {OnboardingStackParamList} from '../shared/types';
 
 type Mode = 'login' | 'register';
@@ -175,6 +177,29 @@ export function AuthScreen({route}: Props) {
               size="lg"
             />
           )}
+
+          {/* Samtykket må stå FØR kontoen opprettes — vilkårene påstår det,
+              og App Store-reviewen ser etter lenkene. Sidene ligger på
+              heiaapp.no og åpnes i Safari. */}
+          {mode === 'register' && (
+            <Text style={styles.consent}>
+              Ved å opprette konto godtar du{' '}
+              <Text
+                style={styles.consentLink}
+                onPress={() => Linking.openURL(TERMS_URL)}
+              >
+                vilkårene
+              </Text>{' '}
+              og{' '}
+              <Text
+                style={styles.consentLink}
+                onPress={() => Linking.openURL(PRIVACY_URL)}
+              >
+                personvernerklæringen
+              </Text>
+              . Du må være minst 13 år.
+            </Text>
+          )}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -260,5 +285,17 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: spacing.lg,
+  },
+  consent: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+    lineHeight: 18,
+  },
+  consentLink: {
+    color: colors.textSecondary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

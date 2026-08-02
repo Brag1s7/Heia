@@ -4,13 +4,20 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Personvern — Heia</title>
-  <!-- UTKAST (V1-hygiene del 2, 2026-08-02): publiseres først når
-       Brage har godkjent teksten OG heiaapp.no-hostingen er oppe
-       (HEIAAPP-NO.md steg 1). TODO-er før publisering:
-       1. Juridisk enhet: «Heia AS» settes inn når stiftelsen er
-          registrert (orgnr). Frem til da står Brage som ansvarlig.
-       2. Verifiser Supabase-prosjektets region før EU/EØS-avsnittet
-          publiseres (Dashboard → Settings → Infrastructure). -->
+  <!-- Personvernerklæring v1 — LIVE på heiaapp.no/personvern/.
+       Brages beslutninger 2026-08-02 (LÅST): aldersgrense 13 år;
+       ingen personnavn som behandlingsansvarlig — plassholdere til
+       AS-et finnes.
+       Supabase-regionen er VERIFISERT 2026-08-02: eu-central-1
+       (Frankfurt) via `x-sb-edge-region`-headeren → §«Hvor
+       opplysningene lagres» kan stå som den gjør.
+       ENESTE GJENSTÅENDE TODO — de tre plassholderne under skal
+       erstattes når Heia AS er registrert (orgnr fra Brønnøysund):
+         [JURIDISK SELSKAPSNAVN] · [ORGANISASJONSNUMMER] ·
+         [FORRETNINGSADRESSE]
+       Søk etter «[» i filen. Samme plassholdere finnes i
+       web/vilkar/index.html. MÅ være erstattet før
+       App Store-innsending. -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -43,8 +50,9 @@
     selv bestemmer over.</p>
 
     <h2>Hvem er ansvarlig?</h2>
-    <p>Heia (under stiftelse som aksjeselskap) er behandlingsansvarlig
-    for opplysningene i appen. Spørsmål om personvern sendes til
+    <p>[JURIDISK SELSKAPSNAVN], org.nr. [ORGANISASJONSNUMMER],
+    [FORRETNINGSADRESSE], er behandlingsansvarlig for opplysningene i
+    appen. Spørsmål om personvern sendes til
     <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a>.</p>
 
     <h2>Hvilke opplysninger vi behandler</h2>
@@ -88,10 +96,25 @@
     <p>Vi selger aldri opplysningene dine, og Heia har ingen
     annonser.</p>
 
+    <h2>Barn og unge</h2>
+    <p>Egen konto i Heia krever at du er minst 13 år — den norske
+    aldersgrensen for å samtykke til digitale tjenester selv. Yngre
+    barn deltar gjennom foresattes konto: forelderen legger dem inn i
+    laget, eier opplysningene om dem og kan slette dem når som helst.
+    Heia har ingen offentlige profiler, så innhold om barn er kun
+    synlig for medlemmene i laget.</p>
+
     <h2>Hvem vi deler med</h2>
     <p>Kun databehandlerne som trengs for å drive tjenesten: Supabase
     (database og innlogging), Stripe (betaling) og Apple (varsler).
     Ingen andre får tilgang.</p>
+
+    <h2>Hvor opplysningene lagres</h2>
+    <p>Databasen, innloggingen og bildene ligger hos Supabase på
+    servere i EU. Stripe (betaling) og Apple (varsler) er amerikanske
+    selskaper som også behandler opplysninger utenfor EØS — de
+    overføringene skjer på EU-kommisjonens godkjente
+    overføringsgrunnlag.</p>
 
     <h2>Hvor lenge vi lagrer</h2>
     <p>Så lenge du har konto. Sletter du kontoen (Profil → Slett
