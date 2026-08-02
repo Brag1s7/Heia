@@ -22,12 +22,16 @@ HERO-KARUSELLEN på Hjem + SESONG-siden (bunnkortet på Hjem-feeden er
 FJERNET), SupportScreen med 60 kr-språket, «MIN STØTTE» på Profil.
 heiaapp.no-bunken (AASA + landingssider + native-sjekkliste) ligger
 klar: `docs/HEIAAPP-NO.md` — NB bundle-ID er RN-placeholder og byttes i
-native-runden. **V1-HYGIENE DEL 1 (MODERASJON) er KODET + DEPLOYET
-2026-08-02 (migrasjon `00041` pushet til prod) — VENTER BRAGES
-TELEFONTEST: slette innlegg/kommentarer (⋯-meny), rapportere til Heia,
-fjerne medlem fra Lagoversikt. Testlisten + ops-SQL står i «🧹
-V1-HYGIENE» under. NESTE SAMTALE: review av del 1, deretter del 2 =
-kontosletting (punkt 4) + vilkårstekstene (punkt 5). Fase 6-eksterne ting (AS-stiftelse, Apple-innmelding
+native-runden. **V1-HYGIENE DEL 1 (MODERASJON) er GODKJENT 2026-08-02
+(«Alt funker fra del 1» — telefontest bestått): slette
+innlegg/kommentarer (⋯-meny), rapportere til Heia, fjerne medlem fra
+Lagoversikt; migrasjon `00041` i prod. BESLUTNING samme dag (LÅST):
+INGEN overvåknings-/gjennomgangsplikt på rapporter — kanalen består
+(App Store-krav), men Brage skal kun reagere når et e-postvarsel
+kommer; varselet (Resend-nøkkel, ~15 min) er restanse før EKSTERN
+TestFlight. NESTE SAMTALE: START DEL 2 = kontosletting i appen
+(punkt 4, Apple 5.1.1(v) — hardt review-krav) + vilkårstekstene
+(punkt 5). Fase 6-eksterne ting (AS-stiftelse, Apple-innmelding
 som privatperson, regnskapsfører) løper hos Brage i parallell;
 native-runden + intern TestFlight tas når Apple-kontoen er klar. NETTSIDEN (markedssiden på heiaapp.no) er
 BESLUTTET som EGET PROSJEKT som startes ETTER at stripe-sporet er
@@ -191,7 +195,7 @@ app-/deep-link-delen → native-runden i fase 6. Fase 6 består av
 **NETTSIDEN (markedssiden) er eget prosjekt ETTER sporet** — parkert
 med full plan i minnet (website_project.md) + docs/HEIAAPP-NO.md.
 
-### 🧹 V1-HYGIENE (🟡 DEL 1 KODET + DEPLOYET 2026-08-02 — venter telefontest; kreves FØR ekstern TestFlight/lansering)
+### 🧹 V1-HYGIENE (✅ DEL 1 GODKJENT 2026-08-02 — «Alt funker fra del 1»; del 2 gjenstår og kreves FØR ekstern TestFlight/lansering)
 
 Brages presisering: ikke nye funksjoner, men fullføring — «fjerne
 innlegg osv.» + alt App Store krever. Listen, mappet mot Apples
@@ -241,7 +245,21 @@ hygiene — start så snart native-runden er gjort. Ekstern TestFlight
 (Ridabu-foreldrene), nettsiden og App Store-innsending VENTER på
 V1-hygienelisten.
 
-**Hva skjer når noen rapporterer? (Brages spørsmål 2026-08-02):**
+**Rapporter — Brages beslutning 2026-08-02 (LÅST): ingen
+gjennomgangsplikt.** Brage spurte om han «virkelig må se alt som er
+rapportert, ellers dropper vi dette». Svar/beslutning: RUTINEN droppes
+— ingen skal sjekke noe dashboard. KANALEN består, av tre grunner som
+ikke er forhandlingsbare: (a) Apple 1.2 krever en flaggemekanisme i
+UGC-apper — uten den ryker innsendingen; (b) den dekker tilfellet der
+TRENEREN er problemet — medlemmer kan ikke slette adminers innhold, så
+rapport til Heia er eneste utvei; (c) barnebilder: en forelder som
+krever et bilde av sitt barn fjernet MÅ nå noen som kan handle.
+Konsekvens: e-postvarsel per rapport (restansen under) er det som gjør
+plikten HELT passiv — null arbeid til en e-post lander, og den vil
+nesten aldri lande. Inntil varselet er koblet: brukerbasen er Brage +
+testkontoer, så det finnes reelt ingenting å overse.
+
+**Hva skjer når noen rapporterer? (bakgrunn):**
 Ingen forhåndsmoderering — Apple krever ikke at Heia overvåker innhold,
 bare at brukere KAN rapportere og at det ryddes når en rapport kommer
 (1.2-forventningen er reaksjon innen ~24 t på rapportert innhold).
@@ -262,7 +280,7 @@ UPDATE content_reports SET status = 'resolved', resolved_at = now(),
   resolution_note = '…' WHERE id = '…';
 ```
 
-### 📱 V1-hygiene del 1 — telefontest (⏳ VENTER — Metro-reload holder, migrasjonen ER deployet)
+### 📱 V1-hygiene del 1 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — «Alt funker fra del 1»)
 
 1. **Feeden:** hvert innlegg har en diskré ⋯ øverst til høyre. På ditt
    eget: «Slett innlegget» (bekreftelse → borte med én gang). På andres
