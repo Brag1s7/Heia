@@ -4,15 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vilkår — Heia</title>
-  <!-- UTKAST (V1-hygiene del 2, 2026-08-02): publiseres først når
-       Brage har godkjent teksten OG heiaapp.no-hostingen er oppe
-       (HEIAAPP-NO.md steg 1). TODO-er før publisering:
-       1. Juridisk enhet: «Heia AS» + orgnr når stiftelsen er
-          registrert.
-       2. Aldersgrense 16 år er et FORSLAG (barn deltar uansett via
-          foresattes konto) — Brages beslutning.
-       3. Refusjonspolicyen er bevisst nøytral her — endelig tekst er
-          en fase 6-beslutning (PAYMENTS.md §Åpne beslutninger). -->
+  <!-- Vilkår v1 — LIVE på heiaapp.no/vilkar/.
+       Brages beslutninger 2026-08-02 (LÅST):
+         · Aldersgrense = 13 år (norsk samtykkealder for digitale
+           tjenester; under 13 deltar via foresattes konto).
+         · Refusjon = 14 dagers angrerett på nytegning + alltid
+           refusjon ved feiltrekk; gjennomførte måneder refunderes
+           ikke (PAYMENTS.md §Åpne beslutninger er dermed lukket).
+         · Juridisk enhet: Brage skal IKKE stå med personnavn.
+       ENESTE GJENSTÅENDE TODO — de tre plassholderne under skal
+       erstattes når Heia AS er registrert (orgnr fra Brønnøysund):
+         [JURIDISK SELSKAPSNAVN] · [ORGANISASJONSNUMMER] ·
+         [FORRETNINGSADRESSE]
+       Søk etter «[» i filen for å finne alle. Samme plassholdere
+       finnes i web/personvern/index.html. MÅ være erstattet før
+       App Store-innsending. -->
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -45,8 +51,10 @@
 
     <h2>Kontoen din</h2>
     <ul>
-      <li>Du må være minst 16 år for å ha egen konto. Barn deltar i
-      Heia gjennom foresattes konto — de har aldri egen pålogging.</li>
+      <li>Du må være minst 13 år for å ha egen konto. Er du under 18,
+      bør en foresatt vite at du bruker Heia.</li>
+      <li>Barn under 13 deltar gjennom foresattes konto — en forelder
+      legger dem inn i laget, og de har ingen egen pålogging.</li>
       <li>Du er ansvarlig for det som skjer på kontoen din, og for at
       opplysningene du legger inn er riktige.</li>
       <li>Lagene i Heia er lukkede: man blir med via invitasjonskode,
@@ -77,11 +85,16 @@
       er godkjent som mottaker).</li>
       <li>Betalingen behandles av Stripe. Avtalen fornyes automatisk
       hver måned til du sier den opp.</li>
-      <li>Du kan si opp når som helst fra Profil → Min støtte —
-      oppsigelsen stopper fremtidige trekk. Spørsmål om en
-      gjennomført betaling? Ta kontakt på
-      <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a>, så
-      finner vi ut av det.</li>
+      <li>Du kan si opp når som helst fra Profil → Min støtte.
+      Oppsigelsen stopper fremtidige trekk, og støtten løper ut
+      perioden du allerede har betalt for.</li>
+      <li><strong>Angrer du?</strong> Sier du opp innen 14 dager etter
+      at du tegnet avtalen, betaler vi tilbake det første trekket. Si
+      fra på <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a>.</li>
+      <li><strong>Feil trekk fikser vi alltid</strong> — er du
+      belastet dobbelt, med feil beløp eller etter at du sa opp,
+      refunderer vi. Måneder som allerede er gjennomført refunderes
+      ellers ikke.</li>
     </ul>
 
     <h2>Slette kontoen</h2>
@@ -96,6 +109,11 @@
     tid. Heia er ikke ansvarlig for innhold brukerne deler, men vi
     rydder når noen sier fra. Tjenesten kan endre seg — vesentlige
     endringer i vilkårene varsles i appen.</p>
+
+    <h2>Hvem du inngår avtale med</h2>
+    <p>Heia leveres av [JURIDISK SELSKAPSNAVN], org.nr.
+    [ORGANISASJONSNUMMER], [FORRETNINGSADRESSE]. Du når oss på
+    <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a>.</p>
 
     <h2>Lovvalg</h2>
     <p>Vilkårene følger norsk rett.</p>
