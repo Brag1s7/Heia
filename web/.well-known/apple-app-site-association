@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "Q5A6QMRZ4A.org.reactjs.native.example.Heia2",
+        "paths": ["/betaling*", "/lag*", "/stott*"]
+      }
+    ]
+  }
+}

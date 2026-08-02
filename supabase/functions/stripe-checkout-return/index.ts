@@ -30,9 +30,20 @@ til Heia-appen.
 Ombestemmer du deg, står «Støtt laget»-
 knappen klar når som helst. 💚`;
 
+// Retur fra Customer Portal (fase 5 — «Min støtte» på Profil).
+const PORTAL_TEXT = `💚 Alt lagret!
+
+Du kan lukke denne siden og gå tilbake
+til Heia-appen.
+
+Endringer i støtten din oppdaterer seg
+der om et lite øyeblikk.`;
+
 Deno.serve((req) => {
   const flow = new URL(req.url).searchParams.get('flow');
-  return new Response(flow === 'cancel' ? CANCEL_TEXT : SUCCESS_TEXT, {
+  const text =
+    flow === 'cancel' ? CANCEL_TEXT : flow === 'portal' ? PORTAL_TEXT : SUCCESS_TEXT;
+  return new Response(text, {
     headers: {'Content-Type': 'text/plain; charset=utf-8'},
   });
 });

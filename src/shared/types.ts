@@ -211,6 +211,8 @@ export type HomeStackParamList = {
       }
     | undefined;
   Support: undefined;
+  /** Lagkassa (betalingsspor fase 5) — lagets støtteside for alle medlemmer. */
+  Lagkassa: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};
   Season: undefined;

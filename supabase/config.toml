@@ -401,6 +401,12 @@ verify_jwt = true
 enabled = true
 verify_jwt = false
 
+# Customer Portal-sesjoner genereres kun for innloggede brukere,
+# alltid mot brukerens EGEN payment_customers-rad (fase 5).
+[functions.stripe-portal]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

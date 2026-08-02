@@ -35,6 +35,7 @@ import {EventDetailScreen} from '../screens/EventDetailScreen';
 import {NewEventScreen} from '../screens/NewEventScreen';
 import {InviteScreen} from '../screens/InviteScreen';
 import {SupportScreen} from '../screens/SupportScreen';
+import {LagkassaScreen} from '../screens/LagkassaScreen';
 import {CommentsScreen} from '../screens/CommentsScreen';
 import {WelcomeIntentScreen} from '../screens/WelcomeIntentScreen';
 import {AuthScreen} from '../screens/AuthScreen';
@@ -143,6 +144,7 @@ function HomeStackNavigator() {
         options={newEventOptions}
       />
       <HomeStack.Screen name="Support" component={SupportScreen} />
+      <HomeStack.Screen name="Lagkassa" component={LagkassaScreen} />
       <HomeStack.Screen name="Invite" component={InviteScreen} />
       <HomeStack.Screen name="Comments" component={CommentsScreen} />
       <HomeStack.Screen name="Season" component={SeasonScreen} />

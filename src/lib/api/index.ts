@@ -40,11 +40,16 @@ export {
   getSupportOffering,
   getMySupportSubscription,
   startSupportCheckout,
+  getTeamSupportSummary,
+  getMySupportOverview,
+  openSupportPortal,
   type SupportActivationState,
   type SupportActivationStatus,
   type SupportOffering,
   type MySupportStatus,
   type MySupportSubscription,
+  type TeamSupportSummary,
+  type MySupportItem,
 } from './payments';
 export {
   getSeasonStats,

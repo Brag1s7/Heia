@@ -1,24 +1,26 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-02. **NYESTE SPOR: 💳 BETALINGER — FASE 4
-(CHECKOUT I APPEN) ER KODET + DEPLOYET + DB-VERIFISERT 11/11 — VENTER
-BRAGES TELEFONTEST + REVIEW.** Bygget 2026-08-02: migrasjon `00039`
-(offering-versjonering ops-only + pris-oppslag for medlemmer — splitten
-lekker aldri), Edge Functions `stripe-checkout` (fase 2-KONTRAKTEN
-implementert: rad FØR redirect + metadata på sesjon OG subscription_data;
-lat provisjonering av product/price/kunde med Idempotency-Keys; «prøv
-igjen» gjenbruker raden trygt) + `stripe-checkout-return` (tekstside),
-webhook-patch (expired-sesjons-vakt), og **SupportScreen har ENDELIG ekte
-offering-data** (49/399-mockupen + 80/20-baren er fjernet — splitten er
-ulåst og aldri offentlig). Ridabu G10 har pilot-offering: 79 kr/mnd,
-bps 2500 (PLASSHOLDER — fase 6 låser splitten). **TELEFONTESTEN ER SELVE
-PENGEVEI-VERIFISERINGEN fra fase 2-restansen** (testkort 4242… →
-transaksjonsrad med frossen splitt + abonnement active) — se «📱 Fase 4 —
-telefontest» under. Domenet (Universal Links + pene landingssider) er
-Brages kjøp/beslutning — **funn: Apple Pay virker UTEN eget domene på
-Stripes hostede checkout**, så domenet blokkerer ikke betaling. Se
-«💳 BETALINGSSPORET» rett under + `docs/PAYMENTS.md` (sannhetskilden,
-inkl. ops-runbooken for claim-godkjenning OG prising av lag).**
+_Sist oppdatert: 2026-08-02 (kveld). **NYESTE SPOR: 💳 BETALINGER —
+FASE 4 GODKJENT (E2E med Apple Pay, pengevei DB-verifisert
+7900/1975/5925, webhooks 4/4). FASE 5 DEL 1 ER KODET + DEPLOYET +
+DB-VERIFISERT 8/8 — VENTER BRAGES TELEFONTEST + REVIEW.** Brages
+beslutninger 2026-08-02 (LÅST — PAYMENTS.md §Pris og split + §Åpne
+beslutninger): fordelingen er OFFENTLIG og positiv («79 kr i måneden —
+60 kr går direkte til laget», «mer enn 3 av 4 kroner»), mekanikken =
+FAST 60 (Ridabu-offering v2; Brages sandbox-abonnement eksplisitt
+P16-migrert), hovedtall = det LAGET får (aldri brutto), lagaggregat
+synlig for ALLE medlemmer, «Min støtte» på Profil (liste, flerlags-klar),
+klubb-admin i Laginnstillinger, domene = **heiaapp.no** (Brage eier).
+Bygget: migrasjon `00040` (lagkassa-summer + min-støtte-oversikt +
+klubbandel i offering-RPC), Edge Function `stripe-portal` (Customer
+Portal = selvbetjeningen), **ny LagkassaScreen** med innganger i
+HERO-KARUSELLEN på Hjem + SESONG-siden (bunnkortet på Hjem-feeden er
+FJERNET), SupportScreen med 60 kr-språket, «MIN STØTTE» på Profil.
+heiaapp.no-bunken (AASA + landingssider + native-sjekkliste) ligger
+klar: `docs/HEIAAPP-NO.md` — NB bundle-ID er RN-placeholder og byttes i
+native-runden. **Test: «📱 Fase 5 del 1 — telefontest» under (kun
+Metro-reload).** Se «💳 BETALINGSSPORET» + `docs/PAYMENTS.md`
+(sannhetskilden).**
 Forrige skive: P9 KALENDEREN — RYTME, IKKE
 GRID (design-polish-planen), OMLAGT etter første telefontest:
 kalenderkortet er nå en KOMPAKT HERO med Hjem-heroens designspråk
@@ -111,8 +113,8 @@ låste invariants og fase 0-funnene. Kortversjonen:
   «Del lenken» → AKTIV). `verify-00038.sql` i spike-mappen: **19/19 PASS**
   mot prod-DB (ruller alltid tilbake). Ops-runbook for manuell godkjenning:
   PAYMENTS.md §Fase 3.
-- **Fase 4 (🟡 KODET + DEPLOYET + DB-VERIFISERT 11/11 2026-08-02 — venter
-  Brages telefontest + review):** migrasjon `00039_support_checkout.sql`
+- **Fase 4 (✅ FERDIG + GODKJENT 2026-08-02 — E2E med Apple Pay, pengevei
+  DB-verifisert):** migrasjon `00039_support_checkout.sql`
   (`create_support_offering` — ops-only versjonering, arkiverer aktiv +
   ny versjon atomisk; `get_support_offering_for_team_space` — pris +
   mottakernavn til LAGMEDLEMMER, splitten lekker aldri, verifisert i
@@ -128,13 +130,42 @@ låste invariants og fase 0-funnene. Kortversjonen:
   LAGET 💚»-tilstand). **Ridabu G10 har pilot-offering 79 kr/mnd
   (bps 2500 — PLASSHOLDER, fase 6 låser splitten; endring = ny versjon).**
   `verify-00039.sql` i spike-mappen: **11/11 PASS** mot prod-DB.
+- **Fase 5 del 1 (🟡 KODET + DEPLOYET + DB-VERIFISERT 8/8 2026-08-02 —
+  venter Brages telefontest + review):** migrasjon `00040_lagkassa.sql`
+  (klubbandel-avledning + lagkassa-summer + min-støtte-oversikt),
+  `stripe-portal`, LagkassaScreen med innganger i hero-karusellen +
+  Sesong (bunnkortet fjernet), SupportScreen med 60 kr-språket,
+  «MIN STØTTE» på Profil. Fast-60-offering (v2) for Ridabu + eksplisitt
+  P16-migrering av Brages abonnement. heiaapp.no-bunken forberedt
+  (`docs/HEIAAPP-NO.md`). Detaljer: PAYMENTS.md §Fase 5.
 - **Gate-regel (LÅST): hver fase stopper for Brages review før neste.**
-  Fase 5 (Customer Portal + lagaggregater) venter på fase 4-reviewen.
-- SupportScreen-mockupen er HISTORIE — skjermen viser nå ekte
-  offering-data (fase 4). 80/20-baren er fjernet med vilje: splitten er
-  en ulåst kommersiell beslutning og kommuniseres ikke offentlig.
+  Fase 5 del 2 (heiaapp.no-stegene + delbar lenke) venter på del 1-
+  reviewen.
+- Fordelingen er nå OFFENTLIG kommunikasjon (låst 2026-08-02): «79 kr i
+  måneden — 60 kr går direkte til laget». Alltid kronebeløp fra offering-
+  DATA, aldri hardkodet, aldri primært som prosent.
 
-### 📱 Fase 4 — telefontest (🟢 BETALT 2026-08-02 — PENGEVEIEN ER DB-VERIFISERT)
+### 📱 Fase 5 del 1 — telefontest (⏳ DIN TUR — kun Metro-reload)
+
+1. **Hjem:** bunnkortet «Støtt laget» er BORTE. Bla i hero-karusellen →
+   💚 LAGKASSA-kortet («60 kr til laget hver måned · 1 støttespiller») —
+   trykk → LagkassaScreen.
+2. **LagkassaScreen:** hovedtallet er 60 kr/mnd (klubb-perspektiv),
+   «59,25 kr samlet inn» (historisk — første betaling var 75/25, frossen
+   med vilje), fordelingskortet «79 kr i måneden — 60 kr går direkte til
+   laget» + 3-av-4-linjen, og «Du er en av dem 💚» (du støtter alt).
+3. **Sesong-siden:** lagkassa-kortet nederst, lyst på stadionmørket.
+4. **Støtt laget-siden:** priskortet sier nå «60 kr går direkte til
+   laget»; 19-kroners-forklaringen står diskret under CTA-en.
+5. **Profil → «MIN STØTTE»:** raden «Ridabu G10 · 79 kr/mnd · 60 kr går
+   til laget · Aktiv · fornyes 2. september». Trykk → Stripe Customer
+   Portal i Safari (endre kort / se kvittering / ev. test en oppsigelse —
+   kanselleringen synker via webhook og raden viser «Avsluttes …» når du
+   er tilbake; reaktiver gjerne i portalen etterpå).
+6. Som IKKE-supporter (annen bruker): Lagkassa viser CTA «Støtt laget ·
+   79 kr/mnd», og Profil har ingen «Min støtte»-seksjon.
+
+### 📱 Fase 4 — telefontest (✅ BESTÅTT + GODKJENT 2026-08-02 — PENGEVEIEN DB-VERIFISERT)
 
 **Brage betalte med privat kort via APPLE PAY i sandbox** (ekte kort
 belastes aldri i sandbox — tokenisert test-charge; Apple Pay-funnet

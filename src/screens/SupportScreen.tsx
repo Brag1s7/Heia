@@ -22,6 +22,7 @@ import {
   type SupportOffering,
   type MySupportSubscription,
 } from '../lib/api';
+import {formatKr} from '../lib/money';
 
 /**
  * «Støtt laget» (betalingssporet fase 4) — for ALLE lagmedlemmer.
@@ -38,12 +39,6 @@ const benefits = [
   'Viser barna at noen heier — også utenfor banen',
   'Enkelt å starte, enkelt å avslutte',
 ];
-
-function formatAmount(amountMinor: number): string {
-  const kroner = Math.floor(amountMinor / 100);
-  const ore = amountMinor % 100;
-  return ore === 0 ? `${kroner} kr` : `${kroner},${String(ore).padStart(2, '0')} kr`;
-}
 
 function formatRenewal(iso: string): string {
   return new Date(iso).toLocaleDateString('nb-NO', {
@@ -120,7 +115,7 @@ export function SupportScreen() {
   }, [activeTeamSpaceId, checkoutLoading]);
 
   const priceLabel =
-    offering?.available ? `${formatAmount(offering.amountMinor)}/mnd` : '';
+    offering?.available ? `${formatKr(offering.amountMinor)}/mnd` : '';
 
   const renderContent = () => {
     if (loading) {
@@ -207,12 +202,22 @@ export function SupportScreen() {
           ))}
         </View>
 
-        {/* Prisen — ett månedlig beløp, rett fra offeringen */}
+        {/* Prisen — ett månedlig beløp, rett fra offeringen. Fordelingen
+            er OFFENTLIG og et tillitspoeng (låst 2026-08-02) — tallene er
+            data fra offeringen, aldri hardkodet. */}
         <View style={styles.section}>
           <View style={styles.priceCard}>
             <Text style={styles.priceLabel}>Månedlig støtte</Text>
-            <Text style={styles.priceValue}>{formatAmount(offering.amountMinor)}</Text>
+            <Text style={styles.priceValue}>{formatKr(offering.amountMinor)}</Text>
             <Text style={styles.pricePeriod}>per måned</Text>
+            <Text style={styles.priceClubLine}>
+              {formatKr(offering.clubAmountMinor)} går direkte til laget
+            </Text>
+            {offering.clubAmountMinor / offering.amountMinor >= 0.75 && (
+              <Text style={styles.priceShareLine}>
+                Mer enn 3 av 4 kroner går tilbake til laget
+              </Text>
+            )}
           </View>
         </View>
 
@@ -238,6 +243,11 @@ export function SupportScreen() {
           />
           <Text style={styles.trustLine}>
             Avslutt når som helst. Ingen binding.
+          </Text>
+          <Text style={styles.recipientLine}>
+            De resterende{' '}
+            {formatKr(offering.amountMinor - offering.clubAmountMinor)} dekker
+            Heia, betalingsbehandling og drift.
           </Text>
           <Text style={styles.recipientLine}>
             Betales trygt hos Stripe i Safari · utbetales til{' '}
@@ -379,6 +389,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textTertiary,
     marginTop: spacing.xs,
+  },
+  priceClubLine: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.heiaDeep,
+    marginTop: spacing.md,
+  },
+  priceShareLine: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 
   // Aktiv støtte

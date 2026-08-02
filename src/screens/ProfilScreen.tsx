@@ -25,6 +25,7 @@ import {
   Bell,
   Check,
   ChevronRight,
+  HandHeart,
   Info,
   LogOut,
   Phone,
@@ -42,7 +43,13 @@ import {
   enablePush,
   type PushPermission,
 } from '../lib/push';
-import {updateProfile} from '../lib/api';
+import {
+  updateProfile,
+  getMySupportOverview,
+  openSupportPortal,
+  type MySupportItem,
+} from '../lib/api';
+import {formatKr} from '../lib/money';
 import type {ProfilStackParamList} from '../shared/types';
 
 // Undertekst på «Varslinger»-raden per status.
@@ -77,6 +84,19 @@ function RowChevron() {
   return <ChevronRight size={18} color={colors.textTertiary} />;
 }
 
+// Statuslinjen på «Min støtte»-raden — rolig informasjon, aldri alarm.
+function supportStatusLine(item: MySupportItem): string {
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString('nb-NO', {day: 'numeric', month: 'long'});
+  if (item.cancelAt) return `Avsluttes ${fmt(item.cancelAt)}`;
+  if (item.status === 'past_due') {
+    return 'Betalingen feilet — Stripe prøver igjen';
+  }
+  return item.currentPeriodEnd
+    ? `Aktiv · fornyes ${fmt(item.currentPeriodEnd)}`
+    : 'Aktiv';
+}
+
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const {profile, signOut, refreshProfile} = useAuth();
@@ -101,6 +121,46 @@ export function ProfilScreen() {
       sub.remove();
     };
   }, []);
+
+  // «Min støtte» (betalingsspor fase 5) — brukerens egne støtteavtaler som
+  // LISTE (flere lag senere). Refetches når appen våkner igjen: endringer
+  // gjort i Customer Portal (Safari) skal synes når man er tilbake.
+  const [mySupport, setMySupport] = useState<MySupportItem[]>([]);
+  const [portalLoading, setPortalLoading] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    const load = () => {
+      getMySupportOverview()
+        .then(items => mounted && setMySupport(items))
+        .catch(() => {});
+    };
+    load();
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active') load();
+    });
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+
+  // Portalen ER selvbetjeningen (betalingsmåte, kvitteringer, oppsigelse) —
+  // kortlevd lenke hentes i klikkøyeblikket og åpnes i Safari.
+  const handleManageSupport = useCallback(async () => {
+    if (portalLoading) return;
+    setPortalLoading(true);
+    try {
+      const {url} = await openSupportPortal();
+      Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert(
+        'Kunne ikke åpne administrasjonen',
+        e?.message ?? 'Prøv igjen om litt.',
+      );
+    } finally {
+      setPortalLoading(false);
+    }
+  }, [portalLoading]);
 
   const handleNotifications = useCallback(async () => {
     if (pushPerm === 'undetermined') {
@@ -288,6 +348,37 @@ export function ProfilScreen() {
               onPress={() => navigation.navigate('Invite')}
               showBorder={false}
             />
+          </View>
+        </View>
+      )}
+
+      {/* Min støtte — egne støtteavtaler (fase 5). Klubbens onboarding og
+          økonomi bor i Laginnstillinger, ALDRI her (låst 2026-08-02). */}
+      {mySupport.length > 0 && (
+        <View style={styles.menuBlock}>
+          <SectionLabel title="Min støtte" />
+          <View style={styles.menuCard}>
+            {mySupport.map((item, index) => (
+              <ListRow
+                key={item.subscriptionId}
+                icon={
+                  <MenuIcon>
+                    <HandHeart size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title={item.teamName}
+                subtitle={`${formatKr(item.amountMinor)}/mnd · ${formatKr(
+                  item.clubAmountMinor,
+                )} går til laget\n${supportStatusLine(item)}`}
+                right={<RowChevron />}
+                onPress={handleManageSupport}
+                showBorder={index < mySupport.length - 1}
+              />
+            ))}
+            <Text style={styles.supportHint}>
+              Betalingsmåte, kvitteringer og oppsigelse håndteres trygt hos
+              Stripe — lenken åpnes i Safari.
+            </Text>
           </View>
         </View>
       )}
@@ -487,6 +578,12 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     overflow: 'hidden',
     ...shadows.card,
+  },
+  supportHint: {
+    ...typography.caption,
+    color: colors.textTertiary,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   menuIconSlot: {
     width: 28,

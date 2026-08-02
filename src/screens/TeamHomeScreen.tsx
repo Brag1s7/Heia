@@ -35,6 +35,10 @@ import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {getLiveMatch, getTeamEvents} from '../lib/api/events';
 import {
+  getTeamSupportSummary,
+  type TeamSupportSummary,
+} from '../lib/api/payments';
+import {
   getTeamFeed,
   createTextPost,
   createImagePost,
@@ -132,6 +136,8 @@ export function TeamHomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
   const [nextEvents, setNextEvents] = useState<HeiaEvent[]>([]);
+  const [supportSummary, setSupportSummary] =
+    useState<TeamSupportSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [composeText, setComposeText] = useState('');
@@ -150,15 +156,21 @@ export function TeamHomeScreen() {
     const eventsPromise = getTeamEvents(activeTeamSpaceId).catch(
       () => [] as HeiaEvent[],
     );
+    // Lagkassa-kortet i karusellen (fase 5) — sekundært, som heroene.
+    const supportPromise = getTeamSupportSummary(activeTeamSpaceId).catch(
+      () => null,
+    );
     try {
-      const [items, live, events] = await Promise.all([
+      const [items, live, events, support] = await Promise.all([
         getTeamFeed(activeTeamSpaceId),
         livePromise,
         eventsPromise,
+        supportPromise,
       ]);
       setFeed(items);
       setLiveMatch(live);
       setNextEvents(pickNextEvents(events, 3));
+      setSupportSummary(support);
     } catch {
       setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
     } finally {
@@ -358,7 +370,7 @@ export function TeamHomeScreen() {
             }
           />
         </View>
-      ) : nextEvents.length > 0 ? (
+      ) : nextEvents.length > 0 || supportSummary ? (
         <View style={styles.carouselSection}>
           <NextEventCarousel
             events={nextEvents}
@@ -370,6 +382,8 @@ export function TeamHomeScreen() {
                 .getParent<NavigationProp<RootTabParamList>>()
                 ?.navigate('KalenderStack')
             }
+            lagkassa={supportSummary}
+            onOpenLagkassa={() => navigation.navigate('Lagkassa')}
           />
         </View>
       ) : null}
@@ -519,21 +533,6 @@ export function TeamHomeScreen() {
         })
       )}
 
-      {/* Støtt laget */}
-      <View style={styles.supportCard}>
-        <Text style={styles.supportTitle}>
-          Støtt {activeTeamSpace.displayName}
-        </Text>
-        <Text style={styles.supportText}>
-          Hjelp laget med å dekke utgifter til kamper, utstyr og sosiale
-          arrangementer.
-        </Text>
-        <Button
-          title="Støtt laget"
-          variant="secondary"
-          onPress={() => navigation.navigate('Support')}
-        />
-      </View>
     </ScrollView>
 
     {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
@@ -689,23 +688,5 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.sm,
-  },
-  supportCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing['2xl'],
-    padding: spacing.xl,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    gap: spacing.md,
-  },
-  supportTitle: {
-    ...typography.heading3,
-  },
-  supportText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    lineHeight: 22,
   },
 });
