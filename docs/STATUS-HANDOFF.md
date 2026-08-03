@@ -1,6 +1,12 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-02 (kveld). **NYESTE SPOR: 💳 BETALINGER —
+_Sist oppdatert: 2026-08-03. **NYESTE: 🚪 KLUBBDØREN + SUPPORTER-
+ROLLEN ER BESLUTTET OG LÅST 2026-08-03 (tre-porter-modellen,
+betalingsansvarlig-rollen, «Klubbbetalinger»-flaten, pause vs.
+deaktiver, dogfood på Brages nye lag, supporter = vanlig medlem via
+invitasjonskode) — se ▶️ NESTE SAMTALE-blokken i native-avsnittet +
+PAYMENTS.md §Åpne beslutninger. Byggerekkefølge: supporter-skiva
+først, så klubbdøren.** Fra før: 💳 BETALINGER —
 FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
 bestått, DB-verifisert 8/8) etter tre review-justeringer på
 Profil/«Min støtte» + Lagkassa (alltid synlig + trykkbar tom-rad →
@@ -128,28 +134,57 @@ TestFlight-bygget — klubben er aktiv (konto per KLUBB), men
 offering (pris/splitt) opprettes PER LAG og er ops-only
 (`create_support_offering`, fase 4-design), så SupportScreen viser
 den planlagte fallbacken «Ikke helt klart ennå». IKKE en bug.
-▶️ NESTE SAMTALE (Brages valg 2026-08-02/03): (1) APNs-PUSH,
-(2) offering-rad for det nye laget (Brage oppgir lagnavnet),
-(3) **SISTE STORE ARKITEKTURVALG — «KLUBBDØR-MODELLEN» (Claudes
-forslag skissert for Brage 2026-08-03, IKKE besluttet ennå):**
-klubbgodkjenning av lag som selvbetjening. Kjernen: (a) godkjent
-claim-innsender blir KLUBBANSVARLIG (club_admins-tabell, seedes fra
-claimet, flere kan legges til senere); (b) nytt lag under aktivert
-klubb: trener trykker «Be om godkjenning» → klubbansvarlig får
-varsel → ett trykk «Godkjenn» → laget ARVER klubbens standardtilbud
-(79/60 som DATA på klubben) og offering-v1 opprettes automatisk i
-samme transaksjon (samme versjonerte modell som i dag);
-(c) godkjenninger er rader (hvem/når/status), REVERSIBLE (revoke →
-offering arkiveres), ops-override består; (d) SupportSetupScreen
-forklarer to-stegs-modellen («1. Klubben kobles ✓ 2. Klubben
-godkjenner laget») — Brage vil ha minst mulig friksjon + en
-forklarende flate. FLAGGET SAMTIDIG (egen beslutning): Brages
-markedsvisjon er at besteforeldre/tanter/venner skal kunne støtte —
-men checkout er MEDLEMSGATET i dag (bevisst); ikke-medlem-støtte
-krever enten supporter-rolle via invitasjonskode eller web-checkout
-(står på «bygger bevisst ikke»-listen) — må besluttes eksplisitt.
-Markedsføringstonen (følelser/samhold/støtte) hører til
-nettside-prosjektet, men flyt-copyen i appen skal speile den.
+BESLUTTET 2026-08-03: INGEN ops-rad lages — laget er E2E-dogfood-
+testen av klubbdøren (se ▶️ NESTE SAMTALE-blokken under).
+▶️ NESTE SAMTALE (beslutningsrunden 2026-08-03 er TATT — alt under
+er LÅST, full beslutningstekst i PAYMENTS.md §Åpne beslutninger
+«KLUBBDØREN»): **(1) SUPPORTER-SKIVA FØRST (liten, Brages valgte
+rekkefølge):** besteforeldre/tanter/venner melder seg inn NØYAKTIG
+som foreldre (invitasjonskode, samme rettigheter) — eneste forskjell
+er etiketten 'supporter'. Bygges: CHECK-constrainten i memberships +
+rollelisten i join_team_space (migrasjon, additiv), tredje rollekort
+i JoinTeamCodeScreen («Supporter · Heier på laget», ingen
+barnekobling), ROLE_LABELS + «Supportere»-seksjon i Lagoversikt, ⋯
+(fjerning) også på supporter-rader (remove_team_member-vakten er
+svarteliste og tillater det alt — kun UI-filteret må med). Dette
+LUKKER «ikke-medlem-støtte»-flagget: supportere ER medlemmer, så
+medlemsgatet checkout står uendret — web-checkout trengs ikke.
+**(2) KLUBBDØREN (hovedskiva) — LÅST MODELL: tre porter** (personen
+er autorisert av klubben + klubben er Stripe/KYC-godkjent + laget er
+godkjent av betalingsansvarlig = laget kan samle inn støtte).
+Rollen heter **BETALINGSANSVARLIG** (ikke «klubbansvarlig»); INGEN
+får den automatisk via lagadminskap eller påbegynt KYC — første
+hovedansvarlige godkjennes som AUTORISERT REPRESENTANT for klubben
+(claim-reviewen) og må fullføre Stripe-KYC; senere betalings-
+ansvarlige INVITERES av eksisterende hovedansvarlig. ÉN kanonisk
+flate **«Klubbbetalinger»**: hovedinngang på PROFIL, kontekstuell
+snarvei fra Laginnstillinger — ingen ny innlogging/portal,
+betalingsansvarlig er vanlig app-bruker. Lagflyten: «Be om
+godkjenning» (SupportSetupScreen + admin-CTA i SupportScreen-
+fallbacken) → varsel → ett trykk «Godkjenn» → laget ARVER klubbens
+standardtilbud (79/60 som DATA i club_support_defaults,
+deny-by-default; betalingsansvarlig ser/velger ALDRI pris —
+create_support_offering forblir ops-only, godkjenningsstien deler
+intern mekanikk) → offering v1 i samme transaksjon. Godkjenninger =
+RADER (team_support_approvals: hvem/når/status/note, maks én åpen
+per lag, avslag krever begrunnelse som treneren ser). V1 har TO
+handlinger med presist språk (ALDRI «revoke» når abonnementer
+består): **«Pause nye støttespillere»** (offering arkiveres, nye
+checkouts stoppes, eksisterende abonnementer fortsetter) og
+**«Deaktiver støtte for laget»** (nye stoppes + eksisterende settes
+til kansellering ved periodeslutt — cancel_at_period_end via
+Stripe-kall → Edge Function, ingen refusjon av betalt periode).
+Begge med bekreftelsesdialog som viser ANTALL berørte aktive
+abonnementer + logg (hvem/når/årsak). DOGFOOD (låst): Brages nye
+Ridabu-lag får INGEN manuell offering — laget ER E2E-testen av
+døren; Brage backfilles som betalingsansvarlig for Ridabu fra det
+godkjente claimet, så hele flyten testes på telefonen. NB
+kontosletting må rydde betalingsansvarlig-raden (spøkelser skal
+ikke beholde godkjenningsmakt). **(3) APNs-PUSH** (restansen under)
+— klubbdør-varselet lander i inboxen uansett; push-varianten følger
+gratis når APNs-nøkkelen er satt. Markedsføringstonen
+(følelser/samhold/støtte) hører til nettside-prosjektet, men
+flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
 NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
 APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for

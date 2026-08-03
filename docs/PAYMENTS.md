@@ -153,6 +153,70 @@ løpende abonnementer · staging-miljø (vurderes før prod).
 
 ## Åpne beslutninger
 
+**Avgjort 2026-08-03 (Brage) — KLUBBDØREN (klubbgodkjenning av lag) +
+SUPPORTER-ROLLEN. Tre-porter-modellen:**
+
+> Personen er autorisert av klubben
+> \+ klubben er godkjent av Stripe/KYC
+> \+ det konkrete laget er godkjent av betalingsansvarlig
+> = laget kan samle inn støtte.
+>
+> Heia avgjør hvem som får administrere klubben. Stripe verifiserer
+> betalingsmottakeren. Klubben avgjør hvilke lag som får samle inn
+> penger.
+
+1. **Rollen heter BETALINGSANSVARLIG** (ikke «klubbansvarlig»). Ingen
+   får den automatisk via lagadminskap eller påbegynt KYC. Første
+   hovedansvarlige godkjennes som **autorisert representant** for
+   klubben (claim-reviewen er autorisasjonen) og må fullføre
+   Stripe-KYC. Senere betalingsansvarlige **inviteres av eksisterende
+   hovedansvarlig**. Kontosletting rydder rollen (anonymiserte
+   spøkelser beholder aldri godkjenningsmakt); ops kan alltid seede en
+   ny ansvarlig.
+2. **Én kanonisk flate: «Klubbbetalinger».** Hovedinngang på PROFIL
+   (rad kun synlig for betalingsansvarlige), kontekstuell snarvei fra
+   Laginnstillinger til SAMME flate. Ingen ny innlogging, portal eller
+   e-postflyt — betalingsansvarlig er en vanlig Heia-bruker i appen.
+   (Presiserer 2026-08-02-beslutningen «klubbadmin i Laginnstillinger»:
+   den gjelder LAGETS aktiveringsflate; klubbens godkjenningsflate er
+   klubb-nivå og bor på Profil.)
+3. **Lagflyten (null friksjon, ingenting nytt å fylle ut):** lag under
+   aktivert klubb → lagadmin trykker «Be om godkjenning» → varsel til
+   betalingsansvarlig (inbox + push) → forespørselskortet viser KUN
+   eksisterende data (lagnavn, årskull/kjønn, hvem som spør, antall
+   medlemmer) → ett trykk «Godkjenn» → laget ARVER klubbens
+   standardtilbud og offering v1 opprettes automatisk i samme
+   transaksjon (samme versjonerte modell). Avslag krever begrunnelse
+   som treneren ser (samme mønster som claim-avslag).
+4. **Prisinvarianten står:** klubbens standardtilbud (79/60) er DATA i
+   en deny-by-default-tabell (`club_support_defaults`), seedet av
+   Heia ved klubbgodkjenning. Betalingsansvarlig ser/velger ALDRI
+   pris. `create_support_offering` forblir ops-only; godkjenningsstien
+   deler intern mekanikk (advisory-lås, arkiver + ny versjon).
+5. **Godkjenninger er rader** (`team_support_approvals`:
+   hvem/når/status/note), auditerbare, maks én åpen per lag,
+   ops-override består.
+6. **To handlinger i v1 — presist språk (ALDRI «revoke» når
+   abonnementer består):**
+   - **«Pause nye støttespillere»:** offering arkiveres, nye checkouts
+     stoppes, eksisterende abonnementer fortsetter.
+   - **«Deaktiver støtte for laget»:** nye checkouts stoppes +
+     eksisterende abonnementer settes til kansellering ved
+     periodeslutt (`cancel_at_period_end` — Stripe-kall, krever Edge
+     Function). Ingen refusjon av allerede betalt periode.
+   Begge med bekreftelsesdialog som viser ANTALL berørte aktive
+   abonnementer, og logg av hvem/når/årsak.
+7. **SUPPORTER-ROLLEN lukker «ikke-medlem-støtte»-flagget:**
+   besteforeldre/tanter/venner melder seg inn NØYAKTIG som foreldre
+   (invitasjonskode, samme rettigheter) med rolle `supporter` — de ER
+   medlemmer, så den medlemsgatede checkouten står uendret.
+   Web-checkout trengs ikke og forblir på «bygger bevisst
+   ikke»-listen.
+8. **Dogfood:** Brages nye Ridabu-lag får INGEN manuell offering —
+   laget er E2E-testen av hele døren (Brage backfilles som
+   betalingsansvarlig for Ridabu fra det godkjente claimet).
+   Byggerekkefølge: supporter-skiva først (liten), så klubbdøren.
+
 **Avgjort 2026-08-02 (Brage):** splitten = FAST 60 kr til laget, offentlig
 kommunisert (se «Pris og split») · lagaggregatet er synlig for ALLE
 lagmedlemmer, hovedtall = det laget får · «Min støtte» bor på Profil
@@ -200,8 +264,9 @@ varslingsflyt ved lagavvikling · endelig
 bundle-ID (placeholder i dag — se HEIAAPP-NO.md steg 0; MÅ byttes før
 første TestFlight-opplasting, bundle-ID er permanent per app-oppføring).
 
-**Utsatt:** klubbadmin-domene · klubbmerge-verktøy · Vipps · engangs-
-betalinger · flere land · payout-rapportering.
+**Utsatt:** klubbmerge-verktøy · Vipps · engangs-
+betalinger · flere land · payout-rapportering. (Klubbadmin-domenet er
+IKKE lenger utsatt — avgjort 2026-08-03, se «KLUBBDØREN» øverst.)
 
 ## Fase 1-verifisering (2026-08-01) — 28/28 PASS
 
