@@ -15,6 +15,8 @@ export const navigationRef = createNavigationContainerRef<RootTabParamList>();
  */
 let pendingEventId: string | null = null;
 let pendingOpsClaimId: string | null = null;
+let pendingLagkassa = false;
+let pendingNotificationData: Record<string, unknown> | null = null;
 
 /**
  * Åpner kampen hvis mulig, ellers parkerer den til `flushPendingDeepLink`.
@@ -67,6 +69,138 @@ export function openOpsClaim(claimId: string): void {
 }
 
 /**
+ * Lagkassa fra web-knappen på heiaapp.no/betaling (heia://lagkassa) — den som
+ * nettopp har betalt i Safari lander rett på pengesiden. Skjermen er
+ * activeTeamSpaceId-drevet og tar ingen params; betaleren kommer fra en
+ * checkout startet i nettopp det aktive laget, så konteksten stemmer.
+ */
+export function openLagkassa(): void {
+  if (!navigationRef.isReady()) {
+    pendingLagkassa = true;
+    return;
+  }
+
+  try {
+    navigationRef.navigate('HjemStack', {screen: 'Lagkassa'});
+  } catch {
+    pendingLagkassa = true;
+  }
+}
+
+/**
+ * Lagbytte utenfra React-treet — registrert av TeamProvider (samme idiom som
+ * navigationRef). Push-innhold bor i ETT lag, og push omgår inboxens
+ * lag-scoping: står appen i et annet lag, må aktivt lag byttes FØR
+ * navigasjonen, ellers rendres målskjermen med feil lagkontekst —
+ * EventDetail henter ALT via activeTeamSpaceId (telefonfunn 2026-08-03:
+ * Stange-navnet på Ridabu-kampen).
+ *
+ * Tre svar, fordi kaldstart er et kappløp: 'pending' = medlemslisten er ikke
+ * lastet ennå (getInitialNotification resolver før fetchen — målet må
+ * PARKERES, ikke droppes), 'not_member' = listen er lastet og laget er ikke
+ * der (da finnes det heller ingenting å vise — RLS), 'switched' = aktivt lag
+ * er byttet/allerede riktig.
+ */
+export type TeamSwitchOutcome = 'switched' | 'pending' | 'not_member';
+
+let teamSwitcher: ((teamSpaceId: string) => TeamSwitchOutcome) | null = null;
+
+export function registerTeamSwitcher(
+  fn: ((teamSpaceId: string) => TeamSwitchOutcome) | null,
+): void {
+  teamSwitcher = fn;
+}
+
+/** 'pending' også når broen ikke er registrert ennå — da parkeres målet. */
+function switchTeamFor(teamSpaceId: string | null): TeamSwitchOutcome {
+  if (!teamSpaceId) return 'switched';
+  if (!teamSwitcher) return 'pending';
+  return teamSwitcher(teamSpaceId);
+}
+
+/**
+ * Målet i et push-trykk — SAMME avgjørelse som Varsler-sidens handlePress,
+ * bare fra rå varseldata: klubbdør-varsler bærer `screen` og peker inn i
+ * Profil-stacken, kampvarsler bærer `event_id`, vanlige poster/kommentarer
+ * bare `feed_post_id`. Nøklene ligger flatt i APNs-payloaden, nøyaktig slik
+ * notifications.data ble skrevet (push-fanout sender data-feltet som det
+ * står). Uten gjenkjent mål gjør trykket ingenting utover å åpne appen —
+ * samme «uten mål»-gren som i inboxen.
+ */
+export function openNotificationTarget(data: Record<string, unknown>): void {
+  const teamSpaceId =
+    typeof data.team_space_id === 'string' && data.team_space_id.length > 0
+      ? data.team_space_id
+      : null;
+
+  const screen = data.screen;
+  if (screen === 'club_payments' || screen === 'support_setup') {
+    // club_payments er KLUBBNIVÅ — betalingsansvarlig er ikke nødvendigvis
+    // medlem av laget som spør (varselet er globalt), så der byttes aldri
+    // lag. support_setup er lagets egen flate → bytt dit først.
+    if (screen === 'support_setup') {
+      const outcome = switchTeamFor(teamSpaceId);
+      if (outcome === 'pending') {
+        pendingNotificationData = data;
+        return;
+      }
+      if (outcome === 'not_member') {
+        return;
+      }
+    }
+    if (!navigationRef.isReady()) {
+      pendingNotificationData = data;
+      return;
+    }
+    try {
+      navigationRef.navigate('ProfilStack', {
+        screen: screen === 'club_payments' ? 'ClubPayments' : 'SupportSetup',
+      });
+    } catch {
+      pendingNotificationData = data;
+    }
+    return;
+  }
+
+  const eventId = data.event_id;
+  const postId = data.feed_post_id;
+  const hasEvent = typeof eventId === 'string' && eventId.length > 0;
+  const hasPost = typeof postId === 'string' && postId.length > 0;
+  if (!hasEvent && !hasPost) {
+    return;
+  }
+
+  const outcome = switchTeamFor(teamSpaceId);
+  if (outcome === 'pending') {
+    pendingNotificationData = data;
+    return;
+  }
+  if (outcome === 'not_member') {
+    return;
+  }
+
+  if (hasEvent) {
+    openEvent(eventId as string);
+    return;
+  }
+
+  if (teamSpaceId) {
+    if (!navigationRef.isReady()) {
+      pendingNotificationData = data;
+      return;
+    }
+    try {
+      navigationRef.navigate('HjemStack', {
+        screen: 'Comments',
+        params: {postId: postId as string, teamSpaceId},
+      });
+    } catch {
+      pendingNotificationData = data;
+    }
+  }
+}
+
+/**
  * heia://-URL-er fra Linking (kaldstart + mens appen kjører). Kjenner kun
  * rutene vi faktisk har — alt annet ignoreres stille.
  */
@@ -75,6 +209,10 @@ export function handleDeepLinkUrl(url: string | null): void {
   const ops = url.match(/^heia:\/\/ops\/claims\/([0-9a-f-]{36})/i);
   if (ops) {
     openOpsClaim(ops[1]);
+    return;
+  }
+  if (/^heia:\/\/lagkassa\/?$/i.test(url)) {
+    openLagkassa();
   }
 }
 
@@ -98,5 +236,16 @@ export function flushPendingDeepLink(): void {
     const claimId = pendingOpsClaimId;
     pendingOpsClaimId = null;
     openOpsClaim(claimId);
+  }
+
+  if (pendingLagkassa) {
+    pendingLagkassa = false;
+    openLagkassa();
+  }
+
+  if (pendingNotificationData !== null) {
+    const data = pendingNotificationData;
+    pendingNotificationData = null;
+    openNotificationTarget(data);
   }
 }

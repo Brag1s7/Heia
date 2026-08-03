@@ -9,6 +9,7 @@ import React, {
   type PropsWithChildren,
 } from 'react';
 import {useAuth} from './UserContext';
+import {registerTeamSwitcher} from '../navigation/deepLink';
 import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
 import type {
   EnrichedMembership,
@@ -56,10 +57,18 @@ export function TeamProvider({children}: PropsWithChildren) {
   // kastet brukeren til Hjem-fanen (telefonfunn 2026-07-31).
   const loadedForRef = useRef<string | null>(null);
 
+  // Speiler userMemberships synkront for lagbytteren (registrert én gang,
+  // leser utenfor render-syklusen — se registerTeamSwitcher-effekten).
+  const membershipsRef = useRef<EnrichedMembership[]>([]);
+  const applyMemberships = useCallback((list: EnrichedMembership[]) => {
+    membershipsRef.current = list;
+    setUserMemberships(list);
+  }, []);
+
   const fetchMemberships = useCallback(async () => {
     if (!userId) {
       loadedForRef.current = null;
-      setUserMemberships([]);
+      applyMemberships([]);
       return;
     }
     const isRefresh = loadedForRef.current === userId;
@@ -69,30 +78,34 @@ export function TeamProvider({children}: PropsWithChildren) {
     try {
       const memberships = await getUserMemberships();
       loadedForRef.current = userId;
-      setUserMemberships(memberships);
+      applyMemberships(memberships);
     } catch {
       // Første last: tom liste (onboarding-flyten eier feilen). Stille
       // refresh: behold forrige liste — et nettverksglipp skal ikke sende
       // en innlogget bruker tilbake til onboarding.
       if (!isRefresh) {
-        setUserMemberships([]);
+        applyMemberships([]);
       }
     } finally {
       if (!isRefresh) {
         setLoading(false);
       }
     }
-  }, [userId]);
+  }, [userId, applyMemberships]);
 
   // Hent memberships når session endres
   useEffect(() => {
     fetchMemberships();
   }, [fetchMemberships]);
 
-  // Auto-velg første lag ved innlogging
+  // Auto-velg første lag ved innlogging. Funksjonell oppdatering: et
+  // push-trykk ved kaldstart kan allerede ha køet et lagvalg i samme
+  // commit (lagbytteren kjører i barne-effekter, denne i foreldre-
+  // effekten) — auto-valget skal fylle tomrommet, aldri overstyre et
+  // valg som alt er tatt.
   useEffect(() => {
     if (userId && userMemberships.length > 0 && !activeTeamSpaceId) {
-      setActiveTeamSpaceId(userMemberships[0].teamSpaceId);
+      setActiveTeamSpaceId(prev => prev ?? userMemberships[0].teamSpaceId);
     }
     if (!userId) {
       setActiveTeamSpaceId(null);
@@ -157,6 +170,29 @@ export function TeamProvider({children}: PropsWithChildren) {
 
   const setActiveTeamSpace = useCallback((teamSpaceId: string) => {
     setActiveTeamSpaceId(teamSpaceId);
+  }, []);
+
+  // Push-trykk kan gjelde et annet lag enn det aktive (push omgår inboxens
+  // lag-scoping), og trykk-håndteringen bor utenfor React-treet. Samme
+  // idiom som navigationRef: deepLink får en registrert bytter, med
+  // medlemskapsvakten her hvor listen bor. Refs, IKKE state, i vakten:
+  // registreringen skjer én gang ved mount, og ved kaldstart resolver
+  // getInitialNotification FØR medlemskaps-fetchen er ferdig — da må
+  // svaret være 'pending' (målet parkeres og flushes når fanene monteres),
+  // aldri et falskt 'not_member' fra en tom liste (telefonfunn 2026-08-03:
+  // kaldstart-trykk ble svelget).
+  useEffect(() => {
+    registerTeamSwitcher(teamSpaceId => {
+      if (loadedForRef.current === null) {
+        return 'pending';
+      }
+      if (!membershipsRef.current.some(m => m.teamSpaceId === teamSpaceId)) {
+        return 'not_member';
+      }
+      setActiveTeamSpaceId(teamSpaceId);
+      return 'switched';
+    });
+    return () => registerTeamSwitcher(null);
   }, []);
 
   return (

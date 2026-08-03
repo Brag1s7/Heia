@@ -1,6 +1,28 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-03 (sen kveld). **NYESTE: 🚪 KLUBBDØREN ER
+_Sist oppdatert: 2026-08-03 (natt mot 04). **ALLER NYESTE: 🚀 EKSTERN
+TESTFLIGHT ER LIVE (Brages beskjed 2026-08-03)** — Beta App Review
+godkjente, «Friends and family»-gruppen kjører. MEN: de eksterne står
+på bygg **1.0 (1)** med FROSSET JS fra 2026-08-02 — de har IKKE
+supporter-rollen, klubbdøren, push-trykk-navigeringen eller noe annet
+fra 2026-08-03. Derfor er **1.0 (2) neste trekk** og ALT er nå klart
+for det: (a) JS-Linking-restansen er BYGGET (siste JS-restanse fra
+native-runden): `heia://lagkassa` i deepLink.ts (openLagkassa +
+parkering/flush, HjemStack → Lagkassa — activeTeamSpaceId-drevet,
+ingen params) og web-knappen på /betaling peker nå `heia://lagkassa`
+(eldre bygg åpner bare appen — skjema-match holder; web-endringen går
+live ved neste merge til main); (b) **byggnummer bumpet:
+CURRENT_PROJECT_VERSION = 2 i begge configs** — 1.0 (2) er dermed et
+rent Archive + Distribute → Upload i Xcode hos Brage (ingen nye pods,
+ingen nye entitlements; AppDelegate-trykkfiksen ligger alt på grenen);
+(c) i App Store Connect: legg 1.0 (2) til BEGGE gruppene (intern +
+ekstern; oppdateringsbygg til eksisterende ekstern gruppe går normalt
+uten ny full review). **PUSH-VIKTIG:** `APNS_HOST` står på SANDBOX →
+TestFlight-bygg får produksjonstokens → push til eksterne testere
+avvises STILLE i dag. Bytt når 1.0 (2) er ute:
+`supabase secrets set APNS_HOST=api.push.apple.com` — da dør push i
+Brages dev-bygg (én host om gangen, kjent v1-begrensning; dev-testing
+av push = bytt tilbake). Fra før: **🚪 KLUBBDØREN ER
 BYGGET OG DEPLOYET 2026-08-03 (sen kveld) — migrasjon `00047` +
 `00048` + Edge Function `club-support-deactivate` + hele app-flaten
 («Klubbbetalinger» på Profil m/snarvei fra Laginnstillinger, «Be om
@@ -46,9 +68,62 @@ simulatoren; Release/Archive bundler som før; (b) repoet ligger i
 iCloud-synket ~/Documents — full disk → iCloud kaster ut filinnhold
 → Metro/bygg fryser med null CPU (dokumentert i minnet
 icloud_evicted_files_hang; flytting til ~/Developer er anbefalt,
-utsatt). **GJENSTÅR: merge PR #35 (web-knappen på /betaling) —
-DERETTER er 1.0 (2) et rent Archive + Upload. NB: bytt APNS_HOST til
-api.push.apple.com når TestFlight-bygget skal testes.** Flyten for NYE klubber er komplett
+utsatt). **✅ PR #35 MERGET (verifisert 2026-08-03: merge-commit `2176b73` på
+origin/main; heiaapp.no/betaling serverer heia://-knappen — røyktestet
+med curl). DERMED er 1.0 (2) et rent Archive + Upload hos Brage.
+NB: bytt APNS_HOST til api.push.apple.com når TestFlight-bygget skal
+testes.** **🐛 DOGFOOD-FUNN 2026-08-03 (kveld) — «push-trykk navigerer
+ikke» + «klubbdør-push uteble»: BEGGE OPPKLART, FIKS KREVER REBUILD:**
+(1) TRYKK-BUGEN (gjaldt ALLE push): AppDelegate MANGLET
+`didReceive response:`-callbacken — selve trykk-videresendingen til
+RNCPushNotificationIOS. Et trykk åpnet bare appen; JS-lytteren
+(userInteraction) fyrte aldri. LAGT TIL i AppDelegate.swift. I
+tillegg kjente JS-siden kun event_id: ny `openNotificationTarget` i
+deepLink.ts speiler nå Varsler-sidens FULLE mapping (klubbdør
+`screen` → ClubPayments/SupportSetup i Profil-stacken · event_id →
+EventDetail · feed_post_id+team_space_id → Comments), med parkering
+til navigatoren er klar; push/index.ts bruker den for både trykk og
+kaldstart. **KREVER ÉN REBUILD i Xcode (native endring, ingen nye
+pods) — deretter Metro som før.** REBUILD GJORT av Brage samme kveld
+(byggefeilen underveis: Swift-bro-navnet er `didReceive(_:)`, ikke
+didReceiveNotificationResponse — fikset). OPPFØLGINGSFUNN (Brage):
+trykk navigerte KUN ved lukket app — fordi et trykk mens appen
+KJØRER leveres på 'localNotification'-JS-kanalen, ikke
+'notification' (pod'en poster didReceive som
+kLocalNotificationReceived, RNCPushNotificationIOS.m linje 124;
+kaldstart går via getInitialNotification/launchOptions og virket
+derfor). Lytter lagt til på begge kanaler — REN JS, Metro-reload
+holder, ingen ny rebuild. TREDJE FUNN (Brage): push PÅ TVERS AV LAG
+(Stange aktivt, Ridabu-målvarsel) åpnet kampen med FEIL lagkontekst
+— «plutselig spilte Stange» — fordi EventDetail/Comments/
+SupportSetup er 100 % activeTeamSpaceId-drevet og push omgår
+inboxens lag-scoping. FIKSET: openNotificationTarget bytter aktivt
+lag FØR navigasjonen (ny registerTeamSwitcher fra TeamProvider —
+navigationRef-idiomet; medlemskapsvakt: uten medlemskap i mållaget
+navigeres det ikke; club_payments bytter ALDRI lag — klubbnivå,
+ansvarlig kan stå utenfor laget; membershipsRef fordi barne-effekter
+(kaldstart-flush i AppNavigator) løper før foreldre-effekter i
+React). Også ren JS. FJERDE FUNN (Brage, samme kveld): kaldstart-
+trykk ble SVELGET etter lagbytte-fiksen — getInitialNotification
+resolver FØR medlemskaps-fetchen, så vakten svarte «ikke medlem» på
+tom liste. Fikset med tre-tilstands-svar ('pending' → målet parkeres
+og flushes når fanene monteres / 'not_member' → dropp (RLS = intet å
+vise) / 'switched'), + auto-velg-første-lag bruker funksjonell
+oppdatering så den aldri overstyrer et lagvalg pushen alt har køet i
+samme commit. Alt ren JS — Metro-reload holder; testløpet er:
+(a) app helt lukket → trykk målvarsel → riktig kamp MED riktig lag;
+(b) app i bakgrunn → samme; (c) stå i Stange, trykk Ridabu-varsel →
+lagbytte + riktig kamp; (d) klubbdør-varsel → Klubbbetalinger. (2) KLUBBDØR-PUSHEN VAR ALDRI FEIL
+— verifisert i prod via net._http_response (Management-API,
+CLI-token fra nøkkelringen): 20:36:36 «Lag ber om godkjenning» =
+sent:2 (begge managere, APNs aksepterte); 20:37:05 «godkjent» =
+tokens:0 fordi mottakeren (Jarle-testkontoen, simulator) IKKE HAR
+push-token — simulatoren kan ikke APNs. Request-banneret kom mens
+Brage sto inne i appen (forgrunn = flyktig banner øverst).
+RE-TEST etter rebuild: telefonen LÅST → be om godkjenning fra
+simulatoren → push på låst skjerm → TRYKK skal lande i
+Klubbbetalinger; kamp-/kommentar-push skal lande i
+EventDetail/tråden.** Flyten for NYE klubber er komplett
 og forklart for Brage: ingen styrer klubben automatisk — claim-
 review i Heia Ops = autorisasjonen, claimanten blir første
 betalingsansvarlige (00048), Heia seeder standardtilbudet
@@ -380,7 +455,7 @@ lande på telefonen; trykk på kamp-varselet → EventDetail åpner;
 (iv) klubbdør-bonus: «Be om godkjenning» fra J2019 i simulatoren →
 telefonen (betalingsansvarlig) får push med klubbdør-varselet.
 JS-Linking-utvidelsen (naviger til Lagkassa ved heia://lagkassa) er
-fortsatt restanse — ren JS, ikke blokkerende.
+✅ BYGGET 2026-08-03 (natt mot 04) — se ALLER NYESTE-blokken øverst.
 NB for Claude: native-arbeid = Xcode hos Brage med guiding; ALDRI
 pod install/build i bakgrunnen mens appen kjører
 (se minnet feedback_dev_environment).**
