@@ -13,13 +13,25 @@ rettigheter verifisert (anon=false overalt), overview-RPC røyktestet
 som Brage. **BRAGES KVITTERING 2026-08-03: «Det funker!»** — klubbdøren er sett
 virke på telefonen; resten av testlisten i punkt (2) tas løpende.
 BESLUTNING (Brage): TestFlight 1.0 (2) tas IKKE ennå — først skal
-mest mulig inn i bygget. **NESTE SAMTALE = APNs-PUSH-SKIVA (punkt
-(3) + PUSH-RESTANSE-blokken): .p8-nøkkel i den betalte Apple-kontoen
-→ 5 secrets → alle varsler (klubbdør/rapport/feed/kamp) begynner å
-pushe — ingen ny pod, ingen ny JS; infrastrukturen ligger klar i
-`_shared/apns.ts`. Samme samtale: «Åpne Heia-appen»-knappen på
-web/betaling (ren web-endring, trenger ikke bygg). DERETTER er 1.0
-(2) et rent Archive + Upload.** Flyten for NYE klubber er komplett
+mest mulig inn i bygget. **📣 PUSH-SKIVA: KODE-/DB-SIDEN FERDIG OG
+DEPLOYET 2026-08-03 (natt):** FUNN først: push fyrte i realiteten
+KUN for feed-poster (pg_net-kallet bodde bare i notify_on_feed_post)
+— klubbdør/kommentar/reaksjon/hendelse var inbox-only. FIKSET med
+migrasjon `00049` (i prod, verifisert): statement-trigger
+`trg_push_on_notifications` på notifications-tabellen (transition
+table → ETT http-kall per insert-statement) → push-fanout med NY
+kontrakt `{notification_ids}`; notify_on_feed_post mistet sitt
+pg_net-kall (ellers dobbel push). Dermed pusher ALT som skriver
+inbox-rader — nå og i fremtiden; inbox og push er samme
+mottakerliste. push-fanout omskrevet + deployet (per-rad utsending,
+data-feltet sendes som det står så event_id ligger flatt som før;
+døde tokens ryddes). Web-knappen «Åpne Heia-appen» på /betaling er
+AKTIVERT (vises kun på iOS-UA; heia:// finnes i bygget fra 1.0 (1))
+— GÅR LIVE VED MERGE til main (Vercel bygger fra main).
+AppDelegate-videresendingen + token-registrering + `_shared/apns.ts`
+var alt klart. **GJENSTÅR KUN BRAGE (5 min): .p8-nøkkel + 5 secrets
+— oppskrift + testliste i PUSH-RESTANSE-blokken under. DERETTER er
+1.0 (2) et rent Archive + Upload.** Flyten for NYE klubber er komplett
 og forklart for Brage: ingen styrer klubben automatisk — claim-
 review i Heia Ops = autorisasjonen, claimanten blir første
 betalingsansvarlige (00048), Heia seeder standardtilbudet
@@ -237,9 +249,10 @@ betalingsansvarlige — inntil da seeder ops (SQL i PAYMENTS.md).
 OPS-RUNBOOK-ENDRING: ved ny klubbgodkjenning MÅ
 club_support_defaults seedes (INSERT-malen står i PAYMENTS.md
 §KLUBBDØREN) — glemmes den, stopper Godkjenn pent med beskjed.
-**(3) APNs-PUSH** (restansen under)
-— klubbdør-varselet lander i inboxen uansett; push-varianten følger
-gratis når APNs-nøkkelen er satt. **(4) ✅ CLAIM-VARSEL MED
+**(3) ✅ APNs-PUSH KODE-/DB-SIDEN FERDIG
+2026-08-03 (natt):** migrasjon `00049` + ny push-fanout deployet —
+ALLE inbox-varsler (også klubbdørens) pusher når nøkkelen er satt.
+Gjenstår kun Brages .p8 + 5 secrets (PUSH-RESTANSE-blokken under). **(4) ✅ CLAIM-VARSEL MED
 AUTORISASJONSBEVIS BYGGET OG DEPLOYET 2026-08-03** (funnet fra
 kodegjennomgangen + Brages presisering om at reviewen eksplisitt
 skal verifisere søkerens FULLMAKT — «Stripe står for KYC; Heia står
@@ -319,12 +332,38 @@ RPC-er; web-flaten er ren frontend-oppgave i nettside-prosjektet
 (notert i website_project-minnet). Markedsføringstonen
 (følelser/samhold/støtte) hører til nettside-prosjektet, men
 flyt-copyen i appen skal speile den.
-PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
-NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
-APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for
-Xcode-debug, api.push.apple.com for TestFlight) — se
-`_shared/apns.ts`. JS-Linking-lytteren (naviger til Lagkassa ved
-heia://) er også restanse — ren JS, tas etter TestFlight.
+PUSH-RESTANSE (kode-/DB-siden FERDIG 2026-08-03 — se 00049-blokken
+øverst; GJENSTÅR KUN dette hos Brage):
+**(A) Lag nøkkelen (Apple Developer, 2 min):** developer.apple.com →
+Certificates, Identifiers & Profiles → **Keys** → «+» → navn f.eks.
+«Heia APNs» → huk av **Apple Push Notifications service (APNs)** →
+Continue → Register → **Download** (AuthKey_XXXXXXXXXX.p8 — kan KUN
+lastes ned én gang, ta vare på den utenfor repoet, f.eks. i
+spike-mappen) + noter **Key ID** (10 tegn). Ingen miljøvalg —
+samme nøkkel gjelder sandbox OG prod.
+**(B) Sett secrets (terminal i repo-mappa; bytt XXXXXXXXXX):**
+```
+supabase secrets set \
+  APNS_KEY="$(cat ~/Downloads/AuthKey_XXXXXXXXXX.p8)" \
+  APNS_KEY_ID=XXXXXXXXXX \
+  APNS_TEAM_ID=D86MWL7V3S \
+  APNS_BUNDLE_ID=no.heiaapp.heia \
+  APNS_HOST=api.sandbox.push.apple.com
+```
+APNS_HOST = sandbox fordi testregimet NÅ er dev-bygg fra Xcode
+(aps-environment=development → sandbox-tokens). BYTTES til
+`api.push.apple.com` når TestFlight 1.0 (2) skal testes (én host om
+gangen — kjent v1-begrensning).
+**(C) Test (dev-bygg, én telefon holder):** (i) Profil → sjekk at
+varsler er PÅ (token registreres ved innlogging/aktivering);
+(ii) legg appen i BAKGRUNNEN (forgrunns-levering er bevisst stille —
+feeden er live uansett); (iii) fra simulatoren (Benjamin-kontoen):
+pin en beskjed i G10 ELLER rapporter en kamphendelse → push skal
+lande på telefonen; trykk på kamp-varselet → EventDetail åpner;
+(iv) klubbdør-bonus: «Be om godkjenning» fra J2019 i simulatoren →
+telefonen (betalingsansvarlig) får push med klubbdør-varselet.
+JS-Linking-utvidelsen (naviger til Lagkassa ved heia://lagkassa) er
+fortsatt restanse — ren JS, ikke blokkerende.
 NB for Claude: native-arbeid = Xcode hos Brage med guiding; ALDRI
 pod install/build i bakgrunnen mens appen kjører
 (se minnet feedback_dev_environment).**
