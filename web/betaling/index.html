@@ -49,8 +49,8 @@
     <h1 id="title">Tusen takk for støtten!</h1>
     <p id="body">Betalingen behandles hos Stripe. Statusen i Heia-appen
       oppdaterer seg av seg selv om et lite øyeblikk.</p>
-    <!-- heia:// registreres i native-runden — knappen er en no-op i
-         nettleseren til skjemaet finnes, og skjules derfor via JS. -->
+    <!-- heia://-skjemaet finnes i appen fra bygg 1.0 (1). Knappen vises
+         kun på iOS — en desktop-nettleser har ingen app å åpne. -->
     <a class="btn" id="openApp" href="heia://" style="display:none">Åpne Heia-appen</a>
     <p class="hint">Du kan trygt lukke denne siden.</p>
   </div>
@@ -73,6 +73,9 @@
     document.getElementById('emoji').textContent = f.emoji;
     document.getElementById('title').textContent = f.title;
     document.getElementById('body').textContent = f.body;
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+      document.getElementById('openApp').style.display = 'inline-block';
+    }
   </script>
 </body>
 </html>
