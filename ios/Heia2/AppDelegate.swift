@@ -93,7 +93,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
-    RNCPushNotificationIOS.didReceiveNotificationResponse(response)
+    RNCPushNotificationIOS.didReceive(response)
     completionHandler()
   }
 
