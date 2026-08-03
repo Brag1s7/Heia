@@ -10,10 +10,22 @@ fra beslutningsrunden 2026-08-03 i prod samme dag: supporter-skiva
 (00045), claim-varselet (00044) og klubbdøren (00047/48). Backfill
 verifisert i prod (Ridabu-defaults 79/60; Brage betalingsansvarlig),
 rettigheter verifisert (anon=false overalt), overview-RPC røyktestet
-som Brage. GJENSTÅR: TELEFONDOGFOOD av hele døren på Ridabu J2019 i
-dev-bygg — testlisten står i punkt (2) i ▶️ NESTE SAMTALE-blokken —
-deretter TestFlight-bygg 1.0 (2). Se PAYMENTS.md §Åpne beslutninger
-«KLUBBDØREN» (nå med bygget-status + ops-runbook).** Fra før: 💳 BETALINGER —
+som Brage. **BRAGES KVITTERING 2026-08-03: «Det funker!»** — klubbdøren er sett
+virke på telefonen; resten av testlisten i punkt (2) tas løpende.
+BESLUTNING (Brage): TestFlight 1.0 (2) tas IKKE ennå — først skal
+mest mulig inn i bygget. **NESTE SAMTALE = APNs-PUSH-SKIVA (punkt
+(3) + PUSH-RESTANSE-blokken): .p8-nøkkel i den betalte Apple-kontoen
+→ 5 secrets → alle varsler (klubbdør/rapport/feed/kamp) begynner å
+pushe — ingen ny pod, ingen ny JS; infrastrukturen ligger klar i
+`_shared/apns.ts`. Samme samtale: «Åpne Heia-appen»-knappen på
+web/betaling (ren web-endring, trenger ikke bygg). DERETTER er 1.0
+(2) et rent Archive + Upload.** Flyten for NYE klubber er komplett
+og forklart for Brage: ingen styrer klubben automatisk — claim-
+review i Heia Ops = autorisasjonen, claimanten blir første
+betalingsansvarlige (00048), Heia seeder standardtilbudet
+(ops-steget), klubben tar KYC, lagene ber om godkjenning. Se
+PAYMENTS.md §Åpne beslutninger «KLUBBDØREN» (bygget-status +
+ops-runbook).** Fra før: 💳 BETALINGER —
 FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
 bestått, DB-verifisert 8/8) etter tre review-justeringer på
 Profil/«Min støtte» + Lagkassa (alltid synlig + trykkbar tom-rad →
