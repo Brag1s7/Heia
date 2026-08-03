@@ -40,6 +40,7 @@ export {
   User,
   UserPlus,
   Users,
+  Wallet,
   X,
 } from 'lucide-react-native';
 

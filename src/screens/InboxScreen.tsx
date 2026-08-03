@@ -8,7 +8,11 @@ import {
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useNavigation,
+  type NavigationProp,
+} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {
@@ -20,7 +24,7 @@ import {
 import {useActiveTeam, useNotifications} from '../context';
 import {getNotifications} from '../lib/api/notifications';
 import type {HeiaNotification} from '../lib/api/notifications';
-import type {InboxStackParamList} from '../shared/types';
+import type {InboxStackParamList, RootTabParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<InboxStackParamList, 'InboxList'>;
 
@@ -116,6 +120,20 @@ export function InboxScreen() {
           prev.map(n => (n.id === item.id ? {...n, readAt: new Date()} : n)),
         );
         markRead([item.id]);
+      }
+
+      // Klubbdør-varsler (00047) peker inn i Profil-stacken — godkjenningen
+      // bor i Klubbbetalinger, lagets status i «Støtte fra supportere».
+      if (item.targetScreen) {
+        navigation
+          .getParent<NavigationProp<RootTabParamList>>()
+          ?.navigate('ProfilStack', {
+            screen:
+              item.targetScreen === 'club_payments'
+                ? 'ClubPayments'
+                : 'SupportSetup',
+          });
+        return;
       }
 
       // Kampvarsler bærer event_id (feed-posten fra report_match_event),
