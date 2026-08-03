@@ -207,10 +207,26 @@ registrerte e-post/telefon som verifiseringskanal, fryser utdraget
 på claim-raden og sender alt til hello@heiaapp.no med ferdig
 approve-/reject-SQL. Registermatch er BEVIS, aldri fasit — Heia
 beslutter fortsatt. API-formene røyktestet mot Ridabu (FLI, hele
-styret, leder@ridabufotball.no). TEST VED ANLEDNING (valgfri, som
-fase 3 runde 2): opprett testlag under en testklubb → send søknad
-fra SupportSetupScreen med et EKTE orgnr → e-post med registerbevis
-skal lande i hello@heiaapp.no → reject_club_claim etterpå. Markedsføringstonen
+styret, leder@ridabufotball.no). **✅ E2E-VERIFISERT 2026-08-03
+(Brages Stange-test) — og den avdekket TO nedarvede hull som nå er
+FIKSET:** (a) **vault-secretene project_url/service_role_key var
+ALDRI seedet** — 00022 la seedingen som manuell SQL-kommentar og
+den ble aldri kjørt, så HELE pg_net→Edge Function-idiomet
+(push-fanout, report-notify, claim-notify) har vært dødt hele
+tiden (triggerne returnerte stille ved tom vault, by design).
+(b) **nøkkel-subtilitet:** prosjektet er migrert til Supabases NYE
+API-nøkler — Edge-runtimen injiserer `sb_secret_…` («default»
+secret key) under navnet SUPABASE_SERVICE_ROLE_KEY, IKKE
+dashboardets legacy-JWT. Vaulten er nå seedet med sb_secret-verdien
+(matcher runtime-digesten), verifisert: claim-notify svarte 200,
+brreg_snapshot={not_found} skrevet (orgnr 111111111 består mod 11
+men finnes ikke — perfekt negativtest), e-post akseptert av Resend
+→ sjekk hello@heiaapp.no. Stange-claimen er AVSLÅTT med note (ses
+på «IKKE GODKJENT»-kortet). Bonus: report-notify er dermed OGSÅ
+reparert; push-fanout-triggeren begynner å fyre (APNs-nøkkel
+mangler fortsatt — egen restanse). NB «til vurdering» i appen er
+DESIGNET tilstand — klubb-claims godkjennes alltid manuelt av Heia
+(det er autorisasjonsporten), også etter klubbdøren. Markedsføringstonen
 (følelser/samhold/støtte) hører til nettside-prosjektet, men
 flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
