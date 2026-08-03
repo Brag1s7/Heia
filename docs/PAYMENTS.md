@@ -464,24 +464,34 @@ landingsside. Retur BEVISER ingenting (fase 2-prinsippet) — siden sier kun
   `startStripeOnboarding` via `functions.invoke`). SupportScreen-mockupen
   (49/399 kr) er fortsatt BEVISST urørt — den er fase 4.
 
-**Ops-runbook (manuell review — dashboardets SQL-editor):**
+**Ops-runbook — NORMAL ARBEIDSFLYT ER «HEIA OPS» I APPEN (00046,
+2026-08-03):** e-postvarselet (claim-notify, med Brønnøysund-bevis)
+deep-linker til søknaden (heia://ops/claims/<id>) → Profil → «Heia
+internt» → Heia Ops. Handlingene Godkjenn (KREVER tekst om hvordan
+autorisasjonen ble verifisert) / Be om mer informasjon (søkeren ser
+meldingen i appen) / Avslå — alle er ops_admins-gatede RPC-er med
+append-only audit (club_claim_audit). Ingen ny innlogging: ops-flaten
+er DB-gatet i appen; egen web-admin på heiaapp.no er utsatt til
+nettside-prosjektet. Appen validerer dessuten orgnr mot Brønnøysund
+FØR innsending (00046-runden) — ugyldige numre blir aldri ops-saker.
+
+**SQL-editoren er NØDFALLBACK** (composer nede e.l.):
 ```sql
--- åpne søknader (sjekk orgnr manuelt mot Brønnøysund):
+-- åpne søknader (registerbeviset ligger i brreg_snapshot):
 select id, claimed_org_number, claimed_legal_name, claimed_role,
-       contact_email, contact_phone, created_at
+       contact_email, brreg_snapshot, created_at
 from club_claims where status in ('submitted','in_review')
 order by created_at;
 
 -- godkjenn (bruk REGISTERETS navn som siste argument):
-select approve_club_claim('<claim-id>', null, 'Sjekket mot Brønnøysund',
+select approve_club_claim('<claim-id>', null, 'Autorisasjon verifisert: …',
                           null, 'KLUBBENS REGISTRERTE NAVN');
 
 -- avslå (begrunnelsen vises til innsenderen i appen):
 select reject_club_claim('<claim-id>', 'Begrunnelsen her');
 ```
-Ingen automatisk varsling til Heia om nye claims i MVP — sjekk spørringen
-over (backlog: e-postvarsel). Allianseidrettslag: splitt/flytt klubbrader
-FØR godkjenning (låst operasjonell regel).
+Allianseidrettslag: splitt/flytt klubbrader FØR godkjenning (låst
+operasjonell regel).
 
 **DB-verifisering (2026-08-01): 19/19 PASS** — `verify-00038.sql` i
 `~/Documents/Heia-Stripe-Spike/` (selvforsynt, ruller alltid tilbake; kjørt

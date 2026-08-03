@@ -270,4 +270,8 @@ export type ProfilStackParamList = {
   // Samme skjermer som i onboarding — her for å legge til lag nr. 2.
   JoinTeamCode: {prefillCode?: string} | undefined;
   CreateTeam: undefined;
+  /** «Heia Ops» — intern klubbsøknad-flate (00046). DB-gatet på ops_admins;
+   *  raden på Profil vises kun for ops, og RPC-ene er vaktene. */
+  OpsClaims: undefined;
+  OpsClaimDetail: {claimId: string};
 };

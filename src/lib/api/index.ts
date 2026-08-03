@@ -71,6 +71,19 @@ export {
   type TournamentRef,
 } from './stats';
 export {
+  isOpsAdmin,
+  clearOpsAdminCache,
+  listOpsClaims,
+  getOpsClaim,
+  opsApproveClaim,
+  opsRejectClaim,
+  opsRequestClaimInfo,
+  type OpsClaim,
+  type OpsClaimStatus,
+  type OpsClaimAuditEntry,
+  type BrregSnapshot,
+} from './ops';
+export {
   getTeamEvents,
   getLiveMatch,
   getEventDetail,

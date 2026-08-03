@@ -55,6 +55,8 @@ import {
   updateProfile,
   getMySupportOverview,
   openSupportPortal,
+  isOpsAdmin,
+  clearOpsAdminCache,
   type MySupportItem,
 } from '../lib/api';
 import {confirmDeleteAccount} from '../lib/account';
@@ -137,6 +139,17 @@ export function ProfilScreen() {
     };
   }, []);
 
+  // «Heia Ops» (00046) — intern klubbsøknad-flate. Raden vises kun for
+  // brukere i ops_admins (DB-sannheten; RPC-ene er vaktene, raden er speil).
+  const [isOps, setIsOps] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    isOpsAdmin().then(v => mounted && setIsOps(v));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // «Min støtte» (betalingsspor fase 5) — brukerens egne støtteavtaler som
   // LISTE (flere lag senere). Refetches når appen våkner igjen: endringer
   // gjort i Customer Portal (Safari) skal synes når man er tilbake.
@@ -187,8 +200,10 @@ export function ProfilScreen() {
 
   // Cachen er modul-state og overlever utlogging — nulles her så en ny
   // bruker på samme enhet aldri ser forrige brukers avtaler et blunk.
+  // Ops-cachen samme sak: neste bruker skal ikke arve ops-svaret.
   const handleSignOut = useCallback(() => {
     supportOverviewCache = null;
+    clearOpsAdminCache();
     signOut();
   }, [signOut]);
 
@@ -205,6 +220,7 @@ export function ProfilScreen() {
       signOut,
       onDeleted: () => {
         supportOverviewCache = null;
+        clearOpsAdminCache();
       },
     });
   }, [deletingAccount, signOut]);
@@ -462,6 +478,28 @@ export function ProfilScreen() {
           )}
         </View>
       </View>
+
+      {/* Heia Ops — kun for ops_admins (Brage). Raden er et speil av
+          DB-vakten; alle handlinger er audit-loggede RPC-er. */}
+      {isOps && (
+        <View style={styles.menuBlock}>
+          <SectionLabel title="Heia internt" />
+          <View style={styles.menuCard}>
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <ShieldCheck size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Heia Ops"
+              subtitle="Klubbsøknader til behandling"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('OpsClaims')}
+              showBorder={false}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Innstillinger */}
       <View style={styles.menuBlock}>

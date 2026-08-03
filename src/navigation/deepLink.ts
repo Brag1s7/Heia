@@ -14,6 +14,7 @@ export const navigationRef = createNavigationContainerRef<RootTabParamList>();
  * finnes ikke engang fanene. Målet parkeres derfor til noen kan åpne det.
  */
 let pendingEventId: string | null = null;
+let pendingOpsClaimId: string | null = null;
 
 /**
  * Åpner kampen hvis mulig, ellers parkerer den til `flushPendingDeepLink`.
@@ -42,16 +43,60 @@ export function openEvent(eventId: string): void {
 }
 
 /**
+ * «Heia Ops»-søknaden fra e-postens deep-link (heia://ops/claims/<id>).
+ * Detaljskjermen bor i Profil-stacken; er ikke fanene montert (kaldstart,
+ * utlogget) parkeres målet — skjermen er uansett DB-gatet på ops_admins,
+ * så en feilnavigering viser bare en tom flate for andre.
+ */
+export function openOpsClaim(claimId: string): void {
+  if (!claimId) return;
+
+  if (!navigationRef.isReady()) {
+    pendingOpsClaimId = claimId;
+    return;
+  }
+
+  try {
+    navigationRef.navigate('ProfilStack', {
+      screen: 'OpsClaimDetail',
+      params: {claimId},
+    });
+  } catch {
+    pendingOpsClaimId = claimId;
+  }
+}
+
+/**
+ * heia://-URL-er fra Linking (kaldstart + mens appen kjører). Kjenner kun
+ * rutene vi faktisk har — alt annet ignoreres stille.
+ */
+export function handleDeepLinkUrl(url: string | null): void {
+  if (!url) return;
+  const ops = url.match(/^heia:\/\/ops\/claims\/([0-9a-f-]{36})/i);
+  if (ops) {
+    openOpsClaim(ops[1]);
+  }
+}
+
+/**
  * Prøver på nytt på et parkert mål. Kalles når navigatoren er klar og når
  * fanene monteres — altså i det øyeblikket en innlogging faktisk gir oss et
  * sted å navigere til.
  */
 export function flushPendingDeepLink(): void {
-  if (pendingEventId === null || !navigationRef.isReady()) return;
+  if (!navigationRef.isReady()) return;
 
-  const eventId = pendingEventId;
-  // Nulles FØR forsøket, ellers kan openEvent parkere det på nytt og vi
-  // sitter med et mål som prøver seg i det uendelige.
-  pendingEventId = null;
-  openEvent(eventId);
+  if (pendingEventId !== null) {
+    const eventId = pendingEventId;
+    // Nulles FØR forsøket, ellers kan openEvent parkere det på nytt og vi
+    // sitter med et mål som prøver seg i det uendelige.
+    pendingEventId = null;
+    openEvent(eventId);
+  }
+
+  if (pendingOpsClaimId !== null) {
+    const claimId = pendingOpsClaimId;
+    pendingOpsClaimId = null;
+    openOpsClaim(claimId);
+  }
 }

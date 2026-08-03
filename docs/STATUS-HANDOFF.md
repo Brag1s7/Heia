@@ -226,7 +226,39 @@ på «IKKE GODKJENT»-kortet). Bonus: report-notify er dermed OGSÅ
 reparert; push-fanout-triggeren begynner å fyre (APNs-nøkkel
 mangler fortsatt — egen restanse). NB «til vurdering» i appen er
 DESIGNET tilstand — klubb-claims godkjennes alltid manuelt av Heia
-(det er autorisasjonsporten), også etter klubbdøren. Markedsføringstonen
+(det er autorisasjonsporten), også etter klubbdøren.
+**(5) ✅ «HEIA OPS» BYGGET OG DEPLOYET 2026-08-03 (Brages
+beslutning: SQL-editoren er pilot-krykke, ikke arbeidsflyt; egen
+WEB-admin-innlogging på heiaapp.no er EKSPLISITT utsatt til
+nettside-prosjektet):** migrasjon `00046` i prod — ops_admins
+(deny-all RLS; seedet: Brages hovedkonto + telefonkontoen
+s2212930@bi.no/«Benjamin Hansen» for dogfood — FUNN: Ridabu-claimets
+claimant var testkontoen jarle.weium, aldri seed ops-makt fra
+claims), append-only `club_claim_audit`, RPC-ene ops_list/get/
+approve/reject/request_info (alle SECURITY DEFINER + is_ops_admin-
+gatet, aldri klientskriving; GODKJENNING KREVER tekst om hvordan
+autorisasjonen ble verifisert — lagres som review_note + audit),
+info-forespørsel = in_review + note søkeren ser i SupportSetupScreen
+(«svar til hello@heiaapp.no»). App: OpsClaims/OpsClaimDetail i
+Profil-stacken, «Heia internt»-seksjon på Profil (kun ops),
+JS-Linking-lytteren er BYGGET (AppNavigator + deepLink.ts) —
+e-posten deep-linker heia://ops/claims/<id> (HTML-knapp i Resend).
+PLUSS: SupportSetupScreen validerer orgnr mot Brønnøysund FØR
+innsending (404 → blokkert med forklaring; slettet/konkurs →
+blokkert; registerets navn brukes som autoritativt; nettverksfeil =
+fail-open; __DEV__-bygg har eksplisitt «Send likevel (testdata)»).
+LÆRDOM fra deploy-verifiseringen: REVOKE FROM anon alene er
+utilstrekkelig — anon arver PUBLIC-granten; alle ops-funksjoner er
+nå revokert FROM PUBLIC og verifisert i prod (anon=false overalt).
+TELEFONTEST (Metro-reload): (a) Profil → «Heia internt» → Heia Ops →
+listen viser Ridabu (godkjent) + Stange (avslått); (b) send ny
+Stange-søknad med EKTE orgnr → e-post med HTML-knapp «Åpne i Heia
+Ops» → trykk → detaljskjermen (kaldstart-varianten: appen lukket
+først); (c) godkjenn UTEN tekst → stoppes; skriv verifiseringstekst
+→ Godkjenn → status flipper + audit-loggen viser handlingen;
+(d) test «Be om mer informasjon» på en åpen søknad → søkerens
+SupportSetupScreen viser gul boks. SQL-editoren består som
+nødfallback (PAYMENTS.md §Fase 3-runbooken). Markedsføringstonen
 (følelser/samhold/støtte) hører til nettside-prosjektet, men
 flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan

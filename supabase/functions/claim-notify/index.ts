@@ -230,8 +230,11 @@ Deno.serve(async (req) => {
     return new Response('skipped', {status: 200});
   }
 
-  const regNavn = snapshot.enhet?.navn ?? record.claimed_legal_name;
+  const opsLink = `heia://ops/claims/${record.id}`;
   const text = `En klubb har søkt om aktivering av støtte i Heia.
+
+ÅPNE I HEIA OPS (på telefonen med Heia installert):
+${opsLink}
 
 Klubb (søknad): ${record.claimed_legal_name}
 Orgnr:          ${org}
@@ -246,23 +249,23 @@ Heia tar autorisasjonskontrollen; registermatch er bevis, aldri fasit):
 ${evidence}
 ----------------------------------------------------------------------
 
-Godkjenn (SQL-editoren — bruk REGISTERETS navn):
-
-  SELECT approve_club_claim(
-    '${record.id}', NULL,
-    'Autorisasjon verifisert: …hvordan…',
-    '${org}', '${String(regNavn).replace(/'/g, "''")}');
-
-Avslå (begrunnelsen vises for søkeren i appen):
-
-  SELECT reject_club_claim(
-    '${record.id}',
-    '…begrunnelse…');
-
-Hele registerutdraget ligger frosset på raden (brreg_snapshot):
-
-  SELECT brreg_snapshot FROM club_claims WHERE id = '${record.id}';
+Handlingene (Godkjenn / Be om mer informasjon / Avslå) gjøres i Heia
+Ops-flaten i appen — godkjenning krever at du beskriver hvordan
+autorisasjonen ble verifisert, og alt logges. SQL-editoren er kun
+nødfallback (ops-runbooken i PAYMENTS.md §Fase 3).
 `;
+
+  // HTML-versjon: Mail gjør ikke custom-scheme-lenker i ren tekst
+  // trykkbare — knappen her er selve inngangen til ops-flaten.
+  const esc = (s: unknown) =>
+    String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const html = `<div style="font-family:-apple-system,sans-serif;max-width:560px">
+<h2 style="margin:0 0 4px">🏟 Klubbsøknad: ${esc(record.claimed_legal_name)}</h2>
+<p style="margin:4px 0 16px;color:#555">Orgnr ${esc(org)} · Søker: ${esc(claimantName || '(ukjent)')} (${esc(record.claimed_role)}) · ${esc(record.contact_email ?? '')}</p>
+<p style="margin:0 0 20px"><a href="${opsLink}" style="background:#02FFAB;color:#0B3B2E;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:700">Åpne i Heia Ops →</a></p>
+<pre style="background:#f6f6f2;border-radius:8px;padding:12px;white-space:pre-wrap;font-size:13px">${esc(evidence)}</pre>
+<p style="color:#888;font-size:12px">Godkjenn / Be om mer info / Avslå gjøres i appen — godkjenning krever verifisert autorisasjon og alt logges. Claim-id: ${esc(record.id)}</p>
+</div>`;
 
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -275,6 +278,7 @@ Hele registerutdraget ligger frosset på raden (brreg_snapshot):
       to: [CLAIM_TO],
       subject: `🏟 Klubbsøknad i Heia: ${record.claimed_legal_name} (${org})`,
       text,
+      html,
     }),
   });
 

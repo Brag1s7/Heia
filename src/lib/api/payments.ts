@@ -28,6 +28,8 @@ export interface SupportActivationStatus {
     legalName: string;
     reviewNote: string | null;
     isMine: boolean;
+    /** «Be om mer informasjon» fra Heia Ops (00046) — vises i søknadskortet. */
+    infoRequestNote: string | null;
   } | null;
   entity: {orgNumber: string; legalName: string} | null;
   account: {actionNeeded: boolean} | null;
@@ -57,6 +59,7 @@ export async function getSupportActivationStatus(
           legalName: data.claim.legal_name,
           reviewNote: data.claim.review_note ?? null,
           isMine: !!data.claim.is_mine,
+          infoRequestNote: data.claim.info_request_note ?? null,
         }
       : null,
     entity: data.entity
