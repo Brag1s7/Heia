@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {colors, typography, spacing, radius, shadows} from '../theme';
 import {inkOnTeamColor} from '../shared/teamColors';
 import type {ProfilStackParamList} from '../shared/types';
 import {BackBar, Button, TeamColorPicker} from '../components';
-import {ChevronRight, HandHeart} from '../components/icons';
+import {ChevronRight, HandHeart, Wallet} from '../components/icons';
 import {useActiveTeam} from '../context';
 import {pickLogoImage} from '../lib/media';
 import {
@@ -26,6 +26,7 @@ import {
   updateTeamName,
   updateTeamLogo,
   setClubLogo,
+  isPaymentManager,
 } from '../lib/api';
 
 /** «Kjelsås G14» → «KG», ett ord → to første tegn (samme som TeamHeader). */
@@ -83,6 +84,16 @@ export function TeamSettingsScreen() {
   const [savingName, setSavingName] = useState(false);
   const [savingTeamLogo, setSavingTeamLogo] = useState(false);
   const [savingClubLogo, setSavingClubLogo] = useState(false);
+
+  // Snarveien til Klubbbetalinger (00047) — kun for betalingsansvarlige.
+  const [isManager, setIsManager] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    isPaymentManager().then(v => mounted && setIsManager(v));
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const club = activeTeam?.club ?? null;
 
@@ -328,6 +339,24 @@ export function TeamSettingsScreen() {
               <Text style={styles.hintFlex}>
                 Aktiver «Støtt laget» — faste månedlige bidrag fra foreldre og
                 supportere, utbetalt til klubben.
+              </Text>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </View>
+          </Pressable>
+        )}
+
+        {/* Kontekstuell snarvei til «Klubbbetalinger» (klubbdøren, 00047)
+            — SAMME flate som på Profil, kun for betalingsansvarlige. */}
+        {club && isManager && (
+          <Pressable
+            style={styles.card}
+            onPress={() => navigation.navigate('ClubPayments')}>
+            <Text style={styles.label}>Klubbbetalinger</Text>
+            <View style={styles.supportRow}>
+              <Wallet size={22} color={colors.heiaDeep} strokeWidth={2} />
+              <Text style={styles.hintFlex}>
+                Du er betalingsansvarlig — godkjenn og administrer lagenes
+                støtte.
               </Text>
               <ChevronRight size={20} color={colors.textTertiary} />
             </View>

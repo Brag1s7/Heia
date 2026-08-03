@@ -31,6 +31,8 @@ export interface HeiaNotification {
   feedPostId?: string;
   eventId?: string;
   teamSpaceId?: string;
+  /** Klubbdør-varsler (00047) peker på en skjerm i Profil-stacken. */
+  targetScreen?: 'club_payments' | 'support_setup';
 }
 
 // Lag-varsler + eventuelle globale (team_space_id null, f.eks. 'system').
@@ -51,6 +53,10 @@ function mapRow(row: any): HeiaNotification {
     feedPostId: data.feed_post_id ?? undefined,
     eventId: data.event_id ?? undefined,
     teamSpaceId: row.team_space_id ?? undefined,
+    targetScreen:
+      data.screen === 'club_payments' || data.screen === 'support_setup'
+        ? data.screen
+        : undefined,
   };
 }
 

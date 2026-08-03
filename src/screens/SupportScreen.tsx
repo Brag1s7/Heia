@@ -11,10 +11,12 @@ import {
   RefreshControl,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useNavigation, type NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
 import {BackBar, Button, Skeleton} from '../components';
 import {Check} from '../components/icons';
 import {useActiveTeam} from '../context';
+import {isTeamAdmin} from '../shared/roles';
 import {
   getSupportOffering,
   getMySupportSubscription,
@@ -23,6 +25,7 @@ import {
   type MySupportSubscription,
 } from '../lib/api';
 import {formatKr} from '../lib/money';
+import type {RootTabParamList} from '../shared/types';
 
 /**
  * «Støtt laget» (betalingssporet fase 4) — for ALLE lagmedlemmer.
@@ -49,7 +52,8 @@ function formatRenewal(iso: string): string {
 
 export function SupportScreen() {
   const insets = useSafeAreaInsets();
-  const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
+  const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
+  const navigation = useNavigation();
 
   const [offering, setOffering] = useState<SupportOffering | null>(null);
   const [mySub, setMySub] = useState<MySupportSubscription | null>(null);
@@ -163,25 +167,39 @@ export function SupportScreen() {
               </Text>
             ) : null}
             <Text style={styles.hint}>
-              Endring og avslutning av støtten kommer i neste oppdatering av
-              Heia.
+              Betalingsmåte, kvitteringer og oppsigelse finner du under
+              «Min støtte» på Profil.
             </Text>
           </View>
         </View>
       );
     }
 
-    // Klubben er ikke koblet til utbetaling (eller mangler pris) ennå.
+    // Klubben er ikke koblet til utbetaling, eller laget mangler klubbens
+    // godkjenning (klubbdøren, 00047). Lagadmin får veien videre rett her.
     if (!offering || !offering.available) {
       return (
         <View style={styles.section}>
           <Text style={styles.stateTitle}>Ikke helt klart ennå</Text>
           <Text style={styles.stateBody}>
-            Støtten for dette laget er ikke satt opp ennå — enten venter
-            klubben på kobling til utbetaling, eller så mangler prisen for
-            laget. Trenere og lagledere finner status i Laginnstillinger →
-            «Støtte fra supportere».
+            {isTeamAdmin(activeRole)
+              ? 'Støtten for laget er ikke åpnet ennå. Sjekk statusen og be ' +
+                'om klubbens godkjenning under «Støtte fra supportere».'
+              : 'Støtten for dette laget er ikke satt opp ennå. Trenere og ' +
+                'lagledere finner status i Laginnstillinger → «Støtte fra ' +
+                'supportere».'}
           </Text>
+          {isTeamAdmin(activeRole) && (
+            <Button
+              title="Åpne «Støtte fra supportere»"
+              variant="secondary"
+              onPress={() =>
+                navigation
+                  .getParent<NavigationProp<RootTabParamList>>()
+                  ?.navigate('ProfilStack', {screen: 'SupportSetup'})
+              }
+            />
+          )}
         </View>
       );
     }

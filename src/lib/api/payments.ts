@@ -33,6 +33,19 @@ export interface SupportActivationStatus {
   } | null;
   entity: {orgNumber: string; legalName: string} | null;
   account: {actionNeeded: boolean} | null;
+  /** Lagets klubbdør-tilstand (00047) — styrer «Be om godkjenning»-kortet. */
+  team: {
+    supportState: 'collecting' | 'pending' | 'paused' | 'deactivated' | 'none';
+    approval: {
+      id: string;
+      status: 'pending' | 'approved' | 'rejected';
+      note: string | null;
+      createdAt: string;
+      decidedAt: string | null;
+    } | null;
+  } | null;
+  /** Er JEG betalingsansvarlig i klubben? (kontekstuell snarvei) */
+  isPaymentManager: boolean;
 }
 
 /** RPC-en returnerer NULL for alle som ikke er lagadmin i laget. */
@@ -68,6 +81,21 @@ export async function getSupportActivationStatus(
     account: data.account
       ? {actionNeeded: !!data.account.action_needed}
       : null,
+    team: data.team
+      ? {
+          supportState: data.team.support_state,
+          approval: data.team.approval
+            ? {
+                id: data.team.approval.id,
+                status: data.team.approval.status,
+                note: data.team.approval.note ?? null,
+                createdAt: data.team.approval.created_at,
+                decidedAt: data.team.approval.decided_at ?? null,
+              }
+            : null,
+        }
+      : null,
+    isPaymentManager: !!data.is_payment_manager,
   };
 }
 

@@ -1,17 +1,31 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-03 (kveld). **NYESTE: 🚪 KLUBBDØREN +
-SUPPORTER-ROLLEN BESLUTTET OG LÅST 2026-08-03 (tre-porter-modellen,
-betalingsansvarlig-rollen, «Klubbbetalinger»-flaten, pause vs.
-deaktiver, dogfood på Brages nye lag) — OG to av tre skiver er alt
-BYGGET OG DEPLOYET samme dag: ✅ SUPPORTER-SKIVA (migrasjon `00045` +
-rollekort + Lagoversikt — venter telefontest) og ✅ CLAIM-VARSEL MED
-BRØNNØYSUND-AUTORISASJONSBEVIS (migrasjon `00044` + Edge Function
-`claim-notify` — Stripe tar KYC, Heia tar autorisasjonskontrollen,
-registerdata hentes automatisk). GJENSTÅR: KLUBBDØREN (hovedskiva —
-neste samtale) + full E2E-dogfood på Brages nye Ridabu-lag FØR
-live/fase 6. Se ▶️ NESTE SAMTALE-blokken i native-avsnittet +
-PAYMENTS.md §Åpne beslutninger.** Fra før: 💳 BETALINGER —
+_Sist oppdatert: 2026-08-03 (sen kveld). **NYESTE: 🚪 KLUBBDØREN ER
+BYGGET OG DEPLOYET 2026-08-03 (sen kveld) — migrasjon `00047` +
+`00048` + Edge Function `club-support-deactivate` + hele app-flaten
+(«Klubbbetalinger» på Profil m/snarvei fra Laginnstillinger, «Be om
+godkjenning» i SupportSetup, pause/deaktiver med antall + logg,
+klubbdør-varsler med inbox-navigasjon). Dermed er ALLE TRE skivene
+fra beslutningsrunden 2026-08-03 i prod samme dag: supporter-skiva
+(00045), claim-varselet (00044) og klubbdøren (00047/48). Backfill
+verifisert i prod (Ridabu-defaults 79/60; Brage betalingsansvarlig),
+rettigheter verifisert (anon=false overalt), overview-RPC røyktestet
+som Brage. **BRAGES KVITTERING 2026-08-03: «Det funker!»** — klubbdøren er sett
+virke på telefonen; resten av testlisten i punkt (2) tas løpende.
+BESLUTNING (Brage): TestFlight 1.0 (2) tas IKKE ennå — først skal
+mest mulig inn i bygget. **NESTE SAMTALE = APNs-PUSH-SKIVA (punkt
+(3) + PUSH-RESTANSE-blokken): .p8-nøkkel i den betalte Apple-kontoen
+→ 5 secrets → alle varsler (klubbdør/rapport/feed/kamp) begynner å
+pushe — ingen ny pod, ingen ny JS; infrastrukturen ligger klar i
+`_shared/apns.ts`. Samme samtale: «Åpne Heia-appen»-knappen på
+web/betaling (ren web-endring, trenger ikke bygg). DERETTER er 1.0
+(2) et rent Archive + Upload.** Flyten for NYE klubber er komplett
+og forklart for Brage: ingen styrer klubben automatisk — claim-
+review i Heia Ops = autorisasjonen, claimanten blir første
+betalingsansvarlige (00048), Heia seeder standardtilbudet
+(ops-steget), klubben tar KYC, lagene ber om godkjenning. Se
+PAYMENTS.md §Åpne beslutninger «KLUBBDØREN» (bygget-status +
+ops-runbook).** Fra før: 💳 BETALINGER —
 FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
 bestått, DB-verifisert 8/8) etter tre review-justeringer på
 Profil/«Min støtte» + Lagkassa (alltid synlig + trykkbar tom-rad →
@@ -160,38 +174,70 @@ kode → tre rollekort, velg Supporter → innmeldt uten barnesteg;
 raden; (c) supporteren kan åpne Støtt laget og betale (medlemsgatet
 checkout uendret). Dette LUKKER «ikke-medlem-støtte»-flagget:
 supportere ER medlemmer — web-checkout trengs ikke.
-**(2) KLUBBDØREN (hovedskiva) — LÅST MODELL: tre porter** (personen
-er autorisert av klubben + klubben er Stripe/KYC-godkjent + laget er
-godkjent av betalingsansvarlig = laget kan samle inn støtte).
-Rollen heter **BETALINGSANSVARLIG** (ikke «klubbansvarlig»); INGEN
-får den automatisk via lagadminskap eller påbegynt KYC — første
-hovedansvarlige godkjennes som AUTORISERT REPRESENTANT for klubben
-(claim-reviewen) og må fullføre Stripe-KYC; senere betalings-
-ansvarlige INVITERES av eksisterende hovedansvarlig. ÉN kanonisk
-flate **«Klubbbetalinger»**: hovedinngang på PROFIL, kontekstuell
-snarvei fra Laginnstillinger — ingen ny innlogging/portal,
-betalingsansvarlig er vanlig app-bruker. Lagflyten: «Be om
-godkjenning» (SupportSetupScreen + admin-CTA i SupportScreen-
-fallbacken) → varsel → ett trykk «Godkjenn» → laget ARVER klubbens
-standardtilbud (79/60 som DATA i club_support_defaults,
-deny-by-default; betalingsansvarlig ser/velger ALDRI pris —
-create_support_offering forblir ops-only, godkjenningsstien deler
-intern mekanikk) → offering v1 i samme transaksjon. Godkjenninger =
-RADER (team_support_approvals: hvem/når/status/note, maks én åpen
-per lag, avslag krever begrunnelse som treneren ser). V1 har TO
-handlinger med presist språk (ALDRI «revoke» når abonnementer
-består): **«Pause nye støttespillere»** (offering arkiveres, nye
-checkouts stoppes, eksisterende abonnementer fortsetter) og
-**«Deaktiver støtte for laget»** (nye stoppes + eksisterende settes
-til kansellering ved periodeslutt — cancel_at_period_end via
-Stripe-kall → Edge Function, ingen refusjon av betalt periode).
-Begge med bekreftelsesdialog som viser ANTALL berørte aktive
-abonnementer + logg (hvem/når/årsak). DOGFOOD (låst): Brages nye
-Ridabu-lag får INGEN manuell offering — laget ER E2E-testen av
-døren; Brage backfilles som betalingsansvarlig for Ridabu fra det
-godkjente claimet, så hele flyten testes på telefonen. NB
-kontosletting må rydde betalingsansvarlig-raden (spøkelser skal
-ikke beholde godkjenningsmakt). **(3) APNs-PUSH** (restansen under)
+**(2) ✅ KLUBBDØREN (hovedskiva) BYGGET OG DEPLOYET 2026-08-03 (sen
+kveld) — venter telefondogfood.** Tre-porter-modellen som bygget:
+migrasjon `00047` — club_payment_managers (rollen; deny-all RLS),
+club_support_defaults (79/60 som DATA, deny-by-default),
+team_support_approvals (RADER: hvem/når/status/note; partiell unik =
+maks én åpen per lag; avslag krever begrunnelse som treneren ser),
+team_support_actions (append-only logg for hele døren), klient-
+RPC-ene request/approve/reject/pause + get_club_payments_overview +
+get_support_activation_status utvidet ('team'-dørtilstand +
+'is_payment_manager') + delete_account_data rydder rollen (spøkelser
+beholder aldri godkjenningsmakt). Migrasjon `00048`:
+approve_club_claim gir nå CLAIMANTEN rollen — fremtidige klubber får
+første betalingsansvarlige automatisk fra claim-reviewen (reviewen ER
+autorisasjonen). Edge Function `club-support-deactivate`:
+cancel_at_period_end per abonnement — DB arkiverer FØRST (nye
+checkouts stoppes atomisk), Stripe etterpå, idempotent retry ved
+delfeil; webhookene bokfører. Godkjenning kaller
+create_support_offering INTERNT (forblir ops-only utenfra);
+betalingsansvarlig ser ALDRI pris — forespørselskortet viser kun
+lagnavn/årskull/medlemstall/hvem som spør. App: ny
+ClubPaymentsScreen («Klubbbetalinger» — Profil-seksjon «Klubben»,
+kun for managere; kontekstuell snarvei i Laginnstillinger),
+SupportSetupScreen har dørkortene (Be om godkjenning / TIL
+GODKJENNING / avslag m/begrunnelse + på nytt / pauset/deaktivert /
+SAMLER INN + «Du er betalingsansvarlig»-snarvei), SupportScreen-
+fallbacken fikk admin-CTA, og klubbdør-varsler navigerer fra inbox
+(varsel til ansvarlig er GLOBALT — team_space_id NULL — siden
+ansvarlig ikke trenger å være medlem av laget som spør; kategorien
+er 'system'). VERIFISERT I PROD: backfill står (Ridabu-defaults
+7900/fixed 6000/2405 bps kopiert fra aktiv offering; managere =
+hovedkonto + telefonkontoen for Ridabu OG Stange — Stange har aktiv
+link fra fase 3-testen og mangler defaults MED VILJE = feilveis-
+test), anon=false på alle nye funksjoner (PUBLIC-revoken tatt),
+create_support_offering/deactivate_team_support_data fortsatt lukket
+for klienter, get_club_payments_overview røyktestet som Brage
+(Ridabu: J2019 'none' → klar for dogfood, G10 'collecting' med 4
+sandbox-abonnementer). 📱 TELEFONDOGFOOD (dev-bygg fra Xcode,
+Metro-reload): (a) Profil → ny seksjon «Klubben» → «Klubbbetalinger»
+(begge kontoer er betalingsansvarlige); (b) bytt til J2019-laget →
+Laginnstillinger → «Støtte fra supportere» → AKTIV-kortet + «Siste
+steg: klubbens godkjenning» → **Be om godkjenning** → kortet flipper
+til TIL GODKJENNING + varsel i Varsler-fanen; (c) trykk varselet →
+Klubbbetalinger → J2019 under TIL GODKJENNING (medlemstall + hvem
+som spør, ALDRI pris) → **Godkjenn** → SAMLER INN + logg-rad +
+varsel tilbake («Laget er godkjent for støtte 💚»); (d) «Støtt
+laget» på J2019 viser nå 79/60-priskortet (ARVET fra defaults —
+ingen manuell offering!) → full dogfood-checkout med testkort om
+ønskelig; (e) pause-testen tas på J2019 (ikke G10): **Pause nye
+støttespillere** → dialog med antall → SupportSetup viser «Støtten
+er satt på pause» → Be om godkjenning på nytt → godkjenn → ny
+offering-versjon arves; (f) **«Deaktiver støtte»** vises kun der det
+finnes levende abonnementer — NB: den kansellerer EKTE
+G10-sandbox-abonnementer ved periodeslutt, bruk den bevisst;
+(g) valgfri feilvei: forespørsel fra et Stange-lag → Godkjenn
+stoppes med «Klubben mangler standardtilbud» → Avslå med begrunnelse
+→ treneren ser den i SupportSetup. OPPRYDDING etter dogfood:
+`DELETE FROM club_payment_managers WHERE user_id = (SELECT id FROM
+auth.users WHERE email = 's2212930@bi.no');` (+ ev. Stange-radene).
+RESTANSE (egen, senere skive): invitasjonsflyt for flere
+betalingsansvarlige — inntil da seeder ops (SQL i PAYMENTS.md).
+OPS-RUNBOOK-ENDRING: ved ny klubbgodkjenning MÅ
+club_support_defaults seedes (INSERT-malen står i PAYMENTS.md
+§KLUBBDØREN) — glemmes den, stopper Godkjenn pent med beskjed.
+**(3) APNs-PUSH** (restansen under)
 — klubbdør-varselet lander i inboxen uansett; push-varianten følger
 gratis når APNs-nøkkelen er satt. **(4) ✅ CLAIM-VARSEL MED
 AUTORISASJONSBEVIS BYGGET OG DEPLOYET 2026-08-03** (funnet fra

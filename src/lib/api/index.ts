@@ -71,6 +71,21 @@ export {
   type TournamentRef,
 } from './stats';
 export {
+  isPaymentManager,
+  clearPaymentManagerCache,
+  getClubPaymentsOverview,
+  requestTeamSupportApproval,
+  approveTeamSupport,
+  rejectTeamSupport,
+  pauseTeamSupport,
+  deactivateTeamSupport,
+  type TeamSupportState,
+  type ClubPaymentsClub,
+  type ClubPaymentRequest,
+  type ClubPaymentTeam,
+  type ClubPaymentLogEntry,
+} from './clubPayments';
+export {
   isOpsAdmin,
   clearOpsAdminCache,
   listOpsClaims,

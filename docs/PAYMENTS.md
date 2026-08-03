@@ -145,11 +145,13 @@ transaksjoner/offerings/webhook-events slettes aldri.
 
 ## Bygger bevisst IKKE nå
 
-Wallet · intern ledger · payout-tabell · klubbadmin-rolle · automatisk
+Wallet · intern ledger · payout-tabell · automatisk
 Brønnøysund · årsplan · navngitte supporterlister · Vipps (via Stripe i dag =
 kun engangs, private preview — verifisert) · automatisert klubbmerge · egen
 selvbetjeningsflate · web-checkout for ikke-medlemmer · prisendringsflyt for
-løpende abonnementer · staging-miljø (vurderes før prod).
+løpende abonnementer · staging-miljø (vurderes før prod) · invitasjonsflyt
+for flere betalingsansvarlige (ops seeder inntil videre — rollen selv er
+BYGGET, se «KLUBBDØREN»).
 
 ## Åpne beslutninger
 
@@ -232,6 +234,37 @@ SUPPORTER-ROLLEN. Tre-porter-modellen:**
    laget er E2E-testen av hele døren (Brage backfilles som
    betalingsansvarlig for Ridabu fra det godkjente claimet).
    Byggerekkefølge: supporter-skiva først (liten), så klubbdøren.
+
+**✅ BYGGET OG DEPLOYET 2026-08-03 (sen kveld) — migrasjon `00047` +
+`00048` + Edge Function `club-support-deactivate`:** tabellene
+`club_payment_managers` / `club_support_defaults` /
+`team_support_approvals` (partiell unik = maks én åpen per lag) /
+`team_support_actions` (append-only logg, forbid_mutation); klient-
+RPC-ene `request_team_support_approval` / `approve_team_support` /
+`reject_team_support` / `pause_team_support` /
+`get_club_payments_overview` (alle selv-gatet på rollen, anon
+revokert inkl. PUBLIC — verifisert i prod); deaktivering =
+`deactivate_team_support_data` (service-role) + Edge Function som
+setter `cancel_at_period_end` per abonnement (DB arkiverer FØRST,
+Stripe etterpå, idempotent retry; webhookene bokfører). Godkjenning
+kaller `create_support_offering` INTERNT (SECURITY DEFINER = eier)
+— funksjonen forblir ops-only utenfra, mekanikken deles.
+`approve_club_claim` gir nå claimanten rollen (00048) — fremtidige
+klubber får første betalingsansvarlige automatisk fra reviewen.
+Kontosletting rydder rollen (`delete_account_data` utvidet).
+Varsler = notifications-rader ('system'); til betalingsansvarlig er
+de GLOBALE (team_space_id NULL — ansvarlig er ikke nødvendigvis
+medlem av laget som spør). Backfill i prod: Ridabu-defaults kopiert
+fra aktiv offering (7900 / fixed 6000 / 2405 bps); managere = Brages
+hovedkonto + telefonkonto (dogfood) for Ridabu OG Stange (Stange har
+aktiv link fra fase 3-testen og mangler defaults MED VILJE —
+feilveis-test). **OPS-RUNBOOK ved ny klubbgodkjenning — seed
+standardtilbudet, ellers stopper Godkjenn pent:**
+```sql
+INSERT INTO club_support_defaults
+  (club_id, amount_minor, fee_model, fee_bps, club_fixed_minor)
+VALUES ('<club_id>', 7900, 'fixed_club_amount', 2405, 6000);
+```
 
 **Avgjort 2026-08-02 (Brage):** splitten = FAST 60 kr til laget, offentlig
 kommunisert (se «Pris og split») · lagaggregatet er synlig for ALLE

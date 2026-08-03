@@ -195,7 +195,9 @@ export type RootTabParamList = {
   KalenderStack: undefined;
   Opprett: undefined;
   InboxStack: NavigatorScreenParams<InboxStackParamList> | undefined;
-  ProfilStack: undefined;
+  // Klubbdør-varsler (00047) navigerer på tvers av faner inn i
+  // Klubbbetalinger/SupportSetup — derfor NavigatorScreenParams her også.
+  ProfilStack: NavigatorScreenParams<ProfilStackParamList> | undefined;
 };
 
 export type HomeStackParamList = {
@@ -274,4 +276,7 @@ export type ProfilStackParamList = {
    *  raden på Profil vises kun for ops, og RPC-ene er vaktene. */
   OpsClaims: undefined;
   OpsClaimDetail: {claimId: string};
+  /** «Klubbbetalinger» (klubbdøren, 00047) — kun betalingsansvarlige.
+   *  DB-gatet på club_payment_managers; raden på Profil er speilet. */
+  ClubPayments: undefined;
 };

@@ -457,6 +457,13 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# «Deaktiver støtte for laget» (klubbdøren, 00047) — kun innloggede
+# betalingsansvarlige; DB-siden håndhever rollen, funksjonen setter
+# cancel_at_period_end hos Stripe per abonnement.
+[functions.club-support-deactivate]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

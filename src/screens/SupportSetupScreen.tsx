@@ -14,6 +14,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {BackBar, Button, Skeleton} from '../components';
 import {useActiveTeam, useAuth} from '../context';
@@ -21,9 +23,11 @@ import {
   getSupportActivationStatus,
   submitClubClaim,
   startStripeOnboarding,
+  requestTeamSupportApproval,
   type SupportActivationStatus,
 } from '../lib/api';
 import {lookupBrregEnhet} from '../lib/brreg';
+import type {ProfilStackParamList} from '../shared/types';
 
 /**
  * Aktivering av «Støtt laget» (betalingssporet fase 3) — kun lagadmin,
@@ -33,6 +37,8 @@ import {lookupBrregEnhet} from '../lib/brreg';
  */
 export function SupportSetupScreen() {
   const insets = useSafeAreaInsets();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<ProfilStackParamList>>();
   const {activeTeamSpaceId, activeTeam} = useActiveTeam();
   const {session} = useAuth();
 
@@ -50,6 +56,7 @@ export function SupportSetupScreen() {
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [requesting, setRequesting] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeTeamSpaceId) return;
@@ -191,6 +198,25 @@ export function SupportSetupScreen() {
     });
   }, [fetchOnboardingUrl]);
 
+  // Klubbdøren (00047): «Be om godkjenning» — null friksjon, ingenting å
+  // fylle ut. Betalingsansvarlig i klubben får varsel og godkjenner med
+  // ett trykk; laget arver klubbens standardtilbud automatisk.
+  const handleRequestApproval = useCallback(async () => {
+    if (!activeTeamSpaceId || requesting) return;
+    setRequesting(true);
+    try {
+      await requestTeamSupportApproval(activeTeamSpaceId);
+      await load();
+    } catch (e: any) {
+      Alert.alert(
+        'Kunne ikke sende forespørselen',
+        e?.message ?? 'Prøv igjen om litt.',
+      );
+    } finally {
+      setRequesting(false);
+    }
+  }, [activeTeamSpaceId, requesting, load]);
+
   const clubName = status?.club?.name ?? activeTeam?.club?.name ?? 'klubben';
   const canSubmit =
     orgNumber.replace(/\D/g, '').length === 9 &&
@@ -306,36 +332,118 @@ export function SupportSetupScreen() {
           </View>
         );
 
-      case 'active':
+      case 'active': {
+        // Klubben (port 1+2) er åpen — resten avgjøres av klubbdøren
+        // (port 3, 00047): lagets egen godkjenning fra betalingsansvarlig.
+        const doorState = status.team?.supportState ?? 'none';
+        const approval = status.team?.approval ?? null;
         return (
-          <View style={styles.card}>
-            <Text style={styles.pillActive}>AKTIV</Text>
-            <Text style={styles.cardTitle}>Klubben er klar for støtte</Text>
-            <Text style={styles.body}>
-              {status.entity?.legalName ?? clubName} er koblet til utbetaling.
-              «Støtt laget»-knappen for foreldre og supportere kommer i neste
-              oppdatering av Heia.
-            </Text>
-            <View style={styles.factBox}>
-              <FactRow label="Organisasjonsnummer" value={status.entity?.orgNumber ?? '—'} />
-              <FactRow label="Mottaker" value={status.entity?.legalName ?? '—'} />
+          <>
+            <View style={styles.card}>
+              <Text style={styles.pillActive}>AKTIV</Text>
+              <Text style={styles.cardTitle}>Klubben er klar for støtte</Text>
+              <Text style={styles.body}>
+                {status.entity?.legalName ?? clubName} er koblet til
+                utbetaling.
+              </Text>
+              <View style={styles.factBox}>
+                <FactRow label="Organisasjonsnummer" value={status.entity?.orgNumber ?? '—'} />
+                <FactRow label="Mottaker" value={status.entity?.legalName ?? '—'} />
+              </View>
+              {status.account?.actionNeeded && (
+                <>
+                  <Text style={styles.body}>
+                    Stripe ber om litt mer informasjon fra klubben.
+                  </Text>
+                  <Button
+                    title="Åpne hos Stripe"
+                    variant="secondary"
+                    onPress={handleOpenStripe}
+                    loading={linkLoading}
+                    style={styles.cardButton}
+                  />
+                </>
+              )}
             </View>
-            {status.account?.actionNeeded && (
-              <>
+
+            {doorState === 'collecting' ? (
+              <View style={styles.card}>
+                <Text style={styles.pillActive}>SAMLER INN</Text>
+                <Text style={styles.cardTitle}>Laget samler inn støtte</Text>
                 <Text style={styles.body}>
-                  Stripe ber om litt mer informasjon fra klubben.
+                  «Støtt laget» er åpen for alle i laget — foreldre og
+                  supportere finner den på Hjem og i lagkassa.
+                </Text>
+              </View>
+            ) : doorState === 'pending' ? (
+              <View style={styles.card}>
+                <Text style={styles.pillPending}>TIL GODKJENNING</Text>
+                <Text style={styles.cardTitle}>
+                  Venter på klubbens godkjenning
+                </Text>
+                <Text style={styles.body}>
+                  Klubbens betalingsansvarlige har fått beskjed og godkjenner
+                  laget med ett trykk — du får varsel når det er gjort.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>
+                  {doorState === 'paused'
+                    ? 'Støtten er satt på pause'
+                    : doorState === 'deactivated'
+                      ? 'Støtten er deaktivert'
+                      : 'Siste steg: klubbens godkjenning'}
+                </Text>
+                {approval?.status === 'rejected' && approval.note ? (
+                  <View style={styles.infoRequestBox}>
+                    <Text style={styles.infoRequestTitle}>
+                      Forrige forespørsel ble ikke godkjent
+                    </Text>
+                    <Text style={styles.body}>{approval.note}</Text>
+                  </View>
+                ) : null}
+                <Text style={styles.body}>
+                  {doorState === 'paused' || doorState === 'deactivated'
+                    ? 'Klubbens betalingsansvarlige har stoppet nye ' +
+                      'støttespillere for laget. Vil dere åpne igjen, ber ' +
+                      'du om godkjenning på nytt.'
+                    : 'Klubben bestemmer hvilke lag som samler inn støtte. ' +
+                      'Be om godkjenning — betalingsansvarlig får varsel og ' +
+                      'godkjenner med ett trykk. Ingenting mer å fylle ut.'}
                 </Text>
                 <Button
-                  title="Åpne hos Stripe"
-                  variant="secondary"
-                  onPress={handleOpenStripe}
-                  loading={linkLoading}
+                  title={
+                    approval?.status === 'rejected' ||
+                    doorState === 'paused' ||
+                    doorState === 'deactivated'
+                      ? 'Be om godkjenning på nytt'
+                      : 'Be om godkjenning'
+                  }
+                  onPress={handleRequestApproval}
+                  loading={requesting}
                   style={styles.cardButton}
                 />
-              </>
+              </View>
             )}
-          </View>
+
+            {status.isPaymentManager && (
+              <View style={styles.card}>
+                <Text style={styles.cardTitle}>Du er betalingsansvarlig</Text>
+                <Text style={styles.body}>
+                  Godkjenn og administrer lagenes støtte i Klubbbetalinger.
+                </Text>
+                <Button
+                  title="Åpne Klubbbetalinger"
+                  variant="secondary"
+                  onPress={() => navigation.navigate('ClubPayments')}
+                  style={styles.cardButton}
+                />
+              </View>
+            )}
+          </>
         );
+      }
 
       case 'disabled':
         return (

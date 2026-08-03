@@ -41,6 +41,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  Wallet,
 } from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {TERMS_URL, PRIVACY_URL} from '../shared/links';
@@ -57,6 +58,8 @@ import {
   openSupportPortal,
   isOpsAdmin,
   clearOpsAdminCache,
+  isPaymentManager,
+  clearPaymentManagerCache,
   type MySupportItem,
 } from '../lib/api';
 import {confirmDeleteAccount} from '../lib/account';
@@ -150,6 +153,17 @@ export function ProfilScreen() {
     };
   }, []);
 
+  // «Klubbbetalinger» (klubbdøren, 00047) — hovedinngangen for
+  // betalingsansvarlig bor på PROFIL (låst). Samme speil-mønster som ops.
+  const [isManager, setIsManager] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    isPaymentManager().then(v => mounted && setIsManager(v));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // «Min støtte» (betalingsspor fase 5) — brukerens egne støtteavtaler som
   // LISTE (flere lag senere). Refetches når appen våkner igjen: endringer
   // gjort i Customer Portal (Safari) skal synes når man er tilbake.
@@ -204,6 +218,7 @@ export function ProfilScreen() {
   const handleSignOut = useCallback(() => {
     supportOverviewCache = null;
     clearOpsAdminCache();
+    clearPaymentManagerCache();
     signOut();
   }, [signOut]);
 
@@ -221,6 +236,7 @@ export function ProfilScreen() {
       onDeleted: () => {
         supportOverviewCache = null;
         clearOpsAdminCache();
+        clearPaymentManagerCache();
       },
     });
   }, [deletingAccount, signOut]);
@@ -478,6 +494,29 @@ export function ProfilScreen() {
           )}
         </View>
       </View>
+
+      {/* Klubbbetalinger (klubbdøren, 00047) — hovedinngangen for
+          betalingsansvarlig (låst: bor på Profil). Raden er et speil av
+          DB-vakten club_payment_managers. */}
+      {isManager && (
+        <View style={styles.menuBlock}>
+          <SectionLabel title="Klubben" />
+          <View style={styles.menuCard}>
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Wallet size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Klubbbetalinger"
+              subtitle="Godkjenn og administrer lagenes støtte"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('ClubPayments')}
+              showBorder={false}
+            />
+          </View>
+        </View>
+      )}
 
       {/* Heia Ops — kun for ops_admins (Brage). Raden er et speil av
           DB-vakten; alle handlinger er audit-loggede RPC-er. */}
