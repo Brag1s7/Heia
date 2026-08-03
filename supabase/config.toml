@@ -406,6 +406,14 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# claim-notify kalles server-til-server av trigger'en
+# notify_on_club_claim (00044) — samme mønster som report-notify.
+# Henter i tillegg åpne registerdata fra Brønnøysund (autorisasjons-
+# beviset) og skriver brreg_snapshot på claim-raden.
+[functions.claim-notify]
+enabled = true
+verify_jwt = false
+
 # Stripe kan ikke sende Supabase-JWT — autentisering er
 # signaturverifisering mot webhook-secretene (se funksjonens header).
 [functions.stripe-webhook]

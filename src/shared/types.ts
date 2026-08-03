@@ -20,7 +20,8 @@ export type UserRole =
   | 'lagleder'
   | 'admin'
   | 'forelder'
-  | 'spiller';
+  | 'spiller'
+  | 'supporter';
 
 export type MatchStatus =
   | 'upcoming'

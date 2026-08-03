@@ -173,6 +173,22 @@ SUPPORTER-ROLLEN. Tre-porter-modellen:**
    hovedansvarlig**. Kontosletting rydder rollen (anonymiserte
    spøkelser beholder aldri godkjenningsmakt); ops kan alltid seede en
    ny ansvarlig.
+   **Presisering 2026-08-03 (Brage) — AUTORISASJONSKONTROLLEN, bygget
+   samme dag (migrasjon `00044` + Edge Function `claim-notify`):**
+   reviewen skal eksplisitt verifisere søkerens FULLMAKT, ikke bare at
+   orgnummeret finnes. Automatisert som BEVIS, aldri beslutning:
+   claim-innsending trigger et varsel til hello@heiaapp.no beriket med
+   Brønnøysunds åpne registerdata — finnes enheten, navnematch,
+   organisasjonsform (FLI forventet), slettet/konkurs-flagg, og
+   ROLLENE (styret er offentlig!) med automatisk navnematch mot
+   søkerens profilnavn. Match = sterkt bevis; ikke-match beviser
+   ingenting (kasserer/trener med reell fullmakt står ikke i
+   registeret) — da er verifiseringskanalen klubbens REGISTRERTE
+   e-post/telefon, som også står i varselet. Registerutdraget fryses
+   på claim-raden (`brreg_snapshot`) — revisjonsbart i ettertid.
+   Grensesnittet: **Stripe står for KYC; Heia står for
+   autorisasjonskontrollen.** (API-formene røyktestet mot Ridabu
+   2026-08-03: FLI, hele styret med navn, leder@ridabufotball.no.)
 2. **Én kanonisk flate: «Klubbbetalinger».** Hovedinngang på PROFIL
    (rad kun synlig for betalingsansvarlige), kontekstuell snarvei fra
    Laginnstillinger til SAMME flate. Ingen ny innlogging, portal eller

@@ -35,6 +35,7 @@ const SECTIONS: {title: string; roles: UserRole[]}[] = [
   {title: 'Trenere og lagledere', roles: ['trener', 'lagleder', 'admin']},
   {title: 'Foreldre', roles: ['forelder']},
   {title: 'Spillere', roles: ['spiller']},
+  {title: 'Supportere', roles: ['supporter']},
 ];
 
 /** Underteksten på en rad: hvilke barn personen følger, ellers rollen. */

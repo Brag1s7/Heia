@@ -1,12 +1,17 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-03. **NYESTE: 🚪 KLUBBDØREN + SUPPORTER-
-ROLLEN ER BESLUTTET OG LÅST 2026-08-03 (tre-porter-modellen,
+_Sist oppdatert: 2026-08-03 (kveld). **NYESTE: 🚪 KLUBBDØREN +
+SUPPORTER-ROLLEN BESLUTTET OG LÅST 2026-08-03 (tre-porter-modellen,
 betalingsansvarlig-rollen, «Klubbbetalinger»-flaten, pause vs.
-deaktiver, dogfood på Brages nye lag, supporter = vanlig medlem via
-invitasjonskode) — se ▶️ NESTE SAMTALE-blokken i native-avsnittet +
-PAYMENTS.md §Åpne beslutninger. Byggerekkefølge: supporter-skiva
-først, så klubbdøren.** Fra før: 💳 BETALINGER —
+deaktiver, dogfood på Brages nye lag) — OG to av tre skiver er alt
+BYGGET OG DEPLOYET samme dag: ✅ SUPPORTER-SKIVA (migrasjon `00045` +
+rollekort + Lagoversikt — venter telefontest) og ✅ CLAIM-VARSEL MED
+BRØNNØYSUND-AUTORISASJONSBEVIS (migrasjon `00044` + Edge Function
+`claim-notify` — Stripe tar KYC, Heia tar autorisasjonskontrollen,
+registerdata hentes automatisk). GJENSTÅR: KLUBBDØREN (hovedskiva —
+neste samtale) + full E2E-dogfood på Brages nye Ridabu-lag FØR
+live/fase 6. Se ▶️ NESTE SAMTALE-blokken i native-avsnittet +
+PAYMENTS.md §Åpne beslutninger.** Fra før: 💳 BETALINGER —
 FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
 bestått, DB-verifisert 8/8) etter tre review-justeringer på
 Profil/«Min støtte» + Lagkassa (alltid synlig + trykkbar tom-rad →
@@ -138,17 +143,23 @@ BESLUTTET 2026-08-03: INGEN ops-rad lages — laget er E2E-dogfood-
 testen av klubbdøren (se ▶️ NESTE SAMTALE-blokken under).
 ▶️ NESTE SAMTALE (beslutningsrunden 2026-08-03 er TATT — alt under
 er LÅST, full beslutningstekst i PAYMENTS.md §Åpne beslutninger
-«KLUBBDØREN»): **(1) SUPPORTER-SKIVA FØRST (liten, Brages valgte
-rekkefølge):** besteforeldre/tanter/venner melder seg inn NØYAKTIG
-som foreldre (invitasjonskode, samme rettigheter) — eneste forskjell
-er etiketten 'supporter'. Bygges: CHECK-constrainten i memberships +
-rollelisten i join_team_space (migrasjon, additiv), tredje rollekort
-i JoinTeamCodeScreen («Supporter · Heier på laget», ingen
-barnekobling), ROLE_LABELS + «Supportere»-seksjon i Lagoversikt, ⋯
-(fjerning) også på supporter-rader (remove_team_member-vakten er
-svarteliste og tillater det alt — kun UI-filteret må med). Dette
-LUKKER «ikke-medlem-støtte»-flagget: supportere ER medlemmer, så
-medlemsgatet checkout står uendret — web-checkout trengs ikke.
+«KLUBBDØREN»): **(1) ✅ SUPPORTER-SKIVA BYGGET OG DEPLOYET
+2026-08-03 (venter Brages telefontest):** besteforeldre/tanter/
+venner melder seg inn NØYAKTIG som foreldre (invitasjonskode, samme
+rettigheter) — eneste forskjell er etiketten 'supporter'. Bygget:
+migrasjon `00045` i prod (CHECK-constrainten i memberships +
+rollelisten i join_team_space + eksplisitt supporter-gren i
+get_team_members-sorteringen), tredje rollekort i JoinTeamCodeScreen
+(«Supporter · Heier på laget», ingen barnekobling), ROLE_LABELS +
+«Supportere»-seksjon i Lagoversikt. ⋯ (fjerning) virker på
+supporter-rader UTEN endring (remove_team_member-vakten og
+canRemove-betingelsen er svartelister på trener/lagleder/admin).
+TELEFONTEST (Metro-reload): (a) «Bli med i et lag til»/onboarding →
+kode → tre rollekort, velg Supporter → innmeldt uten barnesteg;
+(b) Lagoversikt viser «Supportere»-seksjon nederst, admin ser ⋯ på
+raden; (c) supporteren kan åpne Støtt laget og betale (medlemsgatet
+checkout uendret). Dette LUKKER «ikke-medlem-støtte»-flagget:
+supportere ER medlemmer — web-checkout trengs ikke.
 **(2) KLUBBDØREN (hovedskiva) — LÅST MODELL: tre porter** (personen
 er autorisert av klubben + klubben er Stripe/KYC-godkjent + laget er
 godkjent av betalingsansvarlig = laget kan samle inn støtte).
@@ -182,13 +193,24 @@ godkjente claimet, så hele flyten testes på telefonen. NB
 kontosletting må rydde betalingsansvarlig-raden (spøkelser skal
 ikke beholde godkjenningsmakt). **(3) APNs-PUSH** (restansen under)
 — klubbdør-varselet lander i inboxen uansett; push-varianten følger
-gratis når APNs-nøkkelen er satt. **(4) CLAIM-VARSEL (funn i
-kodegjennomgangen 2026-08-03, ~15 min):** ingen varsler Heia når en
-NY klubb sender claim (submit_club_claim) — en klubb som søker
-aktivering blir liggende usett til noen sjekker SQL. Fiks: samme
-pg_net-trigger-idiom som 00043/report-notify (trigger på
-club_claims → Edge Function → Resend → hello@heiaapp.no). Ufarlig
-nå (én pilotklubb), MÅ inn før selvbetjent klubbvekst/lansering. Markedsføringstonen
+gratis når APNs-nøkkelen er satt. **(4) ✅ CLAIM-VARSEL MED
+AUTORISASJONSBEVIS BYGGET OG DEPLOYET 2026-08-03** (funnet fra
+kodegjennomgangen + Brages presisering om at reviewen eksplisitt
+skal verifisere søkerens FULLMAKT — «Stripe står for KYC; Heia står
+for autorisasjonskontrollen»): migrasjon `00044` i prod (AFTER
+INSERT-trigger på club_claims, 00043-idiomet, + ny kolonne
+`brreg_snapshot`) + Edge Function `claim-notify` deployet. Den
+henter Brønnøysunds ÅPNE registerdata automatisk (enhet + ROLLENE —
+styret er offentlig!), matcher søkerens profilnavn mot styret,
+flagger navneavvik/feil organisasjonsform/konkurs, viser klubbens
+registrerte e-post/telefon som verifiseringskanal, fryser utdraget
+på claim-raden og sender alt til hello@heiaapp.no med ferdig
+approve-/reject-SQL. Registermatch er BEVIS, aldri fasit — Heia
+beslutter fortsatt. API-formene røyktestet mot Ridabu (FLI, hele
+styret, leder@ridabufotball.no). TEST VED ANLEDNING (valgfri, som
+fase 3 runde 2): opprett testlag under en testklubb → send søknad
+fra SupportSetupScreen med et EKTE orgnr → e-post med registerbevis
+skal lande i hello@heiaapp.no → reject_club_claim etterpå. Markedsføringstonen
 (følelser/samhold/støtte) hører til nettside-prosjektet, men
 flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan

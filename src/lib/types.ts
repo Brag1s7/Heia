@@ -73,7 +73,8 @@ export type MemberRole =
   | 'lagleder'
   | 'admin'
   | 'forelder'
-  | 'spiller';
+  | 'spiller'
+  | 'supporter';
 
 export type MemberStatus = 'invited' | 'active' | 'inactive' | 'removed';
 
