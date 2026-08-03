@@ -25,6 +25,23 @@ hver Upload fra nå av:**
 api.push.apple.com er SATT og digest-verifisert 2026-08-04** —
 TF-push virker (TestFlight-signering gir produksjonstokens);
 dev-bygg-push krever midlertidig sandbox-bytte (én host om gangen).
+**🌙 NATTSTATUS 2026-08-04 ~01:40 (iCloud-fella slo til IGJEN under
+re-arkiveringen):** disken nede på 13 GB → macOS hadde kastet ut
+38 792 av node_modules-filene (kun 63 MB igjen på disk) → bundle-fasen
+i 1.0 (3)-arkivet frøs på 2937/2950 (prosessen i live, null CPU —
+nøyaktig icloud_evicted_files_hang-mønsteret). Nedlasting tilbake
+pågår (~13 filer/s, ferdig ~kl. 02); Brage trykket **«Behold
+nedlasting»** på Heia Prod i Finder = mappa er nå PINNET og kan aldri
+evictes igjen (fella er nøytralisert for repoet). caffeinate kjører
+5 t så Macen ikke sover fra nedlastingen. MORGENLØPET: (1) sjekk
+dataless=0 (`find node_modules -type f -size +0c -exec stat -f "%b" {} + | grep -c '^0'`);
+(2) det stående bygget våknet neppe — avbryt (⌘.) og Archive på nytt
+(alt lokalt = minutter); (3) main.jsbundle-sjekken (kommandoen over);
+(4) Upload 1.0 (3) → BEGGE gruppene; (5) bekreft at bygg 2 er Expired.
+SENERE (dagtid): frigjør disk (papirkurv/gamle arkiver — 13 GB er
+faresonen) + flytt repoet til ~/Developer (fjerner synkestøyen og
+«Reparer rettigheter»-banneret; ~30 min inkl. én pod install, se
+icloud_evicted_files_hang).
 Fra tidligere samme natt: **🚀 EKSTERN
 TESTFLIGHT ER LIVE (Brages beskjed 2026-08-03)** — Beta App Review
 godkjente, «Friends and family»-gruppen kjører. MEN: de eksterne står
