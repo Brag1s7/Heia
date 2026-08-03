@@ -62,7 +62,36 @@ deepLink.ts speiler nå Varsler-sidens FULLE mapping (klubbdør
 EventDetail · feed_post_id+team_space_id → Comments), med parkering
 til navigatoren er klar; push/index.ts bruker den for både trykk og
 kaldstart. **KREVER ÉN REBUILD i Xcode (native endring, ingen nye
-pods) — deretter Metro som før.** (2) KLUBBDØR-PUSHEN VAR ALDRI FEIL
+pods) — deretter Metro som før.** REBUILD GJORT av Brage samme kveld
+(byggefeilen underveis: Swift-bro-navnet er `didReceive(_:)`, ikke
+didReceiveNotificationResponse — fikset). OPPFØLGINGSFUNN (Brage):
+trykk navigerte KUN ved lukket app — fordi et trykk mens appen
+KJØRER leveres på 'localNotification'-JS-kanalen, ikke
+'notification' (pod'en poster didReceive som
+kLocalNotificationReceived, RNCPushNotificationIOS.m linje 124;
+kaldstart går via getInitialNotification/launchOptions og virket
+derfor). Lytter lagt til på begge kanaler — REN JS, Metro-reload
+holder, ingen ny rebuild. TREDJE FUNN (Brage): push PÅ TVERS AV LAG
+(Stange aktivt, Ridabu-målvarsel) åpnet kampen med FEIL lagkontekst
+— «plutselig spilte Stange» — fordi EventDetail/Comments/
+SupportSetup er 100 % activeTeamSpaceId-drevet og push omgår
+inboxens lag-scoping. FIKSET: openNotificationTarget bytter aktivt
+lag FØR navigasjonen (ny registerTeamSwitcher fra TeamProvider —
+navigationRef-idiomet; medlemskapsvakt: uten medlemskap i mållaget
+navigeres det ikke; club_payments bytter ALDRI lag — klubbnivå,
+ansvarlig kan stå utenfor laget; membershipsRef fordi barne-effekter
+(kaldstart-flush i AppNavigator) løper før foreldre-effekter i
+React). Også ren JS. FJERDE FUNN (Brage, samme kveld): kaldstart-
+trykk ble SVELGET etter lagbytte-fiksen — getInitialNotification
+resolver FØR medlemskaps-fetchen, så vakten svarte «ikke medlem» på
+tom liste. Fikset med tre-tilstands-svar ('pending' → målet parkeres
+og flushes når fanene monteres / 'not_member' → dropp (RLS = intet å
+vise) / 'switched'), + auto-velg-første-lag bruker funksjonell
+oppdatering så den aldri overstyrer et lagvalg pushen alt har køet i
+samme commit. Alt ren JS — Metro-reload holder; testløpet er:
+(a) app helt lukket → trykk målvarsel → riktig kamp MED riktig lag;
+(b) app i bakgrunn → samme; (c) stå i Stange, trykk Ridabu-varsel →
+lagbytte + riktig kamp; (d) klubbdør-varsel → Klubbbetalinger. (2) KLUBBDØR-PUSHEN VAR ALDRI FEIL
 — verifisert i prod via net._http_response (Management-API,
 CLI-token fra nøkkelringen): 20:36:36 «Lag ber om godkjenning» =
 sent:2 (begge managere, APNs aksepterte); 20:37:05 «godkjent» =

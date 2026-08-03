@@ -82,6 +82,18 @@ function attachListeners(): void {
         PNIOS.FetchResult?.NoData ?? 'UIBackgroundFetchResultNoData',
       );
     });
+    // Et TRYKK mens appen KJØRER (bakgrunn eller forgrunns-banner) kommer
+    // IKKE på 'notification'-kanalen: AppDelegates didReceive-videresending
+    // postes av pod'en som kLocalNotificationReceived → JS-eventet
+    // 'localNotification' (RNCPushNotificationIOS.m linje 124). Payloaden er
+    // UN-formatert, så getData() returnerer userInfo — samme flate nøkler
+    // (event_id, screen, …) pluss userInteraction. Kaldstart går utenom
+    // begge kanalene (getInitialNotification/launchOptions).
+    PNIOS.addEventListener('localNotification', (notification: any) => {
+      if (pushData(notification).userInteraction) {
+        openFromPush(notification);
+      }
+    });
   } catch {
     listenersAttached = false;
   }
@@ -199,6 +211,7 @@ export async function stopPush(): Promise<void> {
     PNIOS.removeEventListener?.('register');
     PNIOS.removeEventListener?.('registrationError');
     PNIOS.removeEventListener?.('notification');
+    PNIOS.removeEventListener?.('localNotification');
   } catch {
     // ignorer
   }
