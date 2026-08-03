@@ -182,7 +182,13 @@ godkjente claimet, så hele flyten testes på telefonen. NB
 kontosletting må rydde betalingsansvarlig-raden (spøkelser skal
 ikke beholde godkjenningsmakt). **(3) APNs-PUSH** (restansen under)
 — klubbdør-varselet lander i inboxen uansett; push-varianten følger
-gratis når APNs-nøkkelen er satt. Markedsføringstonen
+gratis når APNs-nøkkelen er satt. **(4) CLAIM-VARSEL (funn i
+kodegjennomgangen 2026-08-03, ~15 min):** ingen varsler Heia når en
+NY klubb sender claim (submit_club_claim) — en klubb som søker
+aktivering blir liggende usett til noen sjekker SQL. Fiks: samme
+pg_net-trigger-idiom som 00043/report-notify (trigger på
+club_claims → Edge Function → Resend → hello@heiaapp.no). Ufarlig
+nå (én pilotklubb), MÅ inn før selvbetjent klubbvekst/lansering. Markedsføringstonen
 (følelser/samhold/støtte) hører til nettside-prosjektet, men
 flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
