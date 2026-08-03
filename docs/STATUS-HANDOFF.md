@@ -1,6 +1,31 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-03 (natt mot 04). **ALLER NYESTE: 🚀 EKSTERN
+_Sist oppdatert: 2026-08-04. **ALLER NYESTE: 🚨 BYGG 1.0 (2) BLE
+LASTET OPP ØDELAGT — KRÆSJER VED OPPSTART. Skal EXPIRES i App Store
+Connect og erstattes av 1.0 (3):** 04-08-arkivet mangler
+`main.jsbundle` fordi `ios/.xcode.env.local` (LOKAL og GITIGNORERT —
+usynlig i git-historikken!) satte `SKIP_BUNDLING=1` ubetinget.
+Kommentaren i filen OG i denne handoffen («Release/Archive bundler
+som før») var FEIL: react-native-xcode.sh sjekker SKIP_BUNDLING
+(linje 30) FØR konfigurasjons-casen og hopper over bundlingen i ALLE
+konfigurasjoner. Release-appens bundleURL() slår opp main.jsbundle i
+egen pakke → nil → «No bundle URL present» i det appen åpnes.
+Verifisert ved diff mot 1.0 (1)-arkivet (5,4 MB main.jsbundle +
+assets/ der; begge mangler i 04-08-arkivet). Funnet i Opus-økten
+2026-08-04 FØR Brage installerte TF-bygget; dev-bygget er upåvirket
+(Debug henter fra Metro). **FIKSET:** `.xcode.env.local` setter nå
+SKIP_BUNDLING kun i Debug (`case "$CONFIGURATION"` — lokal fil, må
+gjenskapes ved ny maskin/kloning), CURRENT_PROJECT_VERSION bumpet
+2→3. **GJENSTÅR HOS BRAGE:** (a) App Store Connect → TestFlight →
+bygg 2 → **Expire** — STRAKS, auto-oppdatering kan gi eksterne
+testere kræsj-bygget; (b) nytt Archive → **OBLIGATORISK SJEKK før
+hver Upload fra nå av:**
+`ls "$(ls -dt ~/Library/Developer/Xcode/Archives/*/*.xcarchive | head -1)/Products/Applications/Heia2.app/main.jsbundle"`
+→ Upload → legg 1.0 (3) til BEGGE gruppene. **PUSH: ✅ APNS_HOST =
+api.push.apple.com er SATT og digest-verifisert 2026-08-04** —
+TF-push virker (TestFlight-signering gir produksjonstokens);
+dev-bygg-push krever midlertidig sandbox-bytte (én host om gangen).
+Fra tidligere samme natt: **🚀 EKSTERN
 TESTFLIGHT ER LIVE (Brages beskjed 2026-08-03)** — Beta App Review
 godkjente, «Friends and family»-gruppen kjører. MEN: de eksterne står
 på bygg **1.0 (1)** med FROSSET JS fra 2026-08-02 — de har IKKE
@@ -17,12 +42,8 @@ rent Archive + Distribute → Upload i Xcode hos Brage (ingen nye pods,
 ingen nye entitlements; AppDelegate-trykkfiksen ligger alt på grenen);
 (c) i App Store Connect: legg 1.0 (2) til BEGGE gruppene (intern +
 ekstern; oppdateringsbygg til eksisterende ekstern gruppe går normalt
-uten ny full review). **PUSH-VIKTIG:** `APNS_HOST` står på SANDBOX →
-TestFlight-bygg får produksjonstokens → push til eksterne testere
-avvises STILLE i dag. Bytt når 1.0 (2) er ute:
-`supabase secrets set APNS_HOST=api.push.apple.com` — da dør push i
-Brages dev-bygg (én host om gangen, kjent v1-begrensning; dev-testing
-av push = bytt tilbake). Fra før: **🚪 KLUBBDØREN ER
+uten ny full review). **PUSH:** ✅ APNS_HOST-byttet til produksjon
+ble GJORT og digest-verifisert 2026-08-04 (se 🚨-blokken øverst). Fra før: **🚪 KLUBBDØREN ER
 BYGGET OG DEPLOYET 2026-08-03 (sen kveld) — migrasjon `00047` +
 `00048` + Edge Function `club-support-deactivate` + hele app-flaten
 («Klubbbetalinger» på Profil m/snarvei fra Laginnstillinger, «Be om
@@ -64,7 +85,9 @@ net._http_response → diagnose rett fra SQL). Verifisert: samme
 7-varslers kall som ga 500 svarer nå 200/sent:2. Dev-bygg-lærdommer
 fra kvelden: (a) `SKIP_BUNDLING=1` i `ios/.xcode.env.local` (lokal,
 gitignorert) — dev-bygg på telefon henter JS fra Metro som
-simulatoren; Release/Archive bundler som før; (b) repoet ligger i
+simulatoren; ⚠️ PÅSTANDEN «Release/Archive bundler som før» VAR FEIL
+og ødela bygg 1.0 (2) — se 🚨-blokken øverst (fikset 2026-08-04:
+Debug-gatet); (b) repoet ligger i
 iCloud-synket ~/Documents — full disk → iCloud kaster ut filinnhold
 → Metro/bygg fryser med null CPU (dokumentert i minnet
 icloud_evicted_files_hang; flytting til ~/Developer er anbefalt,
