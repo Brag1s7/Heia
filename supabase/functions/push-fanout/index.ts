@@ -92,9 +92,17 @@ Deno.serve(async (req) => {
   // Én push per inbox-rad per enhet. `data` sendes videre som den står —
   // appens push-lytter leser event_id m.m. flatt fra toppnivået, nøyaktig
   // slik radene allerede er skrevet (sendApns sprer data på toppnivå).
-  const sends: Promise<
-    Awaited<ReturnType<typeof sendApns>>
-  >[] = [];
+  //
+  // Utsendingene går SEKVENSIELT med fangst per token. Parallelle kall mot
+  // APNs fikk hele batchen til å kaste (én rejection → 500 → INGEN push,
+  // heller ikke til friske enheter) — verifisert 2026-08-03: hvert token
+  // svarte pent enkeltvis, kun flersending veltet. Volumet er et lags
+  // medlemsliste, så sekvensielt koster ingenting; en død enhet skal aldri
+  // kunne stoppe et lagvarsel.
+  type SendOutcome =
+    | Awaited<ReturnType<typeof sendApns>>
+    | {token: string; ok: false; gone: false; error: string};
+  const results: SendOutcome[] = [];
   for (const n of notifs) {
     const data = (n.data ?? {}) as Record<string, unknown>;
     const payload: ApnsPayload = {
@@ -105,10 +113,25 @@ Deno.serve(async (req) => {
       data,
     };
     for (const token of tokensByUser.get(n.user_id as string) ?? []) {
-      sends.push(sendApns(cfg, token, payload));
+      try {
+        results.push(await sendApns(cfg, token, payload));
+      } catch (e) {
+        results.push({
+          token,
+          ok: false,
+          gone: false,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
     }
   }
-  const results = await Promise.all(sends);
+  // Feilårsakene tas med i svaret: pg_net lagrer responsen i
+  // net._http_response, så en feilet push kan diagnostiseres rett fra
+  // databasen uten å grave i Edge-logger.
+  const failures = results
+    .filter((r) => !r.ok)
+    .map((r) => ('error' in r ? r.error : `${r.status} ${r.reason ?? ''}`))
+    .slice(0, 5);
 
   // Døde tokens ryddes bort så vi ikke prøver dem igjen.
   const gone = Array.from(
@@ -126,6 +149,7 @@ Deno.serve(async (req) => {
       tokens: results.length,
       sent,
       removed: gone.length,
+      ...(failures.length > 0 ? {failures} : {}),
     }),
     {headers: {'Content-Type': 'application/json'}},
   );

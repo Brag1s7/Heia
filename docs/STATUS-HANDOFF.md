@@ -29,9 +29,26 @@ døde tokens ryddes). Web-knappen «Åpne Heia-appen» på /betaling er
 AKTIVERT (vises kun på iOS-UA; heia:// finnes i bygget fra 1.0 (1))
 — GÅR LIVE VED MERGE til main (Vercel bygger fra main).
 AppDelegate-videresendingen + token-registrering + `_shared/apns.ts`
-var alt klart. **GJENSTÅR KUN BRAGE (5 min): .p8-nøkkel + 5 secrets
-— oppskrift + testliste i PUSH-RESTANSE-blokken under. DERETTER er
-1.0 (2) et rent Archive + Upload.** Flyten for NYE klubber er komplett
+var alt klart. **NØKKELEN ER SATT OG PUSH ER E2E-VERIFISERT
+2026-08-03 (sen kveld):** .p8 laget (Key ID `8WTTU95VCR`, miljø
+Sandbox & Production — LÅST valg hos Apple, riktig), alle 5 secrets
+verifisert mot sjekksum i skyen; ekte mål-push levert på Brages
+telefon. **BUG FUNNET OG FIKSET SAMME KVELD:** første versjon av nye
+push-fanout brukte Promise.all over utsendingene — én rejection
+veltet HELE batchen (500 → ingen push til noen, bare
+enkeltmottaker-varsler kom frem). Fikset: sekvensiell utsending med
+fangst per token + `failures[]` i svaret (pg_net lagrer responsen i
+net._http_response → diagnose rett fra SQL). Verifisert: samme
+7-varslers kall som ga 500 svarer nå 200/sent:2. Dev-bygg-lærdommer
+fra kvelden: (a) `SKIP_BUNDLING=1` i `ios/.xcode.env.local` (lokal,
+gitignorert) — dev-bygg på telefon henter JS fra Metro som
+simulatoren; Release/Archive bundler som før; (b) repoet ligger i
+iCloud-synket ~/Documents — full disk → iCloud kaster ut filinnhold
+→ Metro/bygg fryser med null CPU (dokumentert i minnet
+icloud_evicted_files_hang; flytting til ~/Developer er anbefalt,
+utsatt). **GJENSTÅR: merge PR #35 (web-knappen på /betaling) —
+DERETTER er 1.0 (2) et rent Archive + Upload. NB: bytt APNS_HOST til
+api.push.apple.com når TestFlight-bygget skal testes.** Flyten for NYE klubber er komplett
 og forklart for Brage: ingen styrer klubben automatisk — claim-
 review i Heia Ops = autorisasjonen, claimanten blir første
 betalingsansvarlige (00048), Heia seeder standardtilbudet
