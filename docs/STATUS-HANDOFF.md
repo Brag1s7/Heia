@@ -46,9 +46,33 @@ simulatoren; Release/Archive bundler som før; (b) repoet ligger i
 iCloud-synket ~/Documents — full disk → iCloud kaster ut filinnhold
 → Metro/bygg fryser med null CPU (dokumentert i minnet
 icloud_evicted_files_hang; flytting til ~/Developer er anbefalt,
-utsatt). **GJENSTÅR: merge PR #35 (web-knappen på /betaling) —
-DERETTER er 1.0 (2) et rent Archive + Upload. NB: bytt APNS_HOST til
-api.push.apple.com når TestFlight-bygget skal testes.** Flyten for NYE klubber er komplett
+utsatt). **✅ PR #35 MERGET (verifisert 2026-08-03: merge-commit `2176b73` på
+origin/main; heiaapp.no/betaling serverer heia://-knappen — røyktestet
+med curl). DERMED er 1.0 (2) et rent Archive + Upload hos Brage.
+NB: bytt APNS_HOST til api.push.apple.com når TestFlight-bygget skal
+testes.** **🐛 DOGFOOD-FUNN 2026-08-03 (kveld) — «push-trykk navigerer
+ikke» + «klubbdør-push uteble»: BEGGE OPPKLART, FIKS KREVER REBUILD:**
+(1) TRYKK-BUGEN (gjaldt ALLE push): AppDelegate MANGLET
+`didReceive response:`-callbacken — selve trykk-videresendingen til
+RNCPushNotificationIOS. Et trykk åpnet bare appen; JS-lytteren
+(userInteraction) fyrte aldri. LAGT TIL i AppDelegate.swift. I
+tillegg kjente JS-siden kun event_id: ny `openNotificationTarget` i
+deepLink.ts speiler nå Varsler-sidens FULLE mapping (klubbdør
+`screen` → ClubPayments/SupportSetup i Profil-stacken · event_id →
+EventDetail · feed_post_id+team_space_id → Comments), med parkering
+til navigatoren er klar; push/index.ts bruker den for både trykk og
+kaldstart. **KREVER ÉN REBUILD i Xcode (native endring, ingen nye
+pods) — deretter Metro som før.** (2) KLUBBDØR-PUSHEN VAR ALDRI FEIL
+— verifisert i prod via net._http_response (Management-API,
+CLI-token fra nøkkelringen): 20:36:36 «Lag ber om godkjenning» =
+sent:2 (begge managere, APNs aksepterte); 20:37:05 «godkjent» =
+tokens:0 fordi mottakeren (Jarle-testkontoen, simulator) IKKE HAR
+push-token — simulatoren kan ikke APNs. Request-banneret kom mens
+Brage sto inne i appen (forgrunn = flyktig banner øverst).
+RE-TEST etter rebuild: telefonen LÅST → be om godkjenning fra
+simulatoren → push på låst skjerm → TRYKK skal lande i
+Klubbbetalinger; kamp-/kommentar-push skal lande i
+EventDetail/tråden.** Flyten for NYE klubber er komplett
 og forklart for Brage: ingen styrer klubben automatisk — claim-
 review i Heia Ops = autorisasjonen, claimanten blir første
 betalingsansvarlige (00048), Heia seeder standardtilbudet

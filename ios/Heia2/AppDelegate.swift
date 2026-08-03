@@ -84,6 +84,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterD
     RNCPushNotificationIOS.didReceiveRemoteNotification(userInfo, fetchCompletionHandler: completionHandler)
   }
 
+  // Brukeren TRYKKET på et varsel (fra bakgrunn, lukket app eller banneret i
+  // forgrunn). Uten denne videresendingen når trykket aldri JS: appen åpnes
+  // bare der den sto, og 'notification'-lytteren (userInteraction) tier —
+  // nøyaktig symptomet «push åpner appen, men navigerer ikke».
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    RNCPushNotificationIOS.didReceiveNotificationResponse(response)
+    completionHandler()
+  }
+
   // Varsel levert mens appen er i forgrunn → vis banner + lyd likevel.
   // (Ren iOS-API, trenger ikke RN-modulen.)
   func userNotificationCenter(

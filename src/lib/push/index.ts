@@ -1,6 +1,6 @@
 import {Platform} from 'react-native';
 import {registerDeviceToken, unregisterDeviceToken} from '../api/push';
-import {openEvent} from '../../navigation/deepLink';
+import {openNotificationTarget} from '../../navigation/deepLink';
 
 // Native modul (@react-native-community/push-notification-ios) leverer APNs-
 // token og permission-flyten. Den finnes FØRST etter `npm install` + pod +
@@ -31,17 +31,12 @@ function pushData(notification: any): Record<string, any> {
 }
 
 /**
- * Åpner kampen varselet handler om.
- *
- * `event_id` er null på poster som ikke hører til en hendelse — da gjør et
- * trykk ingenting utover å åpne appen, som er riktig: det finnes ingen kamp
- * å vise.
+ * Åpner målet varselet handler om — samme mapping som Varsler-sidens
+ * trykk (klubbdør → Profil-stacken, kamp → EventDetail, post/kommentar →
+ * kommentartråden). Varsler uten mål gjør ingenting utover å åpne appen.
  */
-function openEventFromPush(notification: any): void {
-  const eventId = pushData(notification).event_id;
-  if (typeof eventId === 'string' && eventId.length > 0) {
-    openEvent(eventId);
-  }
+function openFromPush(notification: any): void {
+  openNotificationTarget(pushData(notification));
 }
 
 export type PushPermission =
@@ -80,7 +75,7 @@ function attachListeners(): void {
       // en levering. Uten den ville appen hoppet til kampen mens brukeren
       // holdt på med noe helt annet.
       if (pushData(notification).userInteraction) {
-        openEventFromPush(notification);
+        openFromPush(notification);
       }
       // Forgrunns-levering: feeden er live via realtime uansett. Kvitter ut.
       notification.finish?.(
@@ -97,8 +92,8 @@ function attachListeners(): void {
  * det varselet her — og ingen lytter har fyrt, fordi appen ikke levde da det
  * kom. Må derfor leses eksplisitt, og bare én gang per prosess.
  *
- * Målet parkeres av `openEvent` til navigatoren er klar, som den aldri er så
- * tidlig i oppstarten.
+ * Målet parkeres av `openNotificationTarget` til navigatoren er klar, som den
+ * aldri er så tidlig i oppstarten.
  */
 export async function consumeInitialNotification(): Promise<void> {
   if (initialChecked || !isPushAvailable()) {
@@ -108,7 +103,7 @@ export async function consumeInitialNotification(): Promise<void> {
   try {
     const initial = await PNIOS.getInitialNotification();
     if (initial) {
-      openEventFromPush(initial);
+      openFromPush(initial);
     }
   } catch {
     // Ikke linket ennå, eller ingen ventende varsel. Uansett ikke en feil.

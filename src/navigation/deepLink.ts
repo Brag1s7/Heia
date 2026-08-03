@@ -15,6 +15,7 @@ export const navigationRef = createNavigationContainerRef<RootTabParamList>();
  */
 let pendingEventId: string | null = null;
 let pendingOpsClaimId: string | null = null;
+let pendingNotificationData: Record<string, unknown> | null = null;
 
 /**
  * Åpner kampen hvis mulig, ellers parkerer den til `flushPendingDeepLink`.
@@ -67,6 +68,61 @@ export function openOpsClaim(claimId: string): void {
 }
 
 /**
+ * Målet i et push-trykk — SAMME avgjørelse som Varsler-sidens handlePress,
+ * bare fra rå varseldata: klubbdør-varsler bærer `screen` og peker inn i
+ * Profil-stacken, kampvarsler bærer `event_id`, vanlige poster/kommentarer
+ * bare `feed_post_id`. Nøklene ligger flatt i APNs-payloaden, nøyaktig slik
+ * notifications.data ble skrevet (push-fanout sender data-feltet som det
+ * står). Uten gjenkjent mål gjør trykket ingenting utover å åpne appen —
+ * samme «uten mål»-gren som i inboxen.
+ */
+export function openNotificationTarget(data: Record<string, unknown>): void {
+  const screen = data.screen;
+  if (screen === 'club_payments' || screen === 'support_setup') {
+    if (!navigationRef.isReady()) {
+      pendingNotificationData = data;
+      return;
+    }
+    try {
+      navigationRef.navigate('ProfilStack', {
+        screen: screen === 'club_payments' ? 'ClubPayments' : 'SupportSetup',
+      });
+    } catch {
+      pendingNotificationData = data;
+    }
+    return;
+  }
+
+  const eventId = data.event_id;
+  if (typeof eventId === 'string' && eventId.length > 0) {
+    openEvent(eventId);
+    return;
+  }
+
+  const postId = data.feed_post_id;
+  const teamSpaceId = data.team_space_id;
+  if (
+    typeof postId === 'string' &&
+    postId.length > 0 &&
+    typeof teamSpaceId === 'string' &&
+    teamSpaceId.length > 0
+  ) {
+    if (!navigationRef.isReady()) {
+      pendingNotificationData = data;
+      return;
+    }
+    try {
+      navigationRef.navigate('HjemStack', {
+        screen: 'Comments',
+        params: {postId, teamSpaceId},
+      });
+    } catch {
+      pendingNotificationData = data;
+    }
+  }
+}
+
+/**
  * heia://-URL-er fra Linking (kaldstart + mens appen kjører). Kjenner kun
  * rutene vi faktisk har — alt annet ignoreres stille.
  */
@@ -98,5 +154,11 @@ export function flushPendingDeepLink(): void {
     const claimId = pendingOpsClaimId;
     pendingOpsClaimId = null;
     openOpsClaim(claimId);
+  }
+
+  if (pendingNotificationData !== null) {
+    const data = pendingNotificationData;
+    pendingNotificationData = null;
+    openNotificationTarget(data);
   }
 }
