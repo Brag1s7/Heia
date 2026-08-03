@@ -1,6 +1,17 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-02 (kveld). **NYESTE SPOR: 💳 BETALINGER —
+_Sist oppdatert: 2026-08-03 (kveld). **NYESTE: 🚪 KLUBBDØREN +
+SUPPORTER-ROLLEN BESLUTTET OG LÅST 2026-08-03 (tre-porter-modellen,
+betalingsansvarlig-rollen, «Klubbbetalinger»-flaten, pause vs.
+deaktiver, dogfood på Brages nye lag) — OG to av tre skiver er alt
+BYGGET OG DEPLOYET samme dag: ✅ SUPPORTER-SKIVA (migrasjon `00045` +
+rollekort + Lagoversikt — venter telefontest) og ✅ CLAIM-VARSEL MED
+BRØNNØYSUND-AUTORISASJONSBEVIS (migrasjon `00044` + Edge Function
+`claim-notify` — Stripe tar KYC, Heia tar autorisasjonskontrollen,
+registerdata hentes automatisk). GJENSTÅR: KLUBBDØREN (hovedskiva —
+neste samtale) + full E2E-dogfood på Brages nye Ridabu-lag FØR
+live/fase 6. Se ▶️ NESTE SAMTALE-blokken i native-avsnittet +
+PAYMENTS.md §Åpne beslutninger.** Fra før: 💳 BETALINGER —
 FASE 5 GODKJENT 2026-08-02 («Alt funker fra fase 5», telefontest
 bestått, DB-verifisert 8/8) etter tre review-justeringer på
 Profil/«Min støtte» + Lagkassa (alltid synlig + trykkbar tom-rad →
@@ -68,9 +79,10 @@ Individual, hello@heiaapp.no, kr 779/år auto-fornyelse, Enrollment ID
 9XA5DFCLD7. Konvertering til Heia AS senere via Apple Developer
 Support (krever D-U-N-S) — Team ID, apper og TestFlight-historikk
 overlever; reserveløsning er app transfer.**
-**▶️ NATIVE-RUNDEN ER I GANG (fil-siden GJORT 2026-08-02; venter på
-Brages Xcode-/browser-steg). Rekkefølgen er LÅST (bundle-ID er
-permanent per app-oppføring fra første opplasting!):
+**▶️ NATIVE-RUNDEN: ✅ FULLFØRT TIL OG MED OPPLASTING 2026-08-02
+(kveld) — bygg 1.0 (1) «Uploaded to Apple» kl. 21:25! Gjenstår kun
+TestFlight-minuttene hos Brage (se GJENSTÅR nederst i blokken).
+Historikken:
 ✅ FIL-SIDEN (committet på Brage-grenen): bundle-ID
 `no.heiaapp.heia` i project.pbxproj (begge configs), NY
 `ios/Heia2/Heia2.entitlements` (applinks:heiaapp.no +
@@ -90,20 +102,177 @@ vilkårs-/personvern- og e-postsporet-endringene går live i samme
 merge). BESLUTNING (Brage): «Heia2»-navnene internt (target/mappe/
 prosjekt) blir STÅENDE til etter TestFlight — ingen bruker ser dem;
 kun bundle-ID er permanent, og den er ren.
-GJENSTÅR (Brage kjører, Claude guider):
-(a) Xcode viste «Device 'Brage sin iPhone' isn't registered» → trykk
-**Register Device** (trengs for kjøring på egen telefon; ikke for
-TestFlight-opplasting).
-(b) App Store Connect (hello@heiaapp.no) → Agreements → godta
-GRATIS-app-avtalen hvis ikke gjort; Paid Apps/bank/skatt skal IKKE
-settes opp.
-(c) Merge PR-en → verifiser at heiaapp.no serverer AASA med ny appID.
-(d) App-oppføring i App Store Connect (My Apps → + → bundle-ID
-`no.heiaapp.heia`; NB app-NAVNET «Heia» kan være opptatt globalt —
-ha alternativ klar) → Arkiver + last opp → INTERN TestFlight (ingen
-review for interne testere; V1-hygiene kreves ikke for intern).
-NB: ny bundle-ID = NY app på telefonen — gammel placeholder-app kan
-slettes, og innlogging må gjøres på nytt i den nye.
+✅ RESTEN AV LØPET GJENNOMFØRT SAMME KVELD: Register Device gjort;
+**PR #32 MERGET** → AASA røyktestet LIVE på heiaapp.no med appID
+`D86MWL7V3S.no.heiaapp.heia` (200 + application/json — verifisert
+med curl); app-oppføring opprettet i App Store Connect —
+**App Store-NAVN (Brages valg): «Heia – Idrettsglede for alle»**
+(appens egen tagline fra velkomstskjermen; hjemskjermen viser
+fortsatt bare «Heia»), SKU heia-001, norsk primærspråk, Full Access;
+`ITSAppUsesNonExemptEncryption=false` lagt i Info.plist (kun HTTPS —
+slipper eksport-spørsmålet per bygg); **Archive + Distribute →
+App Store Connect → Upload FULLFØRT — bygg 1.0 (1) «Uploaded to
+Apple» 2026-08-02 kl. 21:25.** «Upload Symbols Failed» for
+hermesvm.framework = KJENT RN/Hermes-kosmetikk (prebuilt uten dSYM →
+usymboliserte Hermes-frames i kræsjlogger); ufarlig, backlog.
+✅✅ **INSTALLERT PÅ TELEFONEN 2026-08-02 (sen kveld)** — intern
+gruppe opprettet, bygg 1.0 (1) installert via TestFlight-appen.
+**NATIVE-RUNDEN + FØRSTE TESTFLIGHT ER 100 % I MÅL.** Praktisk å
+huske: dev-bygg fra Xcode og TestFlight-bygget deler bundle-ID og
+OVERSKRIVER hverandre på telefonen (én app på hjemskjermen; gul
+prikk foran navnet = TestFlight-versjonen står der). Simulator er
+uendret. Gamle placeholder-appen slettes manuelt.
+MERK OM BARENE: V1-hygienelisten er reelt FERDIG → EKSTERN
+TestFlight (Ridabu-foreldrene) er ikke lenger blokkert av hygiene —
+den krever kun: ekstern gruppe i TestFlight + Apples Beta App Review
+av første eksterne bygg (~1 døgn; trenger demo-konto til reviewer) +
+Brages GO. Anbefalt først: APNs-push + deep-link-restansene under,
+så foreldrenes førsteinntrykk er komplett.
+ETTER TESTFLIGHT (nye restanser fra runden): (i) «Åpne Heia-appen»-
+knappen på web/betaling kan nå AKTIVERES (heia://-skjemaet finnes i
+bygget); (ii) JS-Linking-lytteren (naviger til Lagkassa); (iii) evt.
+Heia2→Heia-intern-omdøping (Brages «useriøst»-innvending — besluttet
+utsatt til etter TestFlight; kun kosmetisk, ingen bruker ser det);
+(iv) APNs-nøkkelen (push-restansen under); (v) SUPPORT-OFFERING FOR
+BRAGES NYE LAG: Brage opprettet et nytt lag under Ridabu-klubben i
+TestFlight-bygget — klubben er aktiv (konto per KLUBB), men
+offering (pris/splitt) opprettes PER LAG og er ops-only
+(`create_support_offering`, fase 4-design), så SupportScreen viser
+den planlagte fallbacken «Ikke helt klart ennå». IKKE en bug.
+BESLUTTET 2026-08-03: INGEN ops-rad lages — laget er E2E-dogfood-
+testen av klubbdøren (se ▶️ NESTE SAMTALE-blokken under).
+▶️ NESTE SAMTALE (beslutningsrunden 2026-08-03 er TATT — alt under
+er LÅST, full beslutningstekst i PAYMENTS.md §Åpne beslutninger
+«KLUBBDØREN»): **(1) ✅ SUPPORTER-SKIVA BYGGET OG DEPLOYET
+2026-08-03 (venter Brages telefontest):** besteforeldre/tanter/
+venner melder seg inn NØYAKTIG som foreldre (invitasjonskode, samme
+rettigheter) — eneste forskjell er etiketten 'supporter'. Bygget:
+migrasjon `00045` i prod (CHECK-constrainten i memberships +
+rollelisten i join_team_space + eksplisitt supporter-gren i
+get_team_members-sorteringen), tredje rollekort i JoinTeamCodeScreen
+(«Supporter · Heier på laget», ingen barnekobling), ROLE_LABELS +
+«Supportere»-seksjon i Lagoversikt. ⋯ (fjerning) virker på
+supporter-rader UTEN endring (remove_team_member-vakten og
+canRemove-betingelsen er svartelister på trener/lagleder/admin).
+TELEFONTEST (Metro-reload): (a) «Bli med i et lag til»/onboarding →
+kode → tre rollekort, velg Supporter → innmeldt uten barnesteg;
+(b) Lagoversikt viser «Supportere»-seksjon nederst, admin ser ⋯ på
+raden; (c) supporteren kan åpne Støtt laget og betale (medlemsgatet
+checkout uendret). Dette LUKKER «ikke-medlem-støtte»-flagget:
+supportere ER medlemmer — web-checkout trengs ikke.
+**(2) KLUBBDØREN (hovedskiva) — LÅST MODELL: tre porter** (personen
+er autorisert av klubben + klubben er Stripe/KYC-godkjent + laget er
+godkjent av betalingsansvarlig = laget kan samle inn støtte).
+Rollen heter **BETALINGSANSVARLIG** (ikke «klubbansvarlig»); INGEN
+får den automatisk via lagadminskap eller påbegynt KYC — første
+hovedansvarlige godkjennes som AUTORISERT REPRESENTANT for klubben
+(claim-reviewen) og må fullføre Stripe-KYC; senere betalings-
+ansvarlige INVITERES av eksisterende hovedansvarlig. ÉN kanonisk
+flate **«Klubbbetalinger»**: hovedinngang på PROFIL, kontekstuell
+snarvei fra Laginnstillinger — ingen ny innlogging/portal,
+betalingsansvarlig er vanlig app-bruker. Lagflyten: «Be om
+godkjenning» (SupportSetupScreen + admin-CTA i SupportScreen-
+fallbacken) → varsel → ett trykk «Godkjenn» → laget ARVER klubbens
+standardtilbud (79/60 som DATA i club_support_defaults,
+deny-by-default; betalingsansvarlig ser/velger ALDRI pris —
+create_support_offering forblir ops-only, godkjenningsstien deler
+intern mekanikk) → offering v1 i samme transaksjon. Godkjenninger =
+RADER (team_support_approvals: hvem/når/status/note, maks én åpen
+per lag, avslag krever begrunnelse som treneren ser). V1 har TO
+handlinger med presist språk (ALDRI «revoke» når abonnementer
+består): **«Pause nye støttespillere»** (offering arkiveres, nye
+checkouts stoppes, eksisterende abonnementer fortsetter) og
+**«Deaktiver støtte for laget»** (nye stoppes + eksisterende settes
+til kansellering ved periodeslutt — cancel_at_period_end via
+Stripe-kall → Edge Function, ingen refusjon av betalt periode).
+Begge med bekreftelsesdialog som viser ANTALL berørte aktive
+abonnementer + logg (hvem/når/årsak). DOGFOOD (låst): Brages nye
+Ridabu-lag får INGEN manuell offering — laget ER E2E-testen av
+døren; Brage backfilles som betalingsansvarlig for Ridabu fra det
+godkjente claimet, så hele flyten testes på telefonen. NB
+kontosletting må rydde betalingsansvarlig-raden (spøkelser skal
+ikke beholde godkjenningsmakt). **(3) APNs-PUSH** (restansen under)
+— klubbdør-varselet lander i inboxen uansett; push-varianten følger
+gratis når APNs-nøkkelen er satt. **(4) ✅ CLAIM-VARSEL MED
+AUTORISASJONSBEVIS BYGGET OG DEPLOYET 2026-08-03** (funnet fra
+kodegjennomgangen + Brages presisering om at reviewen eksplisitt
+skal verifisere søkerens FULLMAKT — «Stripe står for KYC; Heia står
+for autorisasjonskontrollen»): migrasjon `00044` i prod (AFTER
+INSERT-trigger på club_claims, 00043-idiomet, + ny kolonne
+`brreg_snapshot`) + Edge Function `claim-notify` deployet. Den
+henter Brønnøysunds ÅPNE registerdata automatisk (enhet + ROLLENE —
+styret er offentlig!), matcher søkerens profilnavn mot styret,
+flagger navneavvik/feil organisasjonsform/konkurs, viser klubbens
+registrerte e-post/telefon som verifiseringskanal, fryser utdraget
+på claim-raden og sender alt til hello@heiaapp.no med ferdig
+approve-/reject-SQL. Registermatch er BEVIS, aldri fasit — Heia
+beslutter fortsatt. API-formene røyktestet mot Ridabu (FLI, hele
+styret, leder@ridabufotball.no). **✅ E2E-VERIFISERT 2026-08-03
+(Brages Stange-test) — og den avdekket TO nedarvede hull som nå er
+FIKSET:** (a) **vault-secretene project_url/service_role_key var
+ALDRI seedet** — 00022 la seedingen som manuell SQL-kommentar og
+den ble aldri kjørt, så HELE pg_net→Edge Function-idiomet
+(push-fanout, report-notify, claim-notify) har vært dødt hele
+tiden (triggerne returnerte stille ved tom vault, by design).
+(b) **nøkkel-subtilitet:** prosjektet er migrert til Supabases NYE
+API-nøkler — Edge-runtimen injiserer `sb_secret_…` («default»
+secret key) under navnet SUPABASE_SERVICE_ROLE_KEY, IKKE
+dashboardets legacy-JWT. Vaulten er nå seedet med sb_secret-verdien
+(matcher runtime-digesten), verifisert: claim-notify svarte 200,
+brreg_snapshot={not_found} skrevet (orgnr 111111111 består mod 11
+men finnes ikke — perfekt negativtest), e-post akseptert av Resend
+→ sjekk hello@heiaapp.no. Stange-claimen er AVSLÅTT med note (ses
+på «IKKE GODKJENT»-kortet). Bonus: report-notify er dermed OGSÅ
+reparert; push-fanout-triggeren begynner å fyre (APNs-nøkkel
+mangler fortsatt — egen restanse). NB «til vurdering» i appen er
+DESIGNET tilstand — klubb-claims godkjennes alltid manuelt av Heia
+(det er autorisasjonsporten), også etter klubbdøren.
+**(5) ✅ «HEIA OPS» BYGGET OG DEPLOYET 2026-08-03 (Brages
+beslutning: SQL-editoren er pilot-krykke, ikke arbeidsflyt; egen
+WEB-admin-innlogging på heiaapp.no er EKSPLISITT utsatt til
+nettside-prosjektet):** migrasjon `00046` i prod — ops_admins
+(deny-all RLS; seedet: Brages hovedkonto + telefonkontoen
+s2212930@bi.no/«Benjamin Hansen» for dogfood — FUNN: Ridabu-claimets
+claimant var testkontoen jarle.weium, aldri seed ops-makt fra
+claims), append-only `club_claim_audit`, RPC-ene ops_list/get/
+approve/reject/request_info (alle SECURITY DEFINER + is_ops_admin-
+gatet, aldri klientskriving; GODKJENNING KREVER tekst om hvordan
+autorisasjonen ble verifisert — lagres som review_note + audit),
+info-forespørsel = in_review + note søkeren ser i SupportSetupScreen
+(«svar til hello@heiaapp.no»). App: OpsClaims/OpsClaimDetail i
+Profil-stacken, «Heia internt»-seksjon på Profil (kun ops),
+JS-Linking-lytteren er BYGGET (AppNavigator + deepLink.ts) —
+e-posten deep-linker heia://ops/claims/<id> (HTML-knapp i Resend).
+PLUSS: SupportSetupScreen validerer orgnr mot Brønnøysund FØR
+innsending (404 → blokkert med forklaring; slettet/konkurs →
+blokkert; registerets navn brukes som autoritativt; nettverksfeil =
+fail-open; __DEV__-bygg har eksplisitt «Send likevel (testdata)»).
+LÆRDOM fra deploy-verifiseringen: REVOKE FROM anon alene er
+utilstrekkelig — anon arver PUBLIC-granten; alle ops-funksjoner er
+nå revokert FROM PUBLIC og verifisert i prod (anon=false overalt).
+TELEFONTEST (Metro-reload): (a) Profil → «Heia internt» → Heia Ops →
+listen viser Ridabu (godkjent) + Stange (avslått); (b) send ny
+Stange-søknad med EKTE orgnr → e-post med HTML-knapp «Åpne i Heia
+Ops» → trykk → detaljskjermen (kaldstart-varianten: appen lukket
+først); (c) godkjenn UTEN tekst → stoppes; skriv verifiseringstekst
+→ Godkjenn → status flipper + audit-loggen viser handlingen;
+(d) test «Be om mer informasjon» på en åpen søknad → søkerens
+SupportSetupScreen viser gul boks. SQL-editoren består som
+nødfallback (PAYMENTS.md §Fase 3-runbooken). **BRAGES KVITTERING
+2026-08-03: «Jeg får mail og dette ser veldig proft ut! Det funker
+bra inne på appen»** — e-postkjeden + ops-flaten er sett virke;
+resten av testlisten tas løpende. MERK TESTREGIMET fremover:
+TestFlight-bygget 1.0 (1) er frosset JS fra 2026-08-02 — ALT fra
+2026-08-03 (supporter, Heia Ops, brreg-validering) testes i
+DEV-BYGG fra Xcode (overskriver TF-appen, samme bundle-ID); nytt
+TestFlight-bygg **1.0 (2)** (ren Archive + Upload, null nye
+pods/entitlements) lastes opp når testlisten er grønn — naturlig å
+ta KLUBBDØREN med i samme bygg. Web-ops på heiaapp.no (Brages
+ønske): bekreftet mulig by design — all logikk er klient-agnostiske
+RPC-er; web-flaten er ren frontend-oppgave i nettside-prosjektet
+(notert i website_project-minnet). Markedsføringstonen
+(følelser/samhold/støtte) hører til nettside-prosjektet, men
+flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
 NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
 APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for

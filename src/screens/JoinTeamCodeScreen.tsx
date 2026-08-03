@@ -23,10 +23,11 @@ import type {OnboardingStackParamList} from '../shared/types';
 type Nav = NativeStackNavigationProp<OnboardingStackParamList, 'JoinTeamCode'>;
 type Route = RouteProp<OnboardingStackParamList, 'JoinTeamCode'>;
 
-type JoinRole = Extract<MemberRole, 'forelder' | 'trener'>;
+type JoinRole = Extract<MemberRole, 'forelder' | 'supporter' | 'trener'>;
 
 const ROLES: {key: JoinRole; label: string; description: string}[] = [
   {key: 'forelder', label: 'Forelder', description: 'Følger barnet'},
+  {key: 'supporter', label: 'Supporter', description: 'Heier på laget'},
   {key: 'trener', label: 'Trener', description: 'Leder laget'},
 ];
 

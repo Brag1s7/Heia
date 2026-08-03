@@ -153,6 +153,86 @@ løpende abonnementer · staging-miljø (vurderes før prod).
 
 ## Åpne beslutninger
 
+**Avgjort 2026-08-03 (Brage) — KLUBBDØREN (klubbgodkjenning av lag) +
+SUPPORTER-ROLLEN. Tre-porter-modellen:**
+
+> Personen er autorisert av klubben
+> \+ klubben er godkjent av Stripe/KYC
+> \+ det konkrete laget er godkjent av betalingsansvarlig
+> = laget kan samle inn støtte.
+>
+> Heia avgjør hvem som får administrere klubben. Stripe verifiserer
+> betalingsmottakeren. Klubben avgjør hvilke lag som får samle inn
+> penger.
+
+1. **Rollen heter BETALINGSANSVARLIG** (ikke «klubbansvarlig»). Ingen
+   får den automatisk via lagadminskap eller påbegynt KYC. Første
+   hovedansvarlige godkjennes som **autorisert representant** for
+   klubben (claim-reviewen er autorisasjonen) og må fullføre
+   Stripe-KYC. Senere betalingsansvarlige **inviteres av eksisterende
+   hovedansvarlig**. Kontosletting rydder rollen (anonymiserte
+   spøkelser beholder aldri godkjenningsmakt); ops kan alltid seede en
+   ny ansvarlig.
+   **Presisering 2026-08-03 (Brage) — AUTORISASJONSKONTROLLEN, bygget
+   samme dag (migrasjon `00044` + Edge Function `claim-notify`):**
+   reviewen skal eksplisitt verifisere søkerens FULLMAKT, ikke bare at
+   orgnummeret finnes. Automatisert som BEVIS, aldri beslutning:
+   claim-innsending trigger et varsel til hello@heiaapp.no beriket med
+   Brønnøysunds åpne registerdata — finnes enheten, navnematch,
+   organisasjonsform (FLI forventet), slettet/konkurs-flagg, og
+   ROLLENE (styret er offentlig!) med automatisk navnematch mot
+   søkerens profilnavn. Match = sterkt bevis; ikke-match beviser
+   ingenting (kasserer/trener med reell fullmakt står ikke i
+   registeret) — da er verifiseringskanalen klubbens REGISTRERTE
+   e-post/telefon, som også står i varselet. Registerutdraget fryses
+   på claim-raden (`brreg_snapshot`) — revisjonsbart i ettertid.
+   Grensesnittet: **Stripe står for KYC; Heia står for
+   autorisasjonskontrollen.** (API-formene røyktestet mot Ridabu
+   2026-08-03: FLI, hele styret med navn, leder@ridabufotball.no.)
+2. **Én kanonisk flate: «Klubbbetalinger».** Hovedinngang på PROFIL
+   (rad kun synlig for betalingsansvarlige), kontekstuell snarvei fra
+   Laginnstillinger til SAMME flate. Ingen ny innlogging, portal eller
+   e-postflyt — betalingsansvarlig er en vanlig Heia-bruker i appen.
+   (Presiserer 2026-08-02-beslutningen «klubbadmin i Laginnstillinger»:
+   den gjelder LAGETS aktiveringsflate; klubbens godkjenningsflate er
+   klubb-nivå og bor på Profil.)
+3. **Lagflyten (null friksjon, ingenting nytt å fylle ut):** lag under
+   aktivert klubb → lagadmin trykker «Be om godkjenning» → varsel til
+   betalingsansvarlig (inbox + push) → forespørselskortet viser KUN
+   eksisterende data (lagnavn, årskull/kjønn, hvem som spør, antall
+   medlemmer) → ett trykk «Godkjenn» → laget ARVER klubbens
+   standardtilbud og offering v1 opprettes automatisk i samme
+   transaksjon (samme versjonerte modell). Avslag krever begrunnelse
+   som treneren ser (samme mønster som claim-avslag).
+4. **Prisinvarianten står:** klubbens standardtilbud (79/60) er DATA i
+   en deny-by-default-tabell (`club_support_defaults`), seedet av
+   Heia ved klubbgodkjenning. Betalingsansvarlig ser/velger ALDRI
+   pris. `create_support_offering` forblir ops-only; godkjenningsstien
+   deler intern mekanikk (advisory-lås, arkiver + ny versjon).
+5. **Godkjenninger er rader** (`team_support_approvals`:
+   hvem/når/status/note), auditerbare, maks én åpen per lag,
+   ops-override består.
+6. **To handlinger i v1 — presist språk (ALDRI «revoke» når
+   abonnementer består):**
+   - **«Pause nye støttespillere»:** offering arkiveres, nye checkouts
+     stoppes, eksisterende abonnementer fortsetter.
+   - **«Deaktiver støtte for laget»:** nye checkouts stoppes +
+     eksisterende abonnementer settes til kansellering ved
+     periodeslutt (`cancel_at_period_end` — Stripe-kall, krever Edge
+     Function). Ingen refusjon av allerede betalt periode.
+   Begge med bekreftelsesdialog som viser ANTALL berørte aktive
+   abonnementer, og logg av hvem/når/årsak.
+7. **SUPPORTER-ROLLEN lukker «ikke-medlem-støtte»-flagget:**
+   besteforeldre/tanter/venner melder seg inn NØYAKTIG som foreldre
+   (invitasjonskode, samme rettigheter) med rolle `supporter` — de ER
+   medlemmer, så den medlemsgatede checkouten står uendret.
+   Web-checkout trengs ikke og forblir på «bygger bevisst
+   ikke»-listen.
+8. **Dogfood:** Brages nye Ridabu-lag får INGEN manuell offering —
+   laget er E2E-testen av hele døren (Brage backfilles som
+   betalingsansvarlig for Ridabu fra det godkjente claimet).
+   Byggerekkefølge: supporter-skiva først (liten), så klubbdøren.
+
 **Avgjort 2026-08-02 (Brage):** splitten = FAST 60 kr til laget, offentlig
 kommunisert (se «Pris og split») · lagaggregatet er synlig for ALLE
 lagmedlemmer, hovedtall = det laget får · «Min støtte» bor på Profil
@@ -200,8 +280,9 @@ varslingsflyt ved lagavvikling · endelig
 bundle-ID (placeholder i dag — se HEIAAPP-NO.md steg 0; MÅ byttes før
 første TestFlight-opplasting, bundle-ID er permanent per app-oppføring).
 
-**Utsatt:** klubbadmin-domene · klubbmerge-verktøy · Vipps · engangs-
-betalinger · flere land · payout-rapportering.
+**Utsatt:** klubbmerge-verktøy · Vipps · engangs-
+betalinger · flere land · payout-rapportering. (Klubbadmin-domenet er
+IKKE lenger utsatt — avgjort 2026-08-03, se «KLUBBDØREN» øverst.)
 
 ## Fase 1-verifisering (2026-08-01) — 28/28 PASS
 
@@ -383,24 +464,34 @@ landingsside. Retur BEVISER ingenting (fase 2-prinsippet) — siden sier kun
   `startStripeOnboarding` via `functions.invoke`). SupportScreen-mockupen
   (49/399 kr) er fortsatt BEVISST urørt — den er fase 4.
 
-**Ops-runbook (manuell review — dashboardets SQL-editor):**
+**Ops-runbook — NORMAL ARBEIDSFLYT ER «HEIA OPS» I APPEN (00046,
+2026-08-03):** e-postvarselet (claim-notify, med Brønnøysund-bevis)
+deep-linker til søknaden (heia://ops/claims/<id>) → Profil → «Heia
+internt» → Heia Ops. Handlingene Godkjenn (KREVER tekst om hvordan
+autorisasjonen ble verifisert) / Be om mer informasjon (søkeren ser
+meldingen i appen) / Avslå — alle er ops_admins-gatede RPC-er med
+append-only audit (club_claim_audit). Ingen ny innlogging: ops-flaten
+er DB-gatet i appen; egen web-admin på heiaapp.no er utsatt til
+nettside-prosjektet. Appen validerer dessuten orgnr mot Brønnøysund
+FØR innsending (00046-runden) — ugyldige numre blir aldri ops-saker.
+
+**SQL-editoren er NØDFALLBACK** (composer nede e.l.):
 ```sql
--- åpne søknader (sjekk orgnr manuelt mot Brønnøysund):
+-- åpne søknader (registerbeviset ligger i brreg_snapshot):
 select id, claimed_org_number, claimed_legal_name, claimed_role,
-       contact_email, contact_phone, created_at
+       contact_email, brreg_snapshot, created_at
 from club_claims where status in ('submitted','in_review')
 order by created_at;
 
 -- godkjenn (bruk REGISTERETS navn som siste argument):
-select approve_club_claim('<claim-id>', null, 'Sjekket mot Brønnøysund',
+select approve_club_claim('<claim-id>', null, 'Autorisasjon verifisert: …',
                           null, 'KLUBBENS REGISTRERTE NAVN');
 
 -- avslå (begrunnelsen vises til innsenderen i appen):
 select reject_club_claim('<claim-id>', 'Begrunnelsen her');
 ```
-Ingen automatisk varsling til Heia om nye claims i MVP — sjekk spørringen
-over (backlog: e-postvarsel). Allianseidrettslag: splitt/flytt klubbrader
-FØR godkjenning (låst operasjonell regel).
+Allianseidrettslag: splitt/flytt klubbrader FØR godkjenning (låst
+operasjonell regel).
 
 **DB-verifisering (2026-08-01): 19/19 PASS** — `verify-00038.sql` i
 `~/Documents/Heia-Stripe-Spike/` (selvforsynt, ruller alltid tilbake; kjørt

@@ -23,6 +23,7 @@ import {
   startStripeOnboarding,
   type SupportActivationStatus,
 } from '../lib/api';
+import {lookupBrregEnhet} from '../lib/brreg';
 
 /**
  * Aktivering av «Støtt laget» (betalingssporet fase 3) — kun lagadmin,
@@ -84,27 +85,79 @@ export function SupportSetupScreen() {
     setRefreshing(false);
   }, [load]);
 
+  // Selve innsendingen — registerets navn er autoritativt når vi har det.
+  const doSubmit = useCallback(
+    async (clubId: string, submitLegalName: string) => {
+      try {
+        await submitClubClaim({
+          clubId,
+          orgNumber,
+          legalName: submitLegalName,
+          role,
+          contactEmail: email,
+          contactPhone: phone.trim() || undefined,
+        });
+        setShowForm(false);
+        await load();
+      } catch (e: any) {
+        Alert.alert('Kunne ikke sende søknaden', e?.message ?? 'Prøv igjen om litt.');
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [orgNumber, role, email, phone, load],
+  );
+
+  // Produksjonsvalidering mot Brønnøysund FØR innsending (Brages beslutning
+  // 2026-08-03): et orgnr som ikke finnes skal aldri bli en ops-sak.
+  // Registeret er autoritativt for navnet. Nettverksfeil blokkerer ALDRI
+  // (fail-open — den manuelle reviewen med claim-notify-bevisene fanger
+  // det). Testdata: i dev-bygg finnes en eksplisitt «send likevel»-vei.
   const handleSubmit = useCallback(async () => {
     const clubId = status?.club?.id;
     if (!clubId || submitting) return;
     setSubmitting(true);
-    try {
-      await submitClubClaim({
-        clubId,
-        orgNumber,
-        legalName,
-        role,
-        contactEmail: email,
-        contactPhone: phone.trim() || undefined,
-      });
-      setShowForm(false);
-      await load();
-    } catch (e: any) {
-      Alert.alert('Kunne ikke sende søknaden', e?.message ?? 'Prøv igjen om litt.');
-    } finally {
+
+    const lookup = await lookupBrregEnhet(orgNumber);
+
+    if (lookup.status === 'not_found') {
+      const buttons: any[] = [{text: 'OK', style: 'cancel'}];
+      if (__DEV__) {
+        buttons.push({
+          text: 'Send likevel (testdata)',
+          style: 'destructive',
+          onPress: () => doSubmit(clubId, legalName),
+        });
+      }
+      Alert.alert(
+        'Fant ikke organisasjonsnummeret',
+        `${orgNumber.replace(/[^0-9]/g, '')} finnes ikke i Brønnøysund­registrene. Sjekk sifrene — nummeret står på klubbens side på brreg.no.`,
+        buttons,
+      );
       setSubmitting(false);
+      return;
     }
-  }, [status?.club?.id, submitting, orgNumber, legalName, role, email, phone, load]);
+
+    if (lookup.status === 'found' && lookup.inactive) {
+      Alert.alert(
+        'Organisasjonen er ikke aktiv',
+        `${lookup.navn} er ${lookup.inactiveReason} i Brønnøysund­registrene og kan ikke motta støtte.`,
+      );
+      setSubmitting(false);
+      return;
+    }
+
+    if (lookup.status === 'found' && lookup.navn) {
+      // Registeret vinner: søknaden sendes med det juridiske navnet derfra,
+      // og brukeren ser det i bekreftelsen («til vurdering»-kortet).
+      setLegalName(lookup.navn);
+      await doSubmit(clubId, lookup.navn);
+      return;
+    }
+
+    // unreachable → fail-open med det brukeren skrev.
+    await doSubmit(clubId, legalName);
+  }, [status?.club?.id, submitting, orgNumber, legalName, doSubmit]);
 
   // Lenken er kortlevd (fase 0-funn #6) — hent alltid en fersk, i
   // klikkøyeblikket, både for åpning og deling.
@@ -178,6 +231,17 @@ export function SupportSetupScreen() {
               {clubName} kobles til utbetaling. Du hører fra oss — som regel
               innen et par dager.
             </Text>
+            {status.claim?.infoRequestNote && (
+              <View style={styles.infoRequestBox}>
+                <Text style={styles.infoRequestTitle}>
+                  Heia trenger mer informasjon
+                </Text>
+                <Text style={styles.body}>{status.claim.infoRequestNote}</Text>
+                <Text style={styles.hint}>
+                  Svar til hello@heiaapp.no, så fortsetter behandlingen.
+                </Text>
+              </View>
+            )}
             <View style={styles.factBox}>
               <FactRow label="Organisasjonsnummer" value={status.claim?.orgNumber ?? '—'} />
               <FactRow label="Juridisk navn" value={status.claim?.legalName ?? '—'} />
@@ -474,6 +538,17 @@ const styles = StyleSheet.create({
   },
   cardButton: {
     alignSelf: 'flex-start',
+  },
+  infoRequestBox: {
+    backgroundColor: '#FFF4D6',
+    borderRadius: radius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  infoRequestTitle: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: '#8A6D1A',
   },
   factBox: {
     backgroundColor: colors.background,

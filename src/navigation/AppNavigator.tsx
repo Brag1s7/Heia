@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {
   Alert,
+  Linking,
   Pressable,
   Text,
   StyleSheet,
@@ -28,7 +29,11 @@ import {
 } from '../context';
 import {CreateSheet, NotificationBanner} from '../components';
 import {Bell, Calendar, House, Plus, User} from '../components/icons';
-import {navigationRef, flushPendingDeepLink} from './deepLink';
+import {
+  navigationRef,
+  flushPendingDeepLink,
+  handleDeepLinkUrl,
+} from './deepLink';
 import {isTeamAdmin} from '../shared/roles';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
@@ -47,6 +52,8 @@ import {ProfilScreen} from '../screens/ProfilScreen';
 import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {TeamSettingsScreen} from '../screens/TeamSettingsScreen';
 import {SupportSetupScreen} from '../screens/SupportSetupScreen';
+import {OpsClaimsScreen} from '../screens/OpsClaimsScreen';
+import {OpsClaimDetailScreen} from '../screens/OpsClaimDetailScreen';
 import {InboxScreen} from '../screens/InboxScreen';
 import {SeasonScreen} from '../screens/SeasonScreen';
 import type {
@@ -199,6 +206,11 @@ function ProfilStackNavigator() {
       <ProfilNav.Screen name="TeamMembers" component={TeamMembersScreen} />
       <ProfilNav.Screen name="TeamSettings" component={TeamSettingsScreen} />
       <ProfilNav.Screen name="SupportSetup" component={SupportSetupScreen} />
+      <ProfilNav.Screen name="OpsClaims" component={OpsClaimsScreen} />
+      <ProfilNav.Screen
+        name="OpsClaimDetail"
+        component={OpsClaimDetailScreen}
+      />
       <ProfilNav.Screen name="Invite" component={InviteScreen} />
       <ProfilNav.Screen name="JoinTeamCode" component={JoinTeamCodeScreen} />
       <ProfilNav.Screen name="CreateTeam" component={CreateTeamScreen} />
@@ -405,6 +417,17 @@ export function AppNavigator() {
   const {pendingAction, lastError, setLastError} = useOnboarding();
 
   const hasTeam = userMemberships.length > 0;
+
+  // heia://-lenker (JS-Linking-restansen fra native-runden): kaldstart-URL-en
+  // hentes én gang, og lytteren dekker trykk mens appen kjører. Målet
+  // parkeres i deepLink-laget til navigatoren faktisk kan åpne det.
+  useEffect(() => {
+    Linking.getInitialURL().then(handleDeepLinkUrl);
+    const sub = Linking.addEventListener('url', ({url}) =>
+      handleDeepLinkUrl(url),
+    );
+    return () => sub.remove();
+  }, []);
 
   // WelcomeIntent viser lastError for en gjest. Har brukeren alt et lag rendres
   // MainTabs, og feilen ville forsvunnet i stillhet — så vi sier fra her.
