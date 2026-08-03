@@ -15,6 +15,7 @@ export const navigationRef = createNavigationContainerRef<RootTabParamList>();
  */
 let pendingEventId: string | null = null;
 let pendingOpsClaimId: string | null = null;
+let pendingLagkassa = false;
 let pendingNotificationData: Record<string, unknown> | null = null;
 
 /**
@@ -64,6 +65,25 @@ export function openOpsClaim(claimId: string): void {
     });
   } catch {
     pendingOpsClaimId = claimId;
+  }
+}
+
+/**
+ * Lagkassa fra web-knappen på heiaapp.no/betaling (heia://lagkassa) — den som
+ * nettopp har betalt i Safari lander rett på pengesiden. Skjermen er
+ * activeTeamSpaceId-drevet og tar ingen params; betaleren kommer fra en
+ * checkout startet i nettopp det aktive laget, så konteksten stemmer.
+ */
+export function openLagkassa(): void {
+  if (!navigationRef.isReady()) {
+    pendingLagkassa = true;
+    return;
+  }
+
+  try {
+    navigationRef.navigate('HjemStack', {screen: 'Lagkassa'});
+  } catch {
+    pendingLagkassa = true;
   }
 }
 
@@ -189,6 +209,10 @@ export function handleDeepLinkUrl(url: string | null): void {
   const ops = url.match(/^heia:\/\/ops\/claims\/([0-9a-f-]{36})/i);
   if (ops) {
     openOpsClaim(ops[1]);
+    return;
+  }
+  if (/^heia:\/\/lagkassa\/?$/i.test(url)) {
+    openLagkassa();
   }
 }
 
@@ -212,6 +236,11 @@ export function flushPendingDeepLink(): void {
     const claimId = pendingOpsClaimId;
     pendingOpsClaimId = null;
     openOpsClaim(claimId);
+  }
+
+  if (pendingLagkassa) {
+    pendingLagkassa = false;
+    openLagkassa();
   }
 
   if (pendingNotificationData !== null) {

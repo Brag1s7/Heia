@@ -49,9 +49,11 @@
     <h1 id="title">Tusen takk for støtten!</h1>
     <p id="body">Betalingen behandles hos Stripe. Statusen i Heia-appen
       oppdaterer seg av seg selv om et lite øyeblikk.</p>
-    <!-- heia://-skjemaet finnes i appen fra bygg 1.0 (1). Knappen vises
-         kun på iOS — en desktop-nettleser har ingen app å åpne. -->
-    <a class="btn" id="openApp" href="heia://" style="display:none">Åpne Heia-appen</a>
+    <!-- heia://-skjemaet finnes i appen fra bygg 1.0 (1). Ruten /lagkassa
+         forstås fra 1.0 (2) — eldre bygg åpner bare appen (skjema-match
+         holder). Knappen vises kun på iOS — en desktop-nettleser har ingen
+         app å åpne. -->
+    <a class="btn" id="openApp" href="heia://lagkassa" style="display:none">Åpne Heia-appen</a>
     <p class="hint">Du kan trygt lukke denne siden.</p>
   </div>
   <script>

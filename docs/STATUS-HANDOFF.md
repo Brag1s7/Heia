@@ -1,6 +1,28 @@
 # Heia — statusoverlevering (for ny chat)
 
-_Sist oppdatert: 2026-08-03 (sen kveld). **NYESTE: 🚪 KLUBBDØREN ER
+_Sist oppdatert: 2026-08-03 (natt mot 04). **ALLER NYESTE: 🚀 EKSTERN
+TESTFLIGHT ER LIVE (Brages beskjed 2026-08-03)** — Beta App Review
+godkjente, «Friends and family»-gruppen kjører. MEN: de eksterne står
+på bygg **1.0 (1)** med FROSSET JS fra 2026-08-02 — de har IKKE
+supporter-rollen, klubbdøren, push-trykk-navigeringen eller noe annet
+fra 2026-08-03. Derfor er **1.0 (2) neste trekk** og ALT er nå klart
+for det: (a) JS-Linking-restansen er BYGGET (siste JS-restanse fra
+native-runden): `heia://lagkassa` i deepLink.ts (openLagkassa +
+parkering/flush, HjemStack → Lagkassa — activeTeamSpaceId-drevet,
+ingen params) og web-knappen på /betaling peker nå `heia://lagkassa`
+(eldre bygg åpner bare appen — skjema-match holder; web-endringen går
+live ved neste merge til main); (b) **byggnummer bumpet:
+CURRENT_PROJECT_VERSION = 2 i begge configs** — 1.0 (2) er dermed et
+rent Archive + Distribute → Upload i Xcode hos Brage (ingen nye pods,
+ingen nye entitlements; AppDelegate-trykkfiksen ligger alt på grenen);
+(c) i App Store Connect: legg 1.0 (2) til BEGGE gruppene (intern +
+ekstern; oppdateringsbygg til eksisterende ekstern gruppe går normalt
+uten ny full review). **PUSH-VIKTIG:** `APNS_HOST` står på SANDBOX →
+TestFlight-bygg får produksjonstokens → push til eksterne testere
+avvises STILLE i dag. Bytt når 1.0 (2) er ute:
+`supabase secrets set APNS_HOST=api.push.apple.com` — da dør push i
+Brages dev-bygg (én host om gangen, kjent v1-begrensning; dev-testing
+av push = bytt tilbake). Fra før: **🚪 KLUBBDØREN ER
 BYGGET OG DEPLOYET 2026-08-03 (sen kveld) — migrasjon `00047` +
 `00048` + Edge Function `club-support-deactivate` + hele app-flaten
 («Klubbbetalinger» på Profil m/snarvei fra Laginnstillinger, «Be om
@@ -433,7 +455,7 @@ lande på telefonen; trykk på kamp-varselet → EventDetail åpner;
 (iv) klubbdør-bonus: «Be om godkjenning» fra J2019 i simulatoren →
 telefonen (betalingsansvarlig) får push med klubbdør-varselet.
 JS-Linking-utvidelsen (naviger til Lagkassa ved heia://lagkassa) er
-fortsatt restanse — ren JS, ikke blokkerende.
+✅ BYGGET 2026-08-03 (natt mot 04) — se ALLER NYESTE-blokken øverst.
 NB for Claude: native-arbeid = Xcode hos Brage med guiding; ALDRI
 pod install/build i bakgrunnen mens appen kjører
 (se minnet feedback_dev_environment).**
