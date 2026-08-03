@@ -258,7 +258,19 @@ først); (c) godkjenn UTEN tekst → stoppes; skriv verifiseringstekst
 → Godkjenn → status flipper + audit-loggen viser handlingen;
 (d) test «Be om mer informasjon» på en åpen søknad → søkerens
 SupportSetupScreen viser gul boks. SQL-editoren består som
-nødfallback (PAYMENTS.md §Fase 3-runbooken). Markedsføringstonen
+nødfallback (PAYMENTS.md §Fase 3-runbooken). **BRAGES KVITTERING
+2026-08-03: «Jeg får mail og dette ser veldig proft ut! Det funker
+bra inne på appen»** — e-postkjeden + ops-flaten er sett virke;
+resten av testlisten tas løpende. MERK TESTREGIMET fremover:
+TestFlight-bygget 1.0 (1) er frosset JS fra 2026-08-02 — ALT fra
+2026-08-03 (supporter, Heia Ops, brreg-validering) testes i
+DEV-BYGG fra Xcode (overskriver TF-appen, samme bundle-ID); nytt
+TestFlight-bygg **1.0 (2)** (ren Archive + Upload, null nye
+pods/entitlements) lastes opp når testlisten er grønn — naturlig å
+ta KLUBBDØREN med i samme bygg. Web-ops på heiaapp.no (Brages
+ønske): bekreftet mulig by design — all logikk er klient-agnostiske
+RPC-er; web-flaten er ren frontend-oppgave i nettside-prosjektet
+(notert i website_project-minnet). Markedsføringstonen
 (følelser/samhold/støtte) hører til nettside-prosjektet, men
 flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
