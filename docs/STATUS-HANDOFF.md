@@ -128,8 +128,28 @@ TestFlight-bygget — klubben er aktiv (konto per KLUBB), men
 offering (pris/splitt) opprettes PER LAG og er ops-only
 (`create_support_offering`, fase 4-design), så SupportScreen viser
 den planlagte fallbacken «Ikke helt klart ennå». IKKE en bug.
-▶️ NESTE SAMTALE (Brages valg 2026-08-02): APNs-PUSH + offering-rad
-for det nye laget (Brage oppgir lagnavnet).
+▶️ NESTE SAMTALE (Brages valg 2026-08-02/03): (1) APNs-PUSH,
+(2) offering-rad for det nye laget (Brage oppgir lagnavnet),
+(3) **SISTE STORE ARKITEKTURVALG — «KLUBBDØR-MODELLEN» (Claudes
+forslag skissert for Brage 2026-08-03, IKKE besluttet ennå):**
+klubbgodkjenning av lag som selvbetjening. Kjernen: (a) godkjent
+claim-innsender blir KLUBBANSVARLIG (club_admins-tabell, seedes fra
+claimet, flere kan legges til senere); (b) nytt lag under aktivert
+klubb: trener trykker «Be om godkjenning» → klubbansvarlig får
+varsel → ett trykk «Godkjenn» → laget ARVER klubbens standardtilbud
+(79/60 som DATA på klubben) og offering-v1 opprettes automatisk i
+samme transaksjon (samme versjonerte modell som i dag);
+(c) godkjenninger er rader (hvem/når/status), REVERSIBLE (revoke →
+offering arkiveres), ops-override består; (d) SupportSetupScreen
+forklarer to-stegs-modellen («1. Klubben kobles ✓ 2. Klubben
+godkjenner laget») — Brage vil ha minst mulig friksjon + en
+forklarende flate. FLAGGET SAMTIDIG (egen beslutning): Brages
+markedsvisjon er at besteforeldre/tanter/venner skal kunne støtte —
+men checkout er MEDLEMSGATET i dag (bevisst); ikke-medlem-støtte
+krever enten supporter-rolle via invitasjonskode eller web-checkout
+(står på «bygger bevisst ikke»-listen) — må besluttes eksplisitt.
+Markedsføringstonen (følelser/samhold/støtte) hører til
+nettside-prosjektet, men flyt-copyen i appen skal speile den.
 PUSH-RESTANSE (etter TestFlight, egen skive): APNs-nøkkel (.p8) kan
 NÅ lages i den betalte kontoen → secrets APNS_KEY/APNS_KEY_ID/
 APNS_TEAM_ID/APNS_BUNDLE_ID=no.heiaapp.heia/APNS_HOST (sandbox for
