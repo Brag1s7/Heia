@@ -1,5 +1,45 @@
 # Heia — statusoverlevering (for ny chat)
 
+## 📦 NESTE SAMTALE: FLYTT REPOET UT AV iCLOUD (Brages ønske 2026-08-04)
+
+**Bakgrunn:** iCloud-utkasting har nå kostet tid TRE ganger på ett døgn
+(sist: frøs 1.0 (3)-arkiveringen på 2937/2950). «Behold nedlasting»
+i Finder ble prøvd — attributtet `com.apple.fileprovider.pinned#PX: 1`
+ER satt på mappa, men innholdet ble **likevel kastet ut ved omstart**
+(39 531 filer tomme igjen). Pinning er altså IKKE en fiks. Flytting til
+`~/Developer` (utenfor iCloud) er den varige løsningen.
+**Brage synes flyttingen er skummel → kjør den rolig, forklar hvert
+steg, ikke start før han sier fra.**
+
+**MÅLINGER SOM GJØR DEN TRYGG (2026-08-04, verifisert):**
+- Det som IKKE kan gjenskapes: **371 filer** (.git 2,6 MB + src 1,0 MB
+  + config) — 84 av dem er tomme skall og må materialiseres først
+  (sekunder, ikke timer).
+- `node_modules` (61 MB / ~39 500 filer) og `ios/Pods` (68 MB) er
+  **AVLEDET** → SLETTES, flyttes ikke. Sletting av tomme skall er
+  øyeblikkelig og krever INGEN nedlasting (unngår 6,5 t venting).
+- **Alt er på GitHub:** `origin/Brage` = `f33d8f0`. Verste utfall =
+  `git clone` på nytt. ⚠️ ETT unntak: `docs/STATUS-HANDOFF.md` har
+  ucommittede endringer (nattstatus + denne blokka) — Brage sa nei til
+  opplasting 2026-08-04; AVKLAR før flytting (commit eller godta at de
+  kun finnes lokalt).
+
+**SKISSE (detaljene tas i den nye samtalen):** materialiser de 84
+kildefilene → slett node_modules + ios/Pods → flytt mappa til
+`~/Developer/Heia` → `npm install` → `pod install` (OBLIGATORISK:
+`Pods-Heia2.{debug,release}.xcconfig` har absolutt sti bakt inn) →
+åpne .xcworkspace fra ny sti → verifiser med ett dev-bygg.
+**HUSK disse lokale, gitignorerte tingene:** (a) `ios/.xcode.env.local`
+MÅ gjenskapes (NODE_BINARY + Debug-gatet SKIP_BUNDLING — se
+🚨-blokken; glemmes den blir dev-bygg trege, men arkivene forblir
+riktige); (b) `.claude/settings.local.json`; (c) Claudes minnemappe er
+navngitt etter prosjektstien og bør følge med. Valgfritt: også
+`~/Documents/Heia-Stripe-Spike/` ligger i iCloud (har .env med
+sandbox-nøkkel).
+Se minnet `icloud_evicted_files_hang`.
+
+
+
 _Sist oppdatert: 2026-08-04. **ALLER NYESTE: 🚨 BYGG 1.0 (2) BLE
 LASTET OPP ØDELAGT — KRÆSJER VED OPPSTART. Skal EXPIRES i App Store
 Connect og erstattes av 1.0 (3):** 04-08-arkivet mangler
@@ -31,8 +71,12 @@ re-arkiveringen):** disken nede på 13 GB → macOS hadde kastet ut
 i 1.0 (3)-arkivet frøs på 2937/2950 (prosessen i live, null CPU —
 nøyaktig icloud_evicted_files_hang-mønsteret). Nedlasting tilbake
 pågår (~13 filer/s, ferdig ~kl. 02); Brage trykket **«Behold
-nedlasting»** på Heia Prod i Finder = mappa er nå PINNET og kan aldri
-evictes igjen (fella er nøytralisert for repoet). caffeinate kjører
+nedlasting»** på Heia Prod i Finder — men ⚠️ PINNING VISTE SEG Å IKKE
+VÆRE PÅLITELIG: attributtet `com.apple.fileprovider.pinned#PX: 1` ble
+satt på mappa, og innholdet ble LIKEVEL kastet ut ved neste omstart
+(39 531 filer tomme igjen — se blokka øverst). Pinning er altså INGEN
+fiks; flytting til `~/Developer` (utenfor iCloud) er den varige
+løsningen. caffeinate kjører
 5 t så Macen ikke sover fra nedlastingen. MORGENLØPET: (1) sjekk
 dataless=0 (`find node_modules -type f -size +0c -exec stat -f "%b" {} + | grep -c '^0'`);
 (2) det stående bygget våknet neppe — avbryt (⌘.) og Archive på nytt
