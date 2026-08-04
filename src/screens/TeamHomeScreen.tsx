@@ -406,18 +406,19 @@ export function TeamHomeScreen() {
 
   return (
     <>
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={colors.heia}
-        />
-      }>
-      {/* Team-header (kompakt) — med inngangen til sesongflaten */}
+    {/* Fast header + separat scrollflate — samme mønster som Kalender og
+        Varsler: TeamHeader er søsken OVER ScrollView, ikke inni den. */}
+    <View style={styles.screen}>
       <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
+      <ScrollView
+        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.heia}
+          />
+        }>
 
       {/* HERO — dagens hovedøyeblikk: live kamp slår neste aktivitet.
           Hverdagsmodus = karusell over de neste hendelsene + kalender-kort;
@@ -595,7 +596,8 @@ export function TeamHomeScreen() {
         })
       )}
 
-    </ScrollView>
+      </ScrollView>
+    </View>
 
     {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
     <MatchPhotoGallery

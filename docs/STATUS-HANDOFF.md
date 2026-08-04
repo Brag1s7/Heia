@@ -1,41 +1,95 @@
 # Heia — statusoverlevering (for ny chat)
 
-## 📦 NESTE SAMTALE: FLYTT REPOET UT AV iCLOUD (Brages ønske 2026-08-04)
+## 🎨 LAGHEADEREN BYGGET OM (2026-08-05) — ren JS, ingen rebuild
 
-**Bakgrunn:** iCloud-utkasting har nå kostet tid TRE ganger på ett døgn
-(sist: frøs 1.0 (3)-arkiveringen på 2937/2950). «Behold nedlasting»
-i Finder ble prøvd — attributtet `com.apple.fileprovider.pinned#PX: 1`
-ER satt på mappa, men innholdet ble **likevel kastet ut ved omstart**
-(39 531 filer tomme igjen). Pinning er altså IKKE en fiks. Flytting til
-`~/Developer` (utenfor iCloud) er den varige løsningen.
-**Brage synes flyttingen er skummel → kjør den rolig, forklar hvert
-steg, ikke start før han sier fra.**
+Headeren på Hjem/Kalender/Varsler er nå én lagfarget toppflate. Alt ligger i
+`src/components/TeamHeader.tsx` + `src/shared/teamColors.ts`.
 
-**MÅLINGER SOM GJØR DEN TRYGG (2026-08-04, verifisert):**
-- Det som IKKE kan gjenskapes: **371 filer** (.git 2,6 MB + src 1,0 MB
-  + config) — 84 av dem er tomme skall og må materialiseres først
-  (sekunder, ikke timer).
-- `node_modules` (61 MB / ~39 500 filer) og `ios/Pods` (68 MB) er
-  **AVLEDET** → SLETTES, flyttes ikke. Sletting av tomme skall er
-  øyeblikkelig og krever INGEN nedlasting (unngår 6,5 t venting).
-- **Alt er på GitHub:** `origin/Brage` = `f33d8f0`. Verste utfall =
-  `git clone` på nytt. ⚠️ ETT unntak: `docs/STATUS-HANDOFF.md` har
-  ucommittede endringer (nattstatus + denne blokka) — Brage sa nei til
-  opplasting 2026-08-04; AVKLAR før flytting (commit eller godta at de
-  kun finnes lokalt).
+**Fire ting som er verdt å vite før noen rører den igjen:**
 
-**SKISSE (detaljene tas i den nye samtalen):** materialiser de 84
-kildefilene → slett node_modules + ios/Pods → flytt mappa til
-`~/Developer/Heia` → `npm install` → `pod install` (OBLIGATORISK:
-`Pods-Heia2.{debug,release}.xcconfig` har absolutt sti bakt inn) →
-åpne .xcworkspace fra ny sti → verifiser med ett dev-bygg.
-**HUSK disse lokale, gitignorerte tingene:** (a) `ios/.xcode.env.local`
-MÅ gjenskapes (NODE_BINARY + Debug-gatet SKIP_BUNDLING — se
-🚨-blokken; glemmes den blir dev-bygg trege, men arkivene forblir
-riktige); (b) `.claude/settings.local.json`; (c) Claudes minnemappe er
-navngitt etter prosjektstien og bør følge med. Valgfritt: også
-`~/Documents/Heia-Stripe-Spike/` ligger i iCloud (har .env med
-sandbox-nøkkel).
+1. **Hjem hadde headeren INNE i sin ScrollView** — derfor scrollet den bort.
+   Nå er alle tre fanene like: `<View style={screen}>` → `<TeamHeader />` →
+   `<ScrollView>`. Headeren kan ikke krympe fordi den ikke er i scrollflaten.
+2. **`teamHeaderSurface()` er kontraktsmotoren.** Den returnerer venstre/midt/
+   høyre-farge + tekstfarge, og GARANTERER 4.5:1 (WCAG AA) på lagnavnet for
+   alle lagfarger — også nye. Gradienten: lagets faktiske farge flat gjennom
+   logo/navn (0–18 %), 18 % dypere ved 55 %, og 32 % mørkere + 22 % mot
+   `#143126` (Heias teal) ved høyre kant. **Ikke mint i bakgrunnen** — mint er
+   handlingsfarge. Kontrasten måles der teksten faktisk står (`TEXT_REACH`),
+   ikke ute i kanten bak «Sesongen»-chipen.
+   Målt: svakeste navnekontrast 4,60:1. 9 av 12 lagfarger brukes uendret;
+   Oransje/Lyseblå/Indigo får en dypere valør, samme fargetone.
+   ⚠️ Tekstfargen velges etter **minst avvik fra lagets ekte farge**, ikke
+   etter hvem som vinner på råfargen. Endres den regelen, blir mellomtoner
+   lysnet til blasse pasteller igjen.
+3. **Buene deler geometri med `StadiumSurface`.** Kortenes «banesirkel» har
+   sentrum 30 px inn fra høyre / 10 px opp fra bunn, radius 100 og 68, strek
+   1,5. Headeren bruker de SAMME absolutte verdiene (se `ARC_*`). Lik radius
+   = lik krumning = samme designsystem. Endrer du den ene, endre den andre.
+4. **Statuslinja settes av headeren** (`light-content` på mørke lagfarger),
+   med `useIsFocused`-vakt så den ikke følger med til skjermer som pushes
+   oppå. `App.tsx` har fortsatt `dark-content` som base.
+
+Logoen ligger på ren hvit sirkulær plate (full opacity, ingen tint). Platen
+får en hårfin ring KUN når flaten er lys (i praksis Gul), ellers forsvinner
+den hvite sirkelen mot bakgrunnen.
+
+Visuell referanse med lagfargevelger + kontrastmåling:
+https://claude.ai/code/artifact/43ca53de-21eb-483b-b54b-34947e5165cf
+
+## ✅ TESTFLIGHT 1.0 (3) ER LIVE + REPOET ER FLYTTET UT AV iCLOUD (2026-08-04)
+
+**RELEASE-STATUS (Brages bekreftelse 2026-08-04, erstatter alt lenger
+nede i fila):**
+- **1.0 (3) er lastet opp og ligger på TestFlight.** Dette er bygget
+  med `main.jsbundle` på plass — altså det første TF-bygget som
+  inneholder arbeidet fra 08-03/08-04 (supporter, klubbdør,
+  push-trykk-navigering, `heia://lagkassa`).
+- **1.0 (2) er satt til Expired** i App Store Connect. Kræsj-bygget er
+  ute av sirkulasjon; ingen testere kan lenger auto-oppdatere til det.
+- Arkivet bak opplastingen: `~/Library/Developer/Xcode/Archives/
+  2026-08-04/Heia2 04-08-2026, 02.24.xcarchive` (CFBundleVersion 3,
+  main.jsbundle 5 467 112 b — verifisert). Nattens «frosne»
+  arkivering fullførte altså likevel kl. 02.24 etter at
+  iCloud-nedlastingen ble ferdig.
+- ⚠️ Fortsatt gjeldende regel: **sjekk `main.jsbundle` i arkivet før
+  HVER Upload** (kommandoen står i 🚨-blokken under). Regelen kom fra
+  1.0 (2)-havariet og gjelder uendret.
+
+**FLYTTINGEN ER GJENNOMFØRT OG VERIFISERT 2026-08-04.** Repoet ligger
+nå på **`/Users/bragelotheweium/Developer/Heia Prod`** (utenfor
+iCloud). Fase 1 (read-only) bekreftet: git root = ny sti, `.git` er
+ekte katalog (ikke symlink tilbake), HEAD `5e64ae1`, clean status,
+`git fsck --full` exit 0 (kun dangling-objekter),
+`origin/Brage` = `f33d8f0` (2 commits ligger fortsatt kun lokalt).
+Alle gitignorerte lokalfiler fulgte med **hash-identiske**:
+`ios/.xcode.env.local` (Debug-gatingen intakt), `ios/.xcode.env`,
+`.claude/settings.local.json`, `.env`, `.env.example`.
+**0 dataless-skall** av 45 983 filer, 0 `.icloud`-plassholdere.
+
+**Fase 2 utført samme dag:**
+- `pod install` fra ny sti. ⚠️ LÆRDOM: første kjøring fikset IKKE
+  `HERMES_CLI_PATH` — CocoaPods cacher hermes-podspec'en globalt i
+  `~/Library/Caches/CocoaPods/Pods/Specs/External/hermes-engine/` med
+  absolutt sti bakt inn. Måtte slette den cache-entryen (+ `ios/Pods/
+  Local Podspecs/hermes-engine.podspec.json`) og kjøre `pod install`
+  på nytt. **Husk dette hvis prosjektet flyttes igjen.**
+- `.claude/settings.local.json`: 7 regler pekte på gammel sti → byttet
+  til `~/Developer`-stien (kun stien endret, ingen andre tillatelser).
+- Slettet avledet `node_modules/.generated/.packager.env` (gammel
+  PROJECT_ROOT; regenereres av react-native-xcode.sh).
+- Slettet foreldet DerivedData `Heia2-hfvqxhnjtfpyrndgtxkazyxnalfr`
+  (7,5 GB, WorkspacePath pekte på `Documents/Heia Prod`) →
+  **7 GB frigjort, 37 GB ledig**. Xcode lager ny katalog for ny sti
+  ved første bygg. Arkivene bor i `~/Library/Developer/Xcode/Archives`
+  og ble IKKE rørt.
+- Full skann av prosjektet: **0 treff** på gammel sti.
+
+**GJENSTÅR:** (a) ett dev-bygg fra ny sti som endelig verifisering;
+(b) gammel mappe `~/Documents/Heia Prod` (624 MB) lever fortsatt —
+slett den når dev-bygget er grønt (Cursor må ikke ha filer åpne der);
+(c) valgfritt: `~/Documents/Heia-Stripe-Spike/` ligger fortsatt i
+iCloud (har .env med sandbox-nøkkel).
 Se minnet `icloud_evicted_files_hang`.
 
 
@@ -56,9 +110,10 @@ assets/ der; begge mangler i 04-08-arkivet). Funnet i Opus-økten
 (Debug henter fra Metro). **FIKSET:** `.xcode.env.local` setter nå
 SKIP_BUNDLING kun i Debug (`case "$CONFIGURATION"` — lokal fil, må
 gjenskapes ved ny maskin/kloning), CURRENT_PROJECT_VERSION bumpet
-2→3. **GJENSTÅR HOS BRAGE:** (a) App Store Connect → TestFlight →
-bygg 2 → **Expire** — STRAKS, auto-oppdatering kan gi eksterne
-testere kræsj-bygget; (b) nytt Archive → **OBLIGATORISK SJEKK før
+2→3. **✅ BEGGE PUNKTENE ER GJORT 2026-08-04 (se blokka øverst):**
+(a) bygg 2 er satt til **Expired** i App Store Connect; (b) 1.0 (3)
+er arkivert, verifisert og **lastet opp til TestFlight**.
+**Regelen står likevel ved lag — OBLIGATORISK SJEKK før
 hver Upload fra nå av:**
 `ls "$(ls -dt ~/Library/Developer/Xcode/Archives/*/*.xcarchive | head -1)/Products/Applications/Heia2.app/main.jsbundle"`
 → Upload → legg 1.0 (3) til BEGGE gruppene. **PUSH: ✅ APNS_HOST =
