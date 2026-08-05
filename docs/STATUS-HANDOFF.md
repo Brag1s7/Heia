@@ -1,5 +1,55 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️ NESTE SAMTALE: UI-LØFT FØR PILOT (målt i koden 2026-08-05)
+
+**Brages ramme:** TestFlight i dag er venner og familie, IKKE pilot. Appen
+er ikke pilotklar. UI må løftes før ekte lag slippes inn. Ikke behandle
+TF-testerne som ekte brukere i prioriteringen.
+
+Designgjeld-lista lenger nede er fra 2026-07-30 (før P1–P9) og er delvis
+utdatert. Dette er **målt i koden 2026-08-05**:
+
+| Funn | Tall |
+|---|---|
+| Trykkbare elementer | 72 |
+| …med `accessibilityLabel` | 21 |
+| …med `accessibilityRole` | 20 |
+| `allowFontScaling` / Dynamic Type | **0** |
+| Rå `ActivityIndicator` | 12 i 6 filer |
+
+**1. Førstegangsløpet er det svakeste.** De rå spinnerne sitter i
+`AppNavigator`, `AuthScreen`, `VerifyEmailScreen`, `JoinTeamCodeScreen`
+(+ `MatchPhotoSheet`; `Button` sin er legitim). P1 ga skeletons til feed
+og lister, men innlogging → bekreftelseskode → bli med i lag har fortsatt
+default-spinnere. Det er det FØRSTE en pilotforelder ser, og «default
+spinner» er eksplisitt anti-mønster i BRAND_UI.
+
+**2. Tilgjengelighet er verre enn lista sa.** To tredjedeler av trykkflatene
+er umerket, og all typografi er låst i px. Målgruppa er foreldre 40+ som
+ofte kjører forstørret tekst — hos dem ser appen lik ut uansett innstilling.
+
+**3. Tegn-glyfer igjen:** `⚽`, `↔`, `🟨` hardkodet i `MatchPhotoSheet.tsx`
+blant Lucide-ikonene.
+
+**4. `docs/BRAND_UI.md` beskriver systemet FØR A v2** — slettet `Chip`,
+«Unicode-symboler» som ikonstil, 5-tab med «Meldinger». Den villeder aktivt
+hver nye samtale. Billig å fikse, beskytter alt som bygges etterpå.
+
+**5. Haptikk** (mål/Heia/start-slutt) krever native modul → ta den ved neste
+rebuild uansett årsak. **6. Mørk modus** er aldri låst skriftlig som «nei i
+v1». **7. Delbart invitasjonskort** står som idé, ikke lovet.
+
+⚠️ **Brage har flagget ting muntlig som kanskje ikke står skrevet ned noe
+sted.** Spør ham eksplisitt hva som mangler på denne lista før dere
+prioriterer — ikke anta at listene er komplette.
+
+**Rekkefølgen jeg foreslo (ikke godkjent ennå):** førstegangsløpet →
+tilgjengelighet → BRAND_UI til A v2.
+
+**NB om nettsiden:** heiaapp.no-markedssiden er et EGET prosjekt som er
+LÅST til å starte etter Stripe-sporet (se minnet `website_project` og
+`docs/HEIAAPP-NO.md`). Den er ikke glemt, men den er heller ikke neste.
+
 ## 🎨 LAGHEADEREN BYGGET OM (2026-08-05) — ren JS, ingen rebuild
 
 Headeren på Hjem/Kalender/Varsler er nå én lagfarget toppflate. Alt ligger i
