@@ -103,6 +103,12 @@ export interface HeiaEvent {
   startTime: Date;
   /** Valgfri i databasen — en hendelse trenger ikke sluttidspunkt. */
   endTime?: Date;
+  /**
+   * Frivillig oppmøtetid (00053). Når den finnes er DET klokka foreldre
+   * planlegger etter, og påminnelsen én time før bruker den i stedet for
+   * starttiden (00055) — aldri begge.
+   */
+  meetingTime?: Date;
   location?: string;
   description?: string;
   rsvp: RSVPSummary;

@@ -248,7 +248,84 @@ telefonen (start → mål → ny hendelse → avslutt) og se at det forblir ett
 kort hele veien. Kampvarsler fra FØR 00051 mangler kontekst og vises
 fortsatt som løse rader — det er tilsiktet, så en ny kamp er riktig test.
 
-### 📋 SKIVE B (IKKE GODKJENT): ENDRINGSVARSLER
+### ✅ SKIVE B BYGGET 2026-08-06 — endringsvarsler + oppmøtepåminnelse
+
+Brages spesifikasjon er gjennomført. Tre migrasjoner, alle **I PROD**.
+
+**`00053` — oppmøtetid.** FUNN: feltet fantes ikke. `events` hadde bare
+start/end. Ny frivillig kolonne `meeting_time` + CHECK (<= start_time),
+`create_event` utvidet med `p_meeting_time` (lagt SIST med DEFAULT NULL, så
+TestFlight-bygg som ikke sender feltet virker uendret). Felt lagt i
+NewEventScreen med samme maske som klokkeslettet.
+
+**`00054` — endringsvarsler.** Varsler ved: dato, starttid, oppmøtetid,
+sted, tittel (trigger på `events`) + motstander, avlysning, gjenåpning
+(trigger på `match_sessions`). **Beskrivelse varsler IKKE** (Brages valg).
+⚠️ «ÉN LAGRING = ETT VARSEL» var det vanskelige: tid/sted bor i `events`,
+motstander/avlysning i `match_sessions` — to triggere. Begge går derfor
+gjennom `notify_event_change()`, som SLÅR SAMMEN mot et eksisterende ulest
+endringsvarsel for samme arrangement (< 10 min) og lar nyeste verdi vinne
+per felt. Endringene ligger som `data.changes = [{field,label,old,new}]`,
+så raden kan tegne «17:30 → 17:00». Den som gjorde endringen får ikke
+varsel om sin egen endring.
+
+**`00055` — planlagt påminnelse.** `pg_cron` LOT SEG AKTIVERE i migrasjon
+(var ikke på fra før). Jobb `heia-event-reminders` kjører `*/10 * * * *`.
+Ankeret er `coalesce(meeting_time, start_time)` — ETT anker gjør det
+umulig å sende begge, slik Brage krevde. Tekst: «— oppmøte om én time»
+når oppmøtetid finnes, ellers «— kampen starter om én time» / «starter om
+én time». Vindu 50–70 min før ankeret; idempotent uten skjemaendring ved å
+sjekke om et varsel med `data->>'kind' = 'reminder'` alt finnes. Avlyste
+kamper minner ikke om oppmøte.
+
+**App-siden:** `NotificationRow` tegner nå endringer som «gammel → ny»
+(gammel gjennomstreket og dempet, ny i vekt), med eget klokke-ikon på
+solflate så en endring ikke forveksles med et nytt arrangement. Maks to
+felt vises, resten telles.
+
+**Live-minuttet TIKKER nå.** Det var regnet ut én gang ved render, så
+stripa frøs på minuttet skjermen ble åpnet. Egen `nowTick` oppdaterer hvert
+20. sekund — kun mens en kamp faktisk pågår. Hendelseskortet viser
+fortsatt hendelsens EGET minutt (`match.minute`), som er riktig.
+
+**Bevegelse:** myk innlasting via `LayoutAnimation` ved OPPDATERING (ikke
+førstegangslasting — der ville den bare føltes treg), og kontrollert
+overgang når en rad markeres som lest (mintflaten toner ut over 320 ms,
+prikken fader). `useNativeDriver: false` er påkrevd — backgroundColor er
+JS-drevet.
+
+**LÅST (Brage):** kommentarer og reaksjoner er SOSIALE varsler. De skal
+aldri inn i kamptidslinja eller telle i «N nye hendelser». Låst med to
+tester — inkludert tilfellet der et sosialt varsel bærer samme `event_id`
+som en kamphendelse.
+
+**Tester: 20 grønne** (`npx jest __tests__/inbox.test.ts`).
+
+⛔ **BLOKKERER TESTINGEN: appen kan ikke redigere et arrangement.** Det
+finnes ingen redigeringsskjerm, ingen `updateEvent` i API-laget, og ingen
+kode som setter `avlyst` — RLS har UPDATE-policy på `events`, men
+ingenting bruker den. Triggerne i 00054 er korrekte og fyrer for enhver
+UPDATE (også fra SQL), men Brage kan ikke teste «arrangementendring» fra
+appen før en redigeringsflyt finnes. **Dette er neste skive og er ikke
+besluttet.** Minste versjon: gjør NewEventScreen tosidig (opprett/rediger)
++ `update_event`-RPC med `is_team_admin`-vakt + «Avlys kamp» i
+EventDetail. Påminnelsen kan testes UTEN dette (opprett et arrangement med
+oppmøtetid ~1 t frem).
+
+### 📋 STØTTEVARSLER — DOKUMENTERT, IKKE IMPLEMENTERT
+
+Brage 2026-08-06: støttevarsler blokkerer ikke leveransen; vent til
+betaling er live. Planlagte typer når den tid kommer (alle som
+`data.kind` på kategori `system` eller ny kategori `support`):
+- `support_thanks` — «Takk for at du støtter {lag}» ved første trekk
+- `support_renewed` — «Månedens støtte til {lag} er registrert»
+- `support_milestone` — «{lag} har nå {n} støttespillere» (kun ekte
+  milepæler: 10/25/50/100 — ellers blir det mersalg)
+- `support_failed` — trekket gikk ikke gjennom (dette er det ENESTE som
+  bør pushe aggressivt; resten er varme, ikke krav)
+⚠️ Skal brukes SPARSOMT. Kilde: `stripe-webhook` + `support_subscriptions`.
+
+### 📋 SKIVE B (OPPRINNELIG FORSLAG — NÅ GJENNOMFØRT, se over)
 
 For at Varsler skal bli en ekte endringslogg mangler en `AFTER UPDATE`-
 trigger på `events` som sammenligner OLD/NEW og skriver varselet med

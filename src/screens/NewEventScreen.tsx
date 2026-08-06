@@ -149,6 +149,7 @@ export function NewEventScreen({navigation, route}: Props) {
   }, [inTournament, isNewTournament, activeTeamSpaceId]);
   const [dayOffset, setDayOffset] = useState(0);
   const [time, setTime] = useState(DEFAULT_TIME);
+  const [meetingTime, setMeetingTime] = useState('');
   const [durationMinutes, setDurationMinutes] = useState<number | null>(90);
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
@@ -167,10 +168,20 @@ export function NewEventScreen({navigation, route}: Props) {
   }, []);
 
   const parsedTime = parseTime(time);
+  const parsedMeeting = meetingTime.length > 0 ? parseTime(meetingTime) : null;
+  // Oppmøte etter avspark er alltid en feil — DB-en avviser det også (00053),
+  // men brukeren skal se det her, ikke i en Alert etter lagring.
+  const meetingAfterStart =
+    parsedTime !== null &&
+    parsedMeeting !== null &&
+    parsedMeeting.hours * 60 + parsedMeeting.minutes >
+      parsedTime.hours * 60 + parsedTime.minutes;
+
   const isMatch = type === 'kamp';
   const canSave =
     !!activeTeamSpaceId &&
     parsedTime !== null &&
+    (meetingTime.length === 0 || (parsedMeeting !== null && !meetingAfterStart)) &&
     (!isMatch || opponent.trim().length > 0);
 
   const handleSave = useCallback(async () => {
@@ -184,6 +195,13 @@ export function NewEventScreen({navigation, route}: Props) {
       ? new Date(startTime.getTime() + durationMinutes * 60_000)
       : undefined;
 
+    // Oppmøte hører til SAMME dag som starten.
+    let meeting: Date | undefined;
+    if (parsedMeeting && !meetingAfterStart) {
+      meeting = new Date(day);
+      meeting.setHours(parsedMeeting.hours, parsedMeeting.minutes, 0, 0);
+    }
+
     setSaving(true);
     try {
       await createEvent({
@@ -192,6 +210,7 @@ export function NewEventScreen({navigation, route}: Props) {
         title: title.trim() || defaultTitle(type, opponent),
         startTime,
         endTime,
+        meetingTime: meeting,
         location: location.trim() || undefined,
         description: description.trim() || undefined,
         opponent: isMatch ? opponent.trim() : undefined,
@@ -217,6 +236,8 @@ export function NewEventScreen({navigation, route}: Props) {
   }, [
     activeTeamSpaceId,
     parsedTime,
+    parsedMeeting,
+    meetingAfterStart,
     saving,
     days,
     dayOffset,
@@ -349,6 +370,30 @@ export function NewEventScreen({navigation, route}: Props) {
           />
           {time.length > 0 && !parsedTime && (
             <Text style={styles.errorText}>Skriv klokkeslettet som 18:00</Text>
+          )}
+        </Field>
+
+        {/* Oppmøte er frivillig, men det er DEN klokka foreldre planlegger
+            etter — og påminnelsen én time før bruker den når den finnes
+            (00053/00055). Uten oppmøtetid minner vi om starten i stedet. */}
+        <Field label="Oppmøte (valgfritt)">
+          <TextInput
+            style={[styles.input, styles.timeInput]}
+            value={meetingTime}
+            onChangeText={raw => setMeetingTime(maskTime(raw))}
+            placeholder={parsedTime ? 'F.eks. 17:30' : '17:30'}
+            placeholderTextColor={colors.textTertiary}
+            keyboardType="number-pad"
+            maxLength={5}
+            editable={!saving}
+          />
+          {meetingTime.length > 0 && !parsedMeeting && (
+            <Text style={styles.errorText}>Skriv oppmøtet som 17:30</Text>
+          )}
+          {meetingAfterStart && (
+            <Text style={styles.errorText}>
+              Oppmøtet må være før eller likt starten
+            </Text>
           )}
         </Field>
 

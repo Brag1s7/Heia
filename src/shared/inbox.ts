@@ -76,6 +76,26 @@ export interface NotificationActor {
   avatarUrl?: string;
 }
 
+/**
+ * Én endret verdi på et arrangement (00054). Varselet skal fremheve
+ * FORSKJELLEN, ikke gjenta hele arrangementet — derfor bæres gammel og ny
+ * verdi hver for seg, så raden kan tegne «17:30 → 17:00».
+ */
+export interface NotificationChange {
+  field: string;
+  label: string;
+  old: string;
+  new: string;
+}
+
+/**
+ * Hva slags hendelsesvarsel dette er (00054/00055):
+ * 'change'   — noe ble endret, `changes` er satt
+ * 'reminder' — den planlagte påminnelsen én time før
+ * undefined  — opprettelsesvarselet fra 00023
+ */
+export type EventNotificationKind = 'change' | 'reminder';
+
 export interface HeiaNotification {
   id: string;
   category: NotificationCategory;
@@ -93,6 +113,10 @@ export interface HeiaNotification {
   match?: NotificationMatch;
   /** Satt fra 00051 der handlingen kom fra en person. Mangler på eldre rader. */
   actor?: NotificationActor;
+  /** Satt på hendelsesvarsler fra 00054/00055. */
+  eventKind?: EventNotificationKind;
+  /** Satt når `eventKind === 'change'` — hva som faktisk ble endret. */
+  changes?: NotificationChange[];
 }
 
 /**
@@ -137,6 +161,35 @@ export function mapActor(
   };
 }
 
+/**
+ * Endringene på et arrangementsvarsel (00054). Rader uten `changes` —
+ * påminnelser, opprettelser og alt fra før migrasjonen — gir undefined,
+ * og raden faller tilbake til vanlig tittel/tekst.
+ */
+export function mapChanges(
+  data: Record<string, any>,
+): NotificationChange[] | undefined {
+  const raw = data.changes;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return undefined;
+  }
+  const changes = raw
+    .filter(
+      (c: any) =>
+        c &&
+        typeof c.label === 'string' &&
+        typeof c.old === 'string' &&
+        typeof c.new === 'string',
+    )
+    .map((c: any) => ({
+      field: typeof c.field === 'string' ? c.field : '',
+      label: c.label,
+      old: c.old,
+      new: c.new,
+    }));
+  return changes.length > 0 ? changes : undefined;
+}
+
 /** Én rå rad fra `notifications` → appens modell. */
 export function mapNotificationRow(row: any): HeiaNotification {
   const data = (row.data ?? {}) as Record<string, any>;
@@ -156,6 +209,9 @@ export function mapNotificationRow(row: any): HeiaNotification {
         : undefined,
     match: mapMatch(data),
     actor: mapActor(data),
+    eventKind:
+      data.kind === 'change' || data.kind === 'reminder' ? data.kind : undefined,
+    changes: mapChanges(data),
   };
 }
 

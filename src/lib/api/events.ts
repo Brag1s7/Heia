@@ -36,7 +36,7 @@ const SESSION_COLUMNS =
   'id, opponent, home_score, away_score, is_home, status, reporter_id, started_at';
 
 const EVENT_COLUMNS = `
-  id, type, title, description, location, start_time, end_time,
+  id, type, title, description, location, start_time, end_time, meeting_time,
   match_sessions ( ${SESSION_COLUMNS} )
 `;
 
@@ -82,6 +82,7 @@ function mapEventRow(
     title: row.title,
     startTime: new Date(row.start_time),
     endTime: row.end_time ? new Date(row.end_time) : undefined,
+    meetingTime: row.meeting_time ? new Date(row.meeting_time) : undefined,
     location: row.location ?? undefined,
     description: row.description ?? undefined,
     rsvp,
@@ -212,6 +213,8 @@ export interface CreateEventInput {
   title: string;
   startTime: Date;
   endTime?: Date;
+  /** Frivillig oppmøtetid (00053). Må være <= startTime. */
+  meetingTime?: Date;
   location?: string;
   description?: string;
   opponent?: string;
@@ -240,6 +243,7 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
     p_opponent: isMatch ? (input.opponent ?? null) : null,
     p_is_home: isMatch ? (input.isHome ?? true) : true,
     p_parent_event_id: input.parentEventId ?? null,
+    p_meeting_time: input.meetingTime?.toISOString() ?? null,
   });
 
   if (error) {
