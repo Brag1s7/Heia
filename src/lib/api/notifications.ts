@@ -1,4 +1,5 @@
 import {supabase} from '../supabase';
+import {mapNotificationRow} from '../../shared/inbox';
 
 /**
  * Inbox — leser `notifications`-tabellen (00011) direkte.
@@ -7,57 +8,23 @@ import {supabase} from '../supabase';
  * og «Users mark own notifications read» (UPDATE), så hver spørring her er
  * automatisk avgrenset til innlogget bruker. Radene skrives av Edge Function
  * `push-fanout` — én rad per mottaker per feed-post.
+ *
+ * MODELLEN OG GRUPPERINGEN bor i `shared/inbox` — rene funksjoner uten
+ * Supabase-klient, så de kan verifiseres uten app og uten simulator.
+ * Typene re-eksporteres her fordi skjermene alltid har hentet dem herfra.
  */
-
-/** Speiler CHECK-en på notifications.category (00011, utvidet i 00024). */
-export type NotificationCategory =
-  | 'event_reminder'
-  | 'rsvp_update'
-  | 'match_live'
-  | 'new_post'
-  | 'new_comment'
-  | 'new_reaction'
-  | 'admin_message'
-  | 'system';
-
-export interface HeiaNotification {
-  id: string;
-  category: NotificationCategory;
-  title: string;
-  body: string;
-  createdAt: Date;
-  readAt: Date | null;
-  /** Deep-link-mål. Stemplet i `data` av push-fanout. */
-  feedPostId?: string;
-  eventId?: string;
-  teamSpaceId?: string;
-  /** Klubbdør-varsler (00047) peker på en skjerm i Profil-stacken. */
-  targetScreen?: 'club_payments' | 'support_setup';
-}
+export type {
+  MatchEventType,
+  NotificationCategory,
+  NotificationMatch,
+  NotificationActor,
+  HeiaNotification,
+} from '../../shared/inbox';
 
 // Lag-varsler + eventuelle globale (team_space_id null, f.eks. 'system').
 // Uten null-grenen ville en systemmelding aldri dukket opp i inboxen.
 function scopeToTeam(teamSpaceId: string): string {
   return `team_space_id.eq.${teamSpaceId},team_space_id.is.null`;
-}
-
-function mapRow(row: any): HeiaNotification {
-  const data = (row.data ?? {}) as Record<string, string | null>;
-  return {
-    id: row.id,
-    category: row.category as NotificationCategory,
-    title: row.title,
-    body: row.body,
-    createdAt: new Date(row.created_at),
-    readAt: row.read_at ? new Date(row.read_at) : null,
-    feedPostId: data.feed_post_id ?? undefined,
-    eventId: data.event_id ?? undefined,
-    teamSpaceId: row.team_space_id ?? undefined,
-    targetScreen:
-      data.screen === 'club_payments' || data.screen === 'support_setup'
-        ? data.screen
-        : undefined,
-  };
 }
 
 /** Egne varsler for det aktive laget, nyeste først. */
@@ -77,7 +44,7 @@ export async function getNotifications(
   if (error) {
     throw error;
   }
-  return (data || []).map(mapRow);
+  return (data || []).map(mapNotificationRow);
 }
 
 /** Antall uleste — driver badgen på Varsler-fanen. */

@@ -101,6 +101,8 @@ export interface InviteCodeResult {
   id: string;
   displayName: string;
   color: string;
+  /** Laglogo, ellers klubbens — falt sammen i SQL (00050). null = ingen. */
+  logoUrl: string | null;
   clubName: string;
   sport: string;
   memberCount: number;

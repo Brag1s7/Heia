@@ -1,13 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {
-  Alert,
-  Linking,
-  Pressable,
-  Text,
-  StyleSheet,
-  View,
-  ActivityIndicator,
-} from 'react-native';
+import {Alert, Linking, Pressable, Text, StyleSheet, View} from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
@@ -27,7 +19,7 @@ import {
   useOnboarding,
   useNotifications,
 } from '../context';
-import {CreateSheet, NotificationBanner} from '../components';
+import {BootScreen, CreateSheet, NotificationBanner} from '../components';
 import {Bell, Calendar, House, Plus, User} from '../components/icons';
 import {
   navigationRef,
@@ -398,17 +390,8 @@ function MainTabs() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Loading screen mens session sjekkes
-// ---------------------------------------------------------------------------
-function LoadingScreen({message}: {message?: string}) {
-  return (
-    <View style={styles.loadingScreen}>
-      <ActivityIndicator size="large" color={colors.heia} />
-      {message ? <Text style={styles.loadingText}>{message}</Text> : null}
-    </View>
-  );
-}
+// Oppstartsflaten bor i `BootScreen` — stadionflate + lockup, samme bilde som
+// launch screen og WelcomeIntent (se komponenten for hvorfor).
 
 // ---------------------------------------------------------------------------
 // Rot-navigator — betinget onboarding vs. hoved-app
@@ -442,13 +425,13 @@ export function AppNavigator() {
 
   // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
   if (loading || (session && !profile) || (session && teamLoading)) {
-    return <LoadingScreen />;
+    return <BootScreen />;
   }
 
   // Innlogget med en pending intent (auth-before-commit): fullfør join/create.
   // Gjelder også når brukeren alt har et lag og blir med i sitt neste.
   if (session && profile && pendingAction) {
-    return <LoadingScreen message="Setter opp laget…" />;
+    return <BootScreen message="Setter opp laget…" />;
   }
 
   return (
@@ -520,16 +503,5 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.heiaInk,
     fontWeight: '600',
-  },
-  loadingScreen: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.lg,
-  },
-  loadingText: {
-    ...typography.body,
-    color: colors.textSecondary,
   },
 });
