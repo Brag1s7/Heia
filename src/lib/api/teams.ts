@@ -116,6 +116,8 @@ export async function lookupInviteCode(
     id: data.id,
     displayName: data.display_name,
     color: data.color,
+    // Eldre bygg mot ny DB (og omvendt) skal ikke krasje: feltet kom i 00050.
+    logoUrl: data.logo_url ?? null,
     clubName: data.club_name,
     sport: data.sport,
     memberCount: data.member_count,

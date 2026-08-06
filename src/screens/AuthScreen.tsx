@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -116,9 +115,12 @@ export function AuthScreen({route, navigation}: Props) {
         </Text>
 
         {/* Tab toggle */}
-        <View style={styles.tabRow}>
+        <View style={styles.tabRow} accessibilityRole="tablist">
           <Pressable
             style={[styles.tab, mode === 'login' && styles.tabActive]}
+            accessibilityRole="tab"
+            accessibilityState={{selected: mode === 'login'}}
+            accessibilityLabel="Logg inn"
             onPress={() => {
               setMode('login');
               setError(null);
@@ -133,6 +135,9 @@ export function AuthScreen({route, navigation}: Props) {
           </Pressable>
           <Pressable
             style={[styles.tab, mode === 'register' && styles.tabActive]}
+            accessibilityRole="tab"
+            accessibilityState={{selected: mode === 'register'}}
+            accessibilityLabel="Registrer deg"
             onPress={() => {
               setMode('register');
               setError(null);
@@ -193,28 +198,35 @@ export function AuthScreen({route, navigation}: Props) {
               }
             />
             {mode === 'login' && (
-              <Pressable onPress={handleForgotPassword} disabled={submitting}>
+              <Pressable
+                onPress={handleForgotPassword}
+                disabled={submitting}
+                accessibilityRole="button"
+                accessibilityLabel="Glemt passordet? Send meg en kode">
                 <Text style={styles.forgotLink}>Glemt passordet?</Text>
               </Pressable>
             )}
           </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
-
-          {submitting ? (
-            <ActivityIndicator
-              size="large"
-              color={colors.heia}
-              style={styles.loader}
-            />
-          ) : (
-            <Button
-              title={mode === 'login' ? 'Logg inn' : 'Opprett konto'}
-              onPress={handleSubmit}
-              disabled={!canSubmit}
-              size="lg"
-            />
+          {error && (
+            <Text
+              style={styles.error}
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite">
+              {error}
+            </Text>
           )}
+
+          {/* Knappen BYTTES ikke ut med en spinner: da forsvinner handlingen
+              du nettopp trykket på, og alt under hopper oppover. Button har
+              sin egen laste-tilstand — flaten står stille. */}
+          <Button
+            title={mode === 'login' ? 'Logg inn' : 'Opprett konto'}
+            onPress={handleSubmit}
+            disabled={!canSubmit}
+            loading={submitting}
+            size="lg"
+          />
 
           {/* Samtykket må stå FØR kontoen opprettes — vilkårene påstår det,
               og App Store-reviewen ser etter lenkene. Sidene ligger på
@@ -224,6 +236,8 @@ export function AuthScreen({route, navigation}: Props) {
               Ved å opprette konto godtar du{' '}
               <Text
                 style={styles.consentLink}
+                accessibilityRole="link"
+                accessibilityLabel="Vilkår for bruk, åpnes i nettleser"
                 onPress={() => Linking.openURL(TERMS_URL)}
               >
                 vilkårene
@@ -231,6 +245,8 @@ export function AuthScreen({route, navigation}: Props) {
               og{' '}
               <Text
                 style={styles.consentLink}
+                accessibilityRole="link"
+                accessibilityLabel="Personvernerklæring, åpnes i nettleser"
                 onPress={() => Linking.openURL(PRIVACY_URL)}
               >
                 personvernerklæringen
@@ -320,9 +336,6 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.error,
     textAlign: 'center',
-  },
-  loader: {
-    marginTop: spacing.lg,
   },
   consent: {
     ...typography.caption,

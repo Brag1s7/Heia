@@ -1,35 +1,327 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: UI-LØFT FØR PILOT (målt i koden 2026-08-05)
+## ▶️ UI-LØFT FØR PILOT — SKIVE 1 (FØRSTEGANGSLØPET) BYGGET 2026-08-05
 
 **Brages ramme:** TestFlight i dag er venner og familie, IKKE pilot. Appen
 er ikke pilotklar. UI må løftes før ekte lag slippes inn. Ikke behandle
 TF-testerne som ekte brukere i prioriteringen.
 
-Designgjeld-lista lenger nede er fra 2026-07-30 (før P1–P9) og er delvis
-utdatert. Dette er **målt i koden 2026-08-05**:
+### ✅ Bygget 2026-08-05 (ALT er ren JS + én migrasjon — Metro-reload holder)
 
-| Funn | Tall |
-|---|---|
-| Trykkbare elementer | 72 |
-| …med `accessibilityLabel` | 21 |
-| …med `accessibilityRole` | 20 |
-| `allowFontScaling` / Dynamic Type | **0** |
-| Rå `ActivityIndicator` | 12 i 6 filer |
+**Ny `src/components/BootScreen.tsx`** erstatter `LoadingScreen` i
+AppNavigator. Funnet bak den: `LaunchScreen.storyboard` tegner stadion-
+flaten med merket, og `WelcomeIntentScreen` tegner samme stadionflate med
+lockupen — men imellom lå en KREMFARGET flate med mint spinner. Oppstarten
+blinket altså lyst midt i en mørk sekvens. Nå er ikon → launch screen →
+BootScreen → WelcomeIntent én sammenhengende flate; lockupen står på
+nøyaktig samme mål (260×134) i BootScreen og WelcomeIntent, så den ikke
+flytter seg i overgangen. Pust (opacity 1→0,6) i stedet for spinner.
 
-**1. Førstegangsløpet er det svakeste.** De rå spinnerne sitter i
-`AppNavigator`, `AuthScreen`, `VerifyEmailScreen`, `JoinTeamCodeScreen`
-(+ `MatchPhotoSheet`; `Button` sin er legitim). P1 ga skeletons til feed
-og lister, men innlogging → bekreftelseskode → bli med i lag har fortsatt
-default-spinnere. Det er det FØRSTE en pilotforelder ser, og «default
-spinner» er eksplisitt anti-mønster i BRAND_UI.
+**Spinner-bytte fjernet i tre skjemaer** (`AuthScreen`, `VerifyEmailScreen`,
+`JoinTeamCodeScreen`): alle tre ERSTATTET knappen med en `ActivityIndicator`
+mens de jobbet — handlingen du nettopp trykket på forsvant, og alt under
+hoppet oppover. `Button` har allerede `loading`; nå brukes den. Ekstra
+viktig i VerifyEmail: ved suksess blir skjermen stående til RootNavigator
+bytter, så en naken spinner var det siste bildet av registreringen.
 
-**2. Tilgjengelighet er verre enn lista sa.** To tredjedeler av trykkflatene
-er umerket, og all typografi er låst i px. Målgruppa er foreldre 40+ som
-ofte kjører forstørret tekst — hos dem ser appen lik ut uansett innstilling.
+**Skjelett på lagoppslaget:** «Finn lag» viser nå et skjelett med SAMME
+geometri som lagkortet, så laget glir inn i formen som alt står der.
+
+**Tilgjengelighet på de berørte flatene:** `accessibilityRole`/`-Label`/
+`-State` på fane-velgeren, «Glemt passordet?», «Send koden på nytt»,
+vilkårslenkene, rollevalget (radiogroup/radio) og feilmeldingene
+(`role="alert"` + `liveRegion`).
+
+**Brages to tillegg samme dag:**
+- **Laglogo i innmeldingskortet** (migrasjon `00050` — I PROD, verifisert).
+  `lookup_invite_code()` returnerte aldri logoen, så invitasjonskortet var
+  det ENE stedet i appen der lagmerket ikke kunne vises. Nå returnerer den
+  `coalesce(ts.logo_url, c.logo_url)`, og kortet bruker `TeamBadge` med den
+  vanlige kjeden laglogo → klubblogo → initialer på lagfarge. Bildet ligger
+  i den offentlige `club-logos`-bucketen, så en gjest kan laste det.
+  Appen tåler å kjøre uten migrasjonen (`?? null` → initialer).
+- **Rollevalget brøt over to linjer** («Supporter» på en tredjedels
+  skjermbredde). Tre kort side om side → FULLBREDDE-RADER med radioprikk
+  og hake. Løser det permanent og tåler forstørret skrift, der 3-kolonners
+  kort uansett ville sprukket. ⚠️ Dette er en synlig designendring — hvis
+  Brage vil ha den kompakte 3-kolonners tilbake, si fra.
+
+📱 **TELEFONTEST:** (a) tvangslukk appen → åpne → mørk flate hele veien,
+ingen kremblink; (b) logg inn → knappen blir stående og laster; (c) ny
+konto → kodeskjermen → «Bekreft» laster i knappen; (d) «Bli med i lag» →
+skriv kode → skjelettkort → laget med LOGO (test både et lag med logo og
+et uten) → rollevalget som tre rader.
+
+### ✅ Skive 2: VARSLER-SKJERMEN (2026-08-05) — ren JS
+
+Brages observasjon: «Varsler er litt for hvit og kjedelig». Diagnosen var
+IKKE manglende farge — `NotificationRow` hadde fargesemantikken fra før.
+Tre andre ting:
+
+1. **Leste rader var grå tekst på hvitt** (`title` = `textSecondary` til
+   raden var ulest). En innboks du har lest gjennom — altså NORMAL-
+   tilstanden — ble en side med grå tekst. Tittelen står nå i
+   `textPrimary` alltid; ulest skiller seg på VEKT, flate og prikk.
+2. **Ulest-flaten var alltid mint**, uansett hva som hadde skjedd. Et mål,
+   en trenerbeskjed og en kommentar fikk samme svake vask. Nå bærer de fire
+   semantisk sterke kategoriene sin egen farge (`liveSoft` / `sun` /
+   `heiaTint` / `remindSoft`), resten blir stående på mint.
+   ⚠️ Dette er KONSISTENS, ikke oppfinnelse: `FeedCard` tegner allerede
+   trenerbeskjeder på `sun` + `sunBorder` og feiring på `heiaTint`, og
+   `MatchEventRow` gjør det samme. Innboksen var den ene flaten som ikke
+   snakket språket. Rør du `UNREAD_SURFACE`, sjekk de to andre først.
+3. **Tomtilstanden var en beskjed om ingenting.** Nå viser den de tre
+   kategoriikonene i sine egne farger + «Her blir det liv» — den lærer bort
+   systemet i stedet for å være blank.
+
+Pluss: ulest-prikken i kategoriens blekk (`CATEGORY_INK`), ærlig undertekst
+(«Du er oppdatert» når alt er lest — sto før «Alt du har gått glipp av»
+uansett), og a11y på radene + «Merk alle som lest».
+
+**IKKE gjort — krever DB-arbeid:** innholdsforhåndsvisning i radene
+(stilling på målvarsel, miniatyrbilde på bildepost). `HeiaNotification`
+har kun `title`/`body`/`category`; det finnes ingen thumbnail eller score
+å vise. Egen skive hvis det ønskes.
+
+### ✅ Skive 3: VARSLER REDESIGNET TIL «LAGETS PULS» (2026-08-05)
+
+Brages brief: Varsler skal være **endringsloggen med følelser**. Rolle-
+fordelingen mellom de tre hovedskjermene er nå LÅST:
+- **Hjem** = den redaksjonelle oversikten (hva er viktigst nå?)
+- **Kalender** = den kronologiske fasiten (når og hvor?)
+- **Varsler** = hva har faktisk skjedd/endret seg siden sist?
+
+⚠️ **Varsler skal ALDRI vise et kalenderkort bare fordi en kamp finnes.**
+Den skal vise ÅRSAKEN til varselet. Og kampen er ETT objekt som beveger
+seg kommende → live → ferdig — den blir aldri flere kort.
+
+**Migrasjon `00051` (I PROD, verifisert):** `notifications.data` bærer nå
+kampkontekst (`match_session_id`, `match_event_type`, `minute`, `team_side`,
+`home_score`, `away_score`, `opponent`) og aktør (`actor_id`, `actor_name`,
+`actor_avatar`). Kun `CREATE OR REPLACE` av `notify_on_feed_post` (basert på
+00049), `notify_on_reaction` + `notify_on_comment` (basert på 00026) — ingen
+skjemaendring. Gamle varsler mangler feltene og faller pent tilbake.
+NB: aktøren er DENORMALISERT fordi `data` er jsonb uten FK — PostgREST kan
+ikke joine profiles fra klienten. `title` gjorde allerede det samme (00026).
+
+**Ny `src/components/MatchPulseCard.tsx` — ÉN kamp, tre tilstander:**
+`goal` (nyeste ULESTE er vårt mål → utvidet kort, stor mint score, sprett +
+feiringsvask på montering), `live` (kompakt stripe, ~1/4 av Hjem-kortet:
+LIVE-merke, nåværende minutt, stilling, antall nye), `result` (SEIER! /
+UAVGJORT / FULL TID — varmt også ved tap). Har tidslinje (maks 3 hendelser)
+når kampen har flere. **Ikke** laglogoer, **ikke** «Følg kampen»-knapp,
+**ikke** lagoppstilling — det er Hjems rolle.
+⚠️ `liveMinute` sendes SEPARAT: varselet bærer minuttet hendelsen skjedde i,
+ikke kampens nåværende minutt. En live-stripe på «28′» mens kampen er på 41
+er feil.
+
+**Kamptekstene komponeres i appen fra stillingen** («tar ledelsen» /
+«utligner» / «reduserer»), ikke fra den forhåndsbygde strengen i basen.
+`stripLeadingGlyph()` fjerner ⚽/⏸/🏁 ved visning — raden har alt et ikon.
+⚠️ Selve strengen i `report_match_event` (00020) er UENDRET, fordi den deles
+med feeden og push-varselet. Emojien lever videre der. Egen beslutning.
+
+**`NotificationRow` — to ting fra forrige runde er RULLET TILBAKE** etter
+Brages retning: (a) kategorifargede RADFLATER er borte — raden er nøytral,
+kategorien bæres kun av ikon-chipen; (b) kategorifargede ulest-prikker er
+borte — én konsekvent mint markering (prikk + svak mintflate + tyngre
+tittel). Pluss: avatar der handlingen kom fra et menneske, og typografisk
+hierarki (tittel 15,5/600, ulest 800 — vekt, ikke størrelse, ellers hopper
+raden når den markeres som lest; body 13,5; tid 11,5).
+
+**`InboxScreen`:** grupperer på `match.sessionId`, løfter den pågående
+kampen ØVERST og ut av bolkene, bolker på **Nå / I dag / Tidligere**,
+undertekst «12 nye fra Stange G10». Live-stripa vises også når alle
+kamphendelser er lest (syntetisk item fra `getLiveMatch`).
+
+📱 **TEST:** (a) uten live kamp — lista skal være rolig og lesbar;
+(b) start en kamp fra simulatoren → live-stripe øverst; (c) rapporter et
+mål for oss → utvidet målkort med sprett; (d) rapporter 2–3 hendelser →
+de skal bli ÉN kamp med tidslinje, ikke tre rader; (e) kommenter fra den
+andre kontoen → avatar i raden (krever at kontoen har profilbilde).
+
+**⛔ IKKE BYGGET — data finnes ikke:** «Kampen starter om én time»,
+«Tidspunktet er endret fra 18:00 til 18:30», «Ny bane: Bane 2», «Oppmøte
+flyttet», «Kampen er utsatt». `trg_notify_on_event_created` fyrer KUN
+`AFTER INSERT` på `events` (00023) — det finnes ingen endringstrigger og
+ingen planlagt påminnelse i produktet. Se «SKIVE B» under.
+Bonus-funn: «Hendelse» i varseltekster er fallback-tittelen for
+hendelsestypen `annet` (`NewEventScreen.tsx:107`), som havner rett i
+`notify_on_event_created`-bodyen. «TV» finnes ikke som generert streng —
+det er trolig et arrangement noen faktisk har opprettet med det navnet.
+
+### 🐛 KRITISK FEIL FUNNET OG FIKSET 2026-08-06 — grupperingen virket ikke
+
+Brage så at kampvarslene FORTSATT lå som separate rader. Det var en ekte
+feil, ikke gamle data: `match_events.type` har **ÅTTE** verdier (CHECK i
+00009: `avspark, mål, pause, andre_omgang, slutt, bytte, kort, melding`),
+og filteret som gir et varsel kampkontekst listet bare **fire**. «Kampen er
+i gang» (`avspark`) og «Andre omgang» (`andre_omgang`) mistet dermed
+konteksten og falt ut av grupperingen.
+
+⚠️ **Rør du `MATCH_EVENT_TYPES` i `src/shared/inbox.ts`, må lista speile
+CHECK-en i 00009 fullstendig.** Testen under vokter dette.
+
+**Ny arkitektur som følge av fiksen:** innboksens RENE logikk er flyttet ut
+av `lib/api/notifications.ts` (som ikke kan lastes uten Supabase-klient) til
+**`src/shared/inbox.ts`** — modell, mapping og gruppering som rene
+funksjoner. API-modulen re-eksporterer typene, så ingen importer knakk.
+Kampens SPRÅK bor i **`src/shared/matchCopy.ts`** (samme tekst i kort og rad).
+
+**`__tests__/inbox.test.ts` — 10 tester, alle grønne** (`npx jest
+__tests__/inbox.test.ts`). De kjører den EKTE grupperingen mot rader bygget
+nøyaktig slik 00051 skriver dem, gjennom hele forløpet avspark → mål →
+pause → andre omgang → mål → slutt. Verifisert at testen FANGER
+regresjonen: med den gamle firelista ryker 4 av 10.
+NB: `__tests__/App.test.tsx` (RN-malens egen) feiler på transform-config —
+den er urørt og feilet fra før.
+
+**Migrasjon `00052` (I PROD):** menneskelig ordlyd på kommentar/👏.
+«Brage heiet på «Hei»» → tittel «Brage heiet på innlegget ditt» + body
+«Hei» som innholdsutdrag. Nye hjelpefunksjoner `post_kind()` (hva slags
+post, uten sitat) og `post_excerpt()` (sitert utdrag, NULL når det ikke
+finnes noe å sitere — raden skjuler da linja). Gevinsten treffer også push.
+`post_ref()` beholdes, men brukes ikke lenger av de to triggerne.
+
+**Visuell gjennomgang av alle fire tilstander (Nunito inlinet, ekte tokens):**
+https://claude.ai/code/artifact/371d8553-6f90-480d-a153-b6270723b212
+
+### 🐛 RUNDE 2 (2026-08-06, Brages telefontest): kortet klappet sammen
+
+Grupperingen VIRKET (skjermbilde bekreftet: ett kort, tidslinje, 7–4), men
+Brage så at kortet falt tilbake til den kompakte stripa — og mistet
+tidslinja — i det MOTSTANDEREN scoret eller det ble pause.
+
+**Årsak:** «utvidet» var knyttet til `isOurGoal` (vårt mål + ulest). Alt
+annet traff `variant = 'live'`, som skjuler tidslinja. Kortet krympet altså
+akkurat når det var mest å fortelle.
+
+**Brages regel erstatter min (LÅST):** kortet er **utvidet så lenge noe er
+ULEST**, og faller til kompakt stripe når alt er lest. Størrelsen er
+frikoblet fra hvem som scoret. `MÅÅÅL!` + sprett + mint-vask er nå TONE, og
+gjelder fortsatt kun eget mål — motstanderens mål får samme plass, men
+ingen jubel.
+
+Følgeendringer i `MatchPulseCard`:
+- Sammendragslinja viser nå ALLTID nyeste hendelse («Oslo utligner»,
+  «Pause»), ikke bare «lagnavn stilling lagnavn» når det ikke var vårt mål.
+- Tidslinja: 3 → **5** rader, så pause/andre omgang/motstandermål får plass.
+- Tomme tidslinjerader filtreres bort (Brage så en rad med bare «4′»).
+  ⚠️ ÅRSAKEN TIL DEN TOMME RADEN ER IKKE FUNNET — kun `melding` uten
+  beskrivelse kan gi tom tekst i koden, og den skal ikke kunne oppstå via
+  `report_match_event`. Vakten skjuler symptomet; spør Brage hva som ble
+  rapportert på 4′ hvis det dukker opp igjen.
+- Kompakt-stripa brukes nå også for FERDIG kamp som er lest (resultat-
+  etikett i stedet for LIVE-merke).
+- CTA ved live: «Se kampen ›» — IKKE «Følg kampen», som er Hjems knapp.
+
+Testene utvidet til **15** (`npx jest __tests__/inbox.test.ts`), med egne
+tester for motstandermål, pause/andre omgang og «ingen hendelse gir tom
+tekst».
+
+**RUNDE 3 — måltekst (Brage 2026-08-06):** «2–1 → 3–1» ga «Ridabu tar
+ledelsen». Feil: ledelsen ble ØKT, ikke tatt. Stillingen ETTER målet er
+ikke nok — man må vite stillingen FØR. Den finnes ikke i varselet, men er
+utledbar: målscoreren hadde nøyaktig ett mål mindre. `goalLine()` i
+`shared/matchCopy.ts` regner nå ut `leadBefore`/`leadAfter` sett fra
+målscorerens side:
+| Etter | Før | Tekst |
+|---|---|---|
+| ledelse | ledet alt | «X øker ledelsen» |
+| ledelse | ledet ikke | «X tar ledelsen» |
+| likt | — | «X utligner» |
+| bakpå | — | «X reduserer» |
+Uten `team_side` (skal ikke skje etter 00020) sier den «Nytt mål» —
+å tilskrive feil lag er verre enn å si det nøkternt.
+
+**Fortsatt uavklart / bevisst valg:** kommentarer og 👏 på en kampost er
+`new_comment`/`new_reaction` — de blir egne rader, ikke linjer i
+kamptidslinja. Kamptidslinja er kampens EGNE hendelser. Brage har spurt om
+dette; ikke besluttet.
+
+**Brages ønske notert (egen, senere skive):** stadionspråket fra
+MatchPulseCard bør trekkes inn i **kampsiden (`EventDetailScreen`)** når den
+skal friskes opp. Ikke bygget.
+
+⏳ **VARSLER ER IKKE ENDELIG GODKJENT.** Brage må kjøre ÉN helt ny kamp på
+telefonen (start → mål → ny hendelse → avslutt) og se at det forblir ett
+kort hele veien. Kampvarsler fra FØR 00051 mangler kontekst og vises
+fortsatt som løse rader — det er tilsiktet, så en ny kamp er riktig test.
+
+### 📋 SKIVE B (IKKE GODKJENT): ENDRINGSVARSLER
+
+For at Varsler skal bli en ekte endringslogg mangler en `AFTER UPDATE`-
+trigger på `events` som sammenligner OLD/NEW og skriver varselet med
+FORSKJELLEN (`changed_field`, `old_value`, `new_value` i `data`), slik at
+raden kan si «Oppmøte flyttet 18:00 → 18:30» i stedet for å gjenta hele
+arrangementet. ⚠️ KREVER BRAGES BESLUTNING FØRST, fordi den sender push
+til hele laget hver gang en trener retter et arrangement:
+1. Hvilke felt utløser varsel? (foreslått: `start_time`, `location`,
+   `title`, avlysning — IKKE `description`)
+2. Debounce? En trener som retter tre felt etter hverandre bør gi ÉN push,
+   ikke tre. (Foreslått: slå sammen mot uleste varsler for samme event,
+   samme idiom som `notify_on_reaction` allerede bruker.)
+3. «Starter om én time» krever pg_cron eller en scheduled function —
+   egen vurdering, ikke samme skive.
+
+### 🔌 PLUGIN-BESLUTNING 2026-08-05: `frontend-design` BRUKES IKKE
+
+Brage spurte om Anthropics `frontend-design`-plugin. Undersøkt grundig
+(lastet ned og lest hele SKILL.md fra `anthropics/claude-plugins-public`).
+**Konklusjon: nei.** Ikke fordi den er dårlig, men fordi den løser feil
+problem for Heia:
+- Kjernen er å ETABLERE en distinkt visuell identitet fra bunnen (palett,
+  skriftparing, «signature element», «ta en estetisk risiko»). Heia har
+  låst retning fra 2026-07-30. Skillen optimaliserer for å være distinkt;
+  Heia trenger å være konsistent.
+- Den er web-orientert i det konkrete: «for web designs, the hero is a
+  thesis», CSS-selektor-spesifisitet, hover-mikrointeraksjoner. Ingenting
+  av det finnes i React Native.
+- ⚠️ Reell kollisjon: skillen lister «a warm cream background (near
+  #F4F1EA)» som AI-default den advarer mot. Heias `background` er
+  `#F6F8F0` — et LÅST valg. En økt som laster skillen uten den låste
+  konteksten kan argumentere kremen bort.
+- Markedsplassen har 278 plugins; eneste RN-relaterte er `expo`, og Heia
+  er bare RN 0.83.1 uten Expo (verifisert i package.json). Det finnes
+  INGEN design-system-håndhevelse for React Native der.
+
+Skrive-/selvkritikk-delen av skillen er god og plattformuavhengig («hvert
+element gjør én jobb», «bruk dristigheten ett sted», «en tom skjerm er en
+invitasjon») — den brukes direkte i arbeidet uten å installere noe.
+
+**Det som faktisk sikrer konsistens** (Brages opprinnelige spørsmål):
+riktig `BRAND_UI.md` + tokens + delte komponenter + ev. en ESLint-regel mot
+rå hex i `src/screens/`. Målt 2026-08-05: **13 rå hex-verdier i skjermer**,
+der `#FFF4D6`/`#8A6D1A` er kopiert inn i TRE filer (OpsClaims,
+ClubPayments, SupportSetup) — et utokenisert «venter»-par. Foreslått, ikke
+godkjent: egen prosjekt-skill i `.claude/skills/` som koder den låste
+retningen + RN-spesifikkene, så hver ny økt laster den automatisk.
+
+### Gjenstår på UI-lista (målt i koden 2026-08-05)
+
+| Funn | Tall ved måling | Status |
+|---|---|---|
+| Trykkbare elementer | 72 | — |
+| …med `accessibilityLabel` | 21 | +14 i skive 1 |
+| …med `accessibilityRole` | 20 | +16 i skive 1 |
+| Rå `ActivityIndicator` | 12 i 6 filer | **kun `MatchPhotoSheet` igjen** |
+
+**1. ✅ Førstegangsløpet — TATT** (se over).
+
+**2. ⚠️ RETTELSE AV MÅLINGEN: «`allowFontScaling` = 0» betyr det MOTSATTE
+av det som sto her.** I React Native er `allowFontScaling` default **true**
+på `Text`/`TextInput`. Null treff = ingen har skrudd den AV = Dynamic Type
+er PÅ i hele appen. Verifisert: ingen `Text.defaultProps`-override finnes.
+Påstanden «hos dem ser appen lik ut uansett innstilling» var altså feil.
+Den EKTE risikoen er omvendt: teksten vokser, men containere med FAST
+høyde klipper den — `Button` (48/56), tab-baren (88), `ListRow` (64),
++-knappen (46), logoen (260×134). Riktig tiltak er derfor `minHeight`
+i stedet for `height` + `maxFontSizeMultiplier` på trange etiketter,
+IKKE å strø `allowFontScaling` utover koden. Test: Innstillinger →
+Tilgjengelighet → Skjerm og tekststørrelse → større tekst.
 
 **3. Tegn-glyfer igjen:** `⚽`, `↔`, `🟨` hardkodet i `MatchPhotoSheet.tsx`
-blant Lucide-ikonene.
+blant Lucide-ikonene — samme fil som den siste rå spinneren. Ta dem samlet.
 
 **4. `docs/BRAND_UI.md` beskriver systemet FØR A v2** — slettet `Chip`,
 «Unicode-symboler» som ikonstil, 5-tab med «Meldinger». Den villeder aktivt
@@ -40,11 +332,33 @@ rebuild uansett årsak. **6. Mørk modus** er aldri låst skriftlig som «nei i
 v1». **7. Delbart invitasjonskort** står som idé, ikke lovet.
 
 ⚠️ **Brage har flagget ting muntlig som kanskje ikke står skrevet ned noe
-sted.** Spør ham eksplisitt hva som mangler på denne lista før dere
-prioriterer — ikke anta at listene er komplette.
+sted.** Spurt 2026-08-05, ikke besvart ennå — spør igjen før dere
+prioriterer resten. Ikke anta at listene er komplette.
 
-**Rekkefølgen jeg foreslo (ikke godkjent ennå):** førstegangsløpet →
-tilgjengelighet → BRAND_UI til A v2.
+**Rekkefølgen (skive 1 + 2 er tatt):** ~~førstegangsløpet~~ →
+~~Varsler-skjermen~~ → **PROFIL-OMSTRUKTURERINGEN er neste** (analysert og
+godkjent i prinsippet 2026-08-05, ikke bygget) → faste høyder/Dynamic Type
++ resten av a11y → BRAND_UI til A v2 → MatchPhotoSheet (siste spinner +
+glyfene).
+
+**PROFIL — analysert 2026-08-05, klar til bygging.** Ett kort holder NI
+rader fra fire urelaterte kategorier (`ProfilScreen.tsx` linje 543–646):
+konto (telefon, varslinger), lag-handlinger (bli med, opprett), farlig
+(logg ut, slett konto) og juridisk (vilkår, personvern, om). «Slett konto»
+har samme grå ikon og vekt som «Vilkår for bruk». Avtalt retning:
+- Undersider i `ProfilStack` (som alt finnes): **«Konto og innstillinger»**
+  (telefon, varslinger, logg ut, slett konto) + **«Om Heia»** (vilkår,
+  personvern, versjon).
+- «Bli med i et lag» / «Opprett et nytt lag» flyttes til *Dine lag* — det
+  er lag-handlinger, ikke innstillinger.
+- **Logg ut skal bekrefte.** `handleSignOut` (linje 218) kjører i dag rett
+  igjennom. Ingen biometrisk/lagret innlogging finnes, så et feiltrykk
+  koster e-post + passord på nytt.
+- **Slett konto ett nivå ned — men IKKE begravet.** Apple 5.1.1(v) krever
+  at den er lett å finne; App Review avviser apper som graver den ned. Ett
+  tydelig nivå under «Konto» er vanlig praksis og går fint. ⚠️ Inngangen
+  fra `WelcomeIntentScreen` MÅ bestå — det er den lagløse reviewer-kontoen
+  som treffer den.
 
 **NB om nettsiden:** heiaapp.no-markedssiden er et EGET prosjekt som er
 LÅST til å starte etter Stripe-sporet (se minnet `website_project` og

@@ -5,7 +5,6 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -137,27 +136,38 @@ export function VerifyEmailScreen({route}: Props) {
           )}
         </View>
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && (
+          <Text
+            style={styles.error}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        )}
         {resent && !error && (
-          <Text style={styles.resent}>Ny kode er på vei 💚</Text>
+          <Text style={styles.resent} accessibilityLiveRegion="polite">
+            Ny kode er på vei 💚
+          </Text>
         )}
 
-        {submitting ? (
-          <ActivityIndicator
-            size="large"
-            color={colors.heia}
-            style={styles.loader}
-          />
-        ) : (
-          <Button
-            title={isRecovery ? 'Sett nytt passord' : 'Bekreft'}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            size="lg"
-          />
-        )}
+        {/* Knappen beholder plassen sin og laster i seg selv. Her betyr det
+            ekstra mye: ved suksess blir skjermen STÅENDE til RootNavigator
+            bytter (se handleSubmit), så en spinner uten kontekst ville vært
+            det siste bildet av registreringen. */}
+        <Button
+          title={isRecovery ? 'Sett nytt passord' : 'Bekreft'}
+          onPress={handleSubmit}
+          disabled={!canSubmit}
+          loading={submitting}
+          size="lg"
+        />
 
-        <Pressable onPress={handleResend} disabled={submitting}>
+        <Pressable
+          onPress={handleResend}
+          disabled={submitting}
+          accessibilityRole="button"
+          accessibilityLabel="Send koden på nytt"
+          accessibilityState={{disabled: submitting}}>
           <Text style={styles.resendLink}>Send koden på nytt</Text>
         </Pressable>
 
@@ -244,9 +254,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
-  },
-  loader: {
-    marginTop: spacing.lg,
   },
   resendLink: {
     ...typography.bodySmall,

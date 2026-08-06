@@ -17,72 +17,50 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {
   ListRowSkeleton,
+  MatchPulseCard,
   NotificationRow,
   SectionHeader,
   TeamHeader,
 } from '../components';
+import {Ball, Megaphone} from '../components/icons';
 import {useActiveTeam, useNotifications} from '../context';
 import {getNotifications} from '../lib/api/notifications';
-import type {HeiaNotification} from '../lib/api/notifications';
+import {buildEntries, groupByAge} from '../shared/inbox';
+import type {Entry, HeiaNotification} from '../shared/inbox';
+import {getLiveMatch} from '../lib/api/events';
+import type {HeiaEvent} from '../shared/types';
 import type {InboxStackParamList, RootTabParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<InboxStackParamList, 'InboxList'>;
 
-const DAY_MS = 86_400_000;
-
-/**
- * «I dag / I går / Siste 7 dager / Tidligere» (P6) — ren lesehjelp, ingen ny
- * modell. Radene kommer nyest først fra serveren, så hver bolk er en
- * sammenhengende run og rekkefølgen består.
- */
-function groupByAge(
-  items: HeiaNotification[],
-): {label: string; items: HeiaNotification[]}[] {
-  const now = new Date();
-  const startOfToday = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  ).getTime();
-
-  const labelFor = (d: Date): string => {
-    const t = d.getTime();
-    if (t >= startOfToday) return 'I dag';
-    if (t >= startOfToday - DAY_MS) return 'I går';
-    if (t >= startOfToday - 7 * DAY_MS) return 'Siste 7 dager';
-    return 'Tidligere';
-  };
-
-  const sections: {label: string; items: HeiaNotification[]}[] = [];
-  for (const item of items) {
-    const label = labelFor(item.createdAt);
-    const last = sections[sections.length - 1];
-    if (last && last.label === label) {
-      last.items.push(item);
-    } else {
-      sections.push({label, items: [item]});
-    }
-  }
-  return sections;
-}
-
 export function InboxScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
-  const {activeTeamSpaceId} = useActiveTeam();
+  const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
   const {unreadCount, refreshUnread, markRead, markAllRead, liveNonce} =
     useNotifications();
 
   const [items, setItems] = useState<HeiaNotification[]>([]);
+  const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const teamName = activeTeamSpace?.displayName ?? 'laget';
 
   const load = useCallback(async () => {
     if (!activeTeamSpaceId) return;
     setError(null);
     try {
-      setItems(await getNotifications(activeTeamSpaceId));
+      // Live-kampen hentes ved siden av varslene: stripa skal stå der også
+      // når du har lest alle kamphendelsene. Feiler den, mister vi bare
+      // stripa — varslene er hovedsaken.
+      const [notifications, live] = await Promise.all([
+        getNotifications(activeTeamSpaceId),
+        getLiveMatch(activeTeamSpaceId).catch(() => null),
+      ]);
+      setItems(notifications);
+      setLiveMatch(live);
       // Lista er sannheten — hold badgen i takt med det du faktisk ser.
       refreshUnread();
     } catch {
@@ -112,15 +90,32 @@ export function InboxScreen() {
     load();
   }, [load]);
 
+  const markLocalRead = useCallback(
+    (ids: string[]) => {
+      const unreadIds = ids.filter(
+        id => items.find(n => n.id === id)?.readAt === null,
+      );
+      if (unreadIds.length === 0) return;
+      const now = new Date();
+      setItems(prev =>
+        prev.map(n => (unreadIds.includes(n.id) ? {...n, readAt: now} : n)),
+      );
+      markRead(unreadIds);
+    },
+    [items, markRead],
+  );
+
+  const openEvent = useCallback(
+    (eventId: string, ids: string[]) => {
+      markLocalRead(ids);
+      navigation.navigate('EventDetail', {eventId});
+    },
+    [markLocalRead, navigation],
+  );
+
   const handlePress = useCallback(
     (item: HeiaNotification) => {
-      if (item.readAt === null) {
-        // Lokalt først, så raden endrer seg i samme trykk som navigasjonen.
-        setItems(prev =>
-          prev.map(n => (n.id === item.id ? {...n, readAt: new Date()} : n)),
-        );
-        markRead([item.id]);
-      }
+      markLocalRead([item.id]);
 
       // Klubbdør-varsler (00047) peker inn i Profil-stacken — godkjenningen
       // bor i Klubbbetalinger, lagets status i «Støtte fra supportere».
@@ -151,7 +146,7 @@ export function InboxScreen() {
       }
       // Uten mål: trykket markerer bare som lest.
     },
-    [navigation, markRead, activeTeamSpaceId],
+    [navigation, markLocalRead, activeTeamSpaceId],
   );
 
   const handleMarkAll = useCallback(() => {
@@ -160,9 +155,82 @@ export function InboxScreen() {
     markAllRead();
   }, [markAllRead]);
 
-  const sections = useMemo(() => groupByAge(items), [items]);
+  const entries = useMemo(() => buildEntries(items), [items]);
+
+  // Kampen som pågår løftes ØVERST og ut av bolkene — den er ikke «noe som
+  // skjedde», den skjer nå. Resten av kampene blir resultatkort i sin bolk.
+  const liveSessionId = liveMatch?.matchSessionId ?? null;
+  const liveEntry = useMemo(
+    () =>
+      liveSessionId
+        ? (entries.find(
+            e => e.kind === 'match' && e.sessionId === liveSessionId,
+          ) as Extract<Entry, {kind: 'match'}> | undefined)
+        : undefined,
+    [entries, liveSessionId],
+  );
+
+  const sections = useMemo(
+    () => groupByAge(entries.filter(e => e !== liveEntry)),
+    [entries, liveEntry],
+  );
+
+  const isPaused = liveMatch?.matchStatus === 'halfTime';
+  const liveMinute =
+    liveMatch && !isPaused && liveMatch.startedAt
+      ? Math.max(
+          0,
+          Math.floor((Date.now() - liveMatch.startedAt.getTime()) / 60000),
+        )
+      : null;
+
+  // Stillingen på live-stripa når ingen kamphendelser er varslet ennå
+  // (eller alle er lest): kampen finnes, og da skal stripa stå.
+  const liveItems: HeiaNotification[] = useMemo(() => {
+    if (liveEntry) return liveEntry.items;
+    if (!liveMatch?.matchSessionId) return [];
+    return [
+      {
+        id: `live-${liveMatch.matchSessionId}`,
+        category: 'match_live',
+        title: teamName,
+        body: '',
+        createdAt: liveMatch.startedAt ?? new Date(),
+        readAt: new Date(),
+        eventId: liveMatch.id,
+        match: {
+          sessionId: liveMatch.matchSessionId,
+          eventType: 'melding',
+          minute: null,
+          teamSide: null,
+          homeScore: liveMatch.score?.home ?? 0,
+          awayScore: liveMatch.score?.away ?? 0,
+          opponent: liveMatch.opponent ?? null,
+        },
+      },
+    ];
+  }, [liveEntry, liveMatch, teamName]);
 
   if (!activeTeamSpaceId) return null;
+
+  const renderEntry = (entry: Entry) =>
+    entry.kind === 'match' ? (
+      <View key={entry.key} style={styles.matchSlot}>
+        <MatchPulseCard
+          items={entry.items}
+          teamName={teamName}
+          onPress={() => {
+            const eventId = entry.items.find(i => i.eventId)?.eventId;
+            if (eventId) {
+              openEvent(
+                eventId,
+                entry.items.map(i => i.id),
+              );
+            }
+          }}
+        />
+      </View>
+    ) : null;
 
   return (
     <View style={styles.screen}>
@@ -179,18 +247,48 @@ export function InboxScreen() {
         <View style={styles.header}>
           <View style={styles.headerText}>
             <Text style={styles.title}>Varsler</Text>
+            {/* Underteksten skal si det som ER sant nå — og hvilket lag det
+                gjelder, siden varslene er lag-avgrenset. */}
             <Text style={styles.subtitle}>
               {unreadCount > 0
-                ? `${unreadCount} ulest${unreadCount === 1 ? '' : 'e'}`
-                : 'Alt du har gått glipp av'}
+                ? `${unreadCount} ${
+                    unreadCount === 1 ? 'ny' : 'nye'
+                  } fra ${teamName}`
+                : items.length > 0
+                ? 'Du er oppdatert'
+                : `Alt som skjer i ${teamName}`}
             </Text>
           </View>
           {unreadCount > 0 && (
-            <Pressable onPress={handleMarkAll} hitSlop={8}>
+            <Pressable
+              onPress={handleMarkAll}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Merk alle varsler som lest">
               <Text style={styles.headerAction}>Merk alle som lest</Text>
             </Pressable>
           )}
         </View>
+
+        {/* Kampen som pågår — kompakt status, eller det utvidede målkortet
+            hvis det nyeste uleste er vårt mål. ÉN stadionflate, aldri to. */}
+        {liveMatch && liveItems.length > 0 && (
+          <View style={styles.matchSlot}>
+            <MatchPulseCard
+              items={liveItems}
+              teamName={teamName}
+              isLive
+              paused={isPaused}
+              liveMinute={liveMinute}
+              onPress={() =>
+                openEvent(
+                  liveMatch.id,
+                  liveItems.map(i => i.id),
+                )
+              }
+            />
+          </View>
+        )}
 
         {loading ? (
           <View style={[styles.list, styles.standalone]}>
@@ -204,31 +302,67 @@ export function InboxScreen() {
             <Text style={styles.emptyText}>{error}</Text>
           </View>
         ) : items.length === 0 ? (
+          /* Tom skjerm er en invitasjon, ikke en beskjed om ingenting. */
           <View style={[styles.emptyCard, styles.standalone]}>
-            <Text style={styles.emptyTitle}>Ingen varsler ennå</Text>
+            <View style={styles.emptyIcons}>
+              <View style={[styles.emptyIcon, {backgroundColor: colors.liveSoft}]}>
+                <Ball size={18} color={colors.liveInk} strokeWidth={2} />
+              </View>
+              <View style={[styles.emptyIcon, {backgroundColor: colors.sun}]}>
+                <Megaphone size={18} color={colors.goldInk} />
+              </View>
+              <View style={[styles.emptyIcon, {backgroundColor: colors.heiaTint}]}>
+                <Text style={styles.emptyEmoji}>👏</Text>
+              </View>
+            </View>
+            <Text style={styles.emptyTitle}>Her blir det liv</Text>
             <Text style={styles.emptyText}>
-              Mål, kampstart og nye innlegg fra laget havner her — også når du
-              ikke rakk å se dem.
+              Mål, kampstart, trenerbeskjeder og applaus fra laget havner her
+              — også når du ikke rakk å se dem.
             </Text>
           </View>
         ) : (
-          /* Bolkene «I dag / I går / …» — mint-strek-etikett + samme enkle
-             liste som før, bare delt opp. Ikke kort per varsel. */
-          sections.map(section => (
-            <View key={section.label}>
-              <SectionHeader title={section.label} />
-              <View style={styles.list}>
-                {section.items.map((item, i) => (
-                  <NotificationRow
-                    key={item.id}
-                    item={item}
-                    showBorder={i < section.items.length - 1}
-                    onPress={() => handlePress(item)}
-                  />
-                ))}
+          sections.map(section => {
+            // Radene samles i ett kort per sammenhengende kjede; kampkort
+            // står for seg selv med luft rundt.
+            const blocks: React.ReactNode[] = [];
+            let run: Extract<Entry, {kind: 'row'}>[] = [];
+
+            const flushRun = () => {
+              if (run.length === 0) return;
+              const rows = run;
+              run = [];
+              blocks.push(
+                <View key={`rows-${rows[0].key}`} style={styles.list}>
+                  {rows.map((entry, i) => (
+                    <NotificationRow
+                      key={entry.key}
+                      item={entry.item}
+                      showBorder={i < rows.length - 1}
+                      onPress={() => handlePress(entry.item)}
+                    />
+                  ))}
+                </View>,
+              );
+            };
+
+            for (const entry of section.entries) {
+              if (entry.kind === 'row') {
+                run.push(entry);
+              } else {
+                flushRun();
+                blocks.push(renderEntry(entry));
+              }
+            }
+            flushRun();
+
+            return (
+              <View key={section.label}>
+                <SectionHeader title={section.label} />
+                {blocks}
               </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -240,7 +374,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  // Luften under headeren kommer fra SectionHeaders eget topp-rom («I dag»
+  // Luften under headeren kommer fra SectionHeaders eget topp-rom («Nå»
   // osv.); tilstander uten seksjoner bruker `standalone` i stedet.
   header: {
     flexDirection: 'row',
@@ -268,6 +402,9 @@ const styles = StyleSheet.create({
     color: colors.heiaInk,
     fontWeight: '600',
   },
+  matchSlot: {
+    marginTop: spacing.xl,
+  },
   list: {
     marginHorizontal: spacing.lg,
     borderRadius: radius.xl,
@@ -285,6 +422,21 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     gap: spacing.sm,
     alignItems: 'center',
+  },
+  emptyIcons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  emptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyEmoji: {
+    fontSize: 17,
   },
   emptyTitle: {
     ...typography.heading3,

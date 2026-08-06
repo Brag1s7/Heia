@@ -1,6 +1,8 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, spacing, radius} from '../theme';
+import {stripLeadingGlyph} from '../shared/matchCopy';
+import {Avatar} from './Avatar';
 import {
   Ball,
   Bell,
@@ -39,8 +41,9 @@ const CATEGORY_ICON: Record<NotificationCategory, React.ReactNode> = {
   system: <Info size={18} color={colors.textSecondary} />,
 };
 
-// Ikonflate per kategori — A v2s låste fargesemantikk: coral = live, blå =
-// info/kalender, lilla = påminnelse, sol = trenerbeskjed, mint = Heia-øyeblikk.
+// Ikonflaten bærer kategorien — en liten, rolig chip. Selve RADEN forblir
+// nøytral: farger hele raden per kategori gjorde lista administrativ og
+// tilfeldig, ikke premium (Brages retning 2026-08-05).
 const CATEGORY_SURFACE: Record<NotificationCategory, string> = {
   match_live: colors.liveSoft,
   new_post: colors.surfaceMuted,
@@ -73,28 +76,41 @@ export function NotificationRow({
   showBorder = true,
 }: NotificationRowProps) {
   const unread = item.readAt === null;
+  const body = stripLeadingGlyph(item.body);
+
+  // Er handlingen gjort av et menneske, skal mennesket vises. Et generisk
+  // megafon-ikon der vi KJENNER personen er en tapt mulighet (00051 gir oss
+  // navn + avatar på kommentar, 👏 og trenerbeskjed).
+  const actor = item.actor;
 
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${unread ? 'Ulest. ' : ''}${item.title}. ${body}`}
+      accessibilityHint={timeAgo(item.createdAt)}
       style={({pressed}) => [
         styles.container,
         showBorder && styles.border,
         unread && styles.unread,
         pressed && styles.pressed,
       ]}>
-      <View
-        style={[
-          styles.iconWrap,
-          {
-            backgroundColor:
-              CATEGORY_SURFACE[item.category] ?? colors.surfaceMuted,
-          },
-        ]}>
-        {CATEGORY_ICON[item.category] ?? (
-          <Bell size={18} color={colors.textSecondary} />
-        )}
-      </View>
+      {actor ? (
+        <Avatar uri={actor.avatarUrl} name={actor.name} size="md" />
+      ) : (
+        <View
+          style={[
+            styles.iconWrap,
+            {
+              backgroundColor:
+                CATEGORY_SURFACE[item.category] ?? colors.surfaceMuted,
+            },
+          ]}>
+          {CATEGORY_ICON[item.category] ?? (
+            <Bell size={18} color={colors.textSecondary} />
+          )}
+        </View>
+      )}
 
       <View style={styles.body}>
         <View style={styles.headerRow}>
@@ -105,20 +121,25 @@ export function NotificationRow({
           </Text>
           <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
         </View>
-        <Text style={styles.text} numberOfLines={2}>
-          {item.body}
-        </Text>
+        {/* Utdraget kan mangle — en bildepost uten tekst har ingenting å
+            sitere (00052). Da skal raden være to linjer høy, ikke tre
+            med en tom. */}
+        {body.length > 0 && (
+          <Text style={styles.text} numberOfLines={2}>
+            {body}
+          </Text>
+        )}
       </View>
 
-      {/* Ulest-prikken er den eneste markøren som overlever et raskt blikk. */}
+      {/* ÉN konsekvent ulest-markering for alle kategorier: mint prikk,
+          svak mintflate og tyngre tittel. Kategorifargede prikker gjorde
+          «ulest» til åtte forskjellige signaler. */}
       {unread && <View style={styles.dot} />}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  // P6: litt mer luft i og mellom radene — avsender, innhold og tidspunkt
-  // skal puste hver for seg. Fortsatt en enkel liste, ikke kort.
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -146,28 +167,36 @@ const styles = StyleSheet.create({
   },
   body: {
     flex: 1,
-    gap: spacing.xs,
+    gap: 3,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: spacing.md,
   },
+  // Typografisk hierarki: tittelen er ANKERET og står i full tekstfarge
+  // også når raden er lest — en gjennomlest innboks skal ikke være en side
+  // med grå tekst. Ulest skiller seg på VEKT, ikke størrelse: bytter
+  // størrelsen, hopper raden i det den markeres som lest.
   title: {
-    ...typography.body,
     flex: 1,
-    color: colors.textSecondary,
-  },
-  titleUnread: {
-    fontWeight: '700',
+    fontSize: 15.5,
+    lineHeight: 21,
+    fontWeight: '600',
+    letterSpacing: -0.1,
     color: colors.textPrimary,
   },
+  titleUnread: {
+    fontWeight: '800',
+  },
   time: {
-    ...typography.caption,
+    fontSize: 11.5,
+    fontWeight: '500',
     color: colors.textTertiary,
   },
   text: {
-    ...typography.bodySmall,
+    fontSize: 13.5,
+    lineHeight: 18.5,
     color: colors.textSecondary,
   },
   dot: {
