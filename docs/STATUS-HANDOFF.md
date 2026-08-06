@@ -1,5 +1,45 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️ NESTE SAMTALE: KALENDERVELGER (Brages bestilling 2026-08-06)
+
+**Mål:** en ekspanderende kalender som når man bestiller flybillett eller
+hotell. **Først ved OPPRETTELSE av arrangement**, deretter samme
+kalenderspråk som en valgbar visning på Kalender-siden.
+
+**Dagens tilstand — les dette før noe røres:**
+- `NewEventScreen` velger dato med en horisontal stripe av dagchips,
+  `DAYS_AHEAD = 30` (linje 32). ⚠️ **Man kan altså IKKE opprette et
+  arrangement mer enn 30 dager fram i dag.** En sesongkamp i oktober er
+  umulig å legge inn i august. Kalendervelgeren fjerner den grensen —
+  det er egentlig hovedgevinsten, ikke bare pynt.
+- Klokkeslett og oppmøte er tekstfelt med maske (`maskTime`/`parseTime`),
+  ikke pickere. Oppmøtefeltet er NYTT (00053) og må overleve redesignet.
+- `KalenderScreen` er en flat liste av `EventCard` uten visningsvalg.
+- **Prosjektet har INGEN dato-bibliotek.** Alt er håndrullet `Date`.
+  Første beslutning i samtalen: eget bygg eller ny avhengighet
+  (`react-native-calendars` er ren JS → ingen pod install, men det er
+  fortsatt en ny avhengighet i et prosjekt som har unngått dem).
+- Ingen `date-fns`/`dayjs` heller — ukenummer, månedsmatriser og
+  norske ukedagsnavn må enten skrives eller komme med biblioteket.
+
+**Bindende rammer:**
+- Designretning A v2 er LÅST. Tokens i `src/theme/tokens.ts` er eneste
+  fargekilde. `docs/BRAND_UI.md` er FORELDET og villeder — ikke bygg fra
+  den (se UI-lista lenger nede).
+- Mint (`#02FFAB`) er handlingsfarge, aldri bakgrunn. Valgt dag skal
+  bruke samme «valgt»-språk som resten (heiaSoft-fyll + heia-ramme).
+- Faste høyder klipper ved forstørret skrift — bruk `minHeight`.
+- ALDRI `tsc` og ALDRI pod install/build i bakgrunnen (se minnene
+  `feedback_tsc_workflow`, `feedback_dev_environment`).
+
+**Rekkefølge Brage har bestemt:** kalender ved opprettelse FØRST, så
+visningsvalg på Kalender-siden.
+
+**NB — egen, allerede bestilt skive som IKKE er denne:** redigering av
+arrangement (`update_event`-RPC + tosidig NewEventScreen + «Avlys kamp»).
+Brage tar den i en annen samtale. De to skivene rører SAMME skjerm, så
+den som kommer sist må rebase på den andre.
+
 ## ▶️ UI-LØFT FØR PILOT — SKIVE 1 (FØRSTEGANGSLØPET) BYGGET 2026-08-05
 
 **Brages ramme:** TestFlight i dag er venner og familie, IKKE pilot. Appen
