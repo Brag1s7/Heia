@@ -6,6 +6,8 @@ export {SectionHeader} from './SectionHeader';
 export {RSVPBar} from './RSVPBar';
 export {ListRow} from './ListRow';
 export {EventCard} from './EventCard';
+export {DateField} from './DateField';
+export {TournamentDayCard} from './TournamentDayCard';
 export {FeedCard} from './FeedCard';
 export {StatusPill} from './StatusPill';
 export {TeamBadge} from './TeamBadge';

@@ -121,6 +121,13 @@ export interface HeiaEvent {
   matchSessionId?: string;
   /** Satt når kampen er startet. Kampminuttet regnes ut fra denne. */
   startedAt?: Date;
+  /**
+   * Turneringen kampen hører til (00032). En turneringskamp er en HELT
+   * VANLIG kamp — samme kampmotor, samme live-rapportering, samme kort —
+   * som bare peker oppover. Det finnes ingen egen «turneringskamp»-type,
+   * og kampen skal aldri dupliseres som et eget kalenderobjekt.
+   */
+  parentEventId?: string;
 }
 
 export interface RSVPSummary {
@@ -198,7 +205,9 @@ export type RootTabParamList = {
   // NavigatorScreenParams gjør at «+»-valgarket kan navigere rett inn i
   // en skjerm i Hjem-stacken, typesikkert.
   HjemStack: NavigatorScreenParams<HomeStackParamList> | undefined;
-  KalenderStack: undefined;
+  // Nested params: etter «Turneringen er opprettet» skal man lande i
+  // Kalender PÅ turneringens startdato, ikke på toppen av lista.
+  KalenderStack: NavigatorScreenParams<KalenderStackParamList> | undefined;
   Opprett: undefined;
   InboxStack: NavigatorScreenParams<InboxStackParamList> | undefined;
   // Klubbdør-varsler (00047) navigerer på tvers av faner inn i
@@ -206,19 +215,33 @@ export type RootTabParamList = {
   ProfilStack: NavigatorScreenParams<ProfilStackParamList> | undefined;
 };
 
+/**
+ * Parametere til «Ny hendelse»-modalen. Samme type i alle tre stackene den
+ * bor i (Hjem, Kalender, Varsler) — den var duplisert tre steder, og
+ * turneringsperioden måtte da legges til tre steder.
+ */
+export type NewEventParams =
+  | {
+      parentEventId?: string;
+      parentTitle?: string;
+      /**
+       * Turneringens periode som ISO-strenger. Ruteparametere må være
+       * serialiserbare, så en Date kan ikke sendes direkte. Kampen åpner på
+       * `parentFrom`, og varsler hvis datoen havner utenfor perioden.
+       */
+      parentFrom?: string;
+      parentTo?: string;
+      /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
+      presetType?: 'turnering';
+    }
+  | undefined;
+
 export type HomeStackParamList = {
   /** composeNonce settes av «Del med laget» for å fokusere compose-boksen. */
   TeamHome: {composeNonce?: number} | undefined;
   EventDetail: {eventId: string};
   /** parentEventId settes av «Ny kamp» på en turneringsside. */
-  NewEvent:
-    | {
-        parentEventId?: string;
-        parentTitle?: string;
-        /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
-        presetType?: 'turnering';
-      }
-    | undefined;
+  NewEvent: NewEventParams;
   Support: undefined;
   /** Lagkassa (betalingsspor fase 5) — lagets støtteside for alle medlemmer. */
   Lagkassa: undefined;
@@ -238,18 +261,14 @@ export type OnboardingStackParamList = {
 };
 
 export type KalenderStackParamList = {
-  KalenderList: undefined;
+  // `focusDate` er en dayKey («2026-7-14»), ikke ISO: kalenderen rulles til
+  // DAGEN, og ISO ville vært UTC og bommet på kvelden. Settes når man nettopp
+  // har opprettet noe og skal lande på det, ikke på toppen av lista.
+  KalenderList: {focusDate?: string} | undefined;
   EventDetail: {eventId: string};
   // Samme modal som i Hjem — «Ny kamp» på en turneringsside skal virke
   // uansett hvilken fane turneringen ble åpnet fra.
-  NewEvent:
-    | {
-        parentEventId?: string;
-        parentTitle?: string;
-        /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
-        presetType?: 'turnering';
-      }
-    | undefined;
+  NewEvent: NewEventParams;
 };
 
 // Varsler får egen stack så et trykk på et varsel kan åpne hendelsen eller
@@ -258,14 +277,7 @@ export type InboxStackParamList = {
   InboxList: undefined;
   EventDetail: {eventId: string};
   Comments: {postId: string; teamSpaceId: string};
-  NewEvent:
-    | {
-        parentEventId?: string;
-        parentTitle?: string;
-        /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
-        presetType?: 'turnering';
-      }
-    | undefined;
+  NewEvent: NewEventParams;
 };
 
 export type ProfilStackParamList = {

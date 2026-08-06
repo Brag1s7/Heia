@@ -53,6 +53,7 @@ import {
 import {createImagePost, getMatchPhotos, type MatchPhoto} from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
+import {dayRangeLabel} from '../shared/calendar';
 import type {
   EventAttendee,
   EventType,
@@ -809,12 +810,19 @@ export function EventDetailScreen({route, navigation}: Props) {
           <View style={styles.infoHeroTop}>
             <StatusPill kind={infoPill.kind} label={infoPill.label} withDot />
             <Text style={styles.infoTime}>
-              {event.endTime
+              {/* En turnerings `end_time` bærer SLUTTDATOEN (siste dag
+                  23:59), ikke et klokkeslett — «09:00–23:59» ville vært
+                  meningsløst. Perioden står i datolinja under i stedet. */}
+              {event.type !== 'turnering' && event.endTime
                 ? `${formatTime(event.startTime)}–${formatTime(event.endTime)}`
                 : formatTime(event.startTime)}
             </Text>
           </View>
-          <Text style={styles.infoDate}>{formatDateLong(event.startTime)}</Text>
+          <Text style={styles.infoDate}>
+            {event.type === 'turnering'
+              ? dayRangeLabel(event.startTime, event.endTime ?? event.startTime)
+              : formatDateLong(event.startTime)}
+          </Text>
           <Text style={styles.infoTitle}>{event.title}</Text>
           {event.location && (
             <View style={styles.locationRow}>
@@ -865,9 +873,13 @@ export function EventDetailScreen({route, navigation}: Props) {
                 title="Ny kamp i turneringen"
                 variant="secondary"
                 onPress={() =>
+                  // Turneringens navn OG periode arves ned: kampen åpner på
+                  // første cupdag, og sier fra hvis den havner utenfor.
                   navigation.navigate('NewEvent', {
                     parentEventId: eventId,
                     parentTitle: event.title,
+                    parentFrom: event.startTime.toISOString(),
+                    parentTo: (event.endTime ?? event.startTime).toISOString(),
                   })
                 }
               />

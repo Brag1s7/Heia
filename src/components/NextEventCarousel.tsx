@@ -27,6 +27,8 @@ interface NextEventCarouselProps {
   events: HeiaEvent[];
   onEventPress: (event: HeiaEvent) => void;
   onOpenCalendar: () => void;
+  /** Turneringsnavn per kamp-id — den lille etiketten på kortet. */
+  tournamentTitles?: Record<string, string>;
   /** Lagkassa-side i karusellen — Hjem er den emosjonelle inngangen. */
   lagkassa?: LagkassaCardData | null;
   onOpenLagkassa?: () => void;
@@ -50,6 +52,7 @@ export function NextEventCarousel({
   events,
   onEventPress,
   onOpenCalendar,
+  tournamentTitles,
   lagkassa,
   onOpenLagkassa,
 }: NextEventCarouselProps) {
@@ -78,6 +81,7 @@ export function NextEventCarousel({
         {item.kind === 'event' ? (
           <NextEventHero
             event={item.event}
+            tournamentTitle={tournamentTitles?.[item.event.id]}
             onPress={() => onEventPress(item.event)}
           />
         ) : item.kind === 'lagkassa' ? (
@@ -132,7 +136,14 @@ export function NextEventCarousel({
         )}
       </View>
     ),
-    [width, onEventPress, onOpenCalendar, onOpenLagkassa, lagkassa],
+    [
+      width,
+      onEventPress,
+      onOpenCalendar,
+      onOpenLagkassa,
+      lagkassa,
+      tournamentTitles,
+    ],
   );
 
   if (items.length === 0) return null;
@@ -142,7 +153,9 @@ export function NextEventCarousel({
       <FlatList
         data={items}
         renderItem={renderItem}
-        keyExtractor={item => (item.kind === 'event' ? item.event.id : item.kind)}
+        keyExtractor={item =>
+          item.kind === 'event' ? item.event.id : item.kind
+        }
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}

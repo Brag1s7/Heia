@@ -1,13 +1,12 @@
-import React, {useCallback, useState} from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  RefreshControl,
-} from 'react-native';
+import React, {useCallback, useRef, useState} from 'react';
+import {View, Text, ScrollView, StyleSheet, RefreshControl} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {
@@ -16,25 +15,20 @@ import {
   LiveBadge,
   Skeleton,
   TeamHeader,
+  TournamentDayCard,
 } from '../components';
 import {useActiveTeam} from '../context';
 import {getTeamEvents} from '../lib/api/events';
+import {dayKey, startOfDay} from '../shared/calendar';
+import {
+  buildCalendarRows,
+  splitByTime,
+  type CalendarRow,
+} from '../shared/calendarList';
 import type {KalenderStackParamList, HeiaEvent} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<KalenderStackParamList, 'KalenderList'>;
-
-/** Midnatt samme dag — så en kamp kl. 09:00 er «i dag» hele dagen, ikke «tidligere». */
-function startOfDay(date: Date): number {
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-  ).getTime();
-}
-
-function isPast(date: Date): boolean {
-  return startOfDay(date) < startOfDay(new Date());
-}
+type Route = RouteProp<KalenderStackParamList, 'KalenderList'>;
 
 /** «August», eller «Januar 2027» når måneden bor i et annet år. */
 function formatMonthLabel(date: Date): string {
@@ -46,8 +40,8 @@ function formatMonthLabel(date: Date): string {
 }
 
 function getSectionLabel(date: Date): string {
-  const today = startOfDay(new Date());
-  const eventDay = startOfDay(date);
+  const today = startOfDay(new Date()).getTime();
+  const eventDay = startOfDay(date).getTime();
   const diffDays = Math.round((eventDay - today) / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) return 'Tidligere';
@@ -59,57 +53,47 @@ function getSectionLabel(date: Date): string {
   return formatMonthLabel(date);
 }
 
-/**
- * Kalenderen skal åpne på det som kommer, ikke på det som var.
- *
- * `getTeamEvents` gir alt stigende etter starttid, og da havner hele lagets
- * historikk ØVERST — «Tidligere» først, og en ny hendelse du nettopp opprettet
- * nederst, under alt som har skjedd. Her flyttes fortiden ned og snus, så det
- * som var sist ligger først i arkivet: det er forrige lørdags kamp man leter
- * etter, ikke den fra september.
- *
- * Fortiden slettes IKKE fra lista — gamle kamper bærer nå kamprapport og
- * bilder, og er verdt å komme tilbake til.
- */
-function orderForCalendar(events: HeiaEvent[]): HeiaEvent[] {
-  const upcoming: HeiaEvent[] = [];
-  const past: HeiaEvent[] = [];
-  for (const event of events) {
-    // Samme dag-grense som getSectionLabel, ellers kunne en hendelse tidligere
-    // i dag blitt sortert som fortid men merket «I dag» — og seksjonene ville
-    // dukket opp to ganger.
-    (isPast(event.startTime) ? past : upcoming).push(event);
-  }
-  return [...upcoming, ...past.reverse()];
-}
-
 /** Grupperer en kronologisk liste i sammenhengende seksjoner. */
 function groupIntoSections(
-  events: HeiaEvent[],
-): {label: string; events: HeiaEvent[]}[] {
-  const sections: {label: string; events: HeiaEvent[]}[] = [];
+  rows: CalendarRow[],
+): {label: string; rows: CalendarRow[]}[] {
+  const sections: {label: string; rows: CalendarRow[]}[] = [];
   let currentLabel = '';
-  for (const event of events) {
-    const label = getSectionLabel(event.startTime);
+  for (const row of rows) {
+    const label = getSectionLabel(row.date);
     if (label !== currentLabel) {
       currentLabel = label;
-      sections.push({label, events: [event]});
+      sections.push({label, rows: [row]});
     } else {
-      sections[sections.length - 1].events.push(event);
+      sections[sections.length - 1].rows.push(row);
     }
   }
   return sections;
 }
 
+/** Kampene en rad representerer — brukes til LIVE-merket i seksjonstittelen. */
+function rowEvents(row: CalendarRow): HeiaEvent[] {
+  return row.kind === 'event' ? [row.event] : row.matches;
+}
+
 export function KalenderScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
+  const route = useRoute<Route>();
   const {activeTeamSpaceId} = useActiveTeam();
 
   const [events, setEvents] = useState<HeiaEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Å bli sendt hit fra «Turneringen er opprettet» skal lande PÅ turneringen,
+  // ikke på toppen av lista. Vi måler radens y-posisjon når den legges ut og
+  // ruller dit — en ScrollView kan ikke hoppe til et element uten det.
+  const scrollRef = useRef<ScrollView>(null);
+  const focusDate = route.params?.focusDate;
+  const focusOffset = useRef<number | null>(null);
+  const hasScrolled = useRef(false);
 
   const loadEvents = useCallback(async () => {
     if (!activeTeamSpaceId) return;
@@ -132,19 +116,41 @@ export function KalenderScreen() {
     }, [loadEvents]),
   );
 
+  // Ny målrute = nytt forsøk på å rulle.
+  useFocusEffect(
+    useCallback(() => {
+      hasScrolled.current = false;
+      focusOffset.current = null;
+    }, []),
+  );
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadEvents();
   }, [loadEvents]);
 
+  const scrollToFocusIfReady = useCallback(() => {
+    if (hasScrolled.current || focusOffset.current === null) return;
+    hasScrolled.current = true;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, focusOffset.current - spacing['3xl']),
+      animated: true,
+    });
+  }, []);
+
   if (!activeTeamSpaceId) return null;
 
-  const sections = groupIntoSections(orderForCalendar(events));
+  const {upcoming, past} = splitByTime(buildCalendarRows(events));
+  const sections = groupIntoSections([...upcoming, ...past]);
+
+  const openEvent = (eventId: string) =>
+    navigation.navigate('EventDetail', {eventId});
 
   return (
     <View style={styles.screen}>
       <TeamHeader />
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{
           paddingBottom: insets.bottom + spacing['3xl'],
         }}
@@ -197,39 +203,56 @@ export function KalenderScreen() {
                 <View style={styles.sectionDash} />
                 <Text style={styles.sectionLabel}>{section.label}</Text>
                 {section.label === 'I dag' &&
-                  section.events.some(e => e.matchStatus === 'live') && (
-                    <LiveBadge />
-                  )}
+                  section.rows
+                    .flatMap(rowEvents)
+                    .some(e => e.matchStatus === 'live') && <LiveBadge />}
               </View>
-              {section.events.map((event, index) => {
-                const prev = index > 0 ? section.events[index - 1] : null;
+              {section.rows.map((row, index) => {
+                const prev = index > 0 ? section.rows[index - 1] : null;
                 // Arkivet ruller bakover i tid — en dempet månedsetikett når
                 // måneden bytter gir rytme uten å rope (fremover er månedene
                 // egne seksjoner, så dette gjelder kun «Tidligere»).
                 const monthBreak =
                   section.label === 'Tidligere' &&
                   prev !== null &&
-                  (prev.startTime.getMonth() !== event.startTime.getMonth() ||
-                    prev.startTime.getFullYear() !==
-                      event.startTime.getFullYear());
+                  (prev.date.getMonth() !== row.date.getMonth() ||
+                    prev.date.getFullYear() !== row.date.getFullYear());
+                const isPast = section.label === 'Tidligere';
+                const isFocus =
+                  focusDate !== undefined && dayKey(row.date) === focusDate;
+
                 return (
-                  <React.Fragment key={event.id}>
+                  <React.Fragment key={row.key}>
                     {monthBreak && (
                       <Text style={styles.monthDivider}>
-                        {formatMonthLabel(event.startTime)}
+                        {formatMonthLabel(row.date)}
                       </Text>
                     )}
-                    <View style={styles.cardWrap}>
-                      <EventCard
-                        event={event}
-                        featured={event.matchStatus === 'live'}
-                        past={section.label === 'Tidligere'}
-                        onPress={() =>
-                          navigation.navigate('EventDetail', {
-                            eventId: event.id,
-                          })
-                        }
-                      />
+                    <View
+                      style={styles.cardWrap}
+                      onLayout={
+                        isFocus
+                          ? e => {
+                              focusOffset.current = e.nativeEvent.layout.y;
+                              scrollToFocusIfReady();
+                            }
+                          : undefined
+                      }>
+                      {row.kind === 'tournamentDay' ? (
+                        <TournamentDayCard
+                          row={row}
+                          past={isPast}
+                          onPressTournament={() => openEvent(row.tournament.id)}
+                          onPressMatch={openEvent}
+                        />
+                      ) : (
+                        <EventCard
+                          event={row.event}
+                          featured={row.event.matchStatus === 'live'}
+                          past={isPast}
+                          onPress={() => openEvent(row.event.id)}
+                        />
+                      )}
                     </View>
                   </React.Fragment>
                 );

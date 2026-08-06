@@ -14,13 +14,24 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
-import {Button} from '../components';
+import {Button, DateField} from '../components';
 import {useActiveTeam} from '../context';
 import {
   createEvent,
+  getBusyDays,
   getTournaments,
   type TournamentOption,
 } from '../lib/api/events';
+import {
+  addDays,
+  atTime,
+  dayDiff,
+  dayKey,
+  dayRangeLabel,
+  longDayLabel,
+  startOfDay,
+  type BusyDays,
+} from '../shared/calendar';
 import type {
   EventType,
   HomeStackParamList,
@@ -29,52 +40,28 @@ import type {
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'NewEvent'>;
 
-const DAYS_AHEAD = 30;
 const DEFAULT_TIME = '18:00';
 
-// «Turnering» er bevisst IKKE et valg her — turneringer opprettes fra
-// sesongsiden («+ Ny turnering»), som åpner denne modalen med presetType.
-// Ett sted å lage dem = ingen tvil om hvor de bor.
+// Fortiden er åpen for trener/lagleder (Brage 2026-08-06): «vi spilte i går
+// og glemte å legge den inn» er et ekte tilfelle, og kamprapporten henger på
+// arrangementet. 30 dager er nok til å ta igjen en glemt kamp, og kort nok
+// til at et feiltrykk ikke havner i forrige sesong.
+// Skjermen er allerede rollestyrt — den nås kun via «+» for isTeamAdmin, og
+// `create_event` avviser andre uansett (SECURITY DEFINER, 00019).
+const DAYS_BACK = 30;
+const MONTHS_AHEAD = 18;
+
+// «Turnering» sto lenge KUN på sesongsiden («+ Ny turnering»), for å ha ett
+// sted å lage dem. Brage 2026-08-06: den skal også ligge her, ved siden av
+// trening og kamp — det er her man er når man planlegger noe.
+// Sesongsidens inngang består; begge sender til samme skjema.
 const TYPE_OPTIONS: {value: EventType; label: string}[] = [
   {value: 'trening', label: 'Trening'},
   {value: 'kamp', label: 'Kamp'},
+  {value: 'turnering', label: 'Turnering'},
   {value: 'sosialt', label: 'Sosialt'},
   {value: 'annet', label: 'Annet'},
 ];
-
-const DURATION_OPTIONS: {minutes: number | null; label: string}[] = [
-  {minutes: 60, label: '1 t'},
-  {minutes: 90, label: '1½ t'},
-  {minutes: 120, label: '2 t'},
-  {minutes: null, label: 'Ingen sluttid'},
-];
-
-const weekdaysShort = ['søn', 'man', 'tir', 'ons', 'tor', 'fre', 'lør'];
-const monthsShort = [
-  'jan',
-  'feb',
-  'mar',
-  'apr',
-  'mai',
-  'jun',
-  'jul',
-  'aug',
-  'sep',
-  'okt',
-  'nov',
-  'des',
-];
-
-function startOfToday(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-function dayLabel(date: Date, offset: number): string {
-  if (offset === 0) return 'I dag';
-  if (offset === 1) return 'I morgen';
-  return `${weekdaysShort[date.getDay()]} ${date.getDate()}. ${monthsShort[date.getMonth()]}`;
-}
 
 /** Tvinger inndata mot HH:MM mens brukeren skriver, uten native picker. */
 function maskTime(raw: string): string {
@@ -122,6 +109,15 @@ export function NewEventScreen({navigation, route}: Props) {
   const inTournament = !!parentEventId;
   const isNewTournament = route.params?.presetType === 'turnering';
 
+  // Turneringens datoer arves ned til kampen: den åpner PÅ turneringens
+  // første dag, og vi sier fra hvis den havner utenfor perioden.
+  const parentFrom = route.params?.parentFrom
+    ? startOfDay(new Date(route.params.parentFrom))
+    : undefined;
+  const parentTo = route.params?.parentTo
+    ? startOfDay(new Date(route.params.parentTo))
+    : undefined;
+
   const [type, setType] = useState<EventType>(
     isNewTournament ? 'turnering' : inTournament ? 'kamp' : 'trening',
   );
@@ -147,10 +143,13 @@ export function NewEventScreen({navigation, route}: Props) {
       cancelled = true;
     };
   }, [inTournament, isNewTournament, activeTeamSpaceId]);
-  const [dayOffset, setDayOffset] = useState(0);
+
+  const today = useMemo(() => startOfDay(new Date()), []);
+  const [day, setDay] = useState<Date>(parentFrom ?? today);
+  // Turneringens sluttdato. Standard er SAMME dag som starten, så en
+  // endagsturnering er like rask som før (Brage 2026-08-06).
+  const [endDay, setEndDay] = useState<Date>(parentFrom ?? today);
   const [time, setTime] = useState(DEFAULT_TIME);
-  const [meetingTime, setMeetingTime] = useState('');
-  const [durationMinutes, setDurationMinutes] = useState<number | null>(90);
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
@@ -158,74 +157,130 @@ export function NewEventScreen({navigation, route}: Props) {
   const [isHome, setIsHome] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const days = useMemo(() => {
-    const base = startOfToday();
-    return Array.from({length: DAYS_AHEAD}, (_, offset) => {
-      const date = new Date(base);
-      date.setDate(base.getDate() + offset);
-      return {offset, date, label: dayLabel(date, offset)};
-    });
-  }, []);
+  // ⚠️ OPPMØTETID SPØRRES DET IKKE OM HER (Brage 2026-08-06). Kolonnen
+  // `meeting_time`, RPC-parameteren og påminnelsen i 00055 står urørt og
+  // virker for eksisterende data — men nye arrangementer setter den ikke,
+  // og påminnelsen sier derfor «kampen starter om én time». Det er et
+  // bevisst valg, ikke en mangel: sluttid som klokkeslett og varighets-
+  // chipsene er borte av samme grunn, og skal ikke tilbake.
+  //
+  // `end_time` settes fortsatt for ÉN type: turneringen, der den bærer
+  // SLUTTDATOEN og ikke et klokkeslett. Se performSave.
 
-  const parsedTime = parseTime(time);
-  const parsedMeeting = meetingTime.length > 0 ? parseTime(meetingTime) : null;
-  // Oppmøte etter avspark er alltid en feil — DB-en avviser det også (00053),
-  // men brukeren skal se det her, ikke i en Alert etter lagring.
-  const meetingAfterStart =
-    parsedTime !== null &&
-    parsedMeeting !== null &&
-    parsedMeeting.hours * 60 + parsedMeeting.minutes >
-      parsedTime.hours * 60 + parsedTime.minutes;
+  // Prikkene i kalenderen. Hentes ved åpning, men kalenderen venter ALDRI på
+  // dem — feiler kallet, mangler bare prikkene.
+  const [busy, setBusy] = useState<BusyDays | undefined>(undefined);
+  const [busyLoading, setBusyLoading] = useState(true);
+
+  useEffect(() => {
+    if (!activeTeamSpaceId) return;
+    let cancelled = false;
+    const from = addDays(today, -DAYS_BACK);
+    const to = new Date(
+      today.getFullYear(),
+      today.getMonth() + MONTHS_AHEAD + 1,
+      0,
+      23,
+      59,
+      59,
+    );
+    getBusyDays(activeTeamSpaceId, from, to)
+      .then(days => {
+        if (!cancelled) setBusy(days);
+      })
+      .catch(() => {
+        // Stille: prikkene er en hjelp, ikke en forutsetning.
+      })
+      .finally(() => {
+        if (!cancelled) setBusyLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTeamSpaceId, today]);
 
   const isMatch = type === 'kamp';
+  const isTournament = type === 'turnering' || isNewTournament;
+
+  const parsedTime = parseTime(time);
+  const timeInvalid = time.length > 0 && !parsedTime;
+
+  // Sluttdatoen kan aldri ligge før starten. Flytter man startdatoen forbi
+  // den, følger sluttdatoen med — «samme dag» er standarden, og en dratt
+  // startdato skal ikke lage en ugyldig periode i det stille.
+  const setStartDay = useCallback((next: Date) => {
+    setDay(next);
+    setEndDay(prev => (dayDiff(prev, next) < 0 ? next : prev));
+  }, []);
+
+  // Kampen bør normalt ligge innenfor turneringens datoer. «Normalt» —
+  // derfor en beskjed og ikke en sperre: en cup kan bli forlenget, og en
+  // blokkert lagring ville vært verre enn en kamp på feil dag.
+  const outsideParent =
+    parentFrom !== undefined &&
+    parentTo !== undefined &&
+    (dayDiff(day, parentFrom) < 0 || dayDiff(day, parentTo) > 0);
+
   const canSave =
     !!activeTeamSpaceId &&
     parsedTime !== null &&
-    (meetingTime.length === 0 || (parsedMeeting !== null && !meetingAfterStart)) &&
     (!isMatch || opponent.trim().length > 0);
 
-  const handleSave = useCallback(async () => {
-    if (!activeTeamSpaceId || !parsedTime || saving) return;
+  const startTime = parsedTime
+    ? atTime(day, parsedTime.hours, parsedTime.minutes)
+    : null;
+  const startsInPast = startTime !== null && startTime.getTime() < Date.now();
 
-    const day = days[dayOffset].date;
-    const startTime = new Date(day);
-    startTime.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
-
-    const endTime = durationMinutes
-      ? new Date(startTime.getTime() + durationMinutes * 60_000)
-      : undefined;
-
-    // Oppmøte hører til SAMME dag som starten.
-    let meeting: Date | undefined;
-    if (parsedMeeting && !meetingAfterStart) {
-      meeting = new Date(day);
-      meeting.setHours(parsedMeeting.hours, parsedMeeting.minutes, 0, 0);
-    }
+  const performSave = useCallback(async () => {
+    if (!activeTeamSpaceId || !parsedTime || !startTime || saving) return;
 
     setSaving(true);
     try {
+      // `meetingTime` sendes ikke herfra — skjemaet spør ikke om det
+      // (Brage 2026-08-06), og påminnelsen faller da til «starter om én
+      // time». Kolonnen og RPC-parameteren står urørt for eksisterende data.
+      //
+      // `endTime` settes KUN for turneringer, og bærer da SLUTTDATOEN, ikke
+      // et klokkeslett: siste dag kl. 23:59. Det gjør at en endagsturnering
+      // også tilfredsstiller DB-kravet «end_time > start_time» (00019).
       await createEvent({
         teamSpaceId: activeTeamSpaceId,
         type,
         title: title.trim() || defaultTitle(type, opponent),
         startTime,
-        endTime,
-        meetingTime: meeting,
+        endTime: isTournament ? atTime(endDay, 23, 59) : undefined,
         location: location.trim() || undefined,
         description: description.trim() || undefined,
         opponent: isMatch ? opponent.trim() : undefined,
         isHome,
         parentEventId:
-          parentEventId ?? (isMatch ? (selectedTournament ?? undefined) : undefined),
+          parentEventId ??
+          (isMatch ? selectedTournament ?? undefined : undefined),
       });
-      // Lukk modalen. Frittstående hendelser: vis kalenderen (den refetcher
-      // ved fokus). Fra turneringsside/sesongside: bli stående der brukeren
-      // kom fra — det er der resultatet av handlingen vises (en turnering
-      // ligger ikke i kalenderen i det hele tatt).
+      // Hvor man lander (Brage 2026-08-06):
+      //   fra Sesong          → tilbake til Sesong (goBack alene)
+      //   fra turneringsside  → bli stående på turneringen
+      //   ellers              → Kalender, PÅ hendelsens dato
+      //
+      // Turneringen vises nå i kalenderen som alle andre objekter, så det
+      // er ingen grunn til å holde den unna lenger — men den skal treffes,
+      // ikke ligge et sted i lista.
       navigation.goBack();
       if (!inTournament && !isNewTournament) {
-        navigation.getParent<NavigationProp<RootTabParamList>>()?.navigate(
-          'KalenderStack',
+        navigation
+          .getParent<NavigationProp<RootTabParamList>>()
+          ?.navigate('KalenderStack', {
+            screen: 'KalenderList',
+            params: {focusDate: dayKey(day)},
+          });
+      }
+      if (isTournament) {
+        Alert.alert(
+          'Turneringen er opprettet',
+          `${title.trim() || defaultTitle(type, opponent)} · ${dayRangeLabel(
+            day,
+            endDay,
+          )}`,
         );
       }
     } catch {
@@ -236,18 +291,17 @@ export function NewEventScreen({navigation, route}: Props) {
   }, [
     activeTeamSpaceId,
     parsedTime,
-    parsedMeeting,
-    meetingAfterStart,
+    startTime,
     saving,
-    days,
-    dayOffset,
-    durationMinutes,
     type,
     title,
     opponent,
     location,
     description,
     isMatch,
+    isTournament,
+    endDay,
+    day,
     isHome,
     parentEventId,
     inTournament,
@@ -256,12 +310,42 @@ export function NewEventScreen({navigation, route}: Props) {
     navigation,
   ]);
 
+  /**
+   * Fortiden er lov, men aldri ved et uhell. Bekreftelsen sier også hva som
+   * IKKE skjer: en historisk hendelse gir ingen «ny hendelse»-varsling til
+   * laget (migrasjon 00056). Uten den setningen ville stillheten sett ut
+   * som en feil.
+   */
+  const handleSave = useCallback(() => {
+    if (!startTime || saving) return;
+    if (!startsInPast) {
+      performSave();
+      return;
+    }
+    Alert.alert(
+      'Legge inn noe som har vært?',
+      `${longDayLabel(day, today)} kl. ${time} er tilbake i tid. ` +
+        'Hendelsen legges i kalenderen, men laget får ingen varsling om den.',
+      [
+        {text: 'Avbryt', style: 'cancel'},
+        {
+          text: 'Legg inn likevel',
+          onPress: () => {
+            performSave();
+          },
+        },
+      ],
+    );
+  }, [startTime, saving, startsInPast, performSave, day, today, time]);
+
   return (
     <KeyboardAvoidingView
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        contentContainerStyle={{
+          paddingBottom: insets.bottom + spacing['3xl'],
+        }}
         keyboardShouldPersistTaps="handled">
         {inTournament || isNewTournament ? (
           <Field label="Hva skjer?">
@@ -341,21 +425,61 @@ export function NewEventScreen({navigation, route}: Props) {
           </>
         )}
 
-        <Field label="Dag">
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.dayRow}>
-            {days.map(day => (
-              <SelectChip
-                key={day.offset}
-                label={day.label}
-                selected={dayOffset === day.offset}
-                onPress={() => setDayOffset(day.offset)}
-              />
-            ))}
-          </ScrollView>
+        {/* Tittelen sto nest sist. Den er hendelsens navn, og hører hjemme
+            der man nettopp bestemte hva hendelsen ER (Brages hurtigflyt:
+            type → motstander/tittel → dato → klokkeslett → sted → beskjed). */}
+        <Field label="Tittel">
+          <TextInput
+            style={styles.input}
+            value={title}
+            onChangeText={setTitle}
+            placeholder={defaultTitle(type, opponent)}
+            placeholderTextColor={colors.textTertiary}
+            editable={!saving}
+          />
         </Field>
+
+        <Field label={isTournament ? 'Starter' : 'Dag'}>
+          <DateField
+            value={day}
+            onChange={setStartDay}
+            busy={busy}
+            busyLoading={busyLoading}
+            daysBack={DAYS_BACK}
+            monthsAhead={MONTHS_AHEAD}
+            disabled={saving}
+          />
+          {outsideParent && parentFrom && parentTo && (
+            <Text style={styles.noteText}>
+              Utenfor {parentTitle ?? 'turneringen'} (
+              {dayRangeLabel(parentFrom, parentTo)}). Kampen lagres likevel.
+            </Text>
+          )}
+        </Field>
+
+        {/* En cup varer ofte en helg. Sluttdatoen står som SAMME dag til
+            noen flytter den, så endagsturneringen er like rask som før. */}
+        {isTournament && (
+          <Field label="Slutter">
+            <DateField
+              value={endDay}
+              onChange={setEndDay}
+              busy={busy}
+              busyLoading={busyLoading}
+              minDate={day}
+              monthsAhead={MONTHS_AHEAD}
+              disabled={saving}
+            />
+            <Text style={styles.noteText}>
+              {dayDiff(endDay, day) === 0
+                ? 'Én dag'
+                : `${dayDiff(endDay, day) + 1} dager · ${dayRangeLabel(
+                    day,
+                    endDay,
+                  )}`}
+            </Text>
+          </Field>
+        )}
 
         <Field label="Klokkeslett">
           <TextInput
@@ -368,46 +492,14 @@ export function NewEventScreen({navigation, route}: Props) {
             maxLength={5}
             editable={!saving}
           />
-          {time.length > 0 && !parsedTime && (
+          {timeInvalid && (
             <Text style={styles.errorText}>Skriv klokkeslettet som 18:00</Text>
           )}
-        </Field>
-
-        {/* Oppmøte er frivillig, men det er DEN klokka foreldre planlegger
-            etter — og påminnelsen én time før bruker den når den finnes
-            (00053/00055). Uten oppmøtetid minner vi om starten i stedet. */}
-        <Field label="Oppmøte (valgfritt)">
-          <TextInput
-            style={[styles.input, styles.timeInput]}
-            value={meetingTime}
-            onChangeText={raw => setMeetingTime(maskTime(raw))}
-            placeholder={parsedTime ? 'F.eks. 17:30' : '17:30'}
-            placeholderTextColor={colors.textTertiary}
-            keyboardType="number-pad"
-            maxLength={5}
-            editable={!saving}
-          />
-          {meetingTime.length > 0 && !parsedMeeting && (
-            <Text style={styles.errorText}>Skriv oppmøtet som 17:30</Text>
-          )}
-          {meetingAfterStart && (
-            <Text style={styles.errorText}>
-              Oppmøtet må være før eller likt starten
+          {startsInPast && !timeInvalid && (
+            <Text style={styles.noteText}>
+              Dette tidspunktet har vært. Laget får ingen varsling.
             </Text>
           )}
-        </Field>
-
-        <Field label="Varighet">
-          <View style={styles.chipRow}>
-            {DURATION_OPTIONS.map(option => (
-              <SelectChip
-                key={option.label}
-                label={option.label}
-                selected={durationMinutes === option.minutes}
-                onPress={() => setDurationMinutes(option.minutes)}
-              />
-            ))}
-          </View>
         </Field>
 
         <Field label="Sted">
@@ -416,17 +508,6 @@ export function NewEventScreen({navigation, route}: Props) {
             value={location}
             onChangeText={setLocation}
             placeholder="Kunstgresset"
-            placeholderTextColor={colors.textTertiary}
-            editable={!saving}
-          />
-        </Field>
-
-        <Field label="Tittel">
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder={defaultTitle(type, opponent)}
             placeholderTextColor={colors.textTertiary}
             editable={!saving}
           />
@@ -447,7 +528,11 @@ export function NewEventScreen({navigation, route}: Props) {
         <View style={styles.saveRow}>
           <Button
             title={
-              isNewTournament ? 'Opprett turnering' : 'Legg til i kalenderen'
+              // Turneringen havner ikke i kalenderen, så knappen kan ikke
+              // love det. Gjelder begge inngangene til typen.
+              isTournament || isNewTournament
+                ? 'Opprett turnering'
+                : 'Legg til i kalenderen'
             }
             onPress={handleSave}
             disabled={!canSave}
@@ -463,13 +548,7 @@ export function NewEventScreen({navigation, route}: Props) {
 // ---------------------------------------------------------------------------
 // Hjelpkomponenter
 // ---------------------------------------------------------------------------
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({label, children}: {label: string; children: React.ReactNode}) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -490,6 +569,8 @@ function SelectChip({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{selected}}
       style={({pressed}) => [
         styles.selectChip,
         selected && styles.selectChipSelected,
@@ -531,10 +612,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
-  },
-  dayRow: {
-    gap: spacing.sm,
-    paddingRight: spacing.lg,
   },
   selectChip: {
     paddingHorizontal: spacing.lg,
@@ -584,6 +661,11 @@ const styles = StyleSheet.create({
   errorText: {
     ...typography.bodySmall,
     color: colors.error,
+  },
+  // Ikke en feil — en konsekvens brukeren skal se før den lagres.
+  noteText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
   },
   saveRow: {
     paddingHorizontal: spacing.lg,

@@ -35,6 +35,7 @@ import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {getLiveMatch, getTeamEvents} from '../lib/api/events';
+import {tournamentTitleFor} from '../shared/calendarList';
 import {
   getTeamSupportSummary,
   type TeamSupportSummary,
@@ -105,11 +106,17 @@ function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
  * Hendelsene til hero-karusellen: de neste `limit` som ikke er over.
  * `getTeamEvents` leverer stigende på starttid; en hendelse uten sluttid
  * regnes som ferdig 2 t etter start. Live kamp håndteres separat og vinner.
+ *
+ * ⚠️ Turnerings-CONTAINEREN hoppes over (Brage 2026-08-06). Hjem viser den
+ * neste eller aktive KAMPEN, med turneringen som en liten etikett på kortet —
+ * ikke et eget turneringskort ved siden av. Ellers ville en cup-helg gitt to
+ * hovedøyeblikk som konkurrerte om samme plass.
  */
 function pickNextEvents(events: HeiaEvent[], limit: number): HeiaEvent[] {
   const now = Date.now();
   const upcoming: HeiaEvent[] = [];
   for (const e of events) {
+    if (e.type === 'turnering') continue;
     // Avlyst er ikke et hovedøyeblikk — og en kamp som alt er SPILT skal
     // ikke stå som «neste» selv om det planlagte avsparket er frem i tid.
     if (e.matchStatus === 'cancelled' || e.matchStatus === 'finished') continue;
@@ -140,6 +147,12 @@ export function TeamHomeScreen() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
   const [nextEvents, setNextEvents] = useState<HeiaEvent[]>([]);
+  // Turneringsnavn per kamp-id. Turnerings-CONTAINEREN vises aldri på Hjem
+  // (pickNextEvents hopper over den) — dette er det ENESTE stedet en turnering
+  // nevnes her, som en liten etikett på kampens eget kort.
+  const [tournamentTitles, setTournamentTitles] = useState<
+    Record<string, string>
+  >({});
   const [supportSummary, setSupportSummary] =
     useState<TeamSupportSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -173,7 +186,14 @@ export function TeamHomeScreen() {
       ]);
       setFeed(items);
       setLiveMatch(live);
-      setNextEvents(pickNextEvents(events, 3));
+      const upcoming = pickNextEvents(events, 3);
+      setNextEvents(upcoming);
+      const titles: Record<string, string> = {};
+      for (const event of upcoming) {
+        const tournament = tournamentTitleFor(event, events);
+        if (tournament) titles[event.id] = tournament;
+      }
+      setTournamentTitles(titles);
       setSupportSummary(support);
     } catch {
       setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
@@ -436,6 +456,7 @@ export function TeamHomeScreen() {
         <View style={styles.carouselSection}>
           <NextEventCarousel
             events={nextEvents}
+            tournamentTitles={tournamentTitles}
             onEventPress={e =>
               navigation.navigate('EventDetail', {eventId: e.id})
             }

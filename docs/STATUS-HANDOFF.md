@@ -1,44 +1,294 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: KALENDERVELGER (Brages bestilling 2026-08-06)
+## ▶️ NESTE SAMTALE: KALENDER-SIDEN (Brage har en full spesifikasjon)
 
-**Mål:** en ekspanderende kalender som når man bestiller flybillett eller
-hotell. **Først ved OPPRETTELSE av arrangement**, deretter samme
-kalenderspråk som en valgbar visning på Kalender-siden.
+**Brage kommer med en lang melding om hvordan Kalender-siden skal se ut.
+Vent på den — ikke design flaten på forhånd.**
 
-**Dagens tilstand — les dette før noe røres:**
-- `NewEventScreen` velger dato med en horisontal stripe av dagchips,
-  `DAYS_AHEAD = 30` (linje 32). ⚠️ **Man kan altså IKKE opprette et
-  arrangement mer enn 30 dager fram i dag.** En sesongkamp i oktober er
-  umulig å legge inn i august. Kalendervelgeren fjerner den grensen —
-  det er egentlig hovedgevinsten, ikke bare pynt.
-- Klokkeslett og oppmøte er tekstfelt med maske (`maskTime`/`parseTime`),
-  ikke pickere. Oppmøtefeltet er NYTT (00053) og må overleve redesignet.
-- `KalenderScreen` er en flat liste av `EventCard` uten visningsvalg.
-- **Prosjektet har INGEN dato-bibliotek.** Alt er håndrullet `Date`.
-  Første beslutning i samtalen: eget bygg eller ny avhengighet
-  (`react-native-calendars` er ren JS → ingen pod install, men det er
-  fortsatt en ny avhengighet i et prosjekt som har unngått dem).
-- Ingen `date-fns`/`dayjs` heller — ukenummer, månedsmatriser og
-  norske ukedagsnavn må enten skrives eller komme med biblioteket.
+Les før du starter, fordi den er bygget om i dag og premissene er ferske:
 
-**Bindende rammer:**
+- `KalenderScreen` rendrer ikke lenger en flat liste av `EventCard`. Den
+  bygger **rader** via `shared/calendarList.ts` (`buildCalendarRows` →
+  `splitByTime` → seksjoner), og en rad er enten en vanlig hendelse
+  eller en **turneringsdag** med kampene under.
+- ⛔ **Det finnes bare ETT kampobjekt.** En turneringskamp er en vanlig
+  kamp med `parent_event_id`, og skal aldri dupliseres.
+  `__tests__/calendarList.test.ts` vokter det.
+- Rollefordelingen er LÅST: **Sesong** = sportslig oversikt og
+  administrasjon, **Kalender** = kronologisk fasit, **Hjem** =
+  redaksjonell oversikt, **Varsler** = hva har skjedd. Samme objekt kan
+  vises flere steder.
+- Skjermen tar `focusDate` (en `dayKey`) og ruller dit. Beholdes.
+- Det opprinnelige ønsket fra 2026-08-06 som fortsatt IKKE er bygget:
+  **samme kalenderspråk som en VALGBAR VISNING** (månedsrutenett) på
+  Kalender-siden. `DateField` er skrevet for skjemaet — en månedsvisning
+  her trenger sin egen komponent, men `shared/calendar.ts` dekker matten
+  (månedsmatrise, perioder, norske navn) og er testet.
+
+## ⏳ KØET ETTER DEN: REDIGERING AV ARRANGEMENT
+
+Kalendervelgeren gikk bevisst FØRST slik at redigeringsskiva kan
+gjenbruke `DateField` i stedet for å finne opp datovalget på nytt.
+Skiva er: `update_event`-RPC + tosidig `NewEventScreen` + «Avlys kamp».
+
+**Les før du starter:** `NewEventScreen` ble bygget om 2026-08-06 (ny
+feltrekkefølge, kalendervelger, ingen tidsfelt utover klokkeslett).
+
+⛔ **IKKE gjeninnfør felt som er fjernet.** Oppmøtetid, sluttid som
+klokkeslett, varighetschips og hurtigdatoer er BESLUTTET borte (Brage
+2026-08-06). At nye arrangementer ikke setter `meeting_time` er
+akseptert: påminnelsen sier «Kampen starter om én time», og det er
+riktig. Kolonnen er fortsatt nullable og fallback-logikken i 00055 står
+— for eksisterende data. **Oppmøtetid er verken en blokkering eller en
+hovedoppgave i denne skiva.**
+
+Turneringens `end_time` er det ENESTE unntaket: den bærer sluttdatoen
+(siste dag 23:59), ikke et klokkeslett. Redigering må behandle den som
+en DATO.
+
+Åpen sak arvet fra kalenderskiva: **endringsvarslene (00054) er IKKE
+vaktet mot historiske arrangementer.** 00056 stoppet «ny hendelse» for
+fortiden, men redigerer noen en kamp fra i går, varsles laget fortsatt.
+Ta stilling til det i redigeringsskiva.
+
+## ✅ KALENDERVELGER BYGGET 2026-08-06 (ren JS + én migrasjon)
+
+Brages bestilling: «en ekspanderende kalender som når man bestiller
+flybillett eller hotell», ved OPPRETTELSE først.
+
+**Beslutning: EGET BYGG, ikke `react-native-calendars`.** Biblioteket
+koster sju nye pakker (`lodash`, `recyclerlistview`, `xdate`,
+`prop-types`, `memoize-one`, `hoist-non-react-statics`,
+`react-native-swipe-gestures`, ~12,3 MB) i et prosjekt som bevisst har
+null avhengigheter, det er uverifisert på RN 0.83.1 + React 19.2 + ny
+arkitektur, og temaet rekker uansett ikke til fyll+ramme på valgt dag,
+prikker i tre typefarger, Nunito på tallene eller `minHeight`-celler —
+vi ville skrevet `dayComponent` selv likevel.
+⚠️ **Vippepunktet hvis dette skal opp igjen:** skal Kalender-siden få
+agendavisning med uendelig scroll gjennom sesongen, er
+`recyclerlistview` plutselig verdt prisen. Velgeren låser oss ikke.
+
+**HOVEDGEVINSTEN: `DAYS_AHEAD = 30` er borte.** Den var en PRODUKT-
+grense, ikke en visningsgrense — høstens terminliste kunne ikke legges
+inn i august. Nå: 30 dager tilbake, 18 måneder fram.
+
+### Nye filer
+
+**`src/shared/calendar.ts`** — all datomatte som rene funksjoner, null
+React og null Supabase. Dette ER «datobiblioteket» vi valgte bort.
+⚠️ Alt regnes med `Date`-KONSTRUKTØREN (`new Date(år, mnd, dag + n)`),
+aldri med `+ 86 400 000` — millisekundmatte bommer med en time to netter
+i året. Måneds- og ukedagsnavn er skrevet ut i stedet for hentet fra
+`Intl`, så et rutenett ikke kan bli engelsk der ICU mangler.
+
+**`__tests__/calendar.test.ts` — 25 tester, alle grønne**
+(`TZ=Europe/Oslo npx jest __tests__/calendar.test.ts`). Dekker skuddår,
+måneder som starter på mandag/søndag, års- og månedsskifte, og BEGGE
+sommertidsnettene i 2026 (29. mars = 23 t, 25. oktober = 25 t). Det er
+prisen for å eie datomatten selv — feilene er våre.
+
+**`src/components/DateField.tsx`** — datoraden + kalenderen.
+- Sammendragsrad: datoflis (Nunito) + «Lørdag 8. august» + «om 2 uker».
+  Er dagen opptatt står det «· Kamp samme dag» — kollisjonen følger
+  valget UT av kalenderen.
+- Utfoldingen MÅLER høyden sin (`onLayout` + `Animated` på `height`).
+  Ingen faste høyder: rutenettet er fem eller seks uker, og mer med
+  forstørret skrift.
+  ⚠️ **FELLA — kalenderen kom ikke opp i det hele tatt i første forsøk.**
+  Måler man innholdet inne i en beholder som ALT har `height: 0` +
+  `overflow: 'hidden'`, svarer `onLayout` med 0. Da blir `outputRange`
+  `[0, 0]`, og høyden kan aldri bli noe annet enn null — kalenderen
+  rendres, men er null piksler høy for alltid. Den må måles for å vises,
+  og vises for å måles.
+  **Løsningen:** så lenge en høyde er ukjent rendres kalenderen UTEN
+  høydebegrensning — lukket som en usynlig forhåndsmåling utenfor flyten
+  (`styles.measuring`: `position: absolute`, `opacity: 0`), åpen rett i
+  flyten. Høyden caches PER ANTALL UKER, så en 6-ukers måned ikke blir
+  klippet av en høyde målt på en 5-ukers.
+  Rører du denne beholderen: pass på at det finnes minst én tilstand der
+  innholdet er ubegrenset i høyde, ellers er vi tilbake i null.
+- **Trykk på en dag lukker kalenderen** — som i en billettbestilling.
+  Derfor ingen «Ferdig»-knapp.
+- **INGEN hurtigknapper.** «I dag / I morgen / førstkommende lørdag» ble
+  bygget og så FJERNET samme dag (Brage): i dag er alt standardvalget, og
+  det aller meste legges lenger fram enn i morgen. De løste et problem
+  dagstripa hadde, ikke et kalenderen har. Ikke bygg dem inn igjen uten
+  at noen ber om det.
+- Prikker i typens farge (blå trening, coral kamp, lilla sosialt, gull
+  turnering). ⚠️ Turnering bruker `goldInk`, ikke `gold` — en 5 px prikk
+  i #FFC53D forsvinner på hvitt.
+- ⚠️ **Ingen røde søndager.** Coral er låst til live-status; helgen
+  dempes i ukedagsbokstavene i stedet.
+
+### Endret
+
+**`src/lib/api/events.ts` → `getBusyDays()`** — egen mager spørring (to
+kolonner, ingen RSVP-opptelling). Turneringer er MED her, i motsetning
+til i kalenderlista: en cup-helg er lagets travleste dag.
+⚠️ **Kalenderen venter ALDRI på prikkene** (Brages krav). Feiler kallet,
+mangler bare prikkene.
+
+**`src/screens/NewEventScreen.tsx`** — feltrekkefølgen følger nå Brages
+hurtigflyt: type → motstander/**tittel** → dato → klokkeslett → sted →
+beskjed. Tittelen sto nest sist og er flyttet opp.
+
+**Oppmøtetid og sluttid er HELT UTE av skjemaet.** Utviklingen gikk i tre
+steg samme dag: varighetschips → progressive «+ Legg til …»-lenker →
+fjernet (Brages beslutning). **Datamodellen er URØRT** — `meeting_time`,
+`end_time`, RPC-parameterne og påminnelsen i 00055 står som de var.
+
+⛔ **ÅPEN KONSEKVENS — LES DENNE FØR DU BYGGER REDIGERING.** Ingenting i
+appen kan lenger SETTE oppmøtetid eller sluttid. Da er 00053+00055 reelt
+mørklagt: påminnelsen vil alltid si «kampen starter om én time», aldri
+«oppmøte om én time», fordi `meeting_time` alltid er NULL på nye
+arrangementer. Feltene hører hjemme i redigeringsskjermen — det er den
+som gjenåpner dem.
+
+⚠️ **SYNLIG FØLGE:** hendelser viser nå «18:00» i stedet for
+«18:00–19:30» på `EventCard` (kamper viste aldri sluttid, så det treffer
+trening og sosialt). `TeamHomeScreen` har fra før en 2-timers fallback
+og tåler det.
+
+## ✅ TURNERINGSFLYTEN BYGGET 2026-08-06 (ren JS, INGEN migrasjon)
+
+Brages rollefordeling, som styrer alt under: **Sesong** er den sportslige
+oversikten og administrasjonsflaten. **Kalender** er den kronologiske
+fasiten. **Samme objekt vises begge steder.**
+
+### ⛔ REGELEN SOM IKKE MÅ BRYTES
+
+**Det finnes bare ETT kampobjekt.** En kamp i en turnering er en HELT
+VANLIG kamp med `parent_event_id` — samme kampmotor, live-rapportering,
+score, bilder, kommentarer, resultat og statistikk som alle andre.
+Det finnes ingen egen «turneringskamp»-type, og kampen skal ALDRI
+dupliseres som en separat kalenderhendelse. Samme objekt vises i
+Kalender, Hjem, Varsler og Sesong.
+`__tests__/calendarList.test.ts` vokter dette eksplisitt.
+
+### Turneringen er ikke lenger filtrert bort fra Kalender
+
+`getTeamEvents` hadde `.neq('type', 'turnering')`. Den er BORTE.
+⚠️ Følgen er at turneringer nå dukker opp overalt der `getTeamEvents`
+brukes — derfor hopper `pickNextEvents` i `TeamHomeScreen` eksplisitt
+over dem. Legger du til et nytt sted som bruker `getTeamEvents`, ta
+stilling til turneringscontaineren.
+
+### Ny `src/shared/calendarList.ts` + 19 tester
+
+Ren grupperingslogikk, ingen React og ingen Supabase.
+`buildCalendarRows()` gjør turneringen til ÉN RAD PER DAG den dekker, og
+henger dagens kamper under den raden. Kampene plukkes ut av den flate
+lista — de er tegnet inni turneringen, ikke i tillegg til den.
+⚠️ **Ett bevisst unntak:** en turneringskamp med dato UTENFOR
+turneringens periode, eller med slettet turnering, faller tilbake til en
+vanlig rad. Bedre en løs kamp enn en usynlig kamp. Testet.
+`splitByTime()` deler per DAG, så dag 1 kan ligge i arkivet mens dag 2
+fortsatt er kommende.
+
+### Ny `src/components/TournamentDayCard.tsx`
+
+Kompakt turneringsheader («HamKam Cup · Dag 1 av 2» + «14.–16. august»)
+med dagens kamper under: tidspunkt, motstander, bane og status. Tom dag
+viser «Kampoppsettet er ikke klart ennå». Gullflaten (`sun`/`goldInk`)
+er samme turneringsspråk som StatusPill. Et trykk på en kamprad åpner
+den VANLIGE kampskjermen.
+
+### Start- og sluttdato på turnering
+
+Type «Turnering» gir to datofelt («Starter»/«Slutter»), begge den nye
+`DateField`. Sluttdato står som SAMME dag til noen flytter den, så
+endagsturneringen er like rask. Ny `minDate`-prop hindrer at slutt kan
+ligge før start; flytter du starten forbi slutten, følger slutten med.
+⚠️ **`end_time` på en turnering bærer SLUTTDATOEN (siste dag 23:59),
+ikke et klokkeslett.** Derfor viser `EventDetailScreen` perioden i
+datolinja i stedet for «09:00–23:59». 23:59 er også det som gjør at en
+endagsturnering tilfredsstiller DB-kravet `end_time > start_time`
+(00019). Ingen migrasjon trengs.
+
+### Landing etter opprettelse
+
+- fra Sesong → tilbake til Sesong (`goBack` alene)
+- fra turneringsside → bli stående på turneringen
+- ellers → Kalender, **på hendelsens dato**
+
+Kalenderen tar nå `focusDate` (en `dayKey`, ikke ISO — ISO er UTC og
+bommer på kvelden) og ruller til raden ved å måle `onLayout`-posisjonen.
+Turnering gir i tillegg bekreftelsen «Turneringen er opprettet» med
+navn og periode.
+`RootTabParamList.KalenderStack` tar nå `NavigatorScreenParams`, og
+modalens parametere er samlet i én `NewEventParams` — den var duplisert
+i tre stacker.
+
+### Hjem
+
+`pickNextEvents` hopper over turneringscontaineren. Kampen vises med en
+liten **turneringsetikett** i stedet (`NextEventHero.tournamentTitle` →
+gull StatusPill med cupens navn). Det er det ENESTE stedet en turnering
+nevnes på Hjem — aldri et eget turneringskort i tillegg.
+
+### Kamp lagt til fra turneringsdetaljen
+
+`EventDetailScreen` sender nå `parentFrom`/`parentTo` (ISO) videre.
+Kampen ÅPNER på turneringens første dag, og havner datoen utenfor
+perioden vises «Utenfor HamKam Cup (14.–16. august). Kampen lagres
+likevel.»
+⚠️ Dette er en BESKJED, ikke en sperre — Brage skrev «normalt», og en
+cup kan bli forlenget. En blokkert lagring ville vært verre.
+
+### Prikkene i datovelgeren
+
+`getBusyDays` markerer nå HELE turneringsperioden, ikke bare første dag.
+
+📱 **TELEFONTEST:** (a) opprett turnering over tre dager fra «+» → se
+bekreftelsen → land i Kalender på startdatoen → tre rader med «Dag 1/2/3
+av 3» og «Kampoppsettet er ikke klart ennå»; (b) åpne turneringen → «Ny
+kamp i turneringen» → datoen skal åpne på cupens første dag; (c) legg
+inn to kamper samme dag → de skal samles under ÉN header, og IKKE også
+ligge løse i lista; (d) sjekk Hjem: kampen med cupnavnet som gull-pill,
+ingen eget turneringskort; (e) sett en kampdato utenfor cupen → beskjed,
+men lagring skal virke, og kampen skal da stå som en vanlig rad.
+
+**IKKE bygget (Brages «kan», ikke «skal»):** varsling på turneringsnivå
+ved publisert kampoppsett/avlysning. Mål og kamphendelser grupperes
+fortsatt per enkeltkamp, som før.
+**Neste separate skive (besluttet):** native tidsvelger. Det maskerte
+klokkeslettfeltet står som det er i denne leveransen.
+
+**Fortiden er åpen 30 dager tilbake.** Skjermen er allerede rollestyrt
+(`isTeamAdmin` i CreateSheet + `is_team_admin` i `create_event`), så
+«for trener/lagleder» følger av seg selv. Er starttiden passert, står
+det under klokkeslettet at laget ikke får varsling, og lagringen ber om
+bekreftelse først.
+
+**Migrasjon `00056` (I PROD, verifisert)** — `notify_on_event_created()`
+hopper over arrangementer der `start_time < now()`. Ren
+`CREATE OR REPLACE`, ingen skjemaendring, bygger på 00033.
+⚠️ Grensen er `now()`, ikke «i dag» — en trening som startet 12:00 er
+historikk 16:00. Appen bruker samme test, så bekreftelsen ikke lyver.
+Påminnelsen (00055) trengte ingen vakt: vinduet er 50–70 min FØR
+ankeret, så fortiden kan aldri treffe det. Verifisert.
+
+📱 **TELEFONTEST:** (a) «+» → Ny hendelse → trykk datoraden → bla til
+oktober → legg inn en sesongkamp (dette var UMULIG før); (b) sjekk at
+prikker dukker opp på dager laget alt har noe, uten at kalenderen
+låser seg mens de lastes; (c) velg en dato forrige uke → se linja under
+klokkeslettet → lagre → bekreftelsesdialog → sjekk at ANDRE konto IKKE
+får varsel; (d) «+ Legg til sluttid» → skriv 00:30 på en 22:00-hendelse
+→ «Slutter dagen etter»; (e) forstørret skrift (Innstillinger →
+Tilgjengelighet) → rutenettet skal vokse, ikke klippe.
+
+**Neste ledd i Brages opprinnelige bestilling (IKKE bygget):** samme
+kalenderspråk som en VALGBAR VISNING på Kalender-siden. `DateField` er
+skrevet for skjemaet; en månedsvisning der vil trenge egen komponent,
+men `shared/calendar.ts` dekker matten.
+
+**Bindende rammer (uendret):**
 - Designretning A v2 er LÅST. Tokens i `src/theme/tokens.ts` er eneste
-  fargekilde. `docs/BRAND_UI.md` er FORELDET og villeder — ikke bygg fra
-  den (se UI-lista lenger nede).
-- Mint (`#02FFAB`) er handlingsfarge, aldri bakgrunn. Valgt dag skal
-  bruke samme «valgt»-språk som resten (heiaSoft-fyll + heia-ramme).
+  fargekilde. `docs/BRAND_UI.md` er FORELDET og villeder.
+- Mint (`#02FFAB`) er handlingsfarge, aldri bakgrunn.
 - Faste høyder klipper ved forstørret skrift — bruk `minHeight`.
 - ALDRI `tsc` og ALDRI pod install/build i bakgrunnen (se minnene
   `feedback_tsc_workflow`, `feedback_dev_environment`).
-
-**Rekkefølge Brage har bestemt:** kalender ved opprettelse FØRST, så
-visningsvalg på Kalender-siden.
-
-**NB — egen, allerede bestilt skive som IKKE er denne:** redigering av
-arrangement (`update_event`-RPC + tosidig NewEventScreen + «Avlys kamp»).
-Brage tar den i en annen samtale. De to skivene rører SAMME skjerm, så
-den som kommer sist må rebase på den andre.
 
 ## ▶️ UI-LØFT FØR PILOT — SKIVE 1 (FØRSTEGANGSLØPET) BYGGET 2026-08-05
 
