@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   ScrollView,
@@ -13,18 +14,19 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
-import {colors, typography, spacing, radius, fonts} from '../theme';
-import {Button, DateField} from '../components';
+import {colors, typography, spacing, radius} from '../theme';
+import {Button, DateField, TimeField} from '../components';
 import {useActiveTeam} from '../context';
 import {
   createEvent,
   getBusyDays,
+  getEventForEdit,
   getTournaments,
+  updateEvent,
   type TournamentOption,
 } from '../lib/api/events';
 import {
   addDays,
-  atTime,
   dateFromDayKey,
   dayDiff,
   dayKey,
@@ -33,6 +35,16 @@ import {
   startOfDay,
   type BusyDays,
 } from '../shared/calendar';
+import {
+  buildSavePayload,
+  changedEventFields,
+  defaultTitle,
+  eventIsUpcoming,
+  formValuesFromEvent,
+  willNotifyTeam,
+  type EditableEvent,
+  type EventFormValues,
+} from '../shared/eventForm';
 import type {
   EventType,
   HomeStackParamList,
@@ -64,46 +76,31 @@ const TYPE_OPTIONS: {value: EventType; label: string}[] = [
   {value: 'annet', label: 'Annet'},
 ];
 
-/** Tvinger inndata mot HH:MM mens brukeren skriver, uten native picker. */
-function maskTime(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 4);
-  if (digits.length <= 2) return digits;
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
-}
-
-function parseTime(value: string): {hours: number; minutes: number} | null {
-  const match = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
-  return {hours, minutes};
-}
-
-/** Tittel er valgfri i UI-et — DB krever den, så vi fyller inn en fornuftig. */
-function defaultTitle(type: EventType, opponent: string): string {
-  switch (type) {
-    case 'trening':
-      return 'Trening';
-    case 'kamp':
-      return opponent.trim() ? `Kamp mot ${opponent.trim()}` : 'Kamp';
-    case 'turnering':
-      return 'Turnering';
-    case 'sosialt':
-      return 'Sosialt';
-    default:
-      return 'Hendelse';
-  }
-}
+/** Typen som ren opplysning når den er låst (redigering). */
+const TYPE_LABEL: Record<EventType, string> = {
+  trening: 'Trening',
+  kamp: 'Kamp',
+  turnering: 'Turnering',
+  sosialt: 'Sosialt',
+  annet: 'Hendelse',
+};
 
 export function NewEventScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const {activeTeamSpaceId} = useActiveTeam();
 
-  // Tre innganger til modalen:
+  // Skjermen er TOSIDIG (Brage 2026-08-07). `eventId` = redigering av det
+  // arrangementet; ellers oppretter vi et nytt. Det er den ENESTE forskjellen
+  // i selve skjemaet — feltene, datovelgeren og regnestykkene er de samme, og
+  // et eget redigeringsskjema ville betydd to steder å holde i synk.
+  const editEventId = route.params?.eventId;
+  const isEdit = !!editEventId;
+
+  // Fire innganger til modalen:
   //  - vanlig «Ny hendelse» (+): fri typevelger
   //  - «Ny kamp» fra en turneringsside: type låst til kamp + stemplet
   //  - «+ Ny turnering» fra sesongsiden: type låst til turnering
+  //  - «Rediger» fra en hendelsesside: alt prefylt, typen låst
   // Låst type = typevelgeren skjules; en rad med døde chips skaper bare tvil.
   const parentEventId = route.params?.parentEventId;
   const parentTitle = route.params?.parentTitle;
@@ -130,8 +127,9 @@ export function NewEventScreen({navigation, route}: Props) {
   );
 
   useEffect(() => {
-    // Kun den frie flyten trenger listen — de låste inngangene vet alt.
-    if (inTournament || isNewTournament || !activeTeamSpaceId) return;
+    // Kun den frie flyten trenger listen — de låste inngangene vet alt, og
+    // redigering flytter ikke en kamp mellom turneringer (egen skive).
+    if (isEdit || inTournament || isNewTournament || !activeTeamSpaceId) return;
     let cancelled = false;
     getTournaments(activeTeamSpaceId)
       .then(list => {
@@ -143,7 +141,7 @@ export function NewEventScreen({navigation, route}: Props) {
     return () => {
       cancelled = true;
     };
-  }, [inTournament, isNewTournament, activeTeamSpaceId]);
+  }, [isEdit, inTournament, isNewTournament, activeTeamSpaceId]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
 
@@ -191,7 +189,58 @@ export function NewEventScreen({navigation, route}: Props) {
   // chipsene er borte av samme grunn, og skal ikke tilbake.
   //
   // `end_time` settes fortsatt for ÉN type: turneringen, der den bærer
-  // SLUTTDATOEN og ikke et klokkeslett. Se performSave.
+  // SLUTTDATOEN og ikke et klokkeslett. Se `resolveEndTime`.
+  //
+  // ⚠️ VED REDIGERING arves BEGGE feltene fra det lagrede arrangementet i
+  // stedet for å bli tømt — `update_event` er en full erstatning, og et
+  // arrangement fra før 2026-08-06 skal ikke miste sluttiden eller oppmøtet
+  // fordi noen rettet et stedsnavn. Regnestykket bor i `shared/eventForm.ts`.
+
+  // Arrangementet vi redigerer, slik det ligger i basen. `null` i
+  // opprettelsesmodus — og fram til hentingen er ferdig.
+  const [original, setOriginal] = useState<EditableEvent | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    if (!editEventId || !activeTeamSpaceId) return;
+    let cancelled = false;
+    getEventForEdit(editEventId, activeTeamSpaceId)
+      .then(event => {
+        if (cancelled) return;
+        // ÉN kilde til prefyllingen, og den er delt med testene. Feltene
+        // settes samlet så skjemaet aldri står halvfylt.
+        const values = formValuesFromEvent(event);
+        setType(values.type);
+        setTitle(values.title);
+        setDay(values.day);
+        setEndDay(values.endDay);
+        setTime(values.time);
+        setLocation(values.location);
+        setDescription(values.description);
+        setOpponent(values.opponent);
+        setIsHome(values.isHome);
+        setOriginal(event);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editEventId, activeTeamSpaceId]);
+
+  // Hvor langt tilbake datovelgeren rekker. 30 dager ved opprettelse — men
+  // redigerer man en kamp fra i vår, MÅ dens egen dato være innenfor
+  // rekkevidde, ellers kan man ikke velge den tilbake igjen etter et
+  // feiltrykk. Vinduet strekkes derfor til å dekke arrangementet selv.
+  //
+  // ⚠️ Står FØR prikkehentingen med vilje: den henter samme vindu. Hentet vi
+  // bare 30 dager tilbake, ville hver måned før det stått uten prikker mens
+  // cellene fortsatt var trykkbare — «ingenting den måneden» er en løgn.
+  const daysBack = useMemo(() => {
+    if (!original) return DAYS_BACK;
+    return Math.max(DAYS_BACK, -dayDiff(original.startTime, today));
+  }, [original, today]);
 
   // Prikkene i kalenderen. Hentes ved åpning, men kalenderen venter ALDRI på
   // dem — feiler kallet, mangler bare prikkene.
@@ -201,7 +250,7 @@ export function NewEventScreen({navigation, route}: Props) {
   useEffect(() => {
     if (!activeTeamSpaceId) return;
     let cancelled = false;
-    const from = addDays(today, -DAYS_BACK);
+    const from = addDays(today, -daysBack);
     const to = new Date(
       today.getFullYear(),
       today.getMonth() + MONTHS_AHEAD + 1,
@@ -223,13 +272,49 @@ export function NewEventScreen({navigation, route}: Props) {
     return () => {
       cancelled = true;
     };
-  }, [activeTeamSpaceId, today]);
+  }, [activeTeamSpaceId, today, daysBack]);
 
   const isMatch = type === 'kamp';
   const isTournament = type === 'turnering' || isNewTournament;
 
-  const parsedTime = parseTime(time);
-  const timeInvalid = time.length > 0 && !parsedTime;
+  // ⛔ Ingen «ugyldig klokkeslett»-tilstand lenger. `TimeField` er et
+  // rutenett, så `time` kan bare være en verdi den selv har sendt — det
+  // maskerte tekstfeltet var det eneste som kunne produsere «17:75».
+  // `buildSavePayload` validerer fortsatt, som siste skanse.
+
+  // Skjemaets verdier samlet, slik `shared/eventForm.ts` vil ha dem. Det er
+  // DENNE formen regnestykkene og testene deler — skjermen holder bare
+  // tilstanden, den regner ikke selv.
+  const values: EventFormValues = useMemo(
+    () => ({
+      type: isTournament ? 'turnering' : type,
+      title,
+      day,
+      endDay,
+      time,
+      location,
+      description,
+      opponent,
+      isHome,
+    }),
+    [
+      isTournament,
+      type,
+      title,
+      day,
+      endDay,
+      time,
+      location,
+      description,
+      opponent,
+      isHome,
+    ],
+  );
+
+  const payload = useMemo(
+    () => buildSavePayload(values, original ?? undefined),
+    [values, original],
+  );
 
   // Sluttdatoen kan aldri ligge før starten. Flytter man startdatoen forbi
   // den, følger sluttdatoen med — «samme dag» er standarden, og en dratt
@@ -249,20 +334,56 @@ export function NewEventScreen({navigation, route}: Props) {
 
   const canSave =
     !!activeTeamSpaceId &&
-    parsedTime !== null &&
+    payload !== null &&
+    (!isEdit || original !== null) &&
     (!isMatch || opponent.trim().length > 0);
 
-  const startTime = parsedTime
-    ? atTime(day, parsedTime.hours, parsedTime.minutes)
-    : null;
-  const startsInPast = startTime !== null && startTime.getTime() < Date.now();
+  const startTime = payload?.startTime ?? null;
+  const startsInPast = startTime !== null && !eventIsUpcoming(startTime);
+
+  // ⚠️ Speiler vakten i 00057, ikke en gjetning: laget varsles kun når
+  // arrangementet fortsatt ligger fram i tid OG et felt databasen faktisk ser
+  // på er endret. Uten den ville skjemaet lovet en push som aldri kom — eller
+  // tiet om en som kom.
+  const notifiesTeam =
+    isEdit && original !== null && payload !== null
+      ? willNotifyTeam(original, payload)
+      : false;
+
+  const unchanged =
+    isEdit &&
+    original !== null &&
+    payload !== null &&
+    changedEventFields(original, payload).length === 0;
 
   const performSave = useCallback(async () => {
-    if (!activeTeamSpaceId || !parsedTime || !startTime || saving) return;
+    if (!activeTeamSpaceId || !payload || saving) return;
 
     setSaving(true);
     try {
-      // `meetingTime` sendes ikke herfra — skjemaet spør ikke om det
+      if (isEdit && original) {
+        // FULL erstatning (00057). `endTime` og `meetingTime` kommer med fra
+        // `buildSavePayload`, som arver dem fra det lagrede arrangementet —
+        // ellers ville en rettelse av stedsnavnet slettet dem.
+        await updateEvent({
+          eventId: original.id,
+          title: payload.title,
+          startTime: payload.startTime,
+          endTime: payload.endTime,
+          meetingTime: payload.meetingTime,
+          location: payload.location,
+          description: payload.description,
+          opponent: payload.opponent,
+          isHome: payload.isHome,
+        });
+        // Tilbake dit man kom fra — hendelsessiden, som henter seg selv på
+        // nytt ved fokus. Å kaste brukeren over i Kalender etter en rettelse
+        // ville mistet stedet hun sto.
+        navigation.goBack();
+        return;
+      }
+
+      // `meetingTime` sendes ikke ved OPPRETTELSE — skjemaet spør ikke om det
       // (Brage 2026-08-06), og påminnelsen faller da til «starter om én
       // time». Kolonnen og RPC-parameteren står urørt for eksisterende data.
       //
@@ -272,13 +393,13 @@ export function NewEventScreen({navigation, route}: Props) {
       await createEvent({
         teamSpaceId: activeTeamSpaceId,
         type,
-        title: title.trim() || defaultTitle(type, opponent),
-        startTime,
-        endTime: isTournament ? atTime(endDay, 23, 59) : undefined,
-        location: location.trim() || undefined,
-        description: description.trim() || undefined,
-        opponent: isMatch ? opponent.trim() : undefined,
-        isHome,
+        title: payload.title,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+        location: payload.location,
+        description: payload.description,
+        opponent: payload.opponent,
+        isHome: payload.isHome,
         parentEventId:
           parentEventId ??
           (isMatch ? selectedTournament ?? undefined : undefined),
@@ -303,32 +424,28 @@ export function NewEventScreen({navigation, route}: Props) {
       if (isTournament) {
         Alert.alert(
           'Turneringen er opprettet',
-          `${title.trim() || defaultTitle(type, opponent)} · ${dayRangeLabel(
-            day,
-            endDay,
-          )}`,
+          `${payload.title} · ${dayRangeLabel(day, endDay)}`,
         );
       }
     } catch {
-      Alert.alert('Kunne ikke lagre', 'Prøv igjen om litt.');
+      Alert.alert(
+        isEdit ? 'Kunne ikke lagre endringen' : 'Kunne ikke lagre',
+        'Prøv igjen om litt.',
+      );
     } finally {
       setSaving(false);
     }
   }, [
     activeTeamSpaceId,
-    parsedTime,
-    startTime,
+    payload,
     saving,
+    isEdit,
+    original,
     type,
-    title,
-    opponent,
-    location,
-    description,
     isMatch,
     isTournament,
     endDay,
     day,
-    isHome,
     parentEventId,
     inTournament,
     isNewTournament,
@@ -339,30 +456,73 @@ export function NewEventScreen({navigation, route}: Props) {
   /**
    * Fortiden er lov, men aldri ved et uhell. Bekreftelsen sier også hva som
    * IKKE skjer: en historisk hendelse gir ingen «ny hendelse»-varsling til
-   * laget (migrasjon 00056). Uten den setningen ville stillheten sett ut
+   * laget (migrasjon 00056), og en historisk ENDRING gir ingen
+   * endringsvarsling (00057). Uten de setningene ville stillheten sett ut
    * som en feil.
+   *
+   * ⚠️ Ved redigering spør vi bare når lagringen FLYTTER arrangementet inn i
+   * fortiden. Retter man et sted på en kamp som ble spilt i forrige uke, er
+   * fortiden hele poenget — da er dialogen støy, og notatet under
+   * klokkeslettet sier allerede at laget ikke varsles.
    */
+  const movesIntoPast =
+    startsInPast &&
+    (!isEdit || !original || eventIsUpcoming(original.startTime));
+
   const handleSave = useCallback(() => {
-    if (!startTime || saving) return;
-    if (!startsInPast) {
+    if (!payload || saving) return;
+    // Ingenting er endret: å sende en tom lagring ville bare vært en rundtur
+    // til serveren. Basen ville uansett ikke skrevet et varsel.
+    if (unchanged) {
+      navigation.goBack();
+      return;
+    }
+    if (!movesIntoPast) {
       performSave();
       return;
     }
     Alert.alert(
-      'Legge inn noe som har vært?',
+      isEdit ? 'Flytte den tilbake i tid?' : 'Legge inn noe som har vært?',
       `${longDayLabel(day, today)} kl. ${time} er tilbake i tid. ` +
-        'Hendelsen legges i kalenderen, men laget får ingen varsling om den.',
+        (isEdit
+          ? 'Endringen lagres, men laget får ingen varsling om den.'
+          : 'Hendelsen legges i kalenderen, men laget får ingen varsling om den.'),
       [
         {text: 'Avbryt', style: 'cancel'},
         {
-          text: 'Legg inn likevel',
+          text: isEdit ? 'Flytt likevel' : 'Legg inn likevel',
           onPress: () => {
             performSave();
           },
         },
       ],
     );
-  }, [startTime, saving, startsInPast, performSave, day, today, time]);
+  }, [
+    payload,
+    saving,
+    unchanged,
+    movesIntoPast,
+    performSave,
+    isEdit,
+    day,
+    today,
+    time,
+    navigation,
+  ]);
+
+  // Redigering venter på arrangementet. Å tegne et tomt skjema først og fylle
+  // det ut et øyeblikk senere ville sett ut som at feltene ble slettet.
+  if (isEdit && !original) {
+    return (
+      <View style={[styles.screen, styles.centered]}>
+        {loadError ? (
+          <Text style={styles.errorText}>Kunne ikke hente hendelsen.</Text>
+        ) : (
+          <ActivityIndicator color={colors.heiaInk} />
+        )}
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -373,7 +533,19 @@ export function NewEventScreen({navigation, route}: Props) {
           paddingBottom: insets.bottom + spacing['3xl'],
         }}
         keyboardShouldPersistTaps="handled">
-        {inTournament || isNewTournament ? (
+        {/* Typen kan ikke endres på et arrangement som finnes: en trening som
+            blir en kamp trenger en match_session, og det er ikke en rettelse
+            (00057). En rad med døde chips ville bare invitert til et trykk
+            som ikke gjør noe. */}
+        {isEdit ? (
+          <Field label="Hva skjer?">
+            <View style={styles.lockedBanner}>
+              <Text style={styles.lockedBannerText}>
+                {TYPE_LABEL[type] ?? 'Hendelse'}
+              </Text>
+            </View>
+          </Field>
+        ) : inTournament || isNewTournament ? (
           <Field label="Hva skjer?">
             <View style={styles.tournamentBanner}>
               <Text style={styles.tournamentBannerText}>
@@ -471,7 +643,7 @@ export function NewEventScreen({navigation, route}: Props) {
             onChange={setStartDay}
             busy={busy}
             busyLoading={busyLoading}
-            daysBack={DAYS_BACK}
+            daysBack={daysBack}
             monthsAhead={MONTHS_AHEAD}
             disabled={saving}
           />
@@ -508,22 +680,18 @@ export function NewEventScreen({navigation, route}: Props) {
         )}
 
         <Field label="Klokkeslett">
-          <TextInput
-            style={[styles.input, styles.timeInput]}
-            value={time}
-            onChangeText={raw => setTime(maskTime(raw))}
-            placeholder="18:00"
-            placeholderTextColor={colors.textTertiary}
-            keyboardType="number-pad"
-            maxLength={5}
-            editable={!saving}
-          />
-          {timeInvalid && (
-            <Text style={styles.errorText}>Skriv klokkeslettet som 18:00</Text>
-          )}
-          {startsInPast && !timeInvalid && (
+          <TimeField value={time} onChange={setTime} disabled={saving} />
+          {startsInPast && (
             <Text style={styles.noteText}>
               Dette tidspunktet har vært. Laget får ingen varsling.
+            </Text>
+          )}
+          {/* Sier sant om konsekvensen FØR trykket. Vakten i 00057 og denne
+              setningen regnes ut av samme funksjon — de kan ikke komme i
+              utakt. */}
+          {notifiesTeam && (
+            <Text style={styles.noteText}>
+              Laget får én beskjed om det du har endret.
             </Text>
           )}
         </Field>
@@ -554,11 +722,14 @@ export function NewEventScreen({navigation, route}: Props) {
         <View style={styles.saveRow}>
           <Button
             title={
-              // Turneringen havner ikke i kalenderen, så knappen kan ikke
-              // love det. Gjelder begge inngangene til typen.
-              isTournament || isNewTournament
-                ? 'Opprett turnering'
-                : 'Legg til i kalenderen'
+              // Redigering LOVER ingenting om hvor noe havner — det ligger
+              // allerede der. Turneringen havner ikke i kalenderen, så
+              // knappen kan ikke love det heller.
+              isEdit
+                ? 'Lagre endringer'
+                : isTournament || isNewTournament
+                  ? 'Opprett turnering'
+                  : 'Legg til i kalenderen'
             }
             onPress={handleSave}
             disabled={!canSave}
@@ -621,6 +792,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  centered: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   field: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -672,14 +847,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     color: colors.textPrimary,
   },
-  // Klokkeslettet er skjermens tall — stort og stolt i displayfonten (A v2).
-  timeInput: {
-    alignSelf: 'flex-start',
-    minWidth: 108,
-    textAlign: 'center',
-    fontSize: 20,
-    fontFamily: fonts.display,
-  },
+  // `timeInput` er FJERNET (2026-08-07). Klokkeslettet er ikke lenger et
+  // tekstfelt — det er `TimeField`, som eier sin egen typografi. Det store
+  // tallet i displayfonten bor der nå.
   multiline: {
     minHeight: 96,
     textAlignVertical: 'top',
@@ -711,5 +881,21 @@ const styles = StyleSheet.create({
     ...typography.body,
     fontWeight: '700',
     color: colors.goldInk,
+  },
+  // Låst type ved redigering. Nøytral flate, ikke turneringens gule: dette
+  // er en opplysning om hva hendelsen ER, ikke en kontekst man har valgt.
+  lockedBanner: {
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    alignSelf: 'flex-start',
+  },
+  lockedBannerText: {
+    ...typography.body,
+    fontWeight: '700',
+    color: colors.textSecondary,
   },
 });

@@ -1,14 +1,25 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: REDIGERING AV ARRANGEMENT
+## ▶️ NESTE SAMTALE: EGRESS
 
-Brages valg 2026-08-07. Skiva er beskrevet i egen bolk lenger ned
-(«KØET ETTER DEN») — les den før du starter. Kort: `update_event`-RPC +
-tosidig `NewEventScreen` + «Avlys kamp», og en åpen sak om at
-endringsvarslene ikke er vaktet mot historiske arrangementer.
+Brage 2026-08-07: neste tema er **egress**, og han kommer med instruksene
+selv i en lang melding. Ikke begynn å grave før den er lest — det er hans
+ramme som avgjør hva som skal måles.
+
+Redigeringsskiva før den er **GODKJENT OG VERIFISERT PÅ TELEFON av Brage
+2026-08-07** («det funker på telefon»), og migrasjon `00057` er i prod.
+Skiva er lukket.
+
+Åttepunktslista i bolken under er beholdt som REGRESJONSSJEKK — kjør den
+hvis noen rører redigering, varslene eller `shared/eventForm.ts` igjen.
+Ingen av punktene fanges av `npx jest`.
+
+✅ **Klokkeslettvelgeren** (hjul i et ark, ren JS) ble bygget rett etter og
+er også **godkjent på telefon** — runde 2, etter at rutenettet ble avvist
+på enhet. Egen bolk lenger nede.
 
 Kalenderen er ferdig og lukket. Ikke rør den uten grunn — og ruller du
-den likevel, les bolken under FØRST.
+den likevel, les kalenderbolken FØRST.
 
 ## ✅ KALENDER-SIDEN FERDIG OG GODKJENT PÅ TELEFON 2026-08-07
 
@@ -273,31 +284,275 @@ punktene fanges av `npx jest`.
   meningsløs da Måned ble et ARK i stedet for en modus — det finnes ikke
   lenger en visning å huske. Borte med vilje, ikke glemt.
 
-## ⏳ KØET ETTER DEN: REDIGERING AV ARRANGEMENT
+## ✅ REDIGERING AV ARRANGEMENT — FERDIG OG VERIFISERT PÅ TELEFON 2026-08-07
 
-Kalendervelgeren gikk bevisst FØRST slik at redigeringsskiva kan
-gjenbruke `DateField` i stedet for å finne opp datovalget på nytt.
-Skiva er: `update_event`-RPC + tosidig `NewEventScreen` + «Avlys kamp».
+Skiva er levert i sin helhet: `update_event`-RPC, tosidig
+`NewEventScreen`, «Avlys kamp» som statusendring, og vakten mot
+historiske arrangementer som 00056 lot stå åpen.
 
-**Les før du starter:** `NewEventScreen` ble bygget om 2026-08-06 (ny
-feltrekkefølge, kalendervelger, ingen tidsfelt utover klokkeslett).
+**Brage godkjente omfang og kode, og bekreftet deretter på enhet at det
+virker. Skiva er LUKKET** — og den gikk i ÉN runde, i motsetning til
+kalenderen som tok fem. Forskjellen var trolig at all logikken lå i rene
+funksjoner med tester før noe ble tegnet.
 
-⛔ **IKKE gjeninnfør felt som er fjernet.** Oppmøtetid, sluttid som
-klokkeslett, varighetschips og hurtigdatoer er BESLUTTET borte (Brage
-2026-08-06). At nye arrangementer ikke setter `meeting_time` er
-akseptert: påminnelsen sier «Kampen starter om én time», og det er
-riktig. Kolonnen er fortsatt nullable og fallback-logikken i 00055 står
-— for eksisterende data. **Oppmøtetid er verken en blokkering eller en
-hovedoppgave i denne skiva.**
+Lista lenger nede står igjen som REGRESJONSSJEKK, ikke som en gjenstående
+oppgave.
 
-Turneringens `end_time` er det ENESTE unntaket: den bærer sluttdatoen
-(siste dag 23:59), ikke et klokkeslett. Redigering må behandle den som
-en DATO.
+✅ **Migrasjon `00057` er I PROD** (pushet 2026-08-07, bekreftet med
+`supabase migration list`).
 
-Åpen sak arvet fra kalenderskiva: **endringsvarslene (00054) er IKKE
-vaktet mot historiske arrangementer.** 00056 stoppet «ny hendelse» for
-fortiden, men redigerer noen en kamp fra i går, varsles laget fortsatt.
-Ta stilling til det i redigeringsskiva.
+### Det som ble bygget
+
+**`supabase/migrations/00057_update_event.sql`** — fem ting:
+1. `update_event()` — samme vakt som `create_event` (`is_team_admin`,
+   SECURITY DEFINER).
+2. `set_match_cancelled()` — «Avlys kamp» / «Sett opp igjen».
+3. **Vakten mot historikk** i `notify_event_change()`.
+4. Turneringens `end_time` som en varslet endring.
+5. Tydeligere pushtekst når en kamp avlyses.
+
+**`src/shared/eventForm.ts`** (ny) — ALL skjemalogikken som rene
+funksjoner: prefylling, nyttelast, hva som er endret, og om laget
+varsles. Ingen React, ingen Supabase. Det er dette som gjør at
+opprettelse og redigering kan dele skjerm uten å dele feil.
+
+**`__tests__/eventForm.test.ts`** — 38 tester, alle grønne. De seks
+tilfellene Brage krevde har hver sin beskrivelse. Totalt: **125 grønne**.
+
+**`NewEventScreen`** er tosidig på ÉN parameter: `route.params.eventId`.
+Samme felter, samme `DateField`, samme regnestykker — bare prefylt og
+med `update_event` i den andre enden.
+
+**`EventDetailScreen`** har fått «Rediger» + «Avlys kamp» rett under
+hero-kortet, kun for trener/lagleder/admin, og henter seg nå på nytt ved
+FOKUS (modalen lukker seg tilbake hit — med mount-effekten sto den igjen
+med gammel dato).
+
+### ⛔ Sju ting som er LÅST i denne skiva
+
+1. **Avlysning er en STATUS, aldri en sletting.** Kampen blir stående i
+   kalenderen med «Avlyst»-pill. En forelder som husker at det skulle
+   være kamp skal FINNE svaret — en slettet kamp ser ut som en kamp man
+   har husket feil. `set_match_cancelled` kan bare gå
+   `planlagt → avlyst` og tilbake; en kamp som er i gang eller spilt
+   avlyses ikke.
+2. **Typen kan ikke endres.** Trening ↔ kamp krever at en
+   `match_session` opprettes eller fjernes — det er ikke en rettelse.
+   Typevelgeren er byttet ut med en nøytral, låst plate i redigering.
+   Samme grunn til at en kamp ikke kan flyttes inn i eller ut av en
+   turnering herfra.
+3. **`update_event` er en FULL ERSTATNING, ikke en patch.** NULL betyr
+   «feltet er tomt», ikke «ikke rør det» — det er den eneste tolkningen
+   som lar en trener SLETTE et sted eller en beskjed.
+   ⚠️ Konsekvensen: de to feltene skjemaet IKKE viser må sendes med, og
+   `shared/eventForm.ts` arver dem:
+   - **Sluttid** arves som VARIGHET, ikke som tidspunkt. «18:00–19:30»
+     flyttet til kl. 17 blir «17:00–18:30». Sendte vi tidspunktet
+     uendret, ville sluttiden havnet FØR starten så snart noen flyttet
+     dagen, og DB-kravet `end_time > start_time` hadde brutt.
+   - **Oppmøtetid** arves som AVSTAND til starten. «Møt opp 30 min før»
+     er det avtalen faktisk sier, og avstanden er aldri negativ — så
+     `meeting_time <= start_time` kan ikke brytes av en flytting.
+   ⛔ Ingen av dem er gjeninnført som FELT. Beslutningen fra 2026-08-06
+   står; dette handler kun om å ikke ØDELEGGE data vi ikke viser.
+
+   ⚠️ **Arven er DEFENSIV, ikke et vern om ekte data — og det er verdt å
+   vite før noen bruker tid på den.** Brage bekreftet 2026-08-07 at
+   testerne aldri opprettet reelle arrangementer gjennom TestFlight
+   1.0 (3), og hans egne gamle testhendelser er det ingen grunn til å
+   bevare. Med andre ord: det finnes i praksis INGEN legacy-rader med
+   `end_time` eller `meeting_time` å miste.
+   Koden blir stående — den er skrevet, testet og gjør `update_event`
+   trygg *ved konstruksjon* i stedet for ved antakelser om datagrunnlaget
+   — men den er BEVISST ikke et punkt i den manuelle sluttesten. Finner du
+   den og lurer på hvorfor ingen har verifisert den mot ekte data: det er
+   fordi det ikke finnes ekte data. Ikke bygg ut rundt den.
+   (Til orientering, hvis det likevel skulle dukke opp gamle rader:
+   TestFlight-bygget hadde varighetschips med **1½ t som standardvalg**,
+   så alt laget der ville hatt `end_time`. Oppmøtetid fantes derimot bare
+   lokalt 2026-08-06, aldri i noe TestFlight-bygg.)
+4. **Turneringens `end_time` er en DATO** (siste dag 23:59), og
+   `resolveEndTime` behandler den som det. Turneringen faller ALDRI ned
+   i «bevar varigheten»-grenen — da ville en helgecup blitt 38 timer
+   lang fra ny startdato i stedet for til og med søndag. Egen test.
+5. **Ett arrangement som alt har startet varsler ALDRI.** Vakten ligger i
+   `notify_event_change()` — det ene stedet BEGGE triggerne fra 00054 går
+   gjennom. Grensen er `now()`, ikke «i dag»: en trening som startet kl.
+   12 er historikk kl. 16, selv om datoen er dagens.
+   ⚠️ Det er den NYE starttiden som avgjør. Flytter man en utsatt kamp
+   fra i går til neste tirsdag, VARSLES laget — arrangementet er
+   framtidig etter lagringen. Går flyttingen andre veien (et feilskrevet
+   årstall som rettes tilbake), er det stille. Begge retningene har test.
+6. **Appen og basen regner ut varslingen med SAMME funksjon-par.**
+   `eventIsUpcoming()` er SQL-vaktens tvilling, og den brukes både av
+   notatet i skjemaet og av bekreftelsen før en avlysning. Skriver du
+   `> Date.now()` et nytt sted, har du laget en andre sannhet.
+7. **Beskrivelse varsler fortsatt IKKE** (Brage 2026-08-06), og heller
+   ikke hjemme/borte — basen ser ikke den endringen, og skjemaet skal
+   ikke love et varsel som ikke kommer. Begge har test.
+
+### Sluttest — MÅ kjøres på telefon
+
+Ingen av punktene fanges av `npx jest`. Bruk to enheter (eller en
+lagkamerat) på punkt 1, 4 og 6 — poenget ER hva de ANDRE får. Den som
+gjør endringen får aldri varsel om sin egen endring (00054).
+
+1. **Endre dato** på en kommende trening → laget får ÉN push, og raden i
+   Varsler sier «14.08. kl. 18:00 → 21.08. kl. 18:00».
+2. **Endre tidspunkt** → én push, «18:00 → 17:30» (uten dato, siden
+   dagen er den samme).
+3. **Endre sted** → én push, «Kunstgresset → Grusbanen».
+4. **Endre dato OG sted i samme lagring** → fortsatt ÉN push, med begge
+   linjene. (Dette er «én lagring = ett varsel», og det er det som
+   lettest ryker.)
+5. **Rediger en kamp som ble spilt for noen dager siden** — rett stedet,
+   lagre. Ingen push, ingen ny rad i Varsler, hos noen. Skjemaet skal ha
+   sagt fra på forhånd: «Dette tidspunktet har vært. Laget får ingen
+   varsling.»
+6. **Avlys en fremtidig kamp** → ÉN tydelig push («16.08. kl. 12:00 —
+   kampen spilles ikke»), kampen står igjen i kalenderen med
+   «Avlyst»-pill, og «Sett opp igjen» tar den tilbake.
+7. **Rediger en turnering** — flytt startdatoen, lagre, åpne den igjen:
+   perioden skal fortsatt være hel, og datolinja skal si «22.–23.
+   august». Sjekk også at prikkene i kalenderen dekker BEGGE dagene.
+8. Rediger noe uten å endre noe som helst → «Lagre endringer» lukker
+   modalen uten push (ingen tom rundtur til serveren).
+
+### Kjent, ikke rørt (bevisst)
+
+- **Hjem oppdaterer seg ikke ved fanebytte.** Redigerer man noe fra
+  Hjem → hendelsesside → Rediger, står «Neste hendelse»-kortet igjen med
+  gamle verdier til man drar ned. Dette er en EKSISTERENDE egenskap
+  (`TeamHomeScreen` laster ved mount + feed-realtime, ikke ved fokus) —
+  ikke noe redigering innførte. Kalender og hendelsessiden oppdaterer seg
+  begge ved fokus. En focus-refetch på Hjem koster fire nettverkskall per
+  fanebytte og kan omstokke feeden under fingeren; det er en egen
+  vurdering, ikke en snarvei.
+- **Sletting av arrangement** finnes fortsatt ikke. `deleted_at` er der,
+  RLS tillater det, ingenting bruker det. Avlysning dekker kampen;
+  «trening som ikke blir noe av» er ennå ikke besluttet.
+- **En avlyst kamp teller fortsatt som «opptatt dag»** i prikkene
+  (`getBusyDays` ser ikke på status). Liten, men ekte.
+
+### Åpne spørsmål til Brage
+
+- **Turneringens sluttdato som varsel** er NYTT i 00057 («siste dag er
+  endret: 23.08. → 24.08.»). Det var det eneste datofeltet i appen som
+  ikke sa fra. Lett å fjerne igjen — én gren i
+  `notify_on_event_updated()` — hvis en forlenget cup-helg heller skal
+  være stille.
+- **Avlysning av en LIVE kamp** er blokkert. En kamp som brytes i
+  regnvær har ingen vei ut i dag utenom «Slutt». Egen sak.
+
+## ✅ KLOKKESLETTVELGER — HJUL I ARK, GODKJENT PÅ TELEFON 2026-08-07
+
+Brage 2026-08-07, rett etter at redigering ble godkjent: klokka på «Ny
+hendelse» var fortsatt et maskert `HH:MM`-tekstfelt, mens datoraden rett
+over hadde fått en foldbar kalender i Nunito og mint. Feltet var ikke
+tregt — det var bart.
+
+**Ren JS. Ingen ny pakke, ingen pod install, ingen rebuild — Metro-reload
+holder.**
+
+### ⛔ Runde 1 ble avvist PÅ TELEFONEN, og hvorfor
+
+Første forsøk var et utfoldbart RUTENETT under raden, med samme mekanikk
+som `DateField`: 24 timeceller i 4×6 og 12 minuttceller i 2×6. Grønne
+tester, riktig mekanikk — og feil produkt. Brages dom: «for mye UI for å
+velge ett klokkeslett … mer som et kontrollpanel enn Heia».
+
+⚠️ **Lærdommen er verdt mer enn koden:** at `DateField` folder seg ut i
+skjemaet betyr ikke at klokka skal gjøre det samme. En måned ER et
+rutenett — 42 celler er datoens naturlige form. Et klokkeslett er ETT
+tall, og 36 flater for ett tall er en oppgave, ikke et valg. Ikke
+gjeninnfør rutenettet «for konsistens».
+
+### Slik er den nå
+
+**`src/components/TimeField.tsx`** — raden i skjemaet. Speiler
+`DateField`s sammendragsrad (brikke, flate, radius, chevron), så dato og
+klokkeslett leses som ett par. Trykk åpner arket.
+
+**`src/components/TimeSheet.tsx`** — arket: to hjul (00–23 og :00–:55 i
+femminutterssteg), mintbånd i midten, dempede naboer, «Avbryt» og
+«Ferdig». Eksisterende klokkeslett står valgt ved åpning.
+
+### ⛔ Fem ting som er LÅST her
+
+1. **Hjulene ligger i et ARK, aldri i skjemaet.** Det er HELE grunnen til
+   at de kan være hjul: to vertikale scrollflater rett inne i
+   `NewEventScreen`s egen `ScrollView` er nøyaktig den nøstede scrollen
+   kalenderskiva brukte fem runder på å bli kvitt. I en modal finnes
+   ingen ytre scroll å slåss med.
+2. **Flyten er NATIVE, ikke JS — ikke «optimaliser» den.**
+   `snapToInterval` + `decelerationRate="fast"` er native
+   UIScrollView-egenskaper; både utrullingen og snap-målet regnes ut i
+   `scrollViewWillEndDragging:` på native side, samme mekanikk som iOS'
+   egen picker. Dimmingen drives av `Animated.event` med
+   `useNativeDriver: true`, altså på UI-tråden. Det eneste JS-arbeidet er
+   ett `onMomentumScrollEnd` per gest. Skriver noen om dette til en
+   `onScroll`-drevet JS-animasjon, ryker hele poenget.
+   Presisjonen er eksakt: snap hviler alltid på et multiplum av
+   `ITEM_HEIGHT`.
+3. **`ScrollView`, ikke `FlatList`.** Med 24 og 12 elementer er
+   virtualisering ren overhead, og vindusberegningen kan gi tomme celler
+   under en rask fling. (Brage ba om «FlatList/snap-hjul»; avviket er
+   bevisst og er kun et bytte av beholder, ikke av mønster.)
+4. **Verdiene er TRYKKBARE, ikke bare rullbare.** Uten det var hjulet en
+   regresjon for VoiceOver: en scrollflate med ren tekst har ingen mål å
+   aktivere, så en skjermleserbruker kunne ikke velge noe som helst —
+   rutenettet det erstattet hadde ekte knapper. Trykk ruller til verdien
+   og velger den. Alle andre får en snarvei på kjøpet.
+5. **Startposisjonen settes med `contentOffset`, ikke `scrollTo`.** iOS
+   leser den ved opprettelse, så hjulene REMONTERES per åpning (`mountKey`).
+   Et `scrollTo` i en effekt måtte ventet på layout, og det er nettopp den
+   timingen som gjør slike velgere flakete.
+
+### Det vi IKKE får, og som du vil merke
+
+- **Ingen haptisk tikk.** iOS' egen picker gir ett hakk per verdi. Ekte
+  haptikk krever en native modul, og `Vibration.vibrate()` er på iOS en
+  ~400 ms hørbar alarmbrumming — ikke et tikk (låst funn). Hjulet er
+  stille. Det er den ENESTE målbare forskjellen mot en systemvelger.
+  ⚠️ Er dette utslagsgivende på telefonen, er neste steg
+  `@react-native-community/datetimepicker` — men da med ny native
+  modul, pod install, full rebuild, og et hjul som verken tar Nunito
+  eller mint.
+- **`allowFontScaling` er AV på hjultallene.** Snap krever fast radhøyde;
+  forstørret skrift ville sprengt raden i stedet for å vokse den.
+  Verdiene leses uansett opp av VoiceOver. Resten av appen har Dynamic
+  Type på — dette er det ene unntaket, og det er bevisst.
+
+### Ryddet bort samtidig
+
+- `maskTime()` i `shared/eventForm.ts` — FJERNET. Den fantes kun for
+  tekstfeltet; en maske uten tastatur er bare kode å vedlikeholde.
+- `timeInput`-stilen i `NewEventScreen` — FJERNET. Klokkeslettet eier sin
+  egen typografi nå.
+- Hele «ugyldig klokkeslett»-tilstanden. Arket kan bare sende verdier som
+  finnes. `buildSavePayload` validerer fortsatt, som siste skanse.
+
+### 📱 Kjørt og godkjent på telefon 2026-08-07 — behold som regresjonssjekk
+
+Kjør på nytt hvis noen rører hjulet, arket eller `TimeField`. Ingen av
+punktene fanges av `npx jest`.
+
+1. «+» → Ny hendelse → trykk klokkeslettraden → arket glir opp med
+   **dagens verdi valgt**, ikke 00:00.
+2. Dra begge hjulene raskt → skal snappe rent, uten å stoppe mellom to
+   verdier og uten tomme rader underveis.
+3. Trykk på en verdi to hakk unna → skal rulle dit og velge den.
+4. «Avbryt» → klokkeslettet i skjemaet er uendret.
+5. «Ferdig» → raden viser den nye tiden, og lagring bruker den.
+6. Rediger et eksisterende arrangement → arket åpner på arrangementets
+   egen tid.
+
+⛔ **Avrunding av gamle verdier er IKKE et testpunkt.** Et arrangement
+lagret med 18:07 fra det gamle tekstfeltet vises som 18:05 i hjulet, og
+`snapMinute()` håndterer det — men Brage har bekreftet at slike verdier
+ikke er bevaringsverdige (se den samme avklaringen om `end_time` og
+`meeting_time` i redigeringsbolken). Koden blir stående som forsvar, ikke
+som noe noen skal verifisere.
 
 ## ✅ KALENDERVELGER BYGGET 2026-08-06 (ren JS + én migrasjon)
 
@@ -849,16 +1104,12 @@ som en kamphendelse.
 
 **Tester: 20 grønne** (`npx jest __tests__/inbox.test.ts`).
 
-⛔ **BLOKKERER TESTINGEN: appen kan ikke redigere et arrangement.** Det
-finnes ingen redigeringsskjerm, ingen `updateEvent` i API-laget, og ingen
-kode som setter `avlyst` — RLS har UPDATE-policy på `events`, men
-ingenting bruker den. Triggerne i 00054 er korrekte og fyrer for enhver
-UPDATE (også fra SQL), men Brage kan ikke teste «arrangementendring» fra
-appen før en redigeringsflyt finnes. **Dette er neste skive og er ikke
-besluttet.** Minste versjon: gjør NewEventScreen tosidig (opprett/rediger)
-+ `update_event`-RPC med `is_team_admin`-vakt + «Avlys kamp» i
-EventDetail. Påminnelsen kan testes UTEN dette (opprett et arrangement med
-oppmøtetid ~1 t frem).
+✅ **LØST 2026-08-07 (var: «BLOKKERER TESTINGEN — appen kan ikke redigere
+et arrangement»).** Redigeringsskiva er bygget nøyaktig som den minste
+versjonen beskrev: tosidig `NewEventScreen`, `update_event`-RPC med
+`is_team_admin`-vakt, og «Avlys kamp» i EventDetail. Se bolken
+«REDIGERING AV ARRANGEMENT» øverst. Endringsvarslene fra 00054 kan
+dermed endelig testes fra telefonen — 00057 er i prod.
 
 ### 📋 STØTTEVARSLER — DOKUMENTERT, IKKE IMPLEMENTERT
 
