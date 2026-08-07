@@ -1,11 +1,21 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️ NESTE SAMTALE: REDIGERING AV ARRANGEMENT
+
+Brages valg 2026-08-07. Skiva er beskrevet i egen bolk lenger ned
+(«KØET ETTER DEN») — les den før du starter. Kort: `update_event`-RPC +
+tosidig `NewEventScreen` + «Avlys kamp», og en åpen sak om at
+endringsvarslene ikke er vaktet mot historiske arrangementer.
+
+Kalenderen er ferdig og lukket. Ikke rør den uten grunn — og ruller du
+den likevel, les bolken under FØRST.
+
 ## ✅ KALENDER-SIDEN FERDIG OG GODKJENT PÅ TELEFON 2026-08-07
 
 **Brage har kjørt hele sluttesten (ti punkter, nederst i bolken) på
 enhet. Alt grønt. Skiva er lukket.**
 
-Den tok fire runder, og de tre første ble avvist PÅ TELEFONEN mens
+Den tok FEM runder, og de fire første ble avvist PÅ TELEFONEN mens
 testene var grønne hele veien. Det er verdt å huske: alt i denne bolken
 handler om layout og scroll, og ingenting av det fanges av `npx jest`
 eller `eslint`. Rører du kalenderen, må du kjøre den.
@@ -17,6 +27,8 @@ Avvisningene, i rekkefølge:
 2. For høy topp, og hopp når historikk ble satt inn over agendaen.
 3. Datoraden hoppet opp og ned ved trykk på ulike fortidsdatoer.
 4. Tomtilstandsblokka skapte høydeendring og scrollhopp.
+5. Fortiden var fortsatt skjult og ble satt inn over agendaen på
+   forespørsel — selve mekanikken måtte bort, ikke justeres.
 
 ⚠️ **Én ting er bevisst ikke slått på:** `animated: false` i `fulfil()`.
 Landingen er nå bevist stabil, så den kan byttes til kontrollert
@@ -70,10 +82,11 @@ endring, og kjør sluttesten på nytt etterpå.
    (`calendar/MonthSheet.tsx`) UTENFOR scrollflaten. Chevronene bytter
    bare arkets egen måned; å åpne, bla og lukke kan ikke røre agendaen.
 3. **Ingen effekter som ruller.** Det finnes ÉN funksjon,
-   `scrollToDay(key, origin)`, og den kalles fra nøyaktig fem
-   brukerhandlinger: trykk i ukeraden, datovalg i månedsarket, «I dag»,
-   «Neste hendelse», og `focusDate` etter opprettelse. En tilstand som
-   endrer seg — valgt dato, uke, prikker, rader, lasting, refresh —
+   `scrollToDay(key, origin)`, med nøyaktig fire innganger: den ene
+   posisjoneringen ved åpning, trykk på en dato (ukerad eller månedsark),
+   «I dag», og `focusDate` etter opprettelse. Hele filen har ÉTT
+   `scrollTo`-kallested, inne i `fulfil()`. En tilstand som endrer seg —
+   valgt dato, uke, prikker, rader, lasting, refresh, historikkvinduet —
    fører ALDRI til scrolling.
 4. **Ingen `onScroll`, ingen timeout-fallbacks, ingen etterkorrigering.**
    Valgt dato beregnes først når brukeren har SLUPPET
@@ -125,31 +138,35 @@ ville dukket opp og forsvunnet på grunn av scrollposisjonen. Den settes
 bare av et datotrykk, og tømmes av et nytt datotrykk, «I dag», eller at
 brukeren begynner å DRA (gesten, ikke posisjonen).
 
-### ✅ Fortiden er IKKE en modus (Brage 2026-08-07)
+### ✅ ÉN sammenhengende kronologisk liste (Brage 2026-08-07)
 
-⛔ **«Se tidligere hendelser»-knappen er FJERNET og skal ikke tilbake.**
-Uke- og månedsnavigatoren ER inngangen til historikken; en egen
-historikkmodus var overflødig.
+⛔ **Fortiden skjules ALDRI.** Er det fredag, ligger onsdagens trening
+allerede montert over dagens seksjon; man scroller bare opp. Oppover er
+tidligere, nedover er senere, datotrykk er en snarvei, «I dag» er en
+snarvei tilbake.
 
-Det finnes bare én tilstand: `agendaStart` — dagen agendaen begynner på.
-`null` betyr «i dag» (ikke en frossen dato, så agendaen følger med når
-døgnet skifter mens appen ligger åpen). Trykker man på en tidligere dato,
-flyttes den bakover i SAMME handling som markeringen, og agendaen viser
-den dagen og alt som kommer etter. Ett trykk, ingen ekstra modus, ingen
-omvendt liste. «I dag» setter den tilbake til `null`.
+⛔ **«Se tidligere hendelser»-knappen er fjernet**, og det samme er
+`agendaStart` — mekanikken som skjulte fortiden og satte tidligere rader
+inn OVER agendaen i etterkant. Den var en hovedkilde til scrollhopp,
+fordi innsetting og posisjonering skjedde i samme øyeblikk.
 
-⚠️ `agendaStart` flyttes ALDRI av scrolling. Ville den det, ville radene
-brukeren nettopp scrollet forbi forsvunnet under fingeren.
+Det som styrer utsnittet nå er ett tall: `historyDays`, som starter på
+30. Vinduet **vokser bare bakover** — når brukeren nærmer seg toppen, og
+når noen velger en dato eldre enn vinduet (typisk fra månedsarket). Det
+krymper ALDRI, heller ikke på «I dag»: å fjerne rader over synlig
+innhold flytter posisjonen like mye som å sette dem inn.
 
-De tidligere seksjonene monteres OVER den agendaen som allerede står der
-(nøklene er `dayKey`, så React gjenbruker det som var), og
 `maintainVisibleContentPosition={{minIndexForVisible: 0}}` holder synlig
-innhold i ro mens de kommer inn — iOS kompenserer `contentOffset` med
+innhold i ro når vinduet vokser — iOS kompenserer `contentOffset` med
 rammeforskyvningen til første synlige barn
-(`RCTScrollViewComponentView.mm`). Uten den ville innsettingen vært én
-bevegelse og landingen en til; det var det stygge hoppet.
+(`RCTScrollViewComponentView.mm`).
 ⚠️ RNs egen advarsel gjelder: IKKE omorganiser innholdet i denne lista.
 Innsetting og fjerning i endene er greit, omstokking er det ikke.
+
+**Åpning:** nøyaktig ÉN posisjonering til dagens seksjon, vaktet av
+`didOpen`-refen, etter at seksjonene er montert og målt. Har dagen i dag
+ingenting på seg, lander vi på den første dagen som kommer. En `focusDate`
+setter `didOpen` selv, så de to aldri kappes om den første scrollen.
 
 Kalender er ellers uendret: agenda + ukerad, delt kalenderspråk.
 
@@ -232,11 +249,12 @@ punktene fanges av `npx jest`.
 
 1. Åpne Kalender — ingenting beveger seg over lagheaderen.
 2. Scroll langt ned og tilbake — navigatoren står stabilt.
-3. Trykk på en TIDLIGERE dato — dagen markeres og agendaen viser den
-   dagen og framover, i maksimalt én kontrollert bevegelse. Ingen ekstra
+3. Åpne Kalender og scroll OPPOVER — gårsdagen og resten av uka ligger
+   der allerede, uten at man har trykket på noe.
+4. Trykk på en TIDLIGERE dato — én kontrollert bevegelse, ingen ekstra
    knapp underveis.
-4. «I dag» — uke, valgt dato og agenda tilbake til nå, uten tilbakesprett.
-5. Gjenta tidligere dato → «I dag» flere ganger.
+5. «I dag» — uke, valgt dato og agenda tilbake til nå, uten tilbakesprett.
+   Gjenta tidligere dato → «I dag» flere ganger.
 6. Åpne månedsvisningen — agendaen endrer ikke posisjon.
 7. Bla gjennom minst seks måneder, inkludert februar — kalenderens høyde
    er helt stabil.

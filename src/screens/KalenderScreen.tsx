@@ -84,16 +84,38 @@ const SCROLL_GAP = spacing.sm;
 const STICKY_INDICES = [1];
 
 /**
- * Holder synlig innhold i ro når historikk settes inn OVER agendaen.
+ * Holder synlig innhold i ro når eldre historikk hentes fram i toppen.
  * Stabil identitet av samme grunn som `STICKY_INDICES`.
  */
 const MAINTAIN_POSITION = {minIndexForVisible: 0} as const;
 
 /**
- * Hvorfor agendaen skal flytte seg. Det finnes BARE fire grunner, og alle er
- * en handling brukeren gjorde — aldri en tilstand som endret seg.
+ * Hvor langt tilbake agendaen står MONTERT ved åpning.
+ *
+ * ⚠️ Fortiden skjules ikke lenger (Brage 2026-08-07). Er det fredag, ligger
+ * onsdagens trening allerede over dagens seksjon, og man scroller bare opp
+ * for å se den. Den gamle modellen — vis bare framtiden, og sett tidligere
+ * rader inn OVER agendaen når noen ber om det — var en hovedkilde til
+ * scrollhopp, fordi innsetting og posisjonering skjedde samtidig.
  */
-type ScrollOrigin = 'ukerad' | 'månedsark' | 'i-dag' | 'neste' | 'opprettet';
+const HISTORY_DAYS = 30;
+
+/** Hvor mye mer fortid som hentes fram når man nærmer seg toppen. */
+const HISTORY_STEP_DAYS = 90;
+
+/** Hvor nær toppen man må være før eldre historikk hentes fram. */
+const NEAR_TOP = 400;
+
+/**
+ * Hvorfor agendaen skal flytte seg. Alle er en eksplisitt handling — eller
+ * den ENE posisjoneringen ved åpning. Aldri en tilstand som endret seg.
+ */
+type ScrollOrigin =
+  | 'oppstart'
+  | 'ukerad'
+  | 'månedsark'
+  | 'i-dag'
+  | 'opprettet';
 
 export function KalenderScreen() {
   const insets = useSafeAreaInsets();
@@ -179,22 +201,23 @@ export function KalenderScreen() {
   const [monthOpen, setMonthOpen] = useState(false);
 
   /**
-   * Dagen agendaen begynner på.
+   * Hvor mange dager tilbake agendaen står montert.
    *
-   * ⚠️ Fortiden er IKKE en egen modus (Brage 2026-08-07). Den gamle
-   * «Se tidligere hendelser»-knappen er borte: uke- og månedsnavigatoren ER
-   * inngangen til historikken. Velger man en tidligere dato, flyttes bare
-   * denne startdagen bakover, og agendaen fortsetter kronologisk framover
-   * derfra. Ingen omvendt liste, ingen ekstra trykk.
+   * ⚠️ Kalenderen er ÉN sammenhengende kronologisk liste (Brage 2026-08-07):
+   * oppover er tidligere, nedover er senere. Fortiden er montert fra første
+   * øyeblikk — ingen skjuling, og ingen rader som settes inn over agendaen
+   * i etterkant. Det siste var en hovedkilde til scrollhopp.
    *
-   * `null` betyr «i dag», ikke en frossen dato — da følger agendaen med når
-   * døgnet skifter mens appen ligger åpen.
-   *
-   * Flyttes ALDRI av scrolling. Ville den det, ville radene brukeren nettopp
-   * scrollet forbi forsvunnet under fingeren.
+   * Vinduet vokser BARE bakover, og bare når brukeren nærmer seg toppen
+   * eller velger en dato som ligger utenfor det. Det krymper aldri: fjernede
+   * rader over synlig innhold ville flyttet posisjonen like mye som
+   * innsatte.
    */
-  const [agendaStart, setAgendaStart] = useState<Date | null>(null);
-  const agendaFrom = agendaStart ?? today;
+  const [historyDays, setHistoryDays] = useState(HISTORY_DAYS);
+  const agendaFrom = useMemo(
+    () => addDays(today, -historyDays),
+    [today, historyDays],
+  );
   const agendaFromKey = dayKey(agendaFrom);
 
   // -------------------------------------------------------------------------
@@ -294,12 +317,6 @@ export function KalenderScreen() {
   /** Sant bare mens brukerens EGEN gest driver lista. */
   const userDriven = useRef(false);
 
-  // Dagen agendaen begynner på, lest fra scroll-lytteren. Ligger i en ref og
-  // ikke i avhengighetene: `agendaFrom` er et nytt Date-objekt hver render, og
-  // ville gitt nye handler-props til ScrollView for hver eneste oppdatering.
-  const agendaFromRef = useRef(agendaFrom);
-  agendaFromRef.current = agendaFrom;
-
   const fulfil = useCallback(() => {
     const key = pending.current;
     if (!key) return;
@@ -339,6 +356,28 @@ export function KalenderScreen() {
     },
     [],
   );
+
+  /**
+   * ÉN posisjonering ved åpning, til dagens seksjon.
+   *
+   * ⚠️ Kjøres nøyaktig én gang, vaktet av en ref. Fortiden ligger montert
+   * over, framtiden under — vi flytter bare synsfeltet dit «nå» er. Ingen
+   * etterkorrigering: `fulfil` måler seksjonen etter at den er montert, og
+   * ruller én gang.
+   *
+   * Har dagen i dag ingenting på seg, lander vi på den første dagen som
+   * kommer. Er alt i fortiden, på den siste som var.
+   */
+  const didOpen = useRef(false);
+
+  useEffect(() => {
+    if (didOpen.current || !loaded || sections.length === 0) return;
+    didOpen.current = true;
+    const target =
+      sections.find(s => dayDiff(s.date, today) >= 0) ??
+      sections[sections.length - 1];
+    scrollToDay(target.key, 'oppstart');
+  }, [loaded, sections, today, scrollToDay]);
 
   // Prøver å innfri en skyldig scroll: når den bestilles, og når agendaen har
   // fått nye seksjoner å måle.
@@ -407,14 +446,15 @@ export function KalenderScreen() {
 
       // ⚠️ Toppen av lista er IKKE «ingen dag».
       //
-      // Over den første dagsseksjonen ligger overskriften, navigatoren og
-      // historikkraden — til sammen godt over en skjermhøyde med innhold. Lot
-      // vi valget stå her, ble synkroniseringen enveis i praksis: ukeraden
-      // fulgte med nedover, men kom aldri tilbake når man scrollet helt opp
-      // igjen. Toppen tilhører dagen agendaen BEGYNNER på (i dag, eller
-      // starten av historikken når den er åpnet).
-      const day = current ? current.date : agendaFromRef.current;
+      // Over den første dagsseksjonen ligger overskriften og navigatoren —
+      // godt over en skjermhøyde med innhold. Lot vi valget stå her, ble
+      // synkroniseringen enveis i praksis: ukeraden fulgte med nedover, men
+      // kom aldri tilbake når man scrollet helt opp igjen. Toppen tilhører
+      // den øverste dagen som faktisk har innhold.
+      const day = (current ?? list[0]).date;
 
+      // ⚠️ Denne oppdateringen kaller ALDRI scrollTo. Ukeraden og markeringen
+      // følger blikket; agendaen står stille.
       setSelected(prev =>
         dayKey(prev) === dayKey(day) ? prev : startOfDay(day),
       );
@@ -422,19 +462,44 @@ export function KalenderScreen() {
     [sections],
   );
 
+  /**
+   * Nærmer man seg toppen, hentes eldre historikk fram.
+   *
+   * `maintainVisibleContentPosition` holder synlig innhold i ro mens radene
+   * kommer inn over — og ingenting her ruller. Vinduet vokser bare bakover,
+   * aldri innover.
+   */
+  const extendHistoryIfNearTop = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (e.nativeEvent.contentOffset.y > NEAR_TOP) return;
+      setHistoryDays(days => {
+        // Ikke vokse forbi lagets eldste hendelse — da ville vi lagt til
+        // tomme dager i det uendelige.
+        const oldest = allSections[0];
+        if (!oldest || dayDiff(oldest.date, addDays(today, -days)) >= 0) {
+          return days;
+        }
+        return days + HISTORY_STEP_DAYS;
+      });
+    },
+    [allSections, today],
+  );
+
   const handleScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       syncSelectionToScroll(e);
+      extendHistoryIfNearTop(e);
     },
-    [syncSelectionToScroll],
+    [extendHistoryIfNearTop, syncSelectionToScroll],
   );
 
   const handleMomentumEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       syncSelectionToScroll(e);
+      extendHistoryIfNearTop(e);
       userDriven.current = false;
     },
-    [syncSelectionToScroll],
+    [extendHistoryIfNearTop, syncSelectionToScroll],
   );
 
   // Ukeraden følger valgt dato, men bare visuelt — den ruller ingenting.
@@ -454,10 +519,13 @@ export function KalenderScreen() {
       const key = dayKey(normalized);
       setSelected(normalized);
 
-      // En tidligere dato drar agendaens start bakover med seg, i samme
-      // handling. Ett trykk: dagen markeres, og agendaen viser den dagen og
-      // alt som kommer etter. Rekkefølgen snur aldri.
-      if (dayDiff(normalized, agendaFrom) < 0) setAgendaStart(normalized);
+      // Datoen ligger normalt ALLEREDE i agendaen — fortiden er montert. Bare
+      // et sprang lenger tilbake enn vinduet (typisk fra månedsarket) krever
+      // at det utvides først; `pending` blir stående til seksjonen dukker opp
+      // og innfris da én gang.
+      if (dayDiff(normalized, agendaFrom) < 0) {
+        setHistoryDays(dayDiff(today, normalized) + 7);
+      }
 
       // ⚠️ Agendaen inneholder BARE dager med hendelser. En tom dag markeres
       // og får en stille énlinjes status — den ruller ingenting, og den får
@@ -470,7 +538,7 @@ export function KalenderScreen() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [agendaFromKey, factsByDay, scrollToDay],
+    [agendaFromKey, factsByDay, scrollToDay, today],
   );
 
   const pickFromWeek = useCallback(
@@ -486,16 +554,26 @@ export function KalenderScreen() {
     [chooseDay],
   );
 
-  /** Uke, valgt dato og agenda tilbake til nå. Én kontrollert bevegelse. */
+  /**
+   * Snarvei tilbake til nå. Ren navigasjon — ingen data endres.
+   *
+   * ⚠️ Historikkvinduet krymper IKKE her. Å fjerne rader over synlig innhold
+   * ville flyttet posisjonen like mye som å sette dem inn. «I dag» er et
+   * sprang i lista, ikke en tilbakestilling av den.
+   */
   const goToToday = useCallback(() => {
     const now = startOfDay(new Date());
     setToday(prev => (dayKey(now) === dayKey(prev) ? prev : now));
-    setAgendaStart(null);
     setSelected(now);
     setEmptyNotice(null);
-    if (factsByDay.has(dayKey(now))) scrollToDay(dayKey(now), 'i-dag');
-    else scrollRef.current?.scrollTo({y: 0, animated: false});
-  }, [factsByDay, scrollToDay]);
+
+    // Har dagen i dag ingenting på seg, lander vi på den første dagen som
+    // kommer — det er der «nå» er i en liste over hendelser.
+    const target =
+      sections.find(s => dayDiff(s.date, now) >= 0) ??
+      sections[sections.length - 1];
+    if (target) scrollToDay(target.key, 'i-dag');
+  }, [sections, scrollToDay]);
 
   const openEvent = useCallback(
     (eventId: string) => navigation.navigate('EventDetail', {eventId}),
@@ -517,10 +595,16 @@ export function KalenderScreen() {
     const date = dateFromDayKey(focusDate);
     if (date) {
       setSelected(date);
-      if (dayDiff(date, today) < 0) setAgendaStart(date);
+      // Ligger hendelsen lenger tilbake enn vinduet, utvides det først.
+      const back = dayDiff(today, date);
+      if (back > 0) setHistoryDays(days => Math.max(days, back + 7));
       // Hendelsen er kanskje ikke hentet ennå. Bestillingen blir stående til
       // seksjonen dukker opp, og innfris da én gang.
       scrollToDay(focusDate, 'opprettet');
+
+      // ⚠️ Overstyrer åpningsposisjoneringen. Uten dette ville begge villet
+      // eie den første scrollen, og den ene ville rettet den andre.
+      didOpen.current = true;
     }
     // Engangs-kommando. Uten dette ville Kalender hoppet til den samme gamle
     // datoen hver eneste gang fanen fikk fokus igjen.
@@ -602,7 +686,7 @@ export function KalenderScreen() {
             month={addDays(startOfWeek(weekAnchor), 3)}
             onToday={goToToday}
             onOpenMonth={() => setMonthOpen(true)}
-            atToday={selectedKey === dayKey(today) && agendaStart === null}
+            atToday={selectedKey === dayKey(today)}
           />
           {showSkeleton ? (
             <View style={styles.stripSkeleton}>
@@ -661,11 +745,13 @@ export function KalenderScreen() {
               <Text style={styles.emptyText}>Dra ned for å prøve igjen.</Text>
             </View>
           ) : sections.length === 0 ? (
+            /* Ingenting den siste måneden, og ingenting som kommer. Eldre
+               historikk finnes kanskje — den ligger bak månedsvelgeren. */
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Ingenting mer planlagt</Text>
+              <Text style={styles.emptyTitle}>Ingenting på gang</Text>
               <Text style={styles.emptyText}>
-                Alt laget har gjort ligger bak deg. Åpne måneden for å se
-                tilbake.
+                Verken den siste måneden eller i tiden framover. Åpne måneden
+                for å se lenger tilbake.
               </Text>
             </View>
           ) : (
