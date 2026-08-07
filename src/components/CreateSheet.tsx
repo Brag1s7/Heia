@@ -8,6 +8,11 @@ interface CreateSheetProps {
   visible: boolean;
   /** Trener/lagleder/admin — samme regel som RLS på `events`. */
   canCreateEvent: boolean;
+  /**
+   * Datoen brukeren står på i Kalender, eller null når «+» ble trykket et
+   * annet sted. Er den satt, er «Ny hendelse» handlingen man kom for.
+   */
+  calendarDay: string | null;
   onClose: () => void;
   onShare: () => void;
   onNewEvent: () => void;
@@ -17,15 +22,48 @@ interface CreateSheetProps {
  * Valgarket bak «+». «Del med laget» vises for alle, så knappen aldri er død
  * for en forelder — de er de fleste brukerne, og «+» er appens mest
  * fremhevede knapp.
+ *
+ * Arket er KONTEKSTSENSITIVT (Brage 2026-08-07): står man i Kalender, ligger
+ * «Ny hendelse» øverst for trener/lagleder, og hendelsen arver datoen man ser
+ * på. Ingen egen «Ny turnering»-rad — turnering er allerede tredje valg i
+ * skjemaet, altså ett trykk unna gjennom samme flyt.
  */
 export function CreateSheet({
   visible,
   canCreateEvent,
+  calendarDay,
   onClose,
   onShare,
   onNewEvent,
 }: CreateSheetProps) {
   const insets = useSafeAreaInsets();
+
+  const share = (
+    <SheetRow
+      key="share"
+      icon={<MessageCircle size={20} color={colors.heiaInk} />}
+      iconBg={colors.heiaTint}
+      title="Del med laget"
+      subtitle="Skriv en melding eller legg ut et bilde"
+      onPress={onShare}
+    />
+  );
+
+  const event = canCreateEvent ? (
+    <SheetRow
+      key="event"
+      icon={<Calendar size={20} color={colors.infoInk} />}
+      iconBg={colors.infoSoft}
+      title="Ny hendelse"
+      subtitle="Trening, kamp, turnering eller sosialt"
+      onPress={onNewEvent}
+    />
+  ) : null;
+
+  // Rekkefølgen er hele kontekstsensitiviteten. Vanlige medlemmer ser aldri
+  // en handling de mangler tilgang til — `event` er null for dem.
+  const rows =
+    calendarDay !== null && event !== null ? [event, share] : [share, event];
 
   return (
     <Modal
@@ -36,24 +74,7 @@ export function CreateSheet({
       <Pressable style={styles.backdrop} onPress={onClose} />
       <View style={[styles.sheet, {paddingBottom: insets.bottom + spacing.lg}]}>
         <View style={styles.handle} />
-
-        <SheetRow
-          icon={<MessageCircle size={20} color={colors.heiaInk} />}
-          iconBg={colors.heiaTint}
-          title="Del med laget"
-          subtitle="Skriv en melding eller legg ut et bilde"
-          onPress={onShare}
-        />
-
-        {canCreateEvent && (
-          <SheetRow
-            icon={<Calendar size={20} color={colors.infoInk} />}
-            iconBg={colors.infoSoft}
-            title="Ny hendelse"
-            subtitle="Trening, kamp eller sosialt"
-            onPress={onNewEvent}
-          />
-        )}
+        {rows}
       </View>
     </Modal>
   );

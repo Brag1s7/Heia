@@ -1,29 +1,259 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: KALENDER-SIDEN (Brage har en full spesifikasjon)
+## ✅ KALENDER-SIDEN FERDIG OG GODKJENT PÅ TELEFON 2026-08-07
 
-**Brage kommer med en lang melding om hvordan Kalender-siden skal se ut.
-Vent på den — ikke design flaten på forhånd.**
+**Brage har kjørt hele sluttesten (ti punkter, nederst i bolken) på
+enhet. Alt grønt. Skiva er lukket.**
 
-Les før du starter, fordi den er bygget om i dag og premissene er ferske:
+Den tok fire runder, og de tre første ble avvist PÅ TELEFONEN mens
+testene var grønne hele veien. Det er verdt å huske: alt i denne bolken
+handler om layout og scroll, og ingenting av det fanges av `npx jest`
+eller `eslint`. Rører du kalenderen, må du kjøre den.
 
-- `KalenderScreen` rendrer ikke lenger en flat liste av `EventCard`. Den
-  bygger **rader** via `shared/calendarList.ts` (`buildCalendarRows` →
-  `splitByTime` → seksjoner), og en rad er enten en vanlig hendelse
-  eller en **turneringsdag** med kampene under.
-- ⛔ **Det finnes bare ETT kampobjekt.** En turneringskamp er en vanlig
-  kamp med `parent_event_id`, og skal aldri dupliseres.
-  `__tests__/calendarList.test.ts` vokter det.
-- Rollefordelingen er LÅST: **Sesong** = sportslig oversikt og
+Avvisningene, i rekkefølge:
+1. Egen sticky-arkitektur → innholdet gled over lagheaderen, datotrykk
+   ga hopp, uke/måned-bytte flyttet innholdet, scroll og valgt dato
+   slåss.
+2. For høy topp, og hopp når historikk ble satt inn over agendaen.
+3. Datoraden hoppet opp og ned ved trykk på ulike fortidsdatoer.
+4. Tomtilstandsblokka skapte høydeendring og scrollhopp.
+
+⚠️ **Én ting er bevisst ikke slått på:** `animated: false` i `fulfil()`.
+Landingen er nå bevist stabil, så den kan byttes til kontrollert
+animasjon når noen vil — det er ett ord. Gjør det som en egen, liten
+endring, og kjør sluttesten på nytt etterpå.
+
+### ⛔ Fem ting som IKKE skal gjeninnføres
+
+1. **Ingen navigator som absolutt posisjonert søsken med
+   onScroll-drevet transform.** Den var årsaken til at innholdet gled
+   opp OVER lagheaderen: baren lå inne i skjermens body og translaterte
+   seg ut av den. `TeamHeader` er utenfor scrollflaten; alt annet ligger
+   i `ScrollView`-en.
+   Sticky gjøres nå med RNs egen `stickyHeaderIndices`, og KUN
+   navigatoren (måned/år, «I dag», «Måned», ukeraden) er festet.
+   ⚠️ Tre ting holder den riktig, og alle tre er lette å ødelegge:
+   - Barnelista er låst til NØYAKTIG tre elementer: tittelblokk,
+     navigator, og ETT fragment med alt annet. `ScrollView` kjører
+     `React.Children.toArray` og mapper indekser mot resultatet — et
+     array ville blitt FLATET UT og flyttet indeks 1. Et fragment
+     teller som ett barn uansett hva som ligger i det (verifisert mot
+     React 19 i repoet).
+   - `STICKY_INDICES` ligger på modulnivå. Et nytt array hver render
+     river den native scroll-koblingen ned og opp igjen.
+   - Det sticky barnet MÅ være en host-`View` med bakgrunnen i sin egen
+     `style`. RN flytter `child.props.style` over på sin wrapper og gir
+     barnet `{flex: 1}` — en komponent der ville gitt en gjennomsiktig
+     bar med agendaen rullende bak.
+   Navigatorens høyde OG dens `layoutY` måles med `onLayout` på det sticky
+   barnet (RN kaller den manuelt med wrapperens event). Høyden trekkes fra
+   i scroll-regnestykket, ellers lander dagen BAK baren.
+   ⚠️ **`layoutY` er festeterskelen, og landingen må klemmes til den.**
+   En sticky header står helt stille til `scrollY` når `layoutY`, og
+   fester seg først da (`ScrollViewStickyHeader.js`, ikke-invertert gren).
+   Lander man under terskelen, henger baren `layoutY − scrollY` piksler
+   ned — et forskjellig tall for hver landing. Det var derfor datoraden
+   hoppet opp og ned når man trykket på ulike datoer i fortiden (Brage
+   2026-08-07): en tidligere dato blir agendaens FØRSTE seksjon, og
+   landingen havnet da over terskelen. `Math.max(navTop.current, …)` i
+   `fulfil()` gir baren nøyaktig én posisjon for alle programmatiske
+   landinger. Ikke fjern den klemmen.
+5. **Ingen månedsrutenett som bytter radantall.** `monthGrid` gir
+   ALLTID 42 celler = seks uker; kantene fylles med nabomånedens dager,
+   dempet. Et rutenett som veksler mellom fem og seks rader endrer høyde
+   når man blar, og da hopper alt under — både i månedsarket og i
+   `DateField`. Derfor har `DateField` nå ÉN målt høyde i stedet for en
+   cache per radantall.
+2. **Ingen månedsmatrise som settes inn og fjernes over agendaen.** Fem–
+   seks rader som kommer og går endrer høyden på alt under, og hvert
+   bytte ga et scrollhopp. Måneden er nå et eget ark
+   (`calendar/MonthSheet.tsx`) UTENFOR scrollflaten. Chevronene bytter
+   bare arkets egen måned; å åpne, bla og lukke kan ikke røre agendaen.
+3. **Ingen effekter som ruller.** Det finnes ÉN funksjon,
+   `scrollToDay(key, origin)`, og den kalles fra nøyaktig fem
+   brukerhandlinger: trykk i ukeraden, datovalg i månedsarket, «I dag»,
+   «Neste hendelse», og `focusDate` etter opprettelse. En tilstand som
+   endrer seg — valgt dato, uke, prikker, rader, lasting, refresh —
+   fører ALDRI til scrolling.
+4. **Ingen `onScroll`, ingen timeout-fallbacks, ingen etterkorrigering.**
+   Valgt dato beregnes først når brukeren har SLUPPET
+   (`onScrollEndDrag` / `onMomentumScrollEnd`), og den oppdateringen
+   kaller aldri `scrollTo` tilbake. `userDriven`-flagget nullstilles før
+   hver programmatisk scroll, så en programmatisk scroll aldri kan leses
+   som brukerens egen.
+   ⚠️ **Toppen av lista er IKKE «ingen dag».** Over den første
+   dagsseksjonen ligger overskriften, navigatoren og historikkraden — godt
+   over en skjermhøyde. Lot man valget stå der (fordi ingen seksjon
+   matchet), ble synkroniseringen enveis i praksis: ukeraden fulgte med
+   nedover, men kom ALDRI tilbake når man scrollet helt opp igjen. Det var
+   en ekte feil i piloten (Brage 2026-08-07). Toppen tilhører dagen
+   agendaen begynner på — `agendaFrom`.
+
+### ✅ Slik måles landingen (det som gjør at ett kall er nok)
+
+Dagsseksjonene er **direkte barn** av `ScrollView`-ens innholdsbeholder.
+Ved en bestilt scroll måles seksjonens ytterste wrapper med
+`node.measureLayout(innerView, …)` mot `innerViewRef` — nøyaktig samme
+koordinatsystem som `scrollTo` bruker. Målingen skjer i en effekt, altså
+etter commit, så tallet er ferskt. Ett kall, `animated: false`, ingen
+korrigering etterpå.
+⚠️ Dette er RNs eget mønster: `ScrollView.js` gjør
+`nodeHandle.measureLayout(this._innerView.nativeInstance, …)` for
+tastaturscrolling. Ikke bytt til `onLayout`-offsets for SELVE scrollen —
+`onLayout` leveres asynkront, og tallet kan være fra før siste layout.
+Offset-kartet fra `onLayout` brukes KUN til å finne øverste synlige dag
+etter at brukeren har sluppet, der en frame etterslep er ufarlig.
+
+### ✅ Agendaen inneholder BARE dager med hendelser
+
+⛔ Ingen tomme dagsseksjoner, og ingen «Neste hendelse»-knapp (fjernet
+2026-08-07 — neste hendelse ligger allerede i agendaen, og blokken skapte
+høydeendring og scrollhopp). Uke- og månedsvelgeren viser alle
+kalenderdager; prikkene forteller hvilke som har innhold.
+
+Velger man en tom dato: dagen markeres, agendaen står HELT stille, og en
+énlinjes status sier «Ingen hendelser tirsdag 4. august».
+
+⚠️ Statusen har **forhåndsreservert høyde** (`styles.statusRow`, 20 pt)
+inne i den sticky navigatoren, og er alltid montert. Navigatorens høyde
+kan dermed ikke endre seg — kom og gikk den linja, ville festeterskelen,
+alle målte posisjoner og scrollposisjonen flyttet seg.
+
+⚠️ Statusen ligger i sin EGEN tilstand (`emptyNotice`), ikke utledet av
+`selected`. `selected` endrer seg mens man scroller, og en utledet status
+ville dukket opp og forsvunnet på grunn av scrollposisjonen. Den settes
+bare av et datotrykk, og tømmes av et nytt datotrykk, «I dag», eller at
+brukeren begynner å DRA (gesten, ikke posisjonen).
+
+### ✅ Fortiden er IKKE en modus (Brage 2026-08-07)
+
+⛔ **«Se tidligere hendelser»-knappen er FJERNET og skal ikke tilbake.**
+Uke- og månedsnavigatoren ER inngangen til historikken; en egen
+historikkmodus var overflødig.
+
+Det finnes bare én tilstand: `agendaStart` — dagen agendaen begynner på.
+`null` betyr «i dag» (ikke en frossen dato, så agendaen følger med når
+døgnet skifter mens appen ligger åpen). Trykker man på en tidligere dato,
+flyttes den bakover i SAMME handling som markeringen, og agendaen viser
+den dagen og alt som kommer etter. Ett trykk, ingen ekstra modus, ingen
+omvendt liste. «I dag» setter den tilbake til `null`.
+
+⚠️ `agendaStart` flyttes ALDRI av scrolling. Ville den det, ville radene
+brukeren nettopp scrollet forbi forsvunnet under fingeren.
+
+De tidligere seksjonene monteres OVER den agendaen som allerede står der
+(nøklene er `dayKey`, så React gjenbruker det som var), og
+`maintainVisibleContentPosition={{minIndexForVisible: 0}}` holder synlig
+innhold i ro mens de kommer inn — iOS kompenserer `contentOffset` med
+rammeforskyvningen til første synlige barn
+(`RCTScrollViewComponentView.mm`). Uten den ville innsettingen vært én
+bevegelse og landingen en til; det var det stygge hoppet.
+⚠️ RNs egen advarsel gjelder: IKKE omorganiser innholdet i denne lista.
+Innsetting og fjerning i endene er greit, omstokking er det ikke.
+
+Kalender er ellers uendret: agenda + ukerad, delt kalenderspråk.
+
+### Det som er LÅST i denne skiva
+
+- ⛔ **Tiden går ÉN vei nedover skjermen.** Det gamle arkivet lå
+  reversert etter det kommende, så tiden først gikk framover og så
+  plutselig bakover. `splitByTime` er FJERNET. Agendaen begynner på
+  `agendaFrom` (i dag som standard) og er alltid stigende. Historikk
+  hentes ved å FLYTTE starten bakover — velg en tidligere dato i uke-
+  eller månedsvisningen, eller trykk «Se tidligere hendelser».
+- ⛔ **Det finnes bare ETT kampobjekt.** Uendret.
+  `__tests__/calendarList.test.ts` vokter det fortsatt.
+- ⛔ **Ingen egen «Ny turnering»-rad i «+»-arket.** Turnering er
+  allerede tredje chip i skjemaet — ett trykk unna gjennom samme flyt.
+- ⛔ **Ingen permanent opprettelsesknapp i Kalender.** Den grønne «+» i
+  hovednavigasjonen er den eneste. Unntaket er tom kalender, der
+  «Opprett første hendelse» hindrer en blindvei.
+- Rollefordelingen er uendret: **Sesong** = sportslig oversikt og
   administrasjon, **Kalender** = kronologisk fasit, **Hjem** =
-  redaksjonell oversikt, **Varsler** = hva har skjedd. Samme objekt kan
-  vises flere steder.
-- Skjermen tar `focusDate` (en `dayKey`) og ruller dit. Beholdes.
-- Det opprinnelige ønsket fra 2026-08-06 som fortsatt IKKE er bygget:
-  **samme kalenderspråk som en VALGBAR VISNING** (månedsrutenett) på
-  Kalender-siden. `DateField` er skrevet for skjemaet — en månedsvisning
-  her trenger sin egen komponent, men `shared/calendar.ts` dekker matten
-  (månedsmatrise, perioder, norske navn) og er testet.
+  redaksjonell oversikt, **Varsler** = hva har skjedd.
+
+### Nye filer
+
+**`src/components/calendar/`** — det DELTE kalenderspråket.
+- `DayCell.tsx` — én dagcelle med alle tilstandene (valgt, i dag, helg,
+  utenfor rekkevidde, prikker, «+N»). `minHeight`, aldri `height`.
+- `MonthGrid.tsx` — månedsrutenettet. Brukes av BÅDE `DateField`
+  (`variant="card"`, med grenser og fotnote) og Kalender-fanen
+  (`variant="plain"`, fortiden synlig, egen VoiceOver-tekst). Ett bygg,
+  to bruksmåter — forskjellen er props.
+- `WeekStrip.tsx` — mandag–søndag med sveiping.
+- `CalendarNav.tsx` — «August 2026 · I dag · Uke | Måned».
+
+**`src/context/CalendarFocusContext.tsx`** — broen fra Kalender til «+».
+⚠️ Verdien ligger i en **ref**, ikke i state, og contextverdien er
+stabil. Valgt dato endres mens man scroller; lå den i state, ville hele
+fanetreet rendret på nytt for hver dagsseksjon som passerte toppen.
+
+**`src/components/useReducedMotion.ts`** — «reduser bevegelse».
+
+### ⚠️ To fallgruver som ble VERIFISERT mot RN-kilden
+
+1. **`stickyHeaderIndices` er ren JS i RN 0.83.** Den flytter barnets
+   `style` over på en wrapper (så et komponent-barn blir gjennomsiktig),
+   flater ut arrays i `Children.toArray` (så indeksen peker på feil
+   element så snart seksjonene er et array), tvinger
+   `removeClippedSubviews: false` på Android, skriver posisjonen inn i
+   React-state hvert ~15 ms på Fabric, og legger seg SIST i
+   VoiceOver-rekkefølgen. Skal sticky inn senere, må navigatoren være ETT
+   direkte barn med deterministisk indeks — og de kostnadene må aksepteres
+   bevisst.
+2. **Offset-kartet tømmes ALDRI.** Fabric sender bare `onLayout` når
+   Yoga har flagget ny layout. En oppfriskning som gir nøyaktig samme
+   hendelser gir null events — et tømt kart ville stått tomt for alltid.
+   Vi sletter bare dager som ikke lenger finnes.
+
+### Andre beslutninger verdt å kjenne
+
+- **`today` er en TILSTAND**, ikke frosset ved mount (som i `DateField`,
+  der det er riktig). Kalender er en fane man legger fra seg — den
+  regnes om på fokus OG på `AppState: 'active'`, ellers står gårsdagens
+  kamp under «I dag».
+- **Prikkene bygges av `busyDaysFromRows(allRows)`** — de SAMME radene
+  som agendaen, ikke et nytt `getBusyDays`-kall. ⚠️ Mat den med de
+  UFILTRERTE radene: gjør du det med agendaens utsnitt, står hver måned
+  før agendaens start uten prikker mens cellene fortsatt er trykkbare.
+- **Haptikk er DROPPET.** `Vibration.vibrate()` på iOS er
+  `AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)` — en ~400 ms
+  hørbar alarmbrumming, ikke et tikk. Ekte haptikk krever en native
+  modul (og dermed `pod install`). Ikke bygg en shim som later som.
+- **`presetDate`** (en `dayKey`) er ny i `NewEventParams`: «+» fra
+  Kalender åpner skjemaet i KalenderStack på datoen man ser på. Ligger
+  den utenfor det som uansett kan lagres, faller den til i dag.
+
+### ✅ SLUTTEST — kjørt og grønn 2026-08-07
+
+Kjør den på nytt hvis du rører layout eller scroll i Kalender. Ingen av
+punktene fanges av `npx jest`.
+
+1. Åpne Kalender — ingenting beveger seg over lagheaderen.
+2. Scroll langt ned og tilbake — navigatoren står stabilt.
+3. Trykk på en TIDLIGERE dato — dagen markeres og agendaen viser den
+   dagen og framover, i maksimalt én kontrollert bevegelse. Ingen ekstra
+   knapp underveis.
+4. «I dag» — uke, valgt dato og agenda tilbake til nå, uten tilbakesprett.
+5. Gjenta tidligere dato → «I dag» flere ganger.
+6. Åpne månedsvisningen — agendaen endrer ikke posisjon.
+7. Bla gjennom minst seks måneder, inkludert februar — kalenderens høyde
+   er helt stabil.
+8. Velg en dato i månedsvisningen — arket lukkes og agendaen ruller
+   nøyaktig én gang.
+9. Lukk månedsvisningen uten valg — agendaen står på nøyaktig samme sted.
+10. Pull-to-refresh — ingen header-, navigator- eller offset-hopp.
+
+### Bevisst utelatt i denne skiva
+
+- **Haptikk.** `Vibration.vibrate()` på iOS er
+  `AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)` — en ~400 ms
+  hørbar alarmbrumming, ikke et tikk. Ekte haptikk krever en native
+  modul (og dermed `pod install`). Ikke bygg en shim som later som.
+- **Å huske valgt visning** (opprinnelig spesifikasjon §5). Den ble
+  meningsløs da Måned ble et ARK i stedet for en modus — det finnes ikke
+  lenger en visning å huske. Borte med vilje, ikke glemt.
 
 ## ⏳ KØET ETTER DEN: REDIGERING AV ARRANGEMENT
 
@@ -81,13 +311,23 @@ aldri med `+ 86 400 000` — millisekundmatte bommer med en time to netter
 i året. Måneds- og ukedagsnavn er skrevet ut i stedet for hentet fra
 `Intl`, så et rutenett ikke kan bli engelsk der ICU mangler.
 
-**`__tests__/calendar.test.ts` — 25 tester, alle grønne**
-(`TZ=Europe/Oslo npx jest __tests__/calendar.test.ts`). Dekker skuddår,
-måneder som starter på mandag/søndag, års- og månedsskifte, og BEGGE
-sommertidsnettene i 2026 (29. mars = 23 t, 25. oktober = 25 t). Det er
-prisen for å eie datomatten selv — feilene er våre.
+**`__tests__/calendar.test.ts` + `calendarList.test.ts` — 87 tester,
+alle grønne** (`npx jest`). Dekker skuddår, måneder som starter på
+mandag/søndag, års- og månedsskifte, BEGGE sommertidsnettene i 2026
+(29. mars = 23 t, 25. oktober = 25 t), uke-for-uke-blaing over dem, at
+`dateFromDayKey` avviser 31. februar, og at dagcellens VoiceOver-tekst
+ikke sier «i dag» eller «valgt» to ganger. Det er prisen for å eie
+datomatten selv — feilene er våre.
+⚠️ `__tests__/App.test.tsx` feiler på en GAMMEL jest-konfig
+(`@react-navigation/native` leveres som ESM og treffes ikke av presetens
+`transformIgnorePatterns`). Den har ingenting med kalenderen å gjøre.
 
 **`src/components/DateField.tsx`** — datoraden + kalenderen.
+⚠️ **Selve rutenettet flyttet ut 2026-08-07** til
+`components/calendar/MonthGrid.tsx`, som deles med Kalender-fanen. Det
+som er IGJEN her er skjemaets: sammendragsraden, grensene og
+utfoldingen. Høydemålingen under gjelder fortsatt — `rowCount` regnes nå
+med `monthWeeks(...).length` i `DateField` selv.
 - Sammendragsrad: datoflis (Nunito) + «Lørdag 8. august» + «om 2 uker».
   Er dagen opptatt står det «· Kamp samme dag» — kollisjonen følger
   valget UT av kalenderen.

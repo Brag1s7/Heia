@@ -233,6 +233,14 @@ export type NewEventParams =
       parentTo?: string;
       /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
       presetType?: 'turnering';
+      /**
+       * Datoen skjemaet skal åpne på, som `dayKey` (samme format som
+       * `focusDate`, ikke ISO — ISO ville vært UTC og bommet på kvelden).
+       * Settes når «+» trykkes mens man står i Kalender: datoen man ser på er
+       * datoen man vil planlegge. Ligger den utenfor det som er lov å
+       * opprette, faller skjemaet tilbake til i dag.
+       */
+      presetDate?: string;
     }
   | undefined;
 

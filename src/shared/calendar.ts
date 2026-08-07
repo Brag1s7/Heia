@@ -83,6 +83,26 @@ export function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+/**
+ * Mandagen i uka `date` hører til. Norske kalendere begynner på mandag, og
+ * `getDay()` gjør ikke det (0 = søndag) — søndag skal seks dager tilbake,
+ * ikke null.
+ */
+export function startOfWeek(date: Date): Date {
+  return addDays(startOfDay(date), -((date.getDay() + 6) % 7));
+}
+
+/** Samme ukedag `n` uker unna. Går via `addDays`, så sommertid er trygt. */
+export function addWeeks(date: Date, weeks: number): Date {
+  return addDays(date, weeks * 7);
+}
+
+/** Mandag til søndag i uka `date` hører til — ukestripas sju celler. */
+export function weekDays(date: Date): Date[] {
+  const monday = startOfWeek(date);
+  return Array.from({length: 7}, (_, i) => addDays(monday, i));
+}
+
 /** Sommertidssikker: konstruktøren normaliserer overflyt selv. */
 export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
@@ -115,25 +135,106 @@ export function isSameDay(a: Date, b: Date): boolean {
   return dayKey(a) === dayKey(b);
 }
 
-/**
- * HELE månedsrutenettet: dagen i uka for den 1. skjøvet til mandag-først,
- * antall dager i måneden, og `null` i cellene før og etter.
- *
- * `new Date(år, måned + 1, 0)` er dag null i NESTE måned = siste dag i denne.
- * Det er derfor skuddår og 30/31 dager kommer gratis.
- *
- * Lista fylles opp til hele uker, men ikke til seks rader — et rutenett med
- * en tom bunnrad ser ødelagt ut, og utfoldingen måler høyden sin uansett.
- */
-export function monthMatrix(year: number, month: number): (Date | null)[] {
-  const lead = (new Date(year, month, 1).getDay() + 6) % 7; // man = 0 … søn = 6
-  const days = new Date(year, month + 1, 0).getDate();
+/** Én celle i månedsrutenettet. */
+export interface GridDay {
+  date: Date;
+  /** Hører dagen til måneden som vises, eller er den en nabo? */
+  inMonth: boolean;
+}
 
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < lead; i++) cells.push(null);
-  for (let d = 1; d <= days; d++) cells.push(new Date(year, month, d));
-  while (cells.length % 7 !== 0) cells.push(null);
-  return cells;
+/** Rader i et månedsrutenett. ALLTID seks — se `monthGrid`. */
+export const GRID_WEEKS = 6;
+
+/**
+ * HELE månedsrutenettet: alltid 42 celler = seks uker à sju dager, mandag
+ * først, uten hull.
+ *
+ * ⚠️ Seks rader ALLTID, også når måneden bare trenger fire eller fem
+ * (Brage 2026-08-07). Et rutenett som bytter mellom fem og seks rader endrer
+ * høyde når man blar — og da hopper alt under det, både i skjemaet og i
+ * månedsarket. Cellene før og etter måneden fylles med nabomånedens dager i
+ * stedet for å stå tomme: samme plass, dempet uttrykk, og februar oppfører
+ * seg som alle andre måneder.
+ *
+ * `new Date(år, måned, 1 - lead)` med negativt dagtall normaliseres av
+ * konstruktøren inn i forrige måned — samme regel som resten av denne fila.
+ */
+export function monthGrid(year: number, month: number): GridDay[] {
+  const lead = (new Date(year, month, 1).getDay() + 6) % 7; // man = 0 … søn = 6
+  const first = new Date(year, month, 1 - lead);
+
+  return Array.from({length: GRID_WEEKS * 7}, (_, i) => {
+    const date = addDays(first, i);
+    return {
+      date,
+      inMonth: date.getMonth() === month && date.getFullYear() === year,
+    };
+  });
+}
+
+/** Månedsrutenettet delt i uker — formatet et rutenett faktisk rendres i. */
+export function monthGridWeeks(year: number, month: number): GridDay[][] {
+  const cells = monthGrid(year, month);
+  const rows: GridDay[][] = [];
+  for (let i = 0; i < cells.length; i += 7) rows.push(cells.slice(i, i + 7));
+  return rows;
+}
+
+/**
+ * `dayKey` den andre veien. Nøkkelen er «år-månedsindeks-dag» med 0-basert
+ * måned — den er vår egen, ikke ISO, og må derfor også tolkes av oss.
+ *
+ * Returnerer null på alt som ikke er en ekte dato, fordi den brukes på
+ * navigasjonsparametere: en gammel lenke skal gi «i dag», ikke en Invalid Date
+ * som forplanter seg gjennom hele skjermen.
+ */
+export function dateFromDayKey(key: string): Date | null {
+  const parts = key.split('-');
+  if (parts.length !== 3) return null;
+
+  const [year, month, day] = parts.map(Number);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
+  if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+
+  const date = new Date(year, month, day);
+  // 31. februar normaliseres stille til 3. mars av konstruktøren — den skal
+  // avvises, ikke godtas som «en dato».
+  return date.getMonth() === month && date.getDate() === day ? date : null;
+}
+
+/** Hendelsestypen som substantiv. Brukes i prikkenes VoiceOver-tekst. */
+export const TYPE_NOUN: Record<EventType, string> = {
+  trening: 'Trening',
+  kamp: 'Kamp',
+  turnering: 'Turnering',
+  sosialt: 'Noe sosialt',
+  annet: 'En hendelse',
+};
+
+/**
+ * «Kamp samme dag» / «2 hendelser samme dag» — KOLLISJONEN, kort.
+ * Datovelgerens språk: her er prikken en advarsel om at dagen er opptatt.
+ */
+export function busyLabel(types: EventType[] | undefined): string | null {
+  if (!types || types.length === 0) return null;
+  if (types.length === 1) return `${TYPE_NOUN[types[0]]} samme dag`;
+  return `${types.length} hendelser samme dag`;
+}
+
+/**
+ * «én kamp» / «2 hendelser» — INNHOLDET, kort.
+ * Kalenderens språk: her er prikken ikke en advarsel, men det som skjer.
+ * `count` er antall hendelser, `types` er de ulike typene (prikkene).
+ */
+export function dayContentLabel(
+  types: EventType[] | undefined,
+  count: number,
+): string | null {
+  if (!types || types.length === 0 || count === 0) return null;
+  if (count === 1) return `én ${TYPE_NOUN[types[0]].toLowerCase()}`;
+  return `${count} hendelser`;
 }
 
 function capitalize(value: string): string {
@@ -153,6 +254,22 @@ export function shortDayLabel(date: Date): string {
 }
 
 /**
+ * «Lørdag 8. august» — alltid datoen, aldri «I dag».
+ *
+ * Kalenderens dagceller leses opp med denne: en VoiceOver-bruker som blar i
+ * månedsrutenettet skal få vite hvilken dato cellen ER. «I dag» henges på som
+ * et tillegg der det gjelder, det erstatter ikke datoen.
+ */
+export function fullDayLabel(date: Date, today: Date = new Date()): string {
+  const base = `${capitalize(WEEKDAYS[date.getDay()])} ${date.getDate()}. ${
+    MONTHS[date.getMonth()]
+  }`;
+  return date.getFullYear() === today.getFullYear()
+    ? base
+    : `${base} ${date.getFullYear()}`;
+}
+
+/**
  * «I dag» / «I morgen» / «I går» / «Lørdag 8. august».
  * Året henges på når datoen bor i et annet år enn i dag — ellers er det støy.
  */
@@ -161,13 +278,25 @@ export function longDayLabel(date: Date, today: Date = new Date()): string {
   if (diff === 0) return 'I dag';
   if (diff === 1) return 'I morgen';
   if (diff === -1) return 'I går';
+  return fullDayLabel(date, today);
+}
 
-  const base = `${capitalize(WEEKDAYS[date.getDay()])} ${date.getDate()}. ${
-    MONTHS[date.getMonth()]
-  }`;
-  return date.getFullYear() === today.getFullYear()
-    ? base
-    : `${base} ${date.getFullYear()}`;
+/**
+ * Hele VoiceOver-teksten for én dagcelle: «Fredag 7. august, i dag, én kamp».
+ *
+ * ⚠️ Sier bevisst IKKE «valgt». Cellen setter `accessibilityState.selected`,
+ * og iOS leser den som en egen trait — står ordet også i teksten, blir det
+ * «Valgt, fredag 7. august, valgt». Samme grunn til at datoen ikke hentes fra
+ * `longDayLabel`: den ville sagt «I dag, i dag».
+ */
+export function dayCellLabel(
+  date: Date,
+  today: Date,
+  note?: string | null,
+): string {
+  return [fullDayLabel(date, today), isSameDay(date, today) ? 'i dag' : null, note]
+    .filter(Boolean)
+    .join(', ');
 }
 
 /**

@@ -25,6 +25,7 @@ import {
 import {
   addDays,
   atTime,
+  dateFromDayKey,
   dayDiff,
   dayKey,
   dayRangeLabel,
@@ -145,10 +146,35 @@ export function NewEventScreen({navigation, route}: Props) {
   }, [inTournament, isNewTournament, activeTeamSpaceId]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
-  const [day, setDay] = useState<Date>(parentFrom ?? today);
+
+  // Datoen fra Kalender-fanen: står du på 22. august og trykker «+», er det
+  // den dagen du vil planlegge. Ligger den utenfor det skjemaet uansett
+  // tillater (mer enn 30 dager tilbake, eller lenger fram enn 18 måneder),
+  // faller vi tilbake til i dag i stedet for å åpne på en dag som ikke kan
+  // lagres. Fortiden INNENFOR grensen slippes gjennom — bekreftelsen ved
+  // lagring er allerede regelen der (00056).
+  const presetDay = useMemo(() => {
+    const parsed = route.params?.presetDate
+      ? dateFromDayKey(route.params.presetDate)
+      : null;
+    if (!parsed) return null;
+    const lastAllowed = new Date(
+      today.getFullYear(),
+      today.getMonth() + MONTHS_AHEAD + 1,
+      0,
+    );
+    const inRange =
+      dayDiff(parsed, addDays(today, -DAYS_BACK)) >= 0 &&
+      dayDiff(parsed, lastAllowed) <= 0;
+    return inRange ? parsed : null;
+  }, [route.params?.presetDate, today]);
+
+  const [day, setDay] = useState<Date>(parentFrom ?? presetDay ?? today);
   // Turneringens sluttdato. Standard er SAMME dag som starten, så en
   // endagsturnering er like rask som før (Brage 2026-08-06).
-  const [endDay, setEndDay] = useState<Date>(parentFrom ?? today);
+  const [endDay, setEndDay] = useState<Date>(
+    parentFrom ?? presetDay ?? today,
+  );
   const [time, setTime] = useState(DEFAULT_TIME);
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');

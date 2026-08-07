@@ -14,6 +14,12 @@ interface EventCardProps {
   /** Kalenderarkivet: fortidskort dempes og oppmøtet skjules — historikk
       skal ikke konkurrere med det som kommer. */
   past?: boolean;
+  /**
+   * Skjuler «I dag»/«Lørdag 12. jun» i kickeren. Settes av Kalender, der
+   * dagsoverskriften over kortet alt sier hvilken dag det er — datoen to
+   * ganger på rad leses som støy, ikke som informasjon.
+   */
+  hideDay?: boolean;
 }
 
 const typePill: Record<EventType, {kind: PillKind; label: string}> = {
@@ -75,6 +81,7 @@ export function EventCard({
   onPress,
   featured = false,
   past = false,
+  hideDay = false,
 }: EventCardProps) {
   const start = event.startTime;
   const result = resultLabel(event);
@@ -119,11 +126,13 @@ export function EventCard({
       <View style={styles.kicker}>
         <View style={styles.kickerLeft}>
           <StatusPill kind={pill.kind} label={pill.label} withDot />
-          <Text
-            style={[styles.day, stadium && styles.dayStadium]}
-            numberOfLines={1}>
-            {dayLabel(start)}
-          </Text>
+          {!hideDay && (
+            <Text
+              style={[styles.day, stadium && styles.dayStadium]}
+              numberOfLines={1}>
+              {dayLabel(start)}
+            </Text>
+          )}
         </View>
         <Text style={[styles.time, stadium && styles.timeStadium]}>
           {time}

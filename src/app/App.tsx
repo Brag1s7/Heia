@@ -7,6 +7,7 @@ import {
   TeamProvider,
   OnboardingProvider,
   NotificationsProvider,
+  CalendarFocusProvider,
 } from '../context';
 import {PushGate} from '../components/PushGate';
 
@@ -17,9 +18,13 @@ function App() {
         <TeamProvider>
           <OnboardingProvider>
             <NotificationsProvider>
-              <StatusBar barStyle="dark-content" />
-              <PushGate />
-              <AppNavigator />
+              {/* Kalender skriver hvilken dato brukeren står på hit, og «+»
+                  i hovednavigasjonen leser den når valgarket åpnes. */}
+              <CalendarFocusProvider>
+                <StatusBar barStyle="dark-content" />
+                <PushGate />
+                <AppNavigator />
+              </CalendarFocusProvider>
             </NotificationsProvider>
           </OnboardingProvider>
         </TeamProvider>

@@ -7,7 +7,9 @@
  */
 import {
   buildCalendarRows,
-  splitByTime,
+  busyDaysFromRows,
+  groupByDay,
+  rowsFrom,
   tournamentTitleFor,
   type CalendarRow,
   type TournamentDayRow,
@@ -152,7 +154,7 @@ describe('buildCalendarRows — kanttilfeller som ellers skjuler data', () => {
   });
 });
 
-describe('splitByTime', () => {
+describe('rowsFrom', () => {
   const today = new Date(2026, 7, 15);
 
   it('deler en flerdagers turnering per dag over «i dag»', () => {
@@ -160,20 +162,144 @@ describe('splitByTime', () => {
     const cup = evt('cup', 'turnering', new Date(2026, 7, 14, 9, 0), {
       endTime: new Date(2026, 7, 16, 23, 59),
     });
-    const {upcoming, past} = splitByTime(buildCalendarRows([cup]), today);
-    expect(past.map(r => (r as TournamentDayRow).dayIndex)).toEqual([1]);
-    expect(upcoming.map(r => (r as TournamentDayRow).dayIndex)).toEqual([2, 3]);
+    const rows = buildCalendarRows([cup]);
+    expect(
+      rowsFrom(rows, today).map(r => (r as TournamentDayRow).dayIndex),
+    ).toEqual([2, 3]);
   });
 
-  it('snur arkivet så det nyeste ligger først', () => {
+  it('tar med hele dagen man står på, uansett klokkeslett', () => {
+    // Kampen var kl. 12 og «i dag» er kl. 20 — den hører fortsatt til i dag.
+    const rows = buildCalendarRows([
+      evt('imorges', 'kamp', new Date(2026, 7, 15, 12, 0)),
+    ]);
+    expect(rowsFrom(rows, new Date(2026, 7, 15, 20, 0))).toHaveLength(1);
+  });
+
+  it('går ÉN vei — historikk hentes ved å flytte startdagen bakover', () => {
     const rows = buildCalendarRows([
       evt('gammel', 'kamp', new Date(2026, 7, 1, 12, 0)),
       evt('nyere', 'kamp', new Date(2026, 7, 10, 12, 0)),
+      evt('kommende', 'kamp', new Date(2026, 7, 20, 12, 0)),
     ]);
-    expect(splitByTime(rows, today).past.map(r => r.key)).toEqual([
-      'nyere',
+    expect(rowsFrom(rows, today).map(r => r.key)).toEqual(['kommende']);
+    // Flyttet bakover er rekkefølgen fortsatt stigende — aldri reversert.
+    expect(rowsFrom(rows, new Date(2026, 7, 1)).map(r => r.key)).toEqual([
       'gammel',
+      'nyere',
+      'kommende',
     ]);
+  });
+});
+
+describe('groupByDay', () => {
+  const today = new Date(2026, 7, 15);
+
+  it('gir én seksjon per dag, med dagens etikett', () => {
+    const sections = groupByDay(
+      buildCalendarRows([
+        evt('a', 'trening', new Date(2026, 7, 15, 18, 0)),
+        evt('b', 'kamp', new Date(2026, 7, 15, 20, 0)),
+        evt('c', 'kamp', new Date(2026, 7, 16, 12, 0)),
+      ]),
+      today,
+    );
+    expect(sections.map(s => s.label)).toEqual(['I dag', 'I morgen']);
+    expect(sections[0].rows.map(r => r.key)).toEqual(['a', 'b']);
+    expect(sections[0].key).toBe('2026-7-15');
+  });
+
+  it('skriver ut ukedag og dato lenger fram', () => {
+    const sections = groupByDay(
+      buildCalendarRows([evt('a', 'kamp', new Date(2026, 7, 22, 12, 0))]),
+      today,
+    );
+    expect(sections[0].label).toBe('Lørdag 22. august');
+  });
+
+  it('markerer månedsskiftet på den FØRSTE dagen i den nye måneden', () => {
+    const sections = groupByDay(
+      buildCalendarRows([
+        evt('a', 'kamp', new Date(2026, 7, 30, 12, 0)),
+        evt('b', 'kamp', new Date(2026, 8, 2, 12, 0)),
+        evt('c', 'kamp', new Date(2026, 8, 5, 12, 0)),
+      ]),
+      today,
+    );
+    expect(sections.map(s => s.monthBreak)).toEqual([false, true, false]);
+  });
+
+  it('teller turneringsdagens kamper, ikke turneringen', () => {
+    const cup = evt('cup', 'turnering', new Date(2026, 7, 20, 9, 0), {
+      endTime: new Date(2026, 7, 21, 23, 59),
+    });
+    const sections = groupByDay(
+      buildCalendarRows([
+        cup,
+        evt('m1', 'kamp', new Date(2026, 7, 20, 10, 0), {
+          parentEventId: 'cup',
+        }),
+        evt('m2', 'kamp', new Date(2026, 7, 20, 15, 0), {
+          parentEventId: 'cup',
+        }),
+      ]),
+      today,
+    );
+    // Dag 1: to kamper. Dag 2: oppsettet er ikke klart — men dagen er ikke tom.
+    expect(sections.map(s => s.count)).toEqual([2, 1]);
+    expect(sections[0].types).toEqual(['turnering', 'kamp']);
+  });
+
+  it('samler typene uten å gjenta dem', () => {
+    const sections = groupByDay(
+      buildCalendarRows([
+        evt('a', 'trening', new Date(2026, 7, 18, 17, 0)),
+        evt('b', 'trening', new Date(2026, 7, 18, 19, 0)),
+      ]),
+      today,
+    );
+    expect(sections[0].types).toEqual(['trening']);
+    expect(sections[0].count).toBe(2);
+  });
+});
+
+describe('busyDaysFromRows', () => {
+  it('markerer ALLE dagene en flerdagers turnering dekker', () => {
+    const cup = evt('cup', 'turnering', new Date(2026, 7, 14, 9, 0), {
+      endTime: new Date(2026, 7, 16, 23, 59),
+    });
+    const busy = busyDaysFromRows(buildCalendarRows([cup]));
+    expect(Object.keys(busy).sort()).toEqual([
+      '2026-7-14',
+      '2026-7-15',
+      '2026-7-16',
+    ]);
+  });
+
+  it('gir turneringsdagen både gull og kampens farge', () => {
+    const cup = evt('cup', 'turnering', new Date(2026, 7, 14, 9, 0), {
+      endTime: new Date(2026, 7, 14, 23, 59),
+    });
+    const busy = busyDaysFromRows(
+      buildCalendarRows([
+        cup,
+        evt('m1', 'kamp', new Date(2026, 7, 14, 10, 0), {
+          parentEventId: 'cup',
+        }),
+      ]),
+    );
+    expect(busy['2026-7-14']).toEqual(['turnering', 'kamp']);
+  });
+
+  it('gir én prikk per type, ikke én per hendelse', () => {
+    const busy = busyDaysFromRows(
+      buildCalendarRows([
+        evt('a', 'trening', new Date(2026, 7, 18, 17, 0)),
+        evt('b', 'trening', new Date(2026, 7, 18, 19, 0)),
+        evt('c', 'sosialt', new Date(2026, 7, 18, 21, 0)),
+      ]),
+    );
+    expect(busy['2026-7-18']).toEqual(['trening', 'sosialt']);
   });
 });
 
