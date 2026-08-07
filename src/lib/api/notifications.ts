@@ -1,5 +1,9 @@
 import {supabase} from '../supabase';
 import {mapNotificationRow} from '../../shared/inbox';
+// ⚠️ Egen import, i tillegg til re-eksporten under. `export type {…} from`
+// er en REN videresending: den binder ingen navn lokalt, så typen kunne ikke
+// brukes som returtype her uten denne linja.
+import type {HeiaNotification} from '../../shared/inbox';
 
 /**
  * Inbox — leser `notifications`-tabellen (00011) direkte.
