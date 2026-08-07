@@ -7,6 +7,7 @@ export {RSVPBar} from './RSVPBar';
 export {ListRow} from './ListRow';
 export {EventCard} from './EventCard';
 export {DateField} from './DateField';
+export {TimeField} from './TimeField';
 // Det delte kalenderspråket — samme rutenett i datovelgeren og på Kalender.
 export {MonthGrid} from './calendar/MonthGrid';
 export {MonthSheet} from './calendar/MonthSheet';

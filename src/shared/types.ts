@@ -219,9 +219,20 @@ export type RootTabParamList = {
  * Parametere til «Ny hendelse»-modalen. Samme type i alle tre stackene den
  * bor i (Hjem, Kalender, Varsler) — den var duplisert tre steder, og
  * turneringsperioden måtte da legges til tre steder.
+ *
+ * Modalen er TOSIDIG fra 2026-08-07: `eventId` gjør den til en
+ * redigeringsskjerm for det arrangementet. Samme skjema, samme datovelger,
+ * samme regnestykker — bare prefylt, og med `update_event` i den andre enden.
  */
 export type NewEventParams =
   | {
+      /**
+       * Sett = REDIGERING av dette arrangementet. Skjemaet henter selv
+       * verdiene (det trenger `is_home` og `meeting_time`, som kortene aldri
+       * har båret), og typen og turneringstilknytningen låses.
+       * De øvrige parameterne under gjelder kun opprettelse og ignoreres.
+       */
+      eventId?: string;
       parentEventId?: string;
       parentTitle?: string;
       /**

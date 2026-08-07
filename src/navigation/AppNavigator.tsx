@@ -117,8 +117,13 @@ const stackScreenOptions: NativeStackNavigationOptions = {
 // slik at «Ny kamp» på en turneringsside virker uansett hvilken fane
 // turneringen ble åpnet fra.
 // ---------------------------------------------------------------------------
-const newEventOptions = ({navigation}: any): NativeStackNavigationOptions => ({
-  title: 'Ny hendelse',
+const newEventOptions = ({
+  navigation,
+  route,
+}: any): NativeStackNavigationOptions => ({
+  // Samme modal, to jobber (2026-08-07). Tittelen er det eneste stedet
+  // brukeren ser forskjellen før feltene er fylt ut.
+  title: route?.params?.eventId ? 'Rediger' : 'Ny hendelse',
   presentation: 'modal',
   // Modalen beholder native header og vertikal systemanimasjon —
   // `simple_push` fra fellesinnstillingene ville gjort den horisontal.

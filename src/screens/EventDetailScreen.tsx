@@ -44,6 +44,7 @@ import {
   getEventDetail,
   getTournamentMatches,
   setRsvp,
+  setMatchCancelled,
   setMatchReporter,
   startMatch,
   reportMatchEvent,
@@ -54,6 +55,7 @@ import {createImagePost, getMatchPhotos, type MatchPhoto} from '../lib/api/feed'
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
 import {dayRangeLabel} from '../shared/calendar';
+import {eventIsUpcoming} from '../shared/eventForm';
 import type {
   EventAttendee,
   EventType,
@@ -149,7 +151,18 @@ function matchErrorText(e: unknown, fallback: string): string {
   if (message.includes('Match is not live')) {
     return 'Kampen er alt i pause.';
   }
-  if (message.includes('Access denied')) {
+  // Avlysning (00057). Begge to betyr at noen andre rakk å endre statusen
+  // først — beskjeden må si HVA som gjelder nå, ikke bare at det gikk galt.
+  if (message.includes('Only a scheduled match can be cancelled')) {
+    return 'Kampen er alt i gang eller ferdigspilt.';
+  }
+  if (message.includes('Match is not cancelled')) {
+    return 'Kampen er ikke avlyst.';
+  }
+  if (
+    message.includes('Access denied') ||
+    message.includes('Only coaches, team leaders and admins')
+  ) {
     return 'Du har ikke tilgang til å gjøre dette.';
   }
   return fallback;
@@ -200,6 +213,7 @@ export function EventDetailScreen({route, navigation}: Props) {
   const [reporterSheetVisible, setReporterSheetVisible] = useState(false);
   const [selectedActionType, setSelectedActionType] =
     useState<ReporterActionType>('mål_oss');
+  const [savingCancelled, setSavingCancelled] = useState(false);
   const [reporterId, setReporterId] = useState<string | undefined>(undefined);
   const [pendingPhoto, setPendingPhoto] = useState<PickedImage | null>(null);
   const [publishingPhoto, setPublishingPhoto] = useState(false);
@@ -224,9 +238,15 @@ export function EventDetailScreen({route, navigation}: Props) {
     }
   }, [eventId, activeTeamSpaceId]);
 
-  useEffect(() => {
-    loadEvent();
-  }, [loadEvent]);
+  // ⚠️ Ved FOKUS, ikke ved mount. Redigeringsmodalen lukker seg tilbake hit
+  // (2026-08-07), og med en ren mount-effekt ville siden stått igjen med den
+  // gamle datoen etter at man nettopp hadde flyttet den. Første fokus skjer
+  // sammen med monteringen, så åpningen er uendret.
+  useFocusEffect(
+    useCallback(() => {
+      loadEvent();
+    }, [loadEvent]),
+  );
 
   // Turnering: kampene lastes for seg og refetches ved fokus — «Ny kamp»
   // lukker modalen tilbake hit, og å komme tilbake fra en kamp skal vise
@@ -377,6 +397,9 @@ export function EventDetailScreen({route, navigation}: Props) {
   // kampforløpet forsvant i samme øyeblikk som de var ferdige.
   const isFinishedMatch =
     event.type === 'kamp' && event.matchStatus === 'finished';
+  // Avlyst er en egen tilstand, ikke «ferdig»: kampen kan settes opp igjen.
+  const isCancelledMatch =
+    event.type === 'kamp' && event.matchStatus === 'cancelled';
   const isCurrentUserReporter = reporterId === currentUser?.id;
   // Samme rolleregel som is_team_admin() i RLS — en lagleder skal se det
   // samme som en trener.
@@ -441,6 +464,53 @@ export function EventDetailScreen({route, navigation}: Props) {
     } finally {
       setSavingRsvp(false);
     }
+  };
+
+  /**
+   * «Avlys kamp» er en STATUSENDRING, ikke en sletting (00057). Kampen blir
+   * stående i kalenderen med «Avlyst»-pill — en forelder som husker at det
+   * skulle være kamp skal FINNE svaret. En slettet kamp ser ut som en kamp
+   * man har husket feil.
+   *
+   * Bekreftelsen sier hva som skjer med laget, og den sier sant begge veier:
+   * en fremtidig avlysning gir ett tydelig varsel, en avlysning av noe som
+   * har vært gir ingenting (samme vakt som resten av endringsvarslene).
+   */
+  const handleSetCancelled = (next: boolean) => {
+    const perform = async () => {
+      if (savingCancelled) return;
+      setSavingCancelled(true);
+      try {
+        await setMatchCancelled(eventId, next);
+        await loadEvent();
+      } catch (e) {
+        Alert.alert(
+          next ? 'Kunne ikke avlyse kampen' : 'Kunne ikke sette den opp igjen',
+          matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+        );
+      } finally {
+        setSavingCancelled(false);
+      }
+    };
+
+    // Å sette en kamp opp igjen er å angre — det trenger ingen bekreftelse.
+    if (!next) {
+      perform();
+      return;
+    }
+
+    const notifies = eventIsUpcoming(event.startTime);
+    Alert.alert(
+      'Avlyse kampen?',
+      `${formatDateLong(event.startTime)} kl. ${formatTime(event.startTime)}. ` +
+        (notifies
+          ? 'Kampen blir stående i kalenderen som avlyst, og hele laget får beskjed.'
+          : 'Kampen blir stående i kalenderen som avlyst. Laget får ingen beskjed — kampen har vært.'),
+      [
+        {text: 'Avbryt', style: 'cancel'},
+        {text: 'Avlys kampen', style: 'destructive', onPress: perform},
+      ],
+    );
   };
 
   const handleStartMatch = async () => {
@@ -836,6 +906,39 @@ export function EventDetailScreen({route, navigation}: Props) {
         </HeroSurface>
       )}
 
+      {/* Trenerens to rettelser, rett under det som skal rettes. Kun for
+          trener/lagleder/admin — samme regel som RPC-ene vakter med.
+          «Avlys» er `ghost`: den er tilgjengelig, men den er ikke det man
+          kom hit for. */}
+      {isCurrentUserAdmin && (
+        <View style={styles.adminActions}>
+          <Button
+            title="Rediger"
+            variant="secondary"
+            onPress={() => navigation.navigate('NewEvent', {eventId})}
+            style={styles.adminAction}
+          />
+          {isUpcomingMatch && (
+            <Button
+              title="Avlys kamp"
+              variant="ghost"
+              onPress={() => handleSetCancelled(true)}
+              disabled={savingCancelled}
+              style={styles.adminAction}
+            />
+          )}
+          {isCancelledMatch && (
+            <Button
+              title="Sett opp igjen"
+              variant="secondary"
+              onPress={() => handleSetCancelled(false)}
+              disabled={savingCancelled}
+              style={styles.adminAction}
+            />
+          )}
+        </View>
+      )}
+
       {/* Turnering: dagens kjøreplan. Kampene bor HER — kalenderen viser
           turneringen som ett kort. Hver kamp er en helt vanlig kampside
           (live-rapportering, kamprapport, bilder). */}
@@ -1229,6 +1332,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
     marginBottom: spacing.lg,
+  },
+  // Rettelsene ligger på rad under kortet. To knapper deler bredden når
+  // kampen kan avlyses; alene fyller «Rediger» raden.
+  adminActions: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  adminAction: {
+    flex: 1,
   },
   tournamentList: {
     paddingHorizontal: spacing.lg,

@@ -1,5 +1,6 @@
 import {supabase} from '../supabase';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
+import type {EditableEvent} from '../../shared/eventForm';
 import type {
   EventAttendee,
   EventType,
@@ -320,6 +321,129 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
   }
 
   return (data as any).event_id as string;
+}
+
+/**
+ * Arrangementet slik redigeringsskjemaet trenger det.
+ *
+ * Egen, mager spørring i stedet for `getEventDetail`: den går gjennom
+ * `get_event_with_rsvp` og teller oppmøte, og den returnerer verken `is_home`,
+ * `meeting_time` eller `parent_event_id` — de tre feltene skjemaet må ha for
+ * ikke å ødelegge noe det ikke viser. RLS «Members can view events» dekker
+ * lesingen; skriveretten vaktes av `update_event`.
+ */
+export async function getEventForEdit(
+  eventId: string,
+  teamSpaceId: string,
+): Promise<EditableEvent> {
+  const {data, error} = await supabase
+    .from('events')
+    .select(
+      `id, type, title, description, location, start_time, end_time,
+       meeting_time, parent_event_id,
+       match_sessions ( opponent, is_home, status )`,
+    )
+    .eq('id', eventId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    throw new Error('Fant ikke hendelsen');
+  }
+
+  const row = data as any;
+  const session = firstOf<any>(row.match_sessions);
+
+  return {
+    id: row.id,
+    teamSpaceId,
+    type: EVENT_TYPE_MAP[row.type as string] ?? 'annet',
+    title: row.title,
+    startTime: new Date(row.start_time),
+    endTime: row.end_time ? new Date(row.end_time) : undefined,
+    meetingTime: row.meeting_time ? new Date(row.meeting_time) : undefined,
+    location: row.location ?? undefined,
+    description: row.description ?? undefined,
+    opponent: session?.opponent ?? undefined,
+    isHome: session?.is_home ?? true,
+    parentEventId: row.parent_event_id ?? undefined,
+    matchStatus: session
+      ? MATCH_STATUS_MAP[session.status as string] ?? 'upcoming'
+      : undefined,
+  };
+}
+
+/** Feltene `update_event` erstatter. Se `UpdateEventInput`-kommentaren. */
+export interface UpdateEventInput {
+  eventId: string;
+  title: string;
+  startTime: Date;
+  endTime?: Date;
+  meetingTime?: Date;
+  location?: string;
+  description?: string;
+  /** Kun kamp. RPC-en krever den når arrangementet ER en kamp. */
+  opponent?: string;
+  isHome?: boolean;
+}
+
+/**
+ * Retter et arrangement via `update_event` (SECURITY DEFINER, 00057).
+ *
+ * ⚠️ FULL ERSTATNING, ikke en patch: et utelatt felt BLIR tømt. Det er den
+ * eneste tolkningen som lar en trener slette et sted eller en beskjed, og
+ * derfor bygger `shared/eventForm.ts` alltid hele nyttelasten — inkludert de
+ * to feltene skjemaet ikke viser (`endTime`, `meetingTime`), som arves fra
+ * det lagrede arrangementet.
+ *
+ * Typen og turneringstilknytningen kan ikke endres herfra. Endringsvarselet
+ * skrives av triggerne fra 00054, og går ALDRI ut for et arrangement som alt
+ * har startet (00057).
+ */
+export async function updateEvent(input: UpdateEventInput): Promise<void> {
+  const {error} = await supabase.rpc('update_event', {
+    p_event_id: input.eventId,
+    p_title: input.title,
+    p_start_time: input.startTime.toISOString(),
+    p_end_time: input.endTime?.toISOString() ?? null,
+    p_location: input.location ?? null,
+    p_description: input.description ?? null,
+    p_opponent: input.opponent ?? null,
+    p_is_home: input.isHome ?? null,
+    p_meeting_time: input.meetingTime?.toISOString() ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+/**
+ * Avlyser eller gjenåpner en kamp via `set_match_cancelled` (00057).
+ *
+ * En avlysning er en STATUSENDRING, ikke en sletting: kampen blir stående i
+ * kalenderen med «Avlyst»-pill, så en forelder som husker at det skulle være
+ * kamp faktisk finner svaret. En slettet kamp ser ut som en kamp man har
+ * husket feil.
+ *
+ * RPC-en er nødvendig fordi RLS også slipper kampREPORTEREN inn på
+ * `match_sessions` (00014) — hun skal rapportere kampen, ikke avlyse den.
+ */
+export async function setMatchCancelled(
+  eventId: string,
+  cancelled: boolean,
+): Promise<void> {
+  const {error} = await supabase.rpc('set_match_cancelled', {
+    p_event_id: eventId,
+    p_cancelled: cancelled,
+  });
+
+  if (error) {
+    throw error;
+  }
 }
 
 /** En turnering i kampskjemaets velger. */
