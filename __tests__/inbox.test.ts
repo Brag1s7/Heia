@@ -322,6 +322,113 @@ describe('Varsler — hva kortet skal fortelle', () => {
   });
 });
 
+describe('Varsler — sosialt teller ikke som kamphendelser', () => {
+  // Brage 2026-08-06 (LÅST): kommentarer og reaksjoner er sosiale varsler.
+  // De skal aldri havne i kamptidslinja eller telle med i «N nye hendelser».
+  const social = (id: string, category: string) => ({
+    id,
+    category,
+    title: 'Emma kommenterte bildet ditt',
+    body: '«For en scoring!»',
+    read_at: null,
+    created_at: new Date(clock + 1000).toISOString(),
+    team_space_id: 'ts-1',
+    // NB: samme feed-post som en kamphendelse — likevel ingen match-kontekst.
+    data: {
+      feed_post_id: 'fp-n2',
+      event_id: EVENT,
+      team_space_id: 'ts-1',
+      actor_id: 'u-emma',
+      actor_name: 'Emma',
+    },
+  });
+
+  it('holder kommentar og 👏 utenfor kampgruppa', () => {
+    const rows: any[] = [
+      social('s1', 'new_comment'),
+      social('s2', 'new_reaction'),
+      ...fullMatchRows().reverse(),
+    ];
+    const entries = buildEntries(rows.map(mapNotificationRow));
+    const match = entries.find(e => e.kind === 'match');
+    if (!match || match.kind !== 'match') throw new Error('fant ingen kamp');
+
+    // Kampgruppa inneholder KUN kamphendelser …
+    expect(match.items).toHaveLength(7);
+    expect(match.items.every(i => i.category === 'match_live')).toBe(true);
+
+    // … og «nye hendelser» telles av nettopp den gruppa, så de sosiale
+    // varslene kan ikke blåse opp tallet.
+    const nyeHendelser = match.items.filter(i => i.readAt === null).length;
+    expect(nyeHendelser).toBe(7);
+
+    // De sosiale ligger som egne rader.
+    expect(entries.filter(e => e.kind === 'row')).toHaveLength(2);
+  });
+
+  it('gir aldri sosiale varsler kampkontekst, selv med event_id i data', () => {
+    const n = mapNotificationRow(social('s3', 'new_comment'));
+    expect(n.match).toBeUndefined();
+    expect(n.eventId).toBe(EVENT);
+  });
+});
+
+describe('Varsler — endringer på et arrangement', () => {
+  const changeRow = (changes: any[]) => ({
+    id: 'ch1',
+    category: 'event_reminder',
+    title: 'Kamp mot Oslo er endret',
+    body: 'oppmøtet er flyttet: 17:30 → 17:00',
+    read_at: null,
+    created_at: new Date(clock).toISOString(),
+    team_space_id: 'ts-1',
+    data: {
+      kind: 'change',
+      event_id: EVENT,
+      team_space_id: 'ts-1',
+      event_title: 'Kamp mot Oslo',
+      changes,
+    },
+  });
+
+  it('plukker ut gammel og ny verdi (00054)', () => {
+    const n = mapNotificationRow(
+      changeRow([
+        {field: 'meeting_time', label: 'oppmøtet er flyttet', old: '17:30', new: '17:00'},
+        {field: 'location', label: 'nytt sted', old: 'Bane 1', new: 'Bane 2'},
+      ]),
+    );
+    expect(n.eventKind).toBe('change');
+    expect(n.changes).toHaveLength(2);
+    expect(n.changes?.[0]).toEqual({
+      field: 'meeting_time',
+      label: 'oppmøtet er flyttet',
+      old: '17:30',
+      new: '17:00',
+    });
+  });
+
+  it('ignorerer ufullstendige endringer', () => {
+    const n = mapNotificationRow(changeRow([{field: 'x'}, {label: 'bare label'}]));
+    expect(n.changes).toBeUndefined();
+  });
+
+  it('gir ingen endringer på en påminnelse', () => {
+    const n = mapNotificationRow({
+      id: 'rem1',
+      category: 'event_reminder',
+      title: 'Kamp mot Oslo — oppmøte om én time',
+      body: 'Oppmøte 17:30, Bane 2. Start 18:00.',
+      read_at: null,
+      created_at: new Date(clock).toISOString(),
+      team_space_id: 'ts-1',
+      data: {kind: 'reminder', event_id: EVENT, anchor: 'meeting'},
+    });
+    expect(n.eventKind).toBe('reminder');
+    expect(n.changes).toBeUndefined();
+  });
+});
+
 describe('Varsler — bolkene', () => {
   it('deler i Nå / I dag / Tidligere', () => {
     const now = Date.parse('2026-08-06T20:00:00Z');

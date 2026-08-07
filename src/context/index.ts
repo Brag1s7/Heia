@@ -5,4 +5,8 @@ export {
   NotificationsProvider,
   useNotifications,
 } from './NotificationsContext';
+export {
+  CalendarFocusProvider,
+  useCalendarFocus,
+} from './CalendarFocusContext';
 export type {PendingAction} from './OnboardingContext';

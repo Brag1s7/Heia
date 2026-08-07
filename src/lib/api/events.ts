@@ -1,4 +1,5 @@
 import {supabase} from '../supabase';
+import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {
   EventAttendee,
   EventType,
@@ -36,7 +37,8 @@ const SESSION_COLUMNS =
   'id, opponent, home_score, away_score, is_home, status, reporter_id, started_at';
 
 const EVENT_COLUMNS = `
-  id, type, title, description, location, start_time, end_time,
+  id, type, title, description, location, start_time, end_time, meeting_time,
+  parent_event_id,
   match_sessions ( ${SESSION_COLUMNS} )
 `;
 
@@ -82,6 +84,7 @@ function mapEventRow(
     title: row.title,
     startTime: new Date(row.start_time),
     endTime: row.end_time ? new Date(row.end_time) : undefined,
+    meetingTime: row.meeting_time ? new Date(row.meeting_time) : undefined,
     location: row.location ?? undefined,
     description: row.description ?? undefined,
     rsvp,
@@ -90,11 +93,12 @@ function mapEventRow(
       ? {home: session.home_score, away: session.away_score}
       : undefined,
     matchStatus: session
-      ? (MATCH_STATUS_MAP[session.status as string] ?? 'upcoming')
+      ? MATCH_STATUS_MAP[session.status as string] ?? 'upcoming'
       : undefined,
     reporterId: session?.reporter_id ?? undefined,
     matchSessionId: session?.id ?? undefined,
     startedAt: session?.started_at ? new Date(session.started_at) : undefined,
+    parentEventId: row.parent_event_id ?? undefined,
   };
 }
 
@@ -149,9 +153,15 @@ async function getRsvpSummaries(
 /**
  * Alle hendelser for et lagrom, kronologisk (tidligste først).
  *
- * Turnerings-CONTAINEREN holdes utenfor: turneringer bor på sesongsiden
- * (brukertest 2026-07-30), mens kampene deres er helt vanlige kamper og
- * vises i kalenderen som alle andre — det er dem foreldrene skal møte opp på.
+ * ⚠️ Turnerings-CONTAINEREN er MED (Brage 2026-08-06). Den ble filtrert bort
+ * fram til nå, fordi turneringer «bodde på sesongsiden». Rollefordelingen er
+ * nå en annen: Sesong er den sportslige oversikten og administrasjonsflaten,
+ * Kalender er den kronologiske fasiten — SAMME objekt vises begge steder.
+ *
+ * Kampene i en turnering er helt vanlige kamper med `parent_event_id`. De
+ * kommer med her som alle andre kamper, og grupperes under turneringen av
+ * `shared/calendarList.ts` — det finnes bare ETT kampobjekt, og det skal
+ * aldri dupliseres.
  */
 export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
   const {data, error} = await supabase
@@ -159,7 +169,6 @@ export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
     .select(EVENT_COLUMNS)
     .eq('team_space_id', teamSpaceId)
     .is('deleted_at', null)
-    .neq('type', 'turnering')
     .order('start_time', {ascending: true});
 
   if (error) {
@@ -175,6 +184,67 @@ export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
   return rows.map(row =>
     mapEventRow(row, teamSpaceId, summaries.get(row.id) ?? emptyRsvp()),
   );
+}
+
+/**
+ * Dagene laget alt har noe på, til prikkene i datovelgeren.
+ *
+ * Egen, mager spørring i stedet for `getTeamEvents`: vi trenger to kolonner
+ * og ingen RSVP-opptelling. Å gjenbruke getTeamEvents ville betydd en ekstra
+ * rundtur til `event_rsvps` for tall som aldri vises.
+ *
+ * Turneringer er MED her, i motsetning til i kalenderlista. En cup-helg er
+ * den mest opptatte dagen laget har — at containeren bor på sesongsiden gjør
+ * den ikke ledig.
+ *
+ * Feiler den, feiler bare prikkene: kalenderen skal kunne brukes med én gang.
+ */
+export async function getBusyDays(
+  teamSpaceId: string,
+  from: Date,
+  to: Date,
+): Promise<BusyDays> {
+  const {data, error} = await supabase
+    .from('events')
+    .select('start_time, end_time, type')
+    .eq('team_space_id', teamSpaceId)
+    .is('deleted_at', null)
+    .gte('start_time', from.toISOString())
+    .lte('start_time', to.toISOString());
+
+  if (error) {
+    throw error;
+  }
+
+  const days: BusyDays = {};
+  const mark = (date: Date, type: EventType) => {
+    const key = dayKey(date);
+    const existing = days[key];
+    if (!existing) {
+      days[key] = [type];
+    } else if (!existing.includes(type)) {
+      // Tre treninger samme dag skal gi én prikk, ikke tre.
+      existing.push(type);
+    }
+  };
+
+  for (const row of (data || []) as any[]) {
+    const type = EVENT_TYPE_MAP[row.type as string] ?? 'annet';
+    const start = new Date(row.start_time);
+
+    // En turnering opptar HELE perioden sin, ikke bare den første dagen —
+    // en cup lørdag til søndag skal gi prikk begge dagene. Kun turneringer:
+    // en trening 18–19:30 er ikke «opptatt» to dager selv om den skulle
+    // krysse midnatt.
+    if (type === 'turnering' && row.end_time) {
+      for (const day of eachDay(start, new Date(row.end_time))) {
+        mark(day, type);
+      }
+    } else {
+      mark(start, type);
+    }
+  }
+  return days;
 }
 
 /**
@@ -212,6 +282,8 @@ export interface CreateEventInput {
   title: string;
   startTime: Date;
   endTime?: Date;
+  /** Frivillig oppmøtetid (00053). Må være <= startTime. */
+  meetingTime?: Date;
   location?: string;
   description?: string;
   opponent?: string;
@@ -237,9 +309,10 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
     p_end_time: input.endTime?.toISOString() ?? null,
     p_location: input.location ?? null,
     p_description: input.description ?? null,
-    p_opponent: isMatch ? (input.opponent ?? null) : null,
-    p_is_home: isMatch ? (input.isHome ?? true) : true,
+    p_opponent: isMatch ? input.opponent ?? null : null,
+    p_is_home: isMatch ? input.isHome ?? true : true,
     p_parent_event_id: input.parentEventId ?? null,
+    p_meeting_time: input.meetingTime?.toISOString() ?? null,
   });
 
   if (error) {

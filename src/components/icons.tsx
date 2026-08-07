@@ -13,6 +13,7 @@ export {
   Calendar,
   Camera,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,

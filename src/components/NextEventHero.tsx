@@ -10,6 +10,12 @@ import type {HeiaEvent, EventType} from '../shared/types';
 interface NextEventHeroProps {
   event: HeiaEvent;
   onPress: () => void;
+  /**
+   * Turneringens navn når kampen hører til en (Brage 2026-08-06). Hjem viser
+   * KAMPEN med en liten turneringsetikett — aldri et eget turneringskort ved
+   * siden av. Kampen er og blir samme objekt som i Kalender og Sesong.
+   */
+  tournamentTitle?: string;
 }
 
 const typePill: Record<EventType, {kind: PillKind; label: string}> = {
@@ -30,7 +36,9 @@ function dayLabel(d: Date): string {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const eventDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round((eventDay.getTime() - today.getTime()) / 86400000);
+  const diffDays = Math.round(
+    (eventDay.getTime() - today.getTime()) / 86400000,
+  );
   if (diffDays === 0) return 'I dag';
   if (diffDays === 1) return 'I morgen';
   const label = d.toLocaleDateString('nb-NO', {
@@ -46,7 +54,11 @@ function dayLabel(d: Date): string {
  * med varmt kremdrag og banesirkel — hverdagens svar på stadion-heroen.
  * Hele kortet åpner hendelsen; RSVP-svaret gis der (én kilde til sannhet).
  */
-export function NextEventHero({event, onPress}: NextEventHeroProps) {
+export function NextEventHero({
+  event,
+  onPress,
+  tournamentTitle,
+}: NextEventHeroProps) {
   const pill = typePill[event.type] ?? typePill.annet;
   const {coming, notComing, pending} = event.rsvp;
   const total = coming + notComing + pending;
@@ -66,7 +78,11 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
     <>
       <View style={styles.kicker}>
         <View style={styles.kickerLeft}>
-          <StatusPill kind={pill.kind} label={pill.label} withDot />
+          <StatusPill
+            kind={tournamentTitle ? 'turnering' : pill.kind}
+            label={tournamentTitle ?? pill.label}
+            withDot
+          />
           <Text style={[styles.day, stadium && styles.dayStadium]}>
             {dayLabel(event.startTime)}
           </Text>
@@ -118,7 +134,9 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${title}, ${dayLabel(event.startTime)} ${formatTime(event.startTime)}`}
+        accessibilityLabel={`${title}, ${dayLabel(
+          event.startTime,
+        )} ${formatTime(event.startTime)}`}
         style={({pressed}) => [pressed && styles.pressed]}>
         <StadiumSurface style={styles.stadiumHero} flood={false}>
           {inner}
@@ -131,7 +149,9 @@ export function NextEventHero({event, onPress}: NextEventHeroProps) {
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${dayLabel(event.startTime)} ${formatTime(event.startTime)}`}
+      accessibilityLabel={`${title}, ${dayLabel(event.startTime)} ${formatTime(
+        event.startTime,
+      )}`}
       style={({pressed}) => [styles.hero, pressed && styles.pressed]}>
       {/* Ekte mint→krem-gradient (140°) — varmt kremdrag nede til høyre. */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">

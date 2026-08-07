@@ -18,6 +18,7 @@ import {
   useActiveTeam,
   useOnboarding,
   useNotifications,
+  useCalendarFocus,
 } from '../context';
 import {BootScreen, CreateSheet, NotificationBanner} from '../components';
 import {Bell, Calendar, House, Plus, User} from '../components/icons';
@@ -271,7 +272,13 @@ function MainTabs() {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
   const {activeRole} = useActiveTeam();
   const {unreadCount, refreshUnread} = useNotifications();
-  const [sheetVisible, setSheetVisible] = useState(false);
+  const calendarFocus = useCalendarFocus();
+  // Datoen leses ÉN gang, i det arket åpnes. Den ligger i en ref hos Kalender
+  // nettopp for at scrolling der ikke skal rendre hele fanetreet på nytt.
+  const [sheet, setSheet] = useState<{visible: boolean; day: string | null}>({
+    visible: false,
+    day: null,
+  });
 
   // Et varsel-trykk ved kaldstart kommer mens onboarding/lasting står fremme,
   // og da finnes ikke HjemStack ennå. Fanene er første øyeblikk målet faktisk
@@ -280,7 +287,7 @@ function MainTabs() {
     flushPendingDeepLink();
   }, []);
 
-  const closeSheet = () => setSheetVisible(false);
+  const closeSheet = () => setSheet(prev => ({...prev, visible: false}));
 
   const handleShare = () => {
     closeSheet();
@@ -292,7 +299,17 @@ function MainTabs() {
   };
 
   const handleNewEvent = () => {
+    const day = sheet.day;
     closeSheet();
+    // Kommer man fra Kalender, åpnes skjemaet I Kalender-stacken med datoen
+    // man ser på — «Avbryt» skal legge deg tilbake der du var, ikke i Hjem.
+    if (day !== null) {
+      navigation.navigate('KalenderStack', {
+        screen: 'NewEvent',
+        params: {presetDate: day},
+      });
+      return;
+    }
     navigation.navigate('HjemStack', {screen: 'NewEvent'});
   };
 
@@ -350,7 +367,7 @@ function MainTabs() {
         listeners={{
           tabPress: e => {
             e.preventDefault();
-            setSheetVisible(true);
+            setSheet({visible: true, day: calendarFocus.read()});
           },
         }}
       />
@@ -377,8 +394,9 @@ function MainTabs() {
     </Tab.Navigator>
 
     <CreateSheet
-      visible={sheetVisible}
+      visible={sheet.visible}
       canCreateEvent={isTeamAdmin(activeRole)}
+      calendarDay={sheet.day}
       onClose={closeSheet}
       onShare={handleShare}
       onNewEvent={handleNewEvent}

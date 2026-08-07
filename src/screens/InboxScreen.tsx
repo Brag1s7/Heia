@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   RefreshControl,
+  LayoutAnimation,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
@@ -42,11 +43,15 @@ export function InboxScreen() {
 
   const [items, setItems] = useState<HeiaNotification[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
+  // Kampklokka må TIKKE. Var minuttet regnet ut én gang ved render, frøs
+  // stripa på minuttet skjermen ble åpnet — og sa «6′» mens kampen var på 20.
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const teamName = activeTeamSpace?.displayName ?? 'laget';
+  const firstLoad = useRef(true);
 
   const load = useCallback(async () => {
     if (!activeTeamSpaceId) return;
@@ -59,6 +64,15 @@ export function InboxScreen() {
         getNotifications(activeTeamSpaceId),
         getLiveMatch(activeTeamSpaceId).catch(() => null),
       ]);
+      // Myk innlasting: nye rader glir inn i stedet for å hoppe. Kun ved
+      // OPPDATERING — førstegangslasting går fra skjelett til liste, og der
+      // ville animasjonen bare føltes treg.
+      if (!firstLoad.current) {
+        LayoutAnimation.configureNext(
+          LayoutAnimation.create(260, 'easeInEaseOut', 'opacity'),
+        );
+      }
+      firstLoad.current = false;
       setItems(notifications);
       setLiveMatch(live);
       // Lista er sannheten — hold badgen i takt med det du faktisk ser.
@@ -84,6 +98,15 @@ export function InboxScreen() {
       load();
     }
   }, [liveNonce, load]);
+
+  // Tikker kun når en kamp faktisk pågår — ingen timer i bakgrunnen ellers.
+  useEffect(() => {
+    if (!liveMatch) {
+      return;
+    }
+    const id = setInterval(() => setNowTick(Date.now()), 20_000);
+    return () => clearInterval(id);
+  }, [liveMatch]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -180,7 +203,7 @@ export function InboxScreen() {
     liveMatch && !isPaused && liveMatch.startedAt
       ? Math.max(
           0,
-          Math.floor((Date.now() - liveMatch.startedAt.getTime()) / 60000),
+          Math.floor((nowTick - liveMatch.startedAt.getTime()) / 60000),
         )
       : null;
 
