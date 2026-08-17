@@ -1,4 +1,4 @@
-import React, {useState, useCallback, useEffect, useRef} from 'react';
+import React, {useState, useCallback, useEffect, useMemo, useRef} from 'react';
 import {
   View,
   Text,
@@ -35,7 +35,9 @@ import {
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
-import {getLiveMatch, getTeamEvents} from '../lib/api/events';
+import {getLiveMatch} from '../lib/api/events';
+import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
+import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {tournamentTitleFor} from '../shared/calendarList';
 import {
   getTeamSupportSummary,
@@ -147,13 +149,27 @@ export function TeamHomeScreen() {
 
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
-  const [nextEvents, setNextEvents] = useState<HeiaEvent[]>([]);
+  // Hendelsene deles med Kalender via query-cachen (B2/P7) — én henting
+  // for begge faner, og en 👏-burst i feeden refetcher ikke lenger
+  // kalenderdata. Feiler hentingen er data undefined → heroene skjules,
+  // samme «sekundært, blokkerer aldri feeden»-oppførsel som før.
+  const eventsQuery = useTeamEvents(activeTeamSpaceId);
+  useScreenFocusRefetch(teamEventsKey(activeTeamSpaceId ?? ''));
+  const nextEvents = useMemo(
+    () => pickNextEvents(eventsQuery.data ?? [], 3),
+    [eventsQuery.data],
+  );
   // Turneringsnavn per kamp-id. Turnerings-CONTAINEREN vises aldri på Hjem
   // (pickNextEvents hopper over den) — dette er det ENESTE stedet en turnering
   // nevnes her, som en liten etikett på kampens eget kort.
-  const [tournamentTitles, setTournamentTitles] = useState<
-    Record<string, string>
-  >({});
+  const tournamentTitles = useMemo(() => {
+    const titles: Record<string, string> = {};
+    for (const event of nextEvents) {
+      const tournament = tournamentTitleFor(event, eventsQuery.data ?? []);
+      if (tournament) titles[event.id] = tournament;
+    }
+    return titles;
+  }, [nextEvents, eventsQuery.data]);
   const [supportSummary, setSupportSummary] =
     useState<TeamSupportSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -171,30 +187,18 @@ export function TeamHomeScreen() {
     // Heroene er sekundære: feiler kamp-/kalenderoppslaget skjuler vi dem
     // heller enn å blokkere feeden.
     const livePromise = getLiveMatch(activeTeamSpaceId).catch(() => null);
-    const eventsPromise = getTeamEvents(activeTeamSpaceId).catch(
-      () => [] as HeiaEvent[],
-    );
     // Lagkassa-kortet i karusellen (fase 5) — sekundært, som heroene.
     const supportPromise = getTeamSupportSummary(activeTeamSpaceId).catch(
       () => null,
     );
     try {
-      const [items, live, events, support] = await Promise.all([
+      const [items, live, support] = await Promise.all([
         getTeamFeed(activeTeamSpaceId, myId),
         livePromise,
-        eventsPromise,
         supportPromise,
       ]);
       setFeed(items);
       setLiveMatch(live);
-      const upcoming = pickNextEvents(events, 3);
-      setNextEvents(upcoming);
-      const titles: Record<string, string> = {};
-      for (const event of upcoming) {
-        const tournament = tournamentTitleFor(event, events);
-        if (tournament) titles[event.id] = tournament;
-      }
-      setTournamentTitles(titles);
       setSupportSummary(support);
     } catch {
       setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
@@ -236,8 +240,10 @@ export function TeamHomeScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    // Eksplisitt brukerhandling hopper over staleTime — hent også heroene.
+    eventsQuery.refetch();
     loadFeed();
-  }, [loadFeed]);
+  }, [loadFeed, eventsQuery.refetch]);
 
   const handleToggleHeia = useCallback(async (post: FeedItem) => {
     const wasReacted = post.iReacted ?? false;

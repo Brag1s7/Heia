@@ -1,5 +1,6 @@
 import {supabase} from '../supabase';
 import {getUserIdOrNull} from './authUser';
+import {invalidateEventQueries} from '../queries/invalidate';
 import {acquireChannel} from '../realtimeChannels';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {EditableEvent} from '../../shared/eventForm';
@@ -163,13 +164,26 @@ async function getRsvpSummaries(
  * `shared/calendarList.ts` — det finnes bare ETT kampobjekt, og det skal
  * aldri dupliseres.
  */
-export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
-  const {data, error} = await supabase
+export async function getTeamEvents(
+  teamSpaceId: string,
+  window?: {from: Date; to: Date},
+): Promise<HeiaEvent[]> {
+  // Datovinduet (B2/P10 #7): uten det vokser både raden-hentingen og
+  // getRsvpSummaries' `.in(eventIds)`-URL med lagets historikk for alltid —
+  // ved ~200 hendelser sprenger URL-en serverens grense (HTTP 414).
+  // Vinduet settes av query-laget (src/lib/queries/events.ts); direkte kall
+  // uten vindu beholder gammel oppførsel.
+  let query = supabase
     .from('events')
     .select(EVENT_COLUMNS)
     .eq('team_space_id', teamSpaceId)
-    .is('deleted_at', null)
-    .order('start_time', {ascending: true});
+    .is('deleted_at', null);
+  if (window) {
+    query = query
+      .gte('start_time', window.from.toISOString())
+      .lte('start_time', window.to.toISOString());
+  }
+  const {data, error} = await query.order('start_time', {ascending: true});
 
   if (error) {
     throw error;
@@ -319,6 +333,9 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
     throw error;
   }
 
+  // B2: med staleTime på event-listene ville en ny hendelse ellers ikke
+  // vist seg før neste resync — mutasjonene sier selv fra.
+  invalidateEventQueries();
   return (data as any).event_id as string;
 }
 
@@ -418,6 +435,7 @@ export async function updateEvent(input: UpdateEventInput): Promise<void> {
   if (error) {
     throw error;
   }
+  invalidateEventQueries(input.eventId);
 }
 
 /**
@@ -443,6 +461,7 @@ export async function setMatchCancelled(
   if (error) {
     throw error;
   }
+  invalidateEventQueries(eventId);
 }
 
 /** En turnering i kampskjemaets velger. */
@@ -523,6 +542,8 @@ export async function setRsvp(
   if (error) {
     throw error;
   }
+  // RSVP-tallet vises i listeradene på Hjem/Kalender — si fra til cachen.
+  invalidateEventQueries(eventId);
 }
 
 /**

@@ -154,26 +154,35 @@ jest.mock('../src/context', () => ({
   }),
 }));
 
+import {QueryClientProvider} from '@tanstack/react-query';
 import {TeamHomeScreen} from '../src/screens/TeamHomeScreen';
+import {queryClient} from '../src/lib/queries/queryClient';
 
 const Stack = createNativeStackNavigator();
 
-/** TeamHome slik den står i Hjem-stacken — ekte navigasjon, mockede data. */
+/** TeamHome slik den står i Hjem-stacken — ekte navigasjon, mockede data.
+ *  SAMME queryClient som appen (ikke en fersk per test): fokus-broen og
+ *  mutasjons-invalideringene går mot modul-singletonen, og testen skal
+ *  bevise produksjonskoblingen — derfor tømmes cachen mellom testene. */
 function Harness() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{headerShown: false}}>
-        <Stack.Screen name="TeamHome" component={TeamHomeScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <QueryClientProvider client={queryClient}>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{headerShown: false}}>
+          <Stack.Screen name="TeamHome" component={TeamHomeScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </QueryClientProvider>
   );
 }
 
 // Fake timers skal aldri lekke mellom testene — heller ikke når en av dem
 // feiler midtveis (da hadde neste test hengt på ekte async uten at noen
-// flytter klokka).
+// flytter klokka). Query-cachen tømmes av samme grunn: en events-cache fra
+// forrige test ville gjort neste tests kallbudsjett løgnaktig lavt.
 afterEach(() => {
   jest.useRealTimers();
+  queryClient.clear();
 });
 
 test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', async () => {
@@ -213,7 +222,10 @@ test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', asy
   // …og så NØYAKTIG én refetch — ikke én per hendelse.
   expect(feedCalls()).toBe(2);
   expect(supabase.rpc).toHaveBeenCalledTimes(4); // 2 ved åpning + 2 i refetchen
-  expect(supabase.from).toHaveBeenCalledTimes(4);
+  // B2: hendelsene bor i query-cachen og refetches IKKE av en feed-burst
+  // lenger (åpning: live + events; bursten: kun live). Går tallet til 4
+  // igjen, har noen dratt kalenderdata inn i feed-refetchen på nytt.
+  expect(supabase.from).toHaveBeenCalledTimes(3);
 
   // Ingen etterslep: mer tid skal ikke gi flere kall.
   await ReactTestRenderer.act(async () => {

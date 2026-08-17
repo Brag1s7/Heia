@@ -50,8 +50,22 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   notifications-paginering krever nytt `before`-argument; TeamHome/
   Inbox/galleri er ScrollView (B2 gjør dem til FlatList).
 
+- ✅ B2 events-skiven: `getTeamEvents` har fått valgfritt datovindu
+  (12 mnd bak / 18 frem — dekker ALL eksisterende data, tak på P10 #7);
+  Hjem og Kalender deler nå ÉN events-query (`useTeamEvents`, nøkkel
+  `['events', ts, 'w12b18f']`); `useScreenFocusRefetch` er broen
+  navigasjonsfokus→TanStack (60 s-regelen fra P6, med vern mot
+  dobbelhenting ved mount — invalidateQueries cancelRefetch-fella);
+  mutasjonene (create/update/avlys/RSVP) invaliderer selv via
+  `queries/invalidate.ts` (egen modul UTEN api-import = ingen sirkel);
+  feed-burst refetcher IKKE lenger events — kallbudsjett-vakten i
+  `feedRefetch.test.tsx` er oppdatert til å BEVISE det (from-count 4→3)
+  og harnessen bruker appens queryClient + tømming per test.
+  Kalenderbolkens regler fulgt: kun datalaget rørt, behold-ved-feil
+  bevart (keepPreviousData + isError-mapping). Suiten grønn (141).
+
 **GJENSTÅR I B:** B2 skjermene (feed useInfiniteQuery+FlatList,
-events-deling Hjem/Kalender, event-detalj, notifications inkrementell,
+event-detalj, notifications inkrementell,
 galleri windowSize 3), B3 payload-realtime (P6-tabellen) + Sentry,
 B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
 compressor-thumb → uploadAsync; Brage kjører pod install + nytt
