@@ -89,11 +89,11 @@ function openableMatchId(item: FeedItem): string | undefined {
  * har en bildepost også.
  */
 function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
-  if (!item.imageUrl) return [];
+  if (!item.media) return [];
   return [
     {
       id: item.id,
-      imageUrl: item.imageUrl,
+      media: item.media,
       caption: item.content || undefined,
       authorName: item.author.name,
       authorAvatarUrl: item.author.avatarUrl,
@@ -594,7 +594,7 @@ export function TeamHomeScreen() {
                   : undefined
               }
               onExpandImage={
-                item.imageUrl ? () => setFullscreenItem(item) : undefined
+                item.media ? () => setFullscreenItem(item) : undefined
               }
               onHeia={() => handleToggleHeia(item)}
               onComment={() =>

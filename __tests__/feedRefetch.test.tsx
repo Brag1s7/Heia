@@ -72,8 +72,20 @@ jest.mock('../src/lib/supabase', () => {
 
   // ETT delt objekt, ikke ett per from()-kall — ellers kan ikke testen telle
   // createSignedUrls på tvers og bevise at signeringen skjer som ÉN batch.
+  // Svaret MÅ ekko-e pathene med gyldige URL-er: resolveren (fase A) cacher
+  // dem, og med tomt svar ville hver MediaImage utløst sitt eget
+  // signeringsforsøk — testen hadde da telt en feil som aldri skjer i drift.
   const storageApi = {
-    createSignedUrls: jest.fn(() => Promise.resolve({data: [], error: null})),
+    createSignedUrls: jest.fn((paths: string[]) =>
+      Promise.resolve({
+        data: paths.map(p => ({
+          path: p,
+          signedUrl: `https://cdn.test/${p}?token=t`,
+          error: null,
+        })),
+        error: null,
+      }),
+    ),
     remove: jest.fn(() => Promise.resolve({data: null, error: null})),
   };
 

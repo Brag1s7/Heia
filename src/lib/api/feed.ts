@@ -1,17 +1,15 @@
 import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
+import {FEED_MEDIA_BUCKET, primeMediaUrls} from '../media/resolver';
+import type {MediaRef} from '../media/types';
 import type {FeedItem, UserRole} from '../../shared/types';
 
 // Merkevare-reaksjonen: 👏 «Heia». Én emoji nå (utvides senere ved behov).
 export const HEIA_EMOJI = '👏';
 
-// Privat Storage-bucket for feed-bilder. Path-konvensjon: {team_space_id}/{filnavn}.
-// Privat fordi bilder kan være av barn — vi signerer URL-er ved lesing.
-export const FEED_MEDIA_BUCKET = 'feed-media';
-
-// Signerte URL-er utløper — greit, fordi feeden refetches.
-const SIGNED_URL_TTL = 60 * 60; // 1 time
+// Bucketen bor hos resolveren (P4) — re-eksportert for upload-stien her.
+export {FEED_MEDIA_BUCKET};
 
 /** Bilde valgt fra image-picker, klart for opplasting. */
 export interface ImagePostInput {
@@ -26,7 +24,7 @@ export interface ImagePostInput {
 /** Et bilde som hører til en kamp, klart til visning. */
 export interface MatchPhoto {
   id: string;
-  imageUrl: string;
+  media: MediaRef;
   caption?: string;
   authorName: string;
   authorAvatarUrl?: string;
@@ -144,29 +142,23 @@ export async function getTeamFeed(
     mapFeedRow({...row, team_space_id: teamSpaceId}),
   );
 
-  // Bilde-poster: media[] (jsonb fra RPC) → signert URL. Privat bucket,
-  // så vi signerer i én batch og mapper tilbake på storage_path.
-  const pathByIndex = rows.map((r: any) => {
+  // Bilde-poster: media[] (jsonb fra RPC) → MediaRef (P4). UI-et får path,
+  // aldri URL — men URL-ene varmes opp HER, i ÉN batch per skjermlast, så
+  // MediaImage treffer cachen i stedet for å signere per bilde.
+  const paths: string[] = [];
+  rows.forEach((r: any, i: number) => {
     const media = (r.media ?? []) as any[];
-    return media.length > 0 ? (media[0].storage_path as string) : null;
+    if (media.length === 0) return;
+    const ref: MediaRef = {
+      path: media[0].storage_path as string,
+      thumbPath: (media[0].thumbnail_path as string | null) ?? null,
+    };
+    items[i].media = ref;
+    paths.push(ref.path);
+    if (ref.thumbPath) paths.push(ref.thumbPath);
   });
-  const paths = pathByIndex.filter((p): p is string => p !== null);
   if (paths.length > 0) {
-    const {data: signed} = await supabase.storage
-      .from(FEED_MEDIA_BUCKET)
-      .createSignedUrls(paths, SIGNED_URL_TTL);
-    const urlByPath = new Map<string, string>();
-    for (const s of signed || []) {
-      if (s.signedUrl && !s.error && s.path) {
-        urlByPath.set(s.path, s.signedUrl);
-      }
-    }
-    items.forEach((item: FeedItem, i: number) => {
-      const p = pathByIndex[i];
-      if (p) {
-        item.imageUrl = urlByPath.get(p);
-      }
-    });
+    await primeMediaUrls(paths);
   }
 
   // get_team_feed sier hvor mange som har reagert, men ikke om JEG har det.
@@ -245,7 +237,8 @@ export async function deletePost(postId: string): Promise<void> {
  * Live feed: kaller onChange ved nytt innlegg, reaksjon eller kommentar.
  *
  * Kalleren REFETCHER i stedet for å flette inn payloaden — feeden må uansett
- * sorteres (pinnet øverst), og signerte bilde-URL-er må hentes på nytt.
+ * sorteres (pinnet øverst). Bilde-URL-ene gjenbrukes fra resolver-cachen
+ * (P1), så en refetch koster data, aldri bildebytes.
  *
  * `reactions`/`comments` har ingen team_space_id å filtrere på, så vi
  * abonnerer ufiltrert. Det er trygt: RLS slipper kun gjennom rader du
@@ -446,33 +439,17 @@ export async function getMatchPhotos(eventId: string): Promise<MatchPhoto[]> {
   const rows = (data || []) as any[];
   if (rows.length === 0) return [];
 
-  const paths = rows.map(r => r.storage_path as string);
-  const {data: signed} = await supabase.storage
-    .from(FEED_MEDIA_BUCKET)
-    .createSignedUrls(paths, SIGNED_URL_TTL);
+  // Én oppvarmingsbatch (P4) — MediaImage leser fra cachen. RPC-en (00028)
+  // returnerer ikke thumbnail_path; thumb-varianten faller tilbake til path.
+  await primeMediaUrls(rows.map(r => r.storage_path as string));
 
-  const urlByPath = new Map<string, string>();
-  for (const s of signed || []) {
-    if (s.signedUrl && !s.error && s.path) {
-      urlByPath.set(s.path, s.signedUrl);
-    }
-  }
-
-  // Et bilde uten gyldig URL kan ikke vises — da er en tom liste ærligere
-  // enn en rad med et grått hull i.
-  return rows.flatMap(r => {
-    const url = urlByPath.get(r.storage_path);
-    if (!url) return [];
-    return [
-      {
-        id: r.post_id as string,
-        imageUrl: url,
-        caption: (r.content as string) || undefined,
-        authorName: (r.author_name as string) ?? 'Ukjent',
-        authorAvatarUrl: (r.author_avatar as string) ?? undefined,
-        createdAt: new Date(r.created_at),
-        matchEventId: (r.match_event_id as string) ?? undefined,
-      },
-    ];
-  });
+  return rows.map(r => ({
+    id: r.post_id as string,
+    media: {path: r.storage_path as string},
+    caption: (r.content as string) || undefined,
+    authorName: (r.author_name as string) ?? 'Ukjent',
+    authorAvatarUrl: (r.author_avatar as string) ?? undefined,
+    createdAt: new Date(r.created_at),
+    matchEventId: (r.match_event_id as string) ?? undefined,
+  }));
 }

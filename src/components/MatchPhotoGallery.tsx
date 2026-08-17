@@ -2,7 +2,6 @@ import React, {useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -10,6 +9,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {MediaImage} from '../lib/media/MediaImage';
 import {X} from './icons';
 import {colors, typography, spacing} from '../theme';
 import type {MatchPhoto} from '../lib/api/feed';
@@ -68,8 +68,9 @@ export function MatchPhotoGallery({
           }>
           {photos.map(photo => (
             <View key={photo.id} style={[styles.page, {width}]}>
-              <Image
-                source={{uri: photo.imageUrl}}
+              <MediaImage
+                media={photo.media}
+                variant="display"
                 style={styles.image}
                 resizeMode="contain"
               />

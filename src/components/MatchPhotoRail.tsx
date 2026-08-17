@@ -1,6 +1,7 @@
 import React from 'react';
-import {View, Text, Image, Pressable, ScrollView, StyleSheet} from 'react-native';
+import {View, Text, Pressable, ScrollView, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
+import {MediaImage} from '../lib/media/MediaImage';
 import type {MatchPhoto} from '../lib/api/feed';
 
 interface MatchPhotoRailProps {
@@ -35,8 +36,10 @@ export function MatchPhotoRail({photos, onPressPhoto}: MatchPhotoRailProps) {
             key={photo.id}
             onPress={() => onPressPhoto(photo)}
             style={({pressed}) => [styles.thumb, pressed && styles.pressed]}>
-            <Image
-              source={{uri: photo.imageUrl}}
+            {/* 96 pt-rute → thumb-varianten (480 px holder i massevis). */}
+            <MediaImage
+              media={photo.media}
+              variant="thumb"
               style={styles.thumbImage}
               resizeMode="cover"
             />

@@ -2,7 +2,6 @@ import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
   View,
   Text,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar, BackBar, Button, Skeleton} from '../components';
+import {MediaImage} from '../lib/media/MediaImage';
 import {MoreHorizontal} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin} from '../shared/roles';
@@ -254,9 +254,10 @@ export function CommentsScreen({route, navigation}: Props) {
             {post.content.trim().length > 0 && (
               <Text style={styles.postContent}>{post.content}</Text>
             )}
-            {post.imageUrl && (
-              <Image
-                source={{uri: post.imageUrl}}
+            {post.media && (
+              <MediaImage
+                media={post.media}
+                variant="display"
                 style={styles.postImage}
                 resizeMode="cover"
               />

@@ -1,6 +1,7 @@
 import {supabase} from '../supabase';
 import {getTeamMembers, type TeamMember} from './members';
-import {FEED_MEDIA_BUCKET, HEIA_EMOJI} from './feed';
+import {HEIA_EMOJI} from './feed';
+import {primeMediaUrls} from '../media/resolver';
 import type {FeedComment, FeedItem} from '../../shared/types';
 
 // profiles-RLS lar deg kun lese egen profil, så en direkte comments→profiles
@@ -78,20 +79,21 @@ export async function getFeedPost(
 
   const {data: attachments} = await supabase
     .from('media_attachments')
-    .select('media(storage_path)')
+    .select('media(storage_path, thumbnail_path)')
     .eq('entity_type', 'feed_post')
     .eq('entity_id', postId)
     .order('sort_order', {ascending: true})
     .limit(1);
 
-  const storagePath = (attachments?.[0] as any)?.media?.storage_path as
-    | string
-    | undefined;
-  if (storagePath) {
-    const {data: signed} = await supabase.storage
-      .from(FEED_MEDIA_BUCKET)
-      .createSignedUrl(storagePath, 60 * 60);
-    post.imageUrl = signed?.signedUrl;
+  const attachedMedia = (attachments?.[0] as any)?.media;
+  if (attachedMedia?.storage_path) {
+    post.media = {
+      path: attachedMedia.storage_path as string,
+      thumbPath: (attachedMedia.thumbnail_path as string | null) ?? null,
+    };
+    // Kom du hit fra feeden er URL-en alt varm (samme path, samme cache —
+    // det er F6-fiksen); fra et varsel signerer prime én gang.
+    await primeMediaUrls([post.media.path]);
   }
 
   return post;
