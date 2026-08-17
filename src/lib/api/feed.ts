@@ -60,6 +60,11 @@ async function uploadTeamImage(
     .upload(storagePath, decode(image.base64), {
       contentType: image.mimeType,
       upsert: false,
+      // 24 t (P1, LÅST): en CDN-/OS-cachet kopi av et barnebilde skal ikke
+      // overleve tilgangsvinduet (24 t signert URL) vesentlig, og Free-CDN
+      // invaliderer ikke ved sletting. KAN IKKE endres per objekt i
+      // etterkant — må være riktig ved upload.
+      cacheControl: '86400',
     });
   if (uploadError) {
     throw uploadError;

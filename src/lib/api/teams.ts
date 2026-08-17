@@ -231,6 +231,11 @@ async function uploadLogo(
     .upload(path, decode(image.base64), {
       contentType: image.mimeType,
       upsert: false,
+      // 1 år (P1): filnavnet er unikt per opplasting (immutable), og bucketen
+      // er public — dette er den ene flaten der CDN-en skal få jobbe. Uten
+      // den revalideres hver logo hver time (F3, hovedkilde til cached
+      // egress).
+      cacheControl: '31536000',
     });
   if (error) {
     throw error;
