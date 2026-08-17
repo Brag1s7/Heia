@@ -66,13 +66,13 @@ REVOKE ALL ON FUNCTION get_team_feed(uuid, int, timestamptz) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION get_event_with_rsvp(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION get_match_photos(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION get_team_members(uuid) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION get_season_stats(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION get_season_stats(uuid, int, int, uuid) FROM PUBLIC, anon;
 
 GRANT EXECUTE ON FUNCTION get_team_feed(uuid, int, timestamptz) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_event_with_rsvp(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_match_photos(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION get_team_members(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_season_stats(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_season_stats(uuid, int, int, uuid) TO authenticated;
 
 -- ─── 4. club-logos SELECT: kun authenticated ─────────────────
 -- 00036 åpnet SELECT uten TO-klausul → anon kan liste mappenavn

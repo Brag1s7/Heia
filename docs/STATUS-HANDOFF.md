@@ -34,8 +34,10 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
 
 - ✅ B3 grunnmur: migrasjon 00059 (REPLICA IDENTITY FULL på reactions)
   + 00060 (alle P10 må+bør-fiksene) + `.github/workflows/ci.yml`.
-  Migrasjonene er committet, IKKE kjørt mot prod ennå (`supabase db push`
-  når Brage sier fra — begge er trygge for dagens app).
+  **Begge migrasjonene er PUSHET TIL PROD 2026-08-17** (`supabase db
+  push`; 00060 trengte én signaturrettelse — get_season_stats er
+  `(uuid, int, int, uuid)`). Verifisert: anon får nå «permission denied»
+  på get_team_feed allerede ved funksjonsdøren.
 - ✅ B2 fundament: @tanstack/react-query 5.101.4 installert;
   `src/lib/queries/` (queryClient med P6-defaults 60 s/retry 1, låste
   P7-queryKeys, members-query); QueryClientProvider + focusManager i
