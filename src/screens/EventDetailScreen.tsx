@@ -301,9 +301,13 @@ export function EventDetailScreen({route, navigation}: Props) {
     }
   }, [eventId, isMatchEvent]);
 
-  useEffect(() => {
-    loadPhotos();
-  }, [loadPhotos]);
+  // Fokus, ikke mount: skjermen kan stå montert i en bakgrunnsstack
+  // (EventDetail finnes i tre stacks) — den skal ikke hente bilder derfra.
+  useFocusEffect(
+    useCallback(() => {
+      loadPhotos();
+    }, [loadPhotos]),
+  );
 
   // Kampen er i gang (også i pause — da telles minuttene fortsatt).
   const isUnderway =
@@ -313,19 +317,38 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
   // ville stillingen stått stille til hun selv dro for å oppdatere.
   //
+  // Realtime-hygienen (fase A): FOKUS-bundet (skjermen står i tre stacks —
+  // en bakgrunnsinstans skal ikke arbeide), DEBOUNCED (ett mål = tre
+  // meldinger i én transaksjon = ÉN refetch), og SPLITTET (stilling og
+  // kampbilder har hver sin sti — et mål re-laster aldri bildene).
+  //
   // Varselet ligger IKKE her lenger: det er `NotificationBanner` over fanene,
   // matet av `notifications`-kanalen. Databasen bestemmer allerede hvem som
   // skal varsles (00023: alle aktive medlemmer unntatt forfatteren), og
   // banneret følger deg gjennom hele appen — med ett unntak: står du HER
   // på en pågående kamp, dempes match_live-banneret (se watchEvent under).
-  useEffect(() => {
-    if (!liveMatchSessionId) return;
-    return subscribeToMatch(liveMatchSessionId, eventId, () => {
-      loadEvent();
-      // Bilder bor i feed_posts, ikke i event-payloaden — egen refetch.
-      loadPhotos();
-    });
-  }, [liveMatchSessionId, eventId, loadEvent, loadPhotos]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!liveMatchSessionId) return;
+      let eventTimer: ReturnType<typeof setTimeout> | null = null;
+      let photoTimer: ReturnType<typeof setTimeout> | null = null;
+      const unsubscribe = subscribeToMatch(liveMatchSessionId, eventId, {
+        onMatchChange: () => {
+          if (eventTimer) clearTimeout(eventTimer);
+          eventTimer = setTimeout(loadEvent, 400);
+        },
+        onPhotoPost: () => {
+          if (photoTimer) clearTimeout(photoTimer);
+          photoTimer = setTimeout(loadPhotos, 400);
+        },
+      });
+      return () => {
+        if (eventTimer) clearTimeout(eventTimer);
+        if (photoTimer) clearTimeout(photoTimer);
+        unsubscribe();
+      };
+    }, [liveMatchSessionId, eventId, loadEvent, loadPhotos]),
+  );
 
   // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
   // mellom hendelsene — uten denne ville minuttet frosset til neste mål.

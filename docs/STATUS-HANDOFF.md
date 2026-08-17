@@ -1,10 +1,158 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: EGRESS
+## ▶️ NESTE SAMTALE: KUN MERGE + TESTFLIGHT GJENSTÅR AV FASE A — SÅ FASE B
 
-Brage 2026-08-07: neste tema er **egress**, og han kommer med instruksene
-selv i en lang melding. Ikke begynn å grave før den er lest — det er hans
-ramme som avgjør hva som skal måles.
+**Status 2026-08-17 kveld — alt av Fase A-arbeid er FERDIG unntatt selve
+mergen (blokkert av GitHub-trøbbel den kvelden, ikke av oss):**
+
+- ✅ **Telefontestet OK** (Brage 2026-08-17): «Alt ser ut til å fungere
+  helt fint på telefon.»
+- ✅ **Bucket-limits SATT og verifisert** (via Storage-API med
+  service-nøkkel): feed-media 10 MiB, club-logos 2 MiB, begge låst til
+  image/jpeg+png+webp+heic. (Var helt åpne før — global 50 MiB.)
+- ✅ **Backfill KJØRT med `--apply`**: 38/38 bilder konvertert, 0 feil.
+  Snitt 2,4 MB → 479 kB (~5×), alle rader har thumbnail_path. Manifest:
+  `scripts/backfill-manifest-2026-08-17T150558.json` (gitignorert — TA
+  VARE PÅ DEN til pre-launch-beslutningen om originalene). SAFEGUARD
+  holdt: originalobjektene står urørt i bucketen. NB: gamle TestFlight-
+  klienter får ALLEREDE de lette variantene (de signerer storage_path
+  ferskt), så egressen skal synke i Usage før mergen også.
+- ✅ **Baseline regnes som dekket**: Q1–Q7 ble kjørt og verifisert mot
+  ekte edge_logs 2026-08-12 (Management-API), H1 og H2 er bevist med
+  tall. Hovedbeviset for exit-kriteriet leses uansett av
+  Usage→Bandwidth-HISTORIKKEN (før/etter). Valgfritt, ikke blokkerende:
+  et kvelds-snapshot av Q1–Q7 før TestFlight-bygget skipper.
+- 🔧 **Praktisk**: Supabase-CLI-en på maskinen er innlogget mot
+  prosjektet (`supabase projects list` virker). Service-nøkkelen hentes
+  med `supabase projects api-keys --project-ref sswncdrbsrfieudkdmhj`
+  — slik ble både bucket-limits og backfillen kjørt uten dashboard.
+  Backfill-miljøet (sharp/tsx) ble satt opp i scratchpad, IKKE i
+  prosjektets node_modules (Metro kjørte).
+
+**FASE B ER PÅBEGYNT 2026-08-17** (Brages beslutning: GitHub var nede,
+og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
+
+- ✅ B3 grunnmur: migrasjon 00059 (REPLICA IDENTITY FULL på reactions)
+  + 00060 (alle P10 må+bør-fiksene) + `.github/workflows/ci.yml`.
+  **Begge migrasjonene er PUSHET TIL PROD 2026-08-17** (`supabase db
+  push`; 00060 trengte én signaturrettelse — get_season_stats er
+  `(uuid, int, int, uuid)`). Verifisert: anon får nå «permission denied»
+  på get_team_feed allerede ved funksjonsdøren.
+- ✅ B2 fundament: @tanstack/react-query 5.101.4 installert;
+  `src/lib/queries/` (queryClient med P6-defaults 60 s/retry 1, låste
+  P7-queryKeys, members-query); QueryClientProvider + focusManager i
+  App.tsx; `queryClient.clear()` i clearLocalCaches;
+  CommentsScreen-medlemsdubletten fjernet via `ensureQueryData`.
+  Suiten grønn (141), lint ren (kun gamle kjente advarsler).
+- Kartleggingsnotater (fra agentkart 2026-08-17): `get_team_feed` har
+  UBRUKT cursor-param (klar for useInfiniteQuery); stillingen ligger
+  komplett i match_sessions-payload; INGEN kanaler har status-callbacks
+  (payload-først MÅ få resync-ved-SUBSCRIBED samtidig, ellers tapes
+  hendelser ved reconnect); getTeamEvents mangler {from,to,limit};
+  notifications-paginering krever nytt `before`-argument; TeamHome/
+  Inbox/galleri er ScrollView (B2 gjør dem til FlatList).
+
+- ✅ B2 events-skiven: `getTeamEvents` har fått valgfritt datovindu
+  (12 mnd bak / 18 frem — dekker ALL eksisterende data, tak på P10 #7);
+  Hjem og Kalender deler nå ÉN events-query (`useTeamEvents`, nøkkel
+  `['events', ts, 'w12b18f']`); `useScreenFocusRefetch` er broen
+  navigasjonsfokus→TanStack (60 s-regelen fra P6, med vern mot
+  dobbelhenting ved mount — invalidateQueries cancelRefetch-fella);
+  mutasjonene (create/update/avlys/RSVP) invaliderer selv via
+  `queries/invalidate.ts` (egen modul UTEN api-import = ingen sirkel);
+  feed-burst refetcher IKKE lenger events — kallbudsjett-vakten i
+  `feedRefetch.test.tsx` er oppdatert til å BEVISE det (from-count 4→3)
+  og harnessen bruker appens queryClient + tømming per test.
+  Kalenderbolkens regler fulgt: kun datalaget rørt, behold-ved-feil
+  bevart (keepPreviousData + isError-mapping). Suiten grønn (141).
+
+- ✅ B2 feed-skiven (2026-08-17): feeden over på `useInfiniteQuery`
+  (`src/lib/queries/feed.ts`; cursor-parameteren fra 00029 endelig i bruk,
+  nøkkel = låste `['feed', ts]`); pinned-fellene løst i REN modul
+  `src/shared/feedPaging.ts` (cursor = eldste U-pinnede rad, dedupe på id
+  på tvers av sider) med egen testfil. TeamHome er FlatList: compose i
+  ListHeaderComponent som ELEMENT (remount-fella), memoisert `FeedRow` med
+  stabile callbacks, onEndReached → neste side, optimistiske oppdateringer
+  (👏/unpin/slett) via `patchFeedItem`/`removeFeedItem` rett i cachen;
+  fokus-resync = 60 s-regelen + NY `markFeedStale`-bro (blur midt i
+  realtime-debouncen markerer stale uten fetch — F19 består, og
+  `useScreenFocusRefetch` resyncer straks ved retur via `isInvalidated`).
+  Inbox er FlatList (blokk-granularitet: kort/kampkort/overskrift) med
+  inkrementell henting: `getNotifications` fikk `{before, after}`,
+  realtime-burst henter kun nyere-enn-nyeste, eldre sider pagineres på
+  scroll, `mergeNotifications` (shared/inbox) deduper med readAt-vern
+  (nedgraderer aldri lokal lest-markering); hull-vakt (disjunkt topp-50 →
+  nullstill, aldri flett over et usynlig gap) + generasjonsvern mot
+  lagbytte-/reset-racer. Galleri + kampbilde-rail er FlatList med
+  windowSize 3. KALLBUDSJETT-VAKTEN feedRefetch.test.tsx passerte
+  UENDRET (åpning 2 rpc + 2 events + 1 kanal; burst = én refetch, rpc 4 /
+  from 3). Suiten grønn (151), lint ren. Adversariell review kjørt;
+  bekreftede funn fikset (hull-vakten, generasjonsvernet, readAt-vernet,
+  markFeedStale, LayoutAnimation-gating). AKSEPTERTE kjente grenser,
+  dokumentert i kode: ms-trunkert cursor uten id-tiebreaker (fiks = ny
+  RPC-signatur + gjenskapte 00060-grants, tas ved observasjon); refetch av
+  ALLE lastede sider ved invalidering (dyp scroll × realtime — `maxPages`
+  er knappen hvis det svir, men den klipper synlig liste); Android-clipping
+  av composeren i ListHeader (removeClippedSubviews-default — irrelevant
+  før Android-runden). NESTE EGRESS-KANDIDAT funnet i kartleggingen:
+  MatchTimeline rendrer ALLE kampbilder i display-variant i EventDetails
+  ytre ScrollView — ta den i event-detalj-skiven.
+
+**GJENSTÅR I B:** B2 event-detalj-skiven (EventDetailScreen over på
+queries + MatchTimeline-virtualisering/thumb-variant, se punktet over),
+B3 payload-realtime (P6-tabellen) + Sentry,
+B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
+compressor-thumb → uploadAsync; Brage kjører pod install + nytt
+dev-bygg). Deretter: PR + merge når GitHub virker, TestFlight (A+B),
+exit-avlesning (−80 % egress; P13-lista).
+
+**Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
+Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
+`git log`). Suiten er grønn (8 filer, 141 tester), lint ren. Innholdet:
+
+- **A0** — netMetrics + skjermattribusjon + regresjonsvakter +
+  auditdokumentene (var bygget 7. aug, nå committet).
+- **A1** — `src/lib/media/` (P4): MediaRef-kontrakten (UI ser aldri
+  leverandør-URL-er), resolver med signert-URL-cache (TTL 24 t,
+  AsyncStorage, 6 t-fornyingsmargin, inflight-dedupe, prefiks-purge),
+  `primeMediaUrls` = ÉN signeringsbatch per skjermlast, `MediaImage`
+  (innebygd lastemåling + onError-fornying 1/min/path) på alle 6
+  bildeflater. Ny vakt: `__tests__/mediaResolver.test.ts`.
+- **A2** — pickeren resizer til 2048 px/q0.85 (P2-masteren, låst).
+- **A3** — `cacheControl` ved upload: 86400 feed-media / 31536000
+  club-logos (P1, kan ikke endres i etterkant).
+- **A4** — realtime-hygiene: subscribeToMatch SPLITTET (score vs. bilde,
+  gatet på payload-type) + debounce i EventDetail; fokus-gating på
+  TeamHome/EventDetail/Inbox; INSERT-gate FØR refetch i
+  NotificationsContext; kanal-registry (`src/lib/realtimeChannels.ts`).
+- **A5** — `auth.getUser()` fjernet fra alle 9 kallsteder (P5):
+  `getUserId()`/`getUserIdOrNull()` i `src/lib/api/authUser.ts` for
+  skrivene, id som parameter fra context for lesestiene
+  (`getProfile(userId)`, `getUserMemberships(userId)`,
+  `getTeamFeed(ts, myId)`); AppState-styrt start/stopAutoRefresh i App.tsx.
+- **A6** — livssyklus: `clearLocalCaches()` i account.ts kalles fra selve
+  `signOut` i UserContext (WelcomeIntent-lekkasjen tett); deletePost
+  invaliderer URL-cachen; TeamContext resyncer memberships ved AppState
+  active og purger lag-prefikset ved medlemskapstap.
+- **A7** — `scripts/backfill-media-variants.ts` (tørrkjøring default,
+  `--apply` for alvor; manifest med original→variant er gitignorert).
+  SAFEGUARD står: originalobjektene slettes ALDRI av scriptet.
+
+(Den gamle femtrinnslista over håndgrep er UTFØRT per 2026-08-17 —
+se statusblokka øverst. Kun merge → TestFlight → exit-avlesning står
+igjen. Fase C er fortsatt terskelstyrt — bygg ingenting.)
+
+Dokumentene: `docs/IMPLEMENTATION_HANDOFF.md` (rekkefølge/safeguard),
+`docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md` (P1–P13 + faseplan).
+
+Kortversjon av funnet: 9,5 GB egress/uke med 78 MB lagret skyldes fire
+multiplikatorer (ny signert URL per henting = 100 % cache-miss; 12
+MP-originaler uten varianter; realtime→full refetch; alt lastes uansett
+scroll). Fase A fjerner de tre første; virtualisering (nr. 4) kommer i B2.
+Fristen: mulig HTTP 402 fra 5. sept 2026 — Fase A skal være ute på
+TestFlight i god tid før det. Arkitekturplanen er **GODKJENT av Brage
+2026-08-07** (med én safeguard: eksisterende kameraoriginaler slettes
+IKKE — eksplisitt beslutning før launch).
 
 Redigeringsskiva før den er **GODKJENT OG VERIFISERT PÅ TELEFON av Brage
 2026-08-07** («det funker på telefon»), og migrasjon `00057` er i prod.

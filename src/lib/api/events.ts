@@ -1,4 +1,7 @@
 import {supabase} from '../supabase';
+import {getUserIdOrNull} from './authUser';
+import {invalidateEventQueries} from '../queries/invalidate';
+import {acquireChannel} from '../realtimeChannels';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {EditableEvent} from '../../shared/eventForm';
 import type {
@@ -118,13 +121,10 @@ async function getRsvpSummaries(
     summaries.set(id, emptyRsvp());
   }
 
-  const [
-    {
-      data: {user},
-    },
-    {data, error},
-  ] = await Promise.all([
-    supabase.auth.getUser(),
+  // Lokal sesjonslesing, ikke getUser-rundtur (P5): id-en brukes kun til å
+  // plukke «min» rad i minnet — RLS har alt avgjort hva vi får se.
+  const [myUserId, {data, error}] = await Promise.all([
+    getUserIdOrNull(),
     supabase
       .from('event_rsvps')
       .select('event_id, user_id, child_id, status')
@@ -143,7 +143,7 @@ async function getRsvpSummaries(
     else if (row.status === 'kan_ikke') summary.notComing += 1;
     else summary.pending += 1;
 
-    if (user && row.user_id === user.id && row.child_id === null) {
+    if (myUserId && row.user_id === myUserId && row.child_id === null) {
       summary.myStatus = row.status as RSVPStatus;
     }
   }
@@ -164,13 +164,26 @@ async function getRsvpSummaries(
  * `shared/calendarList.ts` — det finnes bare ETT kampobjekt, og det skal
  * aldri dupliseres.
  */
-export async function getTeamEvents(teamSpaceId: string): Promise<HeiaEvent[]> {
-  const {data, error} = await supabase
+export async function getTeamEvents(
+  teamSpaceId: string,
+  window?: {from: Date; to: Date},
+): Promise<HeiaEvent[]> {
+  // Datovinduet (B2/P10 #7): uten det vokser både raden-hentingen og
+  // getRsvpSummaries' `.in(eventIds)`-URL med lagets historikk for alltid —
+  // ved ~200 hendelser sprenger URL-en serverens grense (HTTP 414).
+  // Vinduet settes av query-laget (src/lib/queries/events.ts); direkte kall
+  // uten vindu beholder gammel oppførsel.
+  let query = supabase
     .from('events')
     .select(EVENT_COLUMNS)
     .eq('team_space_id', teamSpaceId)
-    .is('deleted_at', null)
-    .order('start_time', {ascending: true});
+    .is('deleted_at', null);
+  if (window) {
+    query = query
+      .gte('start_time', window.from.toISOString())
+      .lte('start_time', window.to.toISOString());
+  }
+  const {data, error} = await query.order('start_time', {ascending: true});
 
   if (error) {
     throw error;
@@ -320,6 +333,9 @@ export async function createEvent(input: CreateEventInput): Promise<string> {
     throw error;
   }
 
+  // B2: med staleTime på event-listene ville en ny hendelse ellers ikke
+  // vist seg før neste resync — mutasjonene sier selv fra.
+  invalidateEventQueries();
   return (data as any).event_id as string;
 }
 
@@ -419,6 +435,7 @@ export async function updateEvent(input: UpdateEventInput): Promise<void> {
   if (error) {
     throw error;
   }
+  invalidateEventQueries(input.eventId);
 }
 
 /**
@@ -444,6 +461,7 @@ export async function setMatchCancelled(
   if (error) {
     throw error;
   }
+  invalidateEventQueries(eventId);
 }
 
 /** En turnering i kampskjemaets velger. */
@@ -524,6 +542,8 @@ export async function setRsvp(
   if (error) {
     throw error;
   }
+  // RSVP-tallet vises i listeradene på Hjem/Kalender — si fra til cachen.
+  invalidateEventQueries(eventId);
 }
 
 /**
@@ -613,11 +633,19 @@ export async function reportMatchEvent(
 }
 
 /**
- * Lytter på en pågående kamp og kaller `onChange` når noe skjer.
+ * Lytter på en pågående kamp. To adskilte callbacks (P6-splitten):
+ * `onMatchChange` for stilling/forløp, `onPhotoPost` KUN for nye kampbilder.
  *
- * Vi refetcher i stedet for å flette inn payloaden: en `match_events`-INSERT
- * må uansett inn i kampforløpet i riktig rekkefølge, og en refetch kan ikke
- * komme ut av synk med serveren. Realtime respekterer RLS, så bare lagets
+ * Splitten er halve realtime-hygienen: `report_match_event` skriver tre
+ * tabeller i én transaksjon (match_events + match_sessions + feed-posten),
+ * så ett mål ga tre meldinger — og før dette utløste hver av dem BÅDE
+ * event-refetch og re-lasting av alle kampbilder (F18). Nå treffer et mål
+ * kun `onMatchChange` (kalleren debouncer tre meldinger til én refetch),
+ * og bare et faktisk bilde (`type = 'bilde'`) rører fotostien.
+ *
+ * Vi refetcher fortsatt i stedet for å flette inn payloaden: en
+ * `match_events`-INSERT må uansett inn i kampforløpet i riktig rekkefølge.
+ * Payload-først kommer i B (P6). Realtime respekterer RLS, så bare lagets
  * medlemmer får hendelsene.
  *
  * Returnerer en oppryddingsfunksjon — kall den når skjermen forlates, ellers
@@ -626,48 +654,60 @@ export async function reportMatchEvent(
 export function subscribeToMatch(
   matchSessionId: string,
   eventId: string,
-  onChange: () => void,
+  handlers: {onMatchChange: () => void; onPhotoPost: () => void},
 ): () => void {
-  const channel = supabase
-    .channel(`match:${matchSessionId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'match_events',
-        filter: `match_session_id=eq.${matchSessionId}`,
-      },
-      () => onChange(),
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'match_sessions',
-        filter: `id=eq.${matchSessionId}`,
-      },
-      () => onChange(),
-    )
-    // Kampbilder er feed_posts med event_id (00028) — de rører verken
-    // match_events eller match_sessions, så uten denne dukket reporterens
-    // bilde først opp hos andre etter en manuell refresh.
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'feed_posts',
-        filter: `event_id=eq.${eventId}`,
-      },
-      () => onChange(),
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return acquireChannel(
+    `match:${matchSessionId}`,
+    (channel, emit) => {
+      channel
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'match_events',
+            filter: `match_session_id=eq.${matchSessionId}`,
+          },
+          () => emit({kind: 'match'}),
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'match_sessions',
+            filter: `id=eq.${matchSessionId}`,
+          },
+          () => emit({kind: 'match'}),
+        )
+        // Kampbilder er feed_posts med event_id (00028) — de rører verken
+        // match_events eller match_sessions, så uten denne dukket reporterens
+        // bilde først opp hos andre etter en manuell refresh. Målpostene
+        // (type match_event/resultat) kommer også hit — de gates bort på
+        // type, ellers ville hvert mål re-lastet alle kampbildene.
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'feed_posts',
+            filter: `event_id=eq.${eventId}`,
+          },
+          payload => {
+            if ((payload.new as any)?.type === 'bilde') {
+              emit({kind: 'photo'});
+            }
+          },
+        );
+    },
+    payload => {
+      if ((payload as {kind: string}).kind === 'photo') {
+        handlers.onPhotoPost();
+      } else {
+        handlers.onMatchChange();
+      }
+    },
+  );
 }
 
 function mapAttendees(rows: any): EventAttendee[] {

@@ -216,6 +216,36 @@ export function mapNotificationRow(row: any): HeiaNotification {
 }
 
 /**
+ * Fletter en inkrementell henting inn i lista (B2): dedupe på id — den
+ * INNKOMMENDE raden vinner — deretter nyeste først. Samme funksjon for begge
+ * retninger: nyere rader (realtime-resync) og eldre sider (paginering)
+ * plasseres riktig av sorteringen uansett.
+ *
+ * ETT unntak fra «innkommende vinner»: `readAt` nedgraderes aldri til ulest.
+ * En henting som var i flukt da brukeren trykket på raden bærer et snapshot
+ * fra FØR markAsRead committet — uten vernet ville raden flippet tilbake til
+ * ulest mens badgen sa «Du er oppdatert». (Varsler kan ikke av-leses, så
+ * lokal lest-markering er alltid riktigst.)
+ *
+ * `buildEntries`/`groupByAge` forutsetter ett konsistent, nyeste-først-array
+ * uten duplikater — dette er funksjonen som gir dem det.
+ */
+export function mergeNotifications(
+  existing: HeiaNotification[],
+  incoming: HeiaNotification[],
+): HeiaNotification[] {
+  const existingById = new Map(existing.map(n => [n.id, n]));
+  const merged = incoming.map(n => {
+    const prev = existingById.get(n.id);
+    return prev?.readAt && !n.readAt ? {...n, readAt: prev.readAt} : n;
+  });
+  const incomingIds = new Set(incoming.map(n => n.id));
+  return [...merged, ...existing.filter(n => !incomingIds.has(n.id))].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+}
+
+/**
  * Én oppføring i lista. Kampvarsler kollapser til ETT kamp-objekt; alt
  * annet er en rolig rad.
  */

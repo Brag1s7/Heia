@@ -39,7 +39,8 @@ import {
   useReducedMotion,
 } from '../components';
 import {useActiveTeam, useCalendarFocus} from '../context';
-import {getTeamEvents} from '../lib/api/events';
+import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
+import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {isTeamAdmin} from '../shared/roles';
 import {
   MONTHS,
@@ -60,17 +61,17 @@ import {
   rowsFrom,
   type DaySection,
 } from '../shared/calendarList';
-import type {
-  EventType,
-  KalenderStackParamList,
-  HeiaEvent,
-} from '../shared/types';
+import type {EventType, KalenderStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<KalenderStackParamList, 'KalenderList'>;
 type Route = RouteProp<KalenderStackParamList, 'KalenderList'>;
 
 /** Luft over dagsoverskriften vi ruller til. */
 const SCROLL_GAP = spacing.sm;
+
+// Stabil identitet før første last: `?? []` inline ville gitt nytt array
+// hver render og revet allRows-memoen unødig.
+const EMPTY_EVENTS: never[] = [];
 
 /**
  * ⚠️ Stabil identitet, på modulnivå. `ScrollView` kjører
@@ -155,38 +156,31 @@ export function KalenderScreen() {
 
   // -------------------------------------------------------------------------
   // Data. ⚠️ Ingenting her rører scrollposisjonen eller valgt dato.
+  //
+  // Via query-cachen (B2/P7): samme nøkkel som Hjem, så fanebyttet
+  // Hjem↔Kalender koster null kall når data er ferske. Semantikken fra
+  // før er bevart: en feilet oppfriskning tømmer ALDRI kalenderen
+  // (TanStack beholder forrige data ved bakgrunnsfeil), og et dårlig
+  // nett ser dermed ikke ut som et tomt lag.
   // -------------------------------------------------------------------------
-  const [events, setEvents] = useState<HeiaEvent[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const eventsQuery = useTeamEvents(activeTeamSpaceId);
+  useScreenFocusRefetch(teamEventsKey(activeTeamSpaceId ?? ''));
+  const events = eventsQuery.data ?? EMPTY_EVENTS;
+  const loaded = !eventsQuery.isPending;
+  const error = eventsQuery.isError ? 'Kunne ikke oppdatere kalenderen.' : null;
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadEvents = useCallback(async () => {
-    if (!activeTeamSpaceId) return;
-    try {
-      setEvents(await getTeamEvents(activeTeamSpaceId));
-      setError(null);
-    } catch {
-      // Hendelsene vi ALT har blir stående. En feilet oppfriskning skal ikke
-      // tømme kalenderen — da ville et dårlig nett sett ut som et tomt lag.
-      setError('Kunne ikke oppdatere kalenderen.');
-    } finally {
-      setLoaded(true);
-      setRefreshing(false);
-    }
-  }, [activeTeamSpaceId]);
 
   useFocusEffect(
     useCallback(() => {
       refreshToday();
-      loadEvents();
-    }, [loadEvents, refreshToday]),
+    }, [refreshToday]),
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadEvents();
-  }, [loadEvents]);
+    // Eksplisitt brukerhandling hopper over staleTime.
+    eventsQuery.refetch().finally(() => setRefreshing(false));
+  }, [eventsQuery.refetch]);
 
   // -------------------------------------------------------------------------
   // Valgt dato. En ren markering — den flytter ALDRI agendaen av seg selv.

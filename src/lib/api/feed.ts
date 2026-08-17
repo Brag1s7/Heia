@@ -1,17 +1,21 @@
 import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
+import {getUserId, getUserIdOrNull} from './authUser';
+import {acquireChannel} from '../realtimeChannels';
+import {
+  FEED_MEDIA_BUCKET,
+  invalidateMediaCache,
+  primeMediaUrls,
+} from '../media/resolver';
+import type {MediaRef} from '../media/types';
 import type {FeedItem, UserRole} from '../../shared/types';
 
 // Merkevare-reaksjonen: 👏 «Heia». Én emoji nå (utvides senere ved behov).
 export const HEIA_EMOJI = '👏';
 
-// Privat Storage-bucket for feed-bilder. Path-konvensjon: {team_space_id}/{filnavn}.
-// Privat fordi bilder kan være av barn — vi signerer URL-er ved lesing.
-export const FEED_MEDIA_BUCKET = 'feed-media';
-
-// Signerte URL-er utløper — greit, fordi feeden refetches.
-const SIGNED_URL_TTL = 60 * 60; // 1 time
+// Bucketen bor hos resolveren (P4) — re-eksportert for upload-stien her.
+export {FEED_MEDIA_BUCKET};
 
 /** Bilde valgt fra image-picker, klart for opplasting. */
 export interface ImagePostInput {
@@ -26,7 +30,7 @@ export interface ImagePostInput {
 /** Et bilde som hører til en kamp, klart til visning. */
 export interface MatchPhoto {
   id: string;
-  imageUrl: string;
+  media: MediaRef;
   caption?: string;
   authorName: string;
   authorAvatarUrl?: string;
@@ -62,6 +66,11 @@ async function uploadTeamImage(
     .upload(storagePath, decode(image.base64), {
       contentType: image.mimeType,
       upsert: false,
+      // 24 t (P1, LÅST): en CDN-/OS-cachet kopi av et barnebilde skal ikke
+      // overleve tilgangsvinduet (24 t signert URL) vesentlig, og Free-CDN
+      // invaliderer ikke ved sletting. KAN IKKE endres per objekt i
+      // etterkant — må være riktig ved upload.
+      cacheControl: '86400',
     });
   if (uploadError) {
     throw uploadError;
@@ -125,14 +134,27 @@ function mapFeedRow(row: any): FeedItem {
   };
 }
 
-/** Henter ekte lag-feed via get_team_feed RPC (nyeste først, pinned øverst). */
+/**
+ * Henter ÉN side av lag-feeden via get_team_feed RPC (nyeste først, pinned
+ * øverst). `myUserId` kommer fra kallerens context (P5) — feeden er den
+ * varmeste lesestien, og skal ikke betale en auth-rundtur for å vite hvem
+ * du er.
+ *
+ * `cursor` (B2) er keyset-parameteren RPC-en har hatt siden 00029: kun rader
+ * med `created_at < cursor`. Cursor-VALGET og pinned-fellene bor i
+ * `shared/feedPaging` — dette laget sender bare verdien videre.
+ */
 export async function getTeamFeed(
   teamSpaceId: string,
+  myUserId?: string,
   limit = 20,
+  cursor?: string,
 ): Promise<FeedItem[]> {
   const {data, error} = await supabase.rpc('get_team_feed', {
     ts_id: teamSpaceId,
     lim: limit,
+    // Utelates på første side — RPC-ens DEFAULT NULL betyr «fra toppen».
+    ...(cursor ? {cursor} : {}),
   });
 
   if (error) {
@@ -144,42 +166,34 @@ export async function getTeamFeed(
     mapFeedRow({...row, team_space_id: teamSpaceId}),
   );
 
-  // Bilde-poster: media[] (jsonb fra RPC) → signert URL. Privat bucket,
-  // så vi signerer i én batch og mapper tilbake på storage_path.
-  const pathByIndex = rows.map((r: any) => {
+  // Bilde-poster: media[] (jsonb fra RPC) → MediaRef (P4). UI-et får path,
+  // aldri URL — men URL-ene varmes opp HER, i ÉN batch per skjermlast, så
+  // MediaImage treffer cachen i stedet for å signere per bilde.
+  const paths: string[] = [];
+  rows.forEach((r: any, i: number) => {
     const media = (r.media ?? []) as any[];
-    return media.length > 0 ? (media[0].storage_path as string) : null;
+    if (media.length === 0) return;
+    const ref: MediaRef = {
+      path: media[0].storage_path as string,
+      thumbPath: (media[0].thumbnail_path as string | null) ?? null,
+    };
+    items[i].media = ref;
+    paths.push(ref.path);
+    if (ref.thumbPath) paths.push(ref.thumbPath);
   });
-  const paths = pathByIndex.filter((p): p is string => p !== null);
   if (paths.length > 0) {
-    const {data: signed} = await supabase.storage
-      .from(FEED_MEDIA_BUCKET)
-      .createSignedUrls(paths, SIGNED_URL_TTL);
-    const urlByPath = new Map<string, string>();
-    for (const s of signed || []) {
-      if (s.signedUrl && !s.error && s.path) {
-        urlByPath.set(s.path, s.signedUrl);
-      }
-    }
-    items.forEach((item: FeedItem, i: number) => {
-      const p = pathByIndex[i];
-      if (p) {
-        item.imageUrl = urlByPath.get(p);
-      }
-    });
+    await primeMediaUrls(paths);
   }
 
   // get_team_feed sier hvor mange som har reagert, men ikke om JEG har det.
   // Én ekstra spørring (RLS lar meg se lagets reaksjoner) markerer mine.
   if (items.length > 0) {
-    const {
-      data: {user},
-    } = await supabase.auth.getUser();
-    if (user) {
+    const userId = myUserId ?? (await getUserIdOrNull());
+    if (userId) {
       const {data: mine} = await supabase
         .from('reactions')
         .select('feed_post_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('emoji', HEIA_EMOJI)
         .in(
           'feed_post_id',
@@ -237,6 +251,9 @@ export async function deletePost(postId: string): Promise<void> {
   }
   const paths = (data ?? []) as string[];
   if (paths.length > 0) {
+    // Begge slette-inngangene (feed og kommentartråd) passerer her (P1):
+    // de cachede URL-ene skal ikke overleve objektene de peker på.
+    invalidateMediaCache(paths);
     await supabase.storage.from(FEED_MEDIA_BUCKET).remove(paths);
   }
 }
@@ -245,7 +262,8 @@ export async function deletePost(postId: string): Promise<void> {
  * Live feed: kaller onChange ved nytt innlegg, reaksjon eller kommentar.
  *
  * Kalleren REFETCHER i stedet for å flette inn payloaden — feeden må uansett
- * sorteres (pinnet øverst), og signerte bilde-URL-er må hentes på nytt.
+ * sorteres (pinnet øverst). Bilde-URL-ene gjenbrukes fra resolver-cachen
+ * (P1), så en refetch koster data, aldri bildebytes.
  *
  * `reactions`/`comments` har ingen team_space_id å filtrere på, så vi
  * abonnerer ufiltrert. Det er trygt: RLS slipper kun gjennom rader du
@@ -255,33 +273,33 @@ export function subscribeToFeed(
   teamSpaceId: string,
   onChange: () => void,
 ): () => void {
-  const channel = supabase
-    .channel(`feed:${teamSpaceId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'feed_posts',
-        filter: `team_space_id=eq.${teamSpaceId}`,
-      },
-      () => onChange(),
-    )
-    .on(
-      'postgres_changes',
-      {event: '*', schema: 'public', table: 'reactions'},
-      () => onChange(),
-    )
-    .on(
-      'postgres_changes',
-      {event: '*', schema: 'public', table: 'comments'},
-      () => onChange(),
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return acquireChannel(
+    `feed:${teamSpaceId}`,
+    (channel, emit) => {
+      channel
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'feed_posts',
+            filter: `team_space_id=eq.${teamSpaceId}`,
+          },
+          emit,
+        )
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'reactions'},
+          emit,
+        )
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'comments'},
+          emit,
+        );
+    },
+    () => onChange(),
+  );
 }
 
 /**
@@ -294,19 +312,14 @@ export async function toggleReaction(
   postId: string,
   currentlyReacted: boolean,
 ): Promise<void> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   if (currentlyReacted) {
     const {error} = await supabase
       .from('reactions')
       .delete()
       .eq('feed_post_id', postId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('emoji', HEIA_EMOJI);
     if (error) {
       throw error;
@@ -314,7 +327,7 @@ export async function toggleReaction(
   } else {
     const {error} = await supabase.from('reactions').insert({
       feed_post_id: postId,
-      user_id: user.id,
+      user_id: userId,
       emoji: HEIA_EMOJI,
     });
     if (error) {
@@ -341,16 +354,11 @@ export async function createTextPost(
     throw new Error('Tom melding');
   }
 
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   const {error} = await supabase.from('feed_posts').insert({
     team_space_id: teamSpaceId,
-    author_id: user.id,
+    author_id: userId,
     type: 'melding',
     content: trimmed,
     is_pinned: pinned,
@@ -387,22 +395,17 @@ export async function createImagePost({
   /** Fester bildet til ett øyeblikk i kampen. Krever `eventId`. */
   matchEventId?: string;
 }): Promise<void> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   const trimmed = content.trim();
 
-  const mediaId = await uploadTeamImage(teamSpaceId, image, user.id);
+  const mediaId = await uploadTeamImage(teamSpaceId, image, userId);
 
   const {data: postRow, error: postError} = await supabase
     .from('feed_posts')
     .insert({
       team_space_id: teamSpaceId,
-      author_id: user.id,
+      author_id: userId,
       type: 'bilde',
       content: trimmed,
       is_pinned: pinned,
@@ -446,33 +449,17 @@ export async function getMatchPhotos(eventId: string): Promise<MatchPhoto[]> {
   const rows = (data || []) as any[];
   if (rows.length === 0) return [];
 
-  const paths = rows.map(r => r.storage_path as string);
-  const {data: signed} = await supabase.storage
-    .from(FEED_MEDIA_BUCKET)
-    .createSignedUrls(paths, SIGNED_URL_TTL);
+  // Én oppvarmingsbatch (P4) — MediaImage leser fra cachen. RPC-en (00028)
+  // returnerer ikke thumbnail_path; thumb-varianten faller tilbake til path.
+  await primeMediaUrls(rows.map(r => r.storage_path as string));
 
-  const urlByPath = new Map<string, string>();
-  for (const s of signed || []) {
-    if (s.signedUrl && !s.error && s.path) {
-      urlByPath.set(s.path, s.signedUrl);
-    }
-  }
-
-  // Et bilde uten gyldig URL kan ikke vises — da er en tom liste ærligere
-  // enn en rad med et grått hull i.
-  return rows.flatMap(r => {
-    const url = urlByPath.get(r.storage_path);
-    if (!url) return [];
-    return [
-      {
-        id: r.post_id as string,
-        imageUrl: url,
-        caption: (r.content as string) || undefined,
-        authorName: (r.author_name as string) ?? 'Ukjent',
-        authorAvatarUrl: (r.author_avatar as string) ?? undefined,
-        createdAt: new Date(r.created_at),
-        matchEventId: (r.match_event_id as string) ?? undefined,
-      },
-    ];
-  });
+  return rows.map(r => ({
+    id: r.post_id as string,
+    media: {path: r.storage_path as string},
+    caption: (r.content as string) || undefined,
+    authorName: (r.author_name as string) ?? 'Ukjent',
+    authorAvatarUrl: (r.author_avatar as string) ?? undefined,
+    createdAt: new Date(r.created_at),
+    matchEventId: (r.match_event_id as string) ?? undefined,
+  }));
 }

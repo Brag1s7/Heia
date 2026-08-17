@@ -1,6 +1,7 @@
 import React, {useMemo} from 'react';
-import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
+import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
+import {MediaImage} from '../lib/media/MediaImage';
 import {Camera} from './icons';
 import {MatchEventRow} from './MatchEventRow';
 import type {MatchPhoto} from '../lib/api/feed';
@@ -165,8 +166,9 @@ export function MatchTimeline({
                   styles.photo,
                   pressed && styles.photoPressed,
                 ]}>
-                <Image
-                  source={{uri: entry.photo.imageUrl}}
+                <MediaImage
+                  media={entry.photo.media}
+                  variant="display"
                   style={styles.photoImage}
                   resizeMode="cover"
                 />

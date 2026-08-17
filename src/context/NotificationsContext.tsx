@@ -132,12 +132,17 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
           filter: `user_id=eq.${userId}`,
         },
         payload => {
+          // INSERT-gaten står FØR refetch-kallene (fase A, F16-fiksen):
+          // kanalen lytter på '*', men en UPDATE er «markert som lest» og en
+          // DELETE er opprydding — begge er ekko av noe klienten alt vet.
+          // Før sto gaten etter refreshUnread/liveNonce, så «merk alle som
+          // lest» av N varsler ga N meldinger → N tellerspørringer og N
+          // inbox-reloads. Kun et NYTT varsel skal koste noe.
+          if (payload.eventType !== 'INSERT') return;
+
           refreshUnread();
           setLiveNonce(n => n + 1);
 
-          // Kun INSERT: kanalen lytter på '*', og en UPDATE er «markert som
-          // lest» — det skal ikke sprette opp et banner.
-          if (payload.eventType !== 'INSERT') return;
           const row = payload.new as any;
           // Står du på kampsiden, ER dette øyeblikket skjermen foran deg
           // (scoren spretter, forløpet ruller). Demp banneret for den

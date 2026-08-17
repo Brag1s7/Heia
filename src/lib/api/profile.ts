@@ -1,4 +1,5 @@
 import {supabase} from '../supabase';
+import {getUserId} from './authUser';
 import type {Profile} from '../types';
 
 function mapProfile(row: any): Profile {
@@ -13,18 +14,16 @@ function mapProfile(row: any): Profile {
   };
 }
 
-export async function getProfile(): Promise<Profile> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
-
+/**
+ * `userId` kommer fra kalleren (UserContext eier sesjonen — P5): profilen
+ * ligger i boot-kjeden, og RLS (`id = auth.uid()`) er uansett vakten —
+ * en fremmed id gir null rader, aldri en annens profil.
+ */
+export async function getProfile(userId: string): Promise<Profile> {
   const {data, error} = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single();
 
   if (error) {
@@ -64,12 +63,7 @@ export async function deleteAccount(): Promise<void> {
 export async function updateProfile(
   updates: Partial<Pick<Profile, 'displayName' | 'avatarUrl' | 'phone'>>,
 ): Promise<Profile> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   const dbUpdates: Record<string, any> = {};
   if (updates.displayName !== undefined) {
@@ -86,7 +80,7 @@ export async function updateProfile(
   const {data, error} = await supabase
     .from('profiles')
     .update(dbUpdates)
-    .eq('id', user.id)
+    .eq('id', userId)
     .select()
     .single();
 

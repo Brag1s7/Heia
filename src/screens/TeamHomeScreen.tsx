@@ -1,10 +1,11 @@
-import React, {useState, useCallback, useEffect, useRef} from 'react';
+import React, {useState, useCallback, useEffect, useMemo, useRef} from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   Image,
   Pressable,
-  ScrollView,
+  FlatList,
   RefreshControl,
   StyleSheet,
   TextInput,
@@ -14,6 +15,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
+  useFocusEffect,
   useNavigation,
   useRoute,
   type NavigationProp,
@@ -34,14 +36,23 @@ import {
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
-import {getLiveMatch, getTeamEvents} from '../lib/api/events';
+import {getLiveMatch} from '../lib/api/events';
+import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
+import {
+  useTeamFeed,
+  teamFeedKey,
+  patchFeedItem,
+  removeFeedItem,
+  invalidateFeed,
+  markFeedStale,
+} from '../lib/queries/feed';
+import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {tournamentTitleFor} from '../shared/calendarList';
 import {
   getTeamSupportSummary,
   type TeamSupportSummary,
 } from '../lib/api/payments';
 import {
-  getTeamFeed,
   createTextPost,
   createImagePost,
   toggleReaction,
@@ -89,11 +100,11 @@ function openableMatchId(item: FeedItem): string | undefined {
  * har en bildepost også.
  */
 function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
-  if (!item.imageUrl) return [];
+  if (!item.media) return [];
   return [
     {
       id: item.id,
-      imageUrl: item.imageUrl,
+      media: item.media,
       caption: item.content || undefined,
       authorName: item.author.name,
       authorAvatarUrl: item.author.avatarUrl,
@@ -129,6 +140,58 @@ function pickNextEvents(events: HeiaEvent[], limit: number): HeiaEvent[] {
   return upcoming;
 }
 
+interface FeedRowProps {
+  item: FeedItem;
+  canBroadcast: boolean;
+  onOpenMatch: (eventId: string) => void;
+  onExpandImage: (item: FeedItem) => void;
+  onHeia: (item: FeedItem) => void;
+  onComment: (item: FeedItem) => void;
+  onUnpin: (item: FeedItem) => void;
+  onMore: (item: FeedItem) => void;
+}
+
+/**
+ * Én feed-rad, memoisert for virtualiseringen (B2): compose-feltet bor i
+ * ListHeaderComponent, så hvert tastetrykk re-rendrer skjermen — uten memo
+ * ville hele den synlige feeden re-rendret per tegn. Forelderen sender
+ * STABILE callbacks som tar `item` som argument; closurene her gjenskapes
+ * kun når raden selv re-rendres.
+ */
+const FeedRow = React.memo(function FeedRow({
+  item,
+  canBroadcast,
+  onOpenMatch,
+  onExpandImage,
+  onHeia,
+  onComment,
+  onUnpin,
+  onMore,
+}: FeedRowProps) {
+  const matchId = openableMatchId(item);
+  return (
+    <View style={styles.cardWrap}>
+      <FeedCard
+        item={item}
+        onPress={matchId ? () => onOpenMatch(matchId) : undefined}
+        onExpandImage={item.media ? () => onExpandImage(item) : undefined}
+        onHeia={() => onHeia(item)}
+        onComment={() => onComment(item)}
+        // Kun trener/lagleder — RLS («Admins can moderate posts»)
+        // ville uansett avvist andre.
+        onUnpin={canBroadcast && item.isPinned ? () => onUnpin(item) : undefined}
+        onMore={() => onMore(item)}
+      />
+    </View>
+  );
+});
+
+const feedKeyExtractor = (item: FeedItem) => item.id;
+
+// Stabil tom-referanse: `data ?? []` inline ville gitt nytt array per render
+// og re-rendret FlatList-en til ingen nytte.
+const EMPTY_FEED: FeedItem[] = [];
+
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
 
@@ -144,19 +207,46 @@ export function TeamHomeScreen() {
   const canBroadcast = isTeamAdmin(activeRole);
   const myId = session?.user?.id;
 
-  const [feed, setFeed] = useState<FeedItem[]>([]);
   const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
-  const [nextEvents, setNextEvents] = useState<HeiaEvent[]>([]);
+  // Hendelsene deles med Kalender via query-cachen (B2/P7) — én henting
+  // for begge faner, og en 👏-burst i feeden refetcher ikke lenger
+  // kalenderdata. Feiler hentingen er data undefined → heroene skjules,
+  // samme «sekundært, blokkerer aldri feeden»-oppførsel som før.
+  const eventsQuery = useTeamEvents(activeTeamSpaceId);
+  useScreenFocusRefetch(teamEventsKey(activeTeamSpaceId ?? ''));
+  // Feeden bor også i query-cachen (B2): useInfiniteQuery over cursoren
+  // get_team_feed har hatt ubrukt siden 00029. `data` er den flate,
+  // dedupede visningslista (select i queries/feed) — sidestrukturen bor i
+  // cachen. Skjelett kun ved isPending (første last per lag, cache-kaldt);
+  // resync og refetch er stille, som før. Fokus-resync følger 60 s-regelen.
+  const feedQuery = useTeamFeed(activeTeamSpaceId, myId);
+  useScreenFocusRefetch(teamFeedKey(activeTeamSpaceId ?? ''));
+  const feed = feedQuery.data ?? EMPTY_FEED;
+  const {
+    refetch: refetchFeed,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = feedQuery;
+  const refetchEvents = eventsQuery.refetch;
+
+  const nextEvents = useMemo(
+    () => pickNextEvents(eventsQuery.data ?? [], 3),
+    [eventsQuery.data],
+  );
   // Turneringsnavn per kamp-id. Turnerings-CONTAINEREN vises aldri på Hjem
   // (pickNextEvents hopper over den) — dette er det ENESTE stedet en turnering
   // nevnes her, som en liten etikett på kampens eget kort.
-  const [tournamentTitles, setTournamentTitles] = useState<
-    Record<string, string>
-  >({});
+  const tournamentTitles = useMemo(() => {
+    const titles: Record<string, string> = {};
+    for (const event of nextEvents) {
+      const tournament = tournamentTitleFor(event, eventsQuery.data ?? []);
+      if (tournament) titles[event.id] = tournament;
+    }
+    return titles;
+  }, [nextEvents, eventsQuery.data]);
   const [supportSummary, setSupportSummary] =
     useState<TeamSupportSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [composeText, setComposeText] = useState('');
   const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
   const [posting, setPosting] = useState(false);
@@ -164,104 +254,88 @@ export function TeamHomeScreen() {
   // «Varsle hele laget» — festes øverst i feeden + gir alle et varsel.
   const [broadcast, setBroadcast] = useState(false);
 
-  const loadFeed = useCallback(async () => {
+  // Heroene (live kamp + lagkassa) er sekundære og feiler stille — de
+  // blokkerer aldri feeden. De bor fortsatt i lokal state: to småkall uten
+  // paginering; B3 flytter dem videre ved behov.
+  const loadHeroes = useCallback(async () => {
     if (!activeTeamSpaceId) return;
-    setError(null);
-    // Heroene er sekundære: feiler kamp-/kalenderoppslaget skjuler vi dem
-    // heller enn å blokkere feeden.
-    const livePromise = getLiveMatch(activeTeamSpaceId).catch(() => null);
-    const eventsPromise = getTeamEvents(activeTeamSpaceId).catch(
-      () => [] as HeiaEvent[],
-    );
-    // Lagkassa-kortet i karusellen (fase 5) — sekundært, som heroene.
-    const supportPromise = getTeamSupportSummary(activeTeamSpaceId).catch(
-      () => null,
-    );
-    try {
-      const [items, live, events, support] = await Promise.all([
-        getTeamFeed(activeTeamSpaceId),
-        livePromise,
-        eventsPromise,
-        supportPromise,
-      ]);
-      setFeed(items);
-      setLiveMatch(live);
-      const upcoming = pickNextEvents(events, 3);
-      setNextEvents(upcoming);
-      const titles: Record<string, string> = {};
-      for (const event of upcoming) {
-        const tournament = tournamentTitleFor(event, events);
-        if (tournament) titles[event.id] = tournament;
-      }
-      setTournamentTitles(titles);
-      setSupportSummary(support);
-    } catch {
-      setError('Kunne ikke laste feeden. Dra ned for å prøve igjen.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    const [live, support] = await Promise.all([
+      getLiveMatch(activeTeamSpaceId).catch(() => null),
+      getTeamSupportSummary(activeTeamSpaceId).catch(() => null),
+    ]);
+    setLiveMatch(live);
+    setSupportSummary(support);
   }, [activeTeamSpaceId]);
 
-  // Last feed når aktivt lag endres.
-  useEffect(() => {
-    setLoading(true);
-    loadFeed();
-  }, [loadFeed]);
-
-  // Live feed (00025). Debounce: én burst med 👏 fra flere foreldre skal bli
-  // ÉN refetch, ikke ti. loadFeed setter ikke `loading`, så oppdateringen
-  // skjer uten at spinneren blinker.
-  useEffect(() => {
-    if (!activeTeamSpaceId) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const unsubscribe = subscribeToFeed(activeTeamSpaceId, () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(loadFeed, 400);
-    });
-    return () => {
-      if (timer) clearTimeout(timer);
-      unsubscribe();
-    };
-  }, [activeTeamSpaceId, loadFeed]);
+  // FOKUS-bundet abonnement (fase A, F19-fiksen): en TeamHome bak kampsiden
+  // eller en annen fane skal hverken lytte eller refetche; ved blur rives
+  // kanal og ventende debounce. Feedens fokus-RESYNC eies nå av
+  // useScreenFocusRefetch (60 s-regelen) — heroene hentes fortsatt per fokus.
+  //
+  // Debounce på realtime (00025): én burst med 👏 fra flere foreldre skal
+  // bli ÉN refetch, ikke ti. invalidateFeed refetcher via cachen uten å
+  // røre skjelett-tilstanden, så oppdateringen skjer uten spinner-blink.
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeTeamSpaceId) return;
+      loadHeroes();
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const unsubscribe = subscribeToFeed(activeTeamSpaceId, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(() => {
+          timer = null;
+          invalidateFeed(activeTeamSpaceId);
+          loadHeroes();
+        }, 400);
+      });
+      return () => {
+        if (timer) {
+          clearTimeout(timer);
+          // Blur midt i debounce-vinduet: hendelsen er KJENT, men F19 sier
+          // ingen henting mens skjermen er ubevoktet. Marker stale uten
+          // fetch — fokus-broen resyncer straks ved retur, uavhengig av
+          // 60 s-regelen.
+          markFeedStale(activeTeamSpaceId);
+        }
+        unsubscribe();
+      };
+    }, [activeTeamSpaceId, loadHeroes]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadFeed();
-  }, [loadFeed]);
-
-  const handleToggleHeia = useCallback(async (post: FeedItem) => {
-    const wasReacted = post.iReacted ?? false;
-    const delta = wasReacted ? -1 : 1;
-    // Optimistisk lokal oppdatering — snappy, og trygt å reversere ved feil.
-    setFeed(prev =>
-      prev.map(p =>
-        p.id === post.id
-          ? {
-              ...p,
-              iReacted: !wasReacted,
-              heiaCount: Math.max(0, (p.heiaCount ?? 0) + delta),
-            }
-          : p,
-      ),
+    // Eksplisitt brukerhandling hopper over staleTime (refetch, ikke
+    // invalidate) — og henter også heroene.
+    Promise.all([refetchFeed(), refetchEvents(), loadHeroes()]).finally(() =>
+      setRefreshing(false),
     );
-    try {
-      await toggleReaction(post.id, wasReacted);
-    } catch {
-      // Reverter til forrige tilstand.
-      setFeed(prev =>
-        prev.map(p =>
-          p.id === post.id
-            ? {
-                ...p,
-                iReacted: wasReacted,
-                heiaCount: Math.max(0, (p.heiaCount ?? 0) - delta),
-              }
-            : p,
-        ),
-      );
-    }
-  }, []);
+  }, [refetchFeed, refetchEvents, loadHeroes]);
+
+  const handleToggleHeia = useCallback(
+    async (post: FeedItem) => {
+      if (!activeTeamSpaceId) return;
+      const wasReacted = post.iReacted ?? false;
+      const delta = wasReacted ? -1 : 1;
+      // Optimistisk oppdatering rett i query-cachen — snappy, og trygt å
+      // reversere ved feil.
+      patchFeedItem(activeTeamSpaceId, post.id, p => ({
+        ...p,
+        iReacted: !wasReacted,
+        heiaCount: Math.max(0, (p.heiaCount ?? 0) + delta),
+      }));
+      try {
+        await toggleReaction(post.id, wasReacted);
+      } catch {
+        // Reverter til forrige tilstand.
+        patchFeedItem(activeTeamSpaceId, post.id, p => ({
+          ...p,
+          iReacted: wasReacted,
+          heiaCount: Math.max(0, (p.heiaCount ?? 0) - delta),
+        }));
+      }
+    },
+    [activeTeamSpaceId],
+  );
 
   // Kamerarullen først: hjemme i sofaen ligger bildet som skal deles allerede
   // der. På sidelinja av en kamp er det motsatt — se `handlePickPhoto` i
@@ -297,7 +371,7 @@ export function TeamHomeScreen() {
       setComposeText('');
       setSelectedImage(null);
       setBroadcast(false);
-      await loadFeed();
+      await refetchFeed();
     } catch {
       Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
     } finally {
@@ -309,7 +383,7 @@ export function TeamHomeScreen() {
     composeText,
     selectedImage,
     posting,
-    loadFeed,
+    refetchFeed,
     canBroadcast,
     broadcast,
   ]);
@@ -327,22 +401,26 @@ export function TeamHomeScreen() {
             text: 'Løsne',
             style: 'destructive',
             onPress: async () => {
-              // Optimistisk: markøren forsvinner med én gang.
-              setFeed(prev =>
-                prev.map(p => (p.id === post.id ? {...p, isPinned: false} : p)),
-              );
+              if (!activeTeamSpaceId) return;
+              // Optimistisk: markøren forsvinner med én gang. Refetchen
+              // etterpå resorterer (posten skal ned fra toppen) — og
+              // reverterer samtidig om skrivet feilet.
+              patchFeedItem(activeTeamSpaceId, post.id, p => ({
+                ...p,
+                isPinned: false,
+              }));
               try {
                 await unpinPost(post.id);
               } catch {
                 Alert.alert('Kunne ikke løsne', 'Prøv igjen om litt.');
               }
-              await loadFeed();
+              invalidateFeed(activeTeamSpaceId);
             },
           },
         ],
       );
     },
-    [loadFeed],
+    [activeTeamSpaceId],
   );
 
   // Sletting er soft delete i DB-en (00041) — forfatter eller trener/lagleder.
@@ -358,19 +436,20 @@ export function TeamHomeScreen() {
             text: 'Slett',
             style: 'destructive',
             onPress: async () => {
-              setFeed(prev => prev.filter(p => p.id !== post.id));
+              if (!activeTeamSpaceId) return;
+              removeFeedItem(activeTeamSpaceId, post.id);
               try {
                 await deletePost(post.id);
               } catch {
                 Alert.alert('Kunne ikke slette', 'Prøv igjen om litt.');
               }
-              await loadFeed();
+              invalidateFeed(activeTeamSpaceId);
             },
           },
         ],
       );
     },
-    [loadFeed],
+    [activeTeamSpaceId],
   );
 
   // ⋯-menyen (Apple 1.2): eget innlegg → slett; andres → rapporter;
@@ -402,6 +481,57 @@ export function TeamHomeScreen() {
     [myId, canBroadcast, handleDeletePost],
   );
 
+  const handleOpenMatch = useCallback(
+    (eventId: string) => {
+      navigation.navigate('EventDetail', {eventId});
+    },
+    [navigation],
+  );
+
+  const handleExpandImage = useCallback((item: FeedItem) => {
+    setFullscreenItem(item);
+  }, []);
+
+  const handleComment = useCallback(
+    (item: FeedItem) => {
+      navigation.navigate('Comments', {
+        postId: item.id,
+        teamSpaceId: item.teamSpaceId,
+      });
+    },
+    [navigation],
+  );
+
+  const renderFeedItem = useCallback(
+    ({item}: {item: FeedItem}) => (
+      <FeedRow
+        item={item}
+        canBroadcast={canBroadcast}
+        onOpenMatch={handleOpenMatch}
+        onExpandImage={handleExpandImage}
+        onHeia={handleToggleHeia}
+        onComment={handleComment}
+        onUnpin={handleUnpin}
+        onMore={handlePostActions}
+      />
+    ),
+    [
+      canBroadcast,
+      handleOpenMatch,
+      handleExpandImage,
+      handleToggleHeia,
+      handleComment,
+      handleUnpin,
+      handlePostActions,
+    ],
+  );
+
+  const handleEndReached = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
   // «Del med laget» i +-valgarket sender en ny nonce hit for hvert trykk,
   // så compose-boksen får fokus også når vi allerede står på TeamHome.
   const composeNonce = route.params?.composeNonce;
@@ -424,22 +554,12 @@ export function TeamHomeScreen() {
 
   if (!activeTeamSpace || !activeTeamSpaceId) return null;
 
-  return (
+  // ⚠️ ELEMENT, ikke inline funksjonskomponent: som `ListHeaderComponent={()
+  // => …}` ville headeren REMOUNTET ved hver render — TextInput-en hadde
+  // mistet fokus og tastaturet lukket seg midt i skrivingen. Et element
+  // rekonsilieres på type, så compose-feltet beholder identiteten sin.
+  const listHeader = (
     <>
-    {/* Fast header + separat scrollflate — samme mønster som Kalender og
-        Varsler: TeamHeader er søsken OVER ScrollView, ikke inni den. */}
-    <View style={styles.screen}>
-      <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
-      <ScrollView
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.heia}
-          />
-        }>
-
       {/* HERO — dagens hovedøyeblikk: live kamp slår neste aktivitet.
           Hverdagsmodus = karusell over de neste hendelsene + kalender-kort;
           karusellens sider eier skjermmargen selv (full bredde her). */}
@@ -557,67 +677,72 @@ export function TeamHomeScreen() {
           </View>
         )}
       </View>
+    </>
+  );
 
-      {loading ? (
-        <View style={styles.feedSkeleton}>
-          <FeedCardSkeleton />
-          <FeedCardSkeleton />
-          <FeedCardSkeleton />
-        </View>
-      ) : error ? (
-        <View style={styles.emptyFeed}>
-          <Text style={styles.emptyText}>{error}</Text>
-        </View>
-      ) : feed.length === 0 ? (
-        <View style={styles.emptyFeed}>
-          <Text style={styles.emptyTitle}>Stille her ennå …</Text>
-          <Text style={styles.emptyText}>
-            Skriv den første meldingen, eller inviter foreldre og spillere så
-            blir laget levende.
-          </Text>
-          <Button
-            title="Inviter laget"
-            onPress={() => navigation.navigate('Invite')}
+  // Vises kun når lista er tom — har feeden data, beholdes den også når en
+  // refetch feiler (behold-ved-feil, samme regel som kalenderen).
+  const listEmpty = feedQuery.isPending ? (
+    <View style={styles.feedSkeleton}>
+      <FeedCardSkeleton />
+      <FeedCardSkeleton />
+      <FeedCardSkeleton />
+    </View>
+  ) : feedQuery.isError ? (
+    <View style={styles.emptyFeed}>
+      <Text style={styles.emptyText}>
+        Kunne ikke laste feeden. Dra ned for å prøve igjen.
+      </Text>
+    </View>
+  ) : (
+    <View style={styles.emptyFeed}>
+      <Text style={styles.emptyTitle}>Stille her ennå …</Text>
+      <Text style={styles.emptyText}>
+        Skriv den første meldingen, eller inviter foreldre og spillere så
+        blir laget levende.
+      </Text>
+      <Button
+        title="Inviter laget"
+        onPress={() => navigation.navigate('Invite')}
+      />
+    </View>
+  );
+
+  return (
+    <>
+    {/* Fast header + separat scrollflate — samme mønster som Kalender og
+        Varsler: TeamHeader er søsken OVER lista, ikke inni den. Lista er
+        FlatList (B2): kun det synlige vinduet av feeden er montert, og
+        onEndReached henter neste side via cursoren. */}
+    <View style={styles.screen}>
+      <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
+      <FlatList
+        data={feed}
+        renderItem={renderFeedItem}
+        keyExtractor={feedKeyExtractor}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <ActivityIndicator style={styles.feedFooter} color={colors.heia} />
+          ) : null
+        }
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        // Ingen horisontal padding her — karusellen i headeren er full
+        // bredde; radene har sin egen (cardWrap).
+        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.heia}
           />
-        </View>
-      ) : (
-        feed.map(item => {
-          const matchId = openableMatchId(item);
-          return (
-          <View key={item.id} style={styles.cardWrap}>
-            <FeedCard
-              item={item}
-              onPress={
-                matchId
-                  ? () =>
-                      navigation.navigate('EventDetail', {eventId: matchId})
-                  : undefined
-              }
-              onExpandImage={
-                item.imageUrl ? () => setFullscreenItem(item) : undefined
-              }
-              onHeia={() => handleToggleHeia(item)}
-              onComment={() =>
-                navigation.navigate('Comments', {
-                  postId: item.id,
-                  teamSpaceId: activeTeamSpaceId,
-                })
-              }
-              // Kun trener/lagleder — RLS («Admins can moderate posts»)
-              // ville uansett avvist andre.
-              onUnpin={
-                canBroadcast && item.isPinned
-                  ? () => handleUnpin(item)
-                  : undefined
-              }
-              onMore={() => handlePostActions(item)}
-            />
-          </View>
-          );
-        })
-      )}
-
-      </ScrollView>
+        }
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+      />
     </View>
 
     {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
@@ -753,6 +878,9 @@ const styles = StyleSheet.create({
   feedSkeleton: {
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
+  },
+  feedFooter: {
+    paddingVertical: spacing.lg,
   },
   emptyFeed: {
     marginHorizontal: spacing.lg,

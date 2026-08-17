@@ -1,4 +1,5 @@
 import type {NavigatorScreenParams} from '@react-navigation/native';
+import type {MediaRef} from '../lib/media/types';
 
 // ---------------------------------------------------------------------------
 // Sport & Event-typer — skalerbar via enum-utvidelse
@@ -168,7 +169,8 @@ export interface FeedItem {
   author: User & {role?: UserRole};
   createdAt: Date;
   content: string;
-  imageUrl?: string;
+  /** Bildet som path + variant (P4) — aldri en ferdig URL. `MediaImage` viser den. */
+  media?: MediaRef;
   matchEvent?: MatchEvent;
   /**
    * Kampkontekst fra `get_team_feed` (00029). Satt på poster som hører til en

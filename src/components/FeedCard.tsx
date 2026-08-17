@@ -1,6 +1,7 @@
 import React from 'react';
-import {View, Text, Image, Pressable, StyleSheet} from 'react-native';
+import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {MediaImage} from '../lib/media/MediaImage';
 import {Maximize2, MessageCircle, MoreHorizontal} from './icons';
 import {Avatar} from './Avatar';
 import {StatusPill} from './StatusPill';
@@ -168,10 +169,11 @@ export function FeedCard({
       ) : null}
 
       {/* Bilde */}
-      {item.imageUrl && (
+      {item.media && (
         <View style={styles.imageWrap}>
-          <Image
-            source={{uri: item.imageUrl}}
+          <MediaImage
+            media={item.media}
+            variant="display"
             style={styles.image}
             resizeMode="cover"
           />
