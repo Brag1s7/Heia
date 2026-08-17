@@ -3,7 +3,11 @@ import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
 import {getUserId, getUserIdOrNull} from './authUser';
 import {acquireChannel} from '../realtimeChannels';
-import {FEED_MEDIA_BUCKET, primeMediaUrls} from '../media/resolver';
+import {
+  FEED_MEDIA_BUCKET,
+  invalidateMediaCache,
+  primeMediaUrls,
+} from '../media/resolver';
 import type {MediaRef} from '../media/types';
 import type {FeedItem, UserRole} from '../../shared/types';
 
@@ -239,6 +243,9 @@ export async function deletePost(postId: string): Promise<void> {
   }
   const paths = (data ?? []) as string[];
   if (paths.length > 0) {
+    // Begge slette-inngangene (feed og kommentartråd) passerer her (P1):
+    // de cachede URL-ene skal ikke overleve objektene de peker på.
+    invalidateMediaCache(paths);
     await supabase.storage.from(FEED_MEDIA_BUCKET).remove(paths);
   }
 }

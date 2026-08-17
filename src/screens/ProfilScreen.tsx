@@ -57,12 +57,10 @@ import {
   getMySupportOverview,
   openSupportPortal,
   isOpsAdmin,
-  clearOpsAdminCache,
   isPaymentManager,
-  clearPaymentManagerCache,
   type MySupportItem,
 } from '../lib/api';
-import {confirmDeleteAccount} from '../lib/account';
+import {confirmDeleteAccount, registerLocalCache} from '../lib/account';
 import {formatKr} from '../lib/money';
 import type {ProfilStackParamList, RootTabParamList} from '../shared/types';
 
@@ -100,9 +98,13 @@ function RowChevron() {
 
 // Siste kjente «Min støtte»-svar — lever over remounts så seksjonen aldri
 // popper inn for en supporter. Modul-state overlever utlogging, så cachen
-// nulles eksplisitt i logg ut-handleren (RLS gir uansett kun egne rader,
-// men en ny bruker skal aldri se forrige brukers avtaler et blunk).
+// er registrert hos clearLocalCaches (kalles fra selve signOut i
+// UserContext): RLS gir uansett kun egne rader, men en ny bruker skal
+// aldri se forrige brukers avtaler et blunk.
 let supportOverviewCache: MySupportItem[] | null = null;
+registerLocalCache(() => {
+  supportOverviewCache = null;
+});
 
 // Statuslinjen på «Min støtte»-raden — rolig informasjon, aldri alarm.
 function supportStatusLine(item: MySupportItem): string {
@@ -212,13 +214,9 @@ export function ProfilScreen() {
     }
   }, [portalLoading]);
 
-  // Cachen er modul-state og overlever utlogging — nulles her så en ny
-  // bruker på samme enhet aldri ser forrige brukers avtaler et blunk.
-  // Ops-cachen samme sak: neste bruker skal ikke arve ops-svaret.
+  // All lokal rydding (modul-cacher, medie-URL-er) bor i selve signOut
+  // (UserContext → clearLocalCaches) — begge utloggingsinngangene får den.
   const handleSignOut = useCallback(() => {
-    supportOverviewCache = null;
-    clearOpsAdminCache();
-    clearPaymentManagerCache();
     signOut();
   }, [signOut]);
 
@@ -233,11 +231,6 @@ export function ProfilScreen() {
     confirmDeleteAccount({
       setDeleting: setDeletingAccount,
       signOut,
-      onDeleted: () => {
-        supportOverviewCache = null;
-        clearOpsAdminCache();
-        clearPaymentManagerCache();
-      },
     });
   }, [deletingAccount, signOut]);
 

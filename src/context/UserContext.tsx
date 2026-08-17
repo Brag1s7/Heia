@@ -9,6 +9,7 @@ import React, {
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {getProfile} from '../lib/api/profile';
+import {clearLocalCaches} from '../lib/account';
 import {stopPush} from '../lib/push';
 import type {Profile} from '../lib/types';
 
@@ -167,6 +168,9 @@ export function AuthProvider({children}: PropsWithChildren) {
     // Avregistrer enhets-token FØR session-en tømmes: RPC-en sletter kun
     // token som tilhører auth.uid(), og etter signOut er den null.
     await stopPush().catch(() => {});
+    // Delt enhet skal være ren (P1): modul-cacher og signerte medie-URL-er
+    // ryddes HER — det eneste punktet begge utloggingsinngangene passerer.
+    await clearLocalCaches().catch(() => {});
     setSession(null);
     setProfile(null);
     await supabase.auth.signOut().catch(() => {});

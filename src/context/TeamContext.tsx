@@ -8,9 +8,11 @@ import React, {
   useState,
   type PropsWithChildren,
 } from 'react';
+import {AppState} from 'react-native';
 import {useAuth} from './UserContext';
 import {registerTeamSwitcher} from '../navigation/deepLink';
 import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
+import {purgeMediaCacheByPrefix} from '../lib/media/resolver';
 import type {
   EnrichedMembership,
   MemberRole,
@@ -97,6 +99,35 @@ export function TeamProvider({children}: PropsWithChildren) {
   useEffect(() => {
     fetchMemberships();
   }, [fetchMemberships]);
+
+  // Lett resync når appen våkner (P1, fjernet-medlem-hullet): før kjørte
+  // refreshMemberships kun ved join/create/settings, så en bruker som ble
+  // fjernet fra laget sto igjen med activeTeamSpaceId mot et lag hun ikke
+  // er medlem av — helt til app-omstart. Refreshen er stille (loadedForRef)
+  // og river aldri navigatoren.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        fetchMemberships();
+      }
+    });
+    return () => sub.remove();
+  }, [fetchMemberships]);
+
+  // Medlemskapstap: peker aktivt lag på et lag som ikke lenger står i en
+  // FERSK liste (loadedForRef vokter — en feilet stille refresh beholder
+  // forrige liste og når aldri hit), byttes laget og lagets signerte
+  // medie-URL-er purges (P1: tilgang borte → cache borte).
+  useEffect(() => {
+    if (!userId || loadedForRef.current !== userId || !activeTeamSpaceId) {
+      return;
+    }
+    if (userMemberships.some(m => m.teamSpaceId === activeTeamSpaceId)) {
+      return;
+    }
+    purgeMediaCacheByPrefix(activeTeamSpaceId).catch(() => {});
+    setActiveTeamSpaceId(userMemberships[0]?.teamSpaceId ?? null);
+  }, [userId, userMemberships, activeTeamSpaceId]);
 
   // Auto-velg første lag ved innlogging. Funksjonell oppdatering: et
   // push-trykk ved kaldstart kan allerede ha køet et lagvalg i samme
