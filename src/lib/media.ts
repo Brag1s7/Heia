@@ -10,10 +10,18 @@ import type {ImagePostInput} from './api/feed';
 /** Valgt bilde + `uri` til lokal forhåndsvisning før det er lastet opp. */
 export type PickedImage = ImagePostInput & {uri: string};
 
+// 2048 px lang side / JPEG q0.85 er visningsMASTEREN (P2, LÅST beslutning):
+// Heia lagrer en høyoppløselig visningsmaster, ikke kameraoriginalen —
+// opplasterens kamerarull ER originalarkivet. ~0,3-0,6 MB i stedet for
+// 2-6 MB per foto var den største enkeltfaktoren i egress-auditen (F1).
+// B supplerer med en 480-thumb fra denne fila; selve masteren står.
 const PICKER_OPTIONS = {
   mediaType: 'photo',
   includeBase64: true,
   selectionLimit: 1,
+  maxWidth: 2048,
+  maxHeight: 2048,
+  quality: 0.85,
 } as const;
 
 // Logoer rendres 32–40 pt — 512 px er rikelig, og headeren skal ikke laste
