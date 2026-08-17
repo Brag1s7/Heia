@@ -66,14 +66,14 @@ function mapEnrichedMembership(row: any): EnrichedMembership {
   };
 }
 
-export async function getUserMemberships(): Promise<EnrichedMembership[]> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
-
+/**
+ * `userId` kommer fra kalleren (TeamContext eier sesjonen — P5): dette er
+ * boot-kjedens tyngste kall, og RLS på memberships gjelder uansett —
+ * `.eq` er korrekthets-, ikke sikkerhetsfilter.
+ */
+export async function getUserMemberships(
+  userId: string,
+): Promise<EnrichedMembership[]> {
   const {data, error} = await supabase
     .from('memberships')
     .select(
@@ -89,7 +89,7 @@ export async function getUserMemberships(): Promise<EnrichedMembership[]> {
       )
     `,
     )
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('status', 'active')
     .is('team_space.deleted_at', null);
 

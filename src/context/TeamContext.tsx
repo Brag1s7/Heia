@@ -76,7 +76,7 @@ export function TeamProvider({children}: PropsWithChildren) {
       setLoading(true);
     }
     try {
-      const memberships = await getUserMemberships();
+      const memberships = await getUserMemberships(userId);
       loadedForRef.current = userId;
       applyMemberships(memberships);
     } catch {

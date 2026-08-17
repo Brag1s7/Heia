@@ -58,7 +58,7 @@ export function AuthProvider({children}: PropsWithChildren) {
   // Hent profil når session endres
   useEffect(() => {
     if (userId) {
-      getProfile()
+      getProfile(userId)
         .then(setProfile)
         .catch(() => setProfile(null));
     } else {
@@ -175,7 +175,7 @@ export function AuthProvider({children}: PropsWithChildren) {
   const refreshProfile = useCallback(async () => {
     if (!userId) return;
     try {
-      setProfile(await getProfile());
+      setProfile(await getProfile(userId));
     } catch {
       // Profilen på skjermen er fortsatt gyldig — la den stå.
     }

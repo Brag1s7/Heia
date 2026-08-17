@@ -1,6 +1,7 @@
 import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
+import {getUserId, getUserIdOrNull} from './authUser';
 import {acquireChannel} from '../realtimeChannels';
 import {FEED_MEDIA_BUCKET, primeMediaUrls} from '../media/resolver';
 import type {MediaRef} from '../media/types';
@@ -129,9 +130,14 @@ function mapFeedRow(row: any): FeedItem {
   };
 }
 
-/** Henter ekte lag-feed via get_team_feed RPC (nyeste først, pinned øverst). */
+/**
+ * Henter ekte lag-feed via get_team_feed RPC (nyeste først, pinned øverst).
+ * `myUserId` kommer fra kallerens context (P5) — feeden er den varmeste
+ * lesestien, og skal ikke betale en auth-rundtur for å vite hvem du er.
+ */
 export async function getTeamFeed(
   teamSpaceId: string,
+  myUserId?: string,
   limit = 20,
 ): Promise<FeedItem[]> {
   const {data, error} = await supabase.rpc('get_team_feed', {
@@ -170,14 +176,12 @@ export async function getTeamFeed(
   // get_team_feed sier hvor mange som har reagert, men ikke om JEG har det.
   // Én ekstra spørring (RLS lar meg se lagets reaksjoner) markerer mine.
   if (items.length > 0) {
-    const {
-      data: {user},
-    } = await supabase.auth.getUser();
-    if (user) {
+    const userId = myUserId ?? (await getUserIdOrNull());
+    if (userId) {
       const {data: mine} = await supabase
         .from('reactions')
         .select('feed_post_id')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .eq('emoji', HEIA_EMOJI)
         .in(
           'feed_post_id',
@@ -293,19 +297,14 @@ export async function toggleReaction(
   postId: string,
   currentlyReacted: boolean,
 ): Promise<void> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   if (currentlyReacted) {
     const {error} = await supabase
       .from('reactions')
       .delete()
       .eq('feed_post_id', postId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('emoji', HEIA_EMOJI);
     if (error) {
       throw error;
@@ -313,7 +312,7 @@ export async function toggleReaction(
   } else {
     const {error} = await supabase.from('reactions').insert({
       feed_post_id: postId,
-      user_id: user.id,
+      user_id: userId,
       emoji: HEIA_EMOJI,
     });
     if (error) {
@@ -340,16 +339,11 @@ export async function createTextPost(
     throw new Error('Tom melding');
   }
 
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   const {error} = await supabase.from('feed_posts').insert({
     team_space_id: teamSpaceId,
-    author_id: user.id,
+    author_id: userId,
     type: 'melding',
     content: trimmed,
     is_pinned: pinned,
@@ -386,22 +380,17 @@ export async function createImagePost({
   /** Fester bildet til ett øyeblikk i kampen. Krever `eventId`. */
   matchEventId?: string;
 }): Promise<void> {
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   const trimmed = content.trim();
 
-  const mediaId = await uploadTeamImage(teamSpaceId, image, user.id);
+  const mediaId = await uploadTeamImage(teamSpaceId, image, userId);
 
   const {data: postRow, error: postError} = await supabase
     .from('feed_posts')
     .insert({
       team_space_id: teamSpaceId,
-      author_id: user.id,
+      author_id: userId,
       type: 'bilde',
       content: trimmed,
       is_pinned: pinned,

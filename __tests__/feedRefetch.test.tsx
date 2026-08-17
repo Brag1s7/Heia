@@ -99,6 +99,12 @@ jest.mock('../src/lib/supabase', () => {
         getUser: jest.fn(() =>
           Promise.resolve({data: {user: {id: 'user-1'}}, error: null}),
         ),
+        getSession: jest.fn(() =>
+          Promise.resolve({
+            data: {session: {user: {id: 'user-1'}}},
+            error: null,
+          }),
+        ),
       },
       storage: {
         from: jest.fn(() => storageApi),
@@ -275,9 +281,10 @@ test('TeamHome med bilde i feeden: signering er ÉN batch, reactions ÉN runde',
     ['ts-1/1722900000000-ab12cd34.jpg'],
     expect.anything(),
   );
-  // … og «har JEG reagert» = én getUser + ÉN reactions-spørring for hele
-  // feeden, aldri én per post.
-  expect(supabase.auth.getUser).toHaveBeenCalledTimes(1);
+  // … og «har JEG reagert» = ÉN reactions-spørring for hele feeden, aldri
+  // én per post — og INGEN auth-rundtur: id-en kommer fra context (fase A,
+  // P5; getUser er fjernet fra hele kodebasen).
+  expect(supabase.auth.getUser).not.toHaveBeenCalled();
   expect(supabase.from).toHaveBeenCalledTimes(3); // 2× events + 1× reactions
   expect(supabase.from).toHaveBeenCalledWith('reactions');
 

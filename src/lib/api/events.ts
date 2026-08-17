@@ -1,4 +1,5 @@
 import {supabase} from '../supabase';
+import {getUserIdOrNull} from './authUser';
 import {acquireChannel} from '../realtimeChannels';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {EditableEvent} from '../../shared/eventForm';
@@ -119,13 +120,10 @@ async function getRsvpSummaries(
     summaries.set(id, emptyRsvp());
   }
 
-  const [
-    {
-      data: {user},
-    },
-    {data, error},
-  ] = await Promise.all([
-    supabase.auth.getUser(),
+  // Lokal sesjonslesing, ikke getUser-rundtur (P5): id-en brukes kun til å
+  // plukke «min» rad i minnet — RLS har alt avgjort hva vi får se.
+  const [myUserId, {data, error}] = await Promise.all([
+    getUserIdOrNull(),
     supabase
       .from('event_rsvps')
       .select('event_id, user_id, child_id, status')
@@ -144,7 +142,7 @@ async function getRsvpSummaries(
     else if (row.status === 'kan_ikke') summary.notComing += 1;
     else summary.pending += 1;
 
-    if (user && row.user_id === user.id && row.child_id === null) {
+    if (myUserId && row.user_id === myUserId && row.child_id === null) {
       summary.myStatus = row.status as RSVPStatus;
     }
   }

@@ -1,5 +1,6 @@
 import {supabase} from '../supabase';
 import {getTeamMembers, type TeamMember} from './members';
+import {getUserId} from './authUser';
 import {HEIA_EMOJI} from './feed';
 import {primeMediaUrls} from '../media/resolver';
 import type {FeedComment, FeedItem} from '../../shared/types';
@@ -144,16 +145,11 @@ export async function createComment(
     throw new Error('Tom kommentar');
   }
 
-  const {
-    data: {user},
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('Not authenticated');
-  }
+  const userId = await getUserId();
 
   const {error} = await supabase.from('comments').insert({
     feed_post_id: postId,
-    author_id: user.id,
+    author_id: userId,
     content: trimmed,
   });
 

@@ -180,7 +180,7 @@ export function TeamHomeScreen() {
     );
     try {
       const [items, live, events, support] = await Promise.all([
-        getTeamFeed(activeTeamSpaceId),
+        getTeamFeed(activeTeamSpaceId, myId),
         livePromise,
         eventsPromise,
         supportPromise,
@@ -202,7 +202,7 @@ export function TeamHomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTeamSpaceId]);
+  }, [activeTeamSpaceId, myId]);
 
   // FOKUS-bundet lasting + abonnement (fase A, F19-fiksen): en TeamHome bak
   // kampsiden eller en annen fane skal hverken lytte eller refetche. Ved
