@@ -1,0 +1,37 @@
+# Fase B3 — CI-kallvaktene (P9 lag 5 / P13 exit-kriteriet
+# «regresjonstestene grønne i CI på hver PR»).
+#
+# Kjører KUN JS-laget: tsc (typene sjekkes ellers bare i editoren),
+# jest (inkl. regresjonsvaktene for kall-antall fra A0) og eslint.
+# Ingen native bygg her — pod install/Xcode er bevisst utenfor CI
+# (etablert arbeidsregel: native bygges manuelt av Brage).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  js:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer avhengigheter
+        run: npm ci
+
+      - name: Typer (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Tester (jest, inkl. kall-antall-vaktene)
+        run: npx jest --ci
+
+      - name: Lint (eslint)
+        run: npm run lint

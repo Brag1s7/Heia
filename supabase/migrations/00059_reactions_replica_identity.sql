@@ -1,0 +1,24 @@
+-- ============================================================
+-- 00059_reactions_replica_identity.sql
+-- Fase B3 — payload-kontrakten (P6 i EGRESS-MEDIA-ARKITEKTUR).
+--
+-- REPLICA IDENTITY FULL på reactions gjør to ting:
+--   1. DELETE-payloaden over Realtime får med seg hele raden
+--      (feed_post_id + user_id), så klienten kan justere telleren
+--      lokalt uten refetch.
+--   2. Realtime kan RLS-filtrere DELETE-events (lukker H4 i
+--      auditen: uten full identitet kan DELETE ikke policy-
+--      sjekkes og slippes til alle abonnenter).
+--
+-- 00025 sa bevisst nei til REPLICA IDENTITY FULL — det var riktig
+-- da (refetch-modellen trengte det ikke). P6 reverserer beslutningen
+-- for reactions ALENE: comments er soft-delete (UPDATE) og trenger
+-- det ikke; feed_posts payload-appliseres på UPDATE/DELETE som
+-- allerede bærer raden via sin default-identitet + payload.
+--
+-- Kostnad: WAL-raden for UPDATE/DELETE på reactions bærer hele den
+-- gamle raden (4 små kolonner — neglisjerbart).
+-- Reversering: ALTER TABLE public.reactions REPLICA IDENTITY DEFAULT;
+-- ============================================================
+
+ALTER TABLE public.reactions REPLICA IDENTITY FULL;
