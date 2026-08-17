@@ -449,17 +449,29 @@ export async function getMatchPhotos(eventId: string): Promise<MatchPhoto[]> {
   const rows = (data || []) as any[];
   if (rows.length === 0) return [];
 
-  // Én oppvarmingsbatch (P4) — MediaImage leser fra cachen. RPC-en (00028)
-  // returnerer ikke thumbnail_path; thumb-varianten faller tilbake til path.
-  await primeMediaUrls(rows.map(r => r.storage_path as string));
-
-  return rows.map(r => ({
+  const photos = rows.map(r => ({
     id: r.post_id as string,
-    media: {path: r.storage_path as string},
+    media: {
+      path: r.storage_path as string,
+      // 00061. Mangler den (eldre opplastinger før B1-thumbs, eller RPC-en
+      // fra 00028 mot en gammel klient) faller thumb-varianten til path.
+      thumbPath: (r.thumbnail_path as string | null) ?? null,
+    },
     caption: (r.content as string) || undefined,
     authorName: (r.author_name as string) ?? 'Ukjent',
     authorAvatarUrl: (r.author_avatar as string) ?? undefined,
     createdAt: new Date(r.created_at),
     matchEventId: (r.match_event_id as string) ?? undefined,
   }));
+
+  // Én oppvarmingsbatch (P4) for begge variantene — kampforløpet og railen
+  // leser thumb, galleriet display. MediaImage treffer cachen for begge.
+  const paths: string[] = [];
+  for (const photo of photos) {
+    paths.push(photo.media.path);
+    if (photo.media.thumbPath) paths.push(photo.media.thumbPath);
+  }
+  await primeMediaUrls(paths);
+
+  return photos;
 }

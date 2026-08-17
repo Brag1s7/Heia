@@ -39,9 +39,21 @@ import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam, useNotifications} from '../context';
-import {getTeamMembers, type TeamMember} from '../lib/api/members';
+import type {TeamMember} from '../lib/api/members';
+import {useTeamMembers} from '../lib/queries/members';
 import {
-  getEventDetail,
+  eventDetailKey,
+  invalidateEventDetail,
+  invalidateMatchPhotos,
+  markEventDetailStale,
+  markMatchPhotosStale,
+  matchPhotosKey,
+  patchEventDetail,
+  useEventDetail,
+  useMatchPhotos,
+} from '../lib/queries/eventDetail';
+import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
+import {
   getTournamentMatches,
   setRsvp,
   setMatchCancelled,
@@ -51,7 +63,7 @@ import {
   subscribeToMatch,
   type ReportMatchEventInput,
 } from '../lib/api/events';
-import {createImagePost, getMatchPhotos, type MatchPhoto} from '../lib/api/feed';
+import {createImagePost, type MatchPhoto} from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
 import {dayRangeLabel} from '../shared/calendar';
@@ -60,13 +72,17 @@ import type {
   EventAttendee,
   EventType,
   HeiaEvent,
-  HeiaEventDetail,
   HomeStackParamList,
   RSVPStatus,
   RSVPSummary,
 } from '../shared/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
+
+// Stabile tomme referanser: `?? []` ville gitt railens FlatList ny data-ref
+// hver render (minuttickeren re-rendrer skjermen hvert 30. sekund på live).
+const NO_MEMBERS: TeamMember[] = [];
+const NO_PHOTOS: MatchPhoto[] = [];
 
 const dayNamesLong = [
   'Søndag',
@@ -198,12 +214,15 @@ export function EventDetailScreen({route, navigation}: Props) {
 
   const teamName = activeTeamSpace?.displayName ?? '';
 
-  const [event, setEvent] = useState<HeiaEventDetail | null>(null);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // B2: hendelsen bor i query-cachen (P7-nøkkelen ['event', id]).
+  // Redigeringsmodal-fella fra 2026-08-07 (lukker seg tilbake hit med gammel
+  // dato) dekkes nå av invalideringen: updateEvent invaliderer ['event', id]
+  // i api-laget, og observeren her står montert under modalen og refetcher
+  // straks — uavhengig av fokus-broens 60 s-regel.
+  const eventQuery = useEventDetail(eventId, activeTeamSpaceId);
+  const event = eventQuery.data ?? null;
+  const refetchEvent = eventQuery.refetch;
 
-  const [myStatus, setMyStatus] = useState<RSVPStatus>('venter');
   const [savingRsvp, setSavingRsvp] = useState(false);
   const [savingReporter, setSavingReporter] = useState(false);
   const [savingAction, setSavingAction] = useState(false);
@@ -214,39 +233,9 @@ export function EventDetailScreen({route, navigation}: Props) {
   const [selectedActionType, setSelectedActionType] =
     useState<ReporterActionType>('mål_oss');
   const [savingCancelled, setSavingCancelled] = useState(false);
-  const [reporterId, setReporterId] = useState<string | undefined>(undefined);
   const [pendingPhoto, setPendingPhoto] = useState<PickedImage | null>(null);
   const [publishingPhoto, setPublishingPhoto] = useState(false);
-  const [matchPhotos, setMatchPhotos] = useState<MatchPhoto[]>([]);
   const [galleryPhotoId, setGalleryPhotoId] = useState<string | null>(null);
-
-  const loadEvent = useCallback(async () => {
-    if (!activeTeamSpaceId) {
-      setLoading(false);
-      return;
-    }
-    setError(null);
-    try {
-      const detail = await getEventDetail(eventId, activeTeamSpaceId);
-      setEvent(detail);
-      setMyStatus(detail.rsvp.myStatus);
-      setReporterId(detail.reporterId);
-    } catch {
-      setError('Kunne ikke laste hendelsen.');
-    } finally {
-      setLoading(false);
-    }
-  }, [eventId, activeTeamSpaceId]);
-
-  // ⚠️ Ved FOKUS, ikke ved mount. Redigeringsmodalen lukker seg tilbake hit
-  // (2026-08-07), og med en ren mount-effekt ville siden stått igjen med den
-  // gamle datoen etter at man nettopp hadde flyttet den. Første fokus skjer
-  // sammen med monteringen, så åpningen er uendret.
-  useFocusEffect(
-    useCallback(() => {
-      loadEvent();
-    }, [loadEvent]),
-  );
 
   // Turnering: kampene lastes for seg og refetches ved fokus — «Ny kamp»
   // lukker modalen tilbake hit, og å komme tilbake fra en kamp skal vise
@@ -270,49 +259,37 @@ export function EventDetailScreen({route, navigation}: Props) {
     }, [isTournament, loadTournamentMatches]),
   );
 
-  // Medlemslisten brukes kun av kampreporter-UI-et, så vi henter den først når
-  // vi vet at hendelsen er en kamp — en trening skal ikke koste et RPC-kall.
-  // Feiler den, lever resten av skjermen videre: `reporter` faller tilbake på
-  // et navnløst medlem i stedet for å påstå at rollen er ledig.
+  // Medlemslisten brukes kun av kampreporter-UI-et, så den hentes først når
+  // vi vet at hendelsen er en kamp — en trening skal ikke koste et RPC-kall
+  // (null → enabled: false). Cachen deler 5 min-staleTime med de andre
+  // medlemsflatene. Feiler den, lever resten av skjermen videre: `reporter`
+  // faller tilbake på et navnløst medlem i stedet for å påstå at rollen er
+  // ledig.
   const isMatchEvent = event?.matchSessionId != null;
-  useEffect(() => {
-    if (!activeTeamSpaceId || !isMatchEvent) return;
+  const teamMembers =
+    useTeamMembers(isMatchEvent ? activeTeamSpaceId : null).data ?? NO_MEMBERS;
 
-    let cancelled = false;
-    getTeamMembers(activeTeamSpaceId)
-      .then(members => {
-        if (!cancelled) setTeamMembers(members);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTeamSpaceId, isMatchEvent]);
-
-  // Kampbilder. Feiler kallet lever resten av kampsiden videre — et manglende
-  // bilde skal aldri stå i veien for stillingen.
-  const loadPhotos = useCallback(async () => {
-    if (!isMatchEvent) return;
-    try {
-      setMatchPhotos(await getMatchPhotos(eventId));
-    } catch {
-      // Stille: stripa vises bare når det finnes bilder.
-    }
-  }, [eventId, isMatchEvent]);
-
-  // Fokus, ikke mount: skjermen kan stå montert i en bakgrunnsstack
-  // (EventDetail finnes i tre stacks) — den skal ikke hente bilder derfra.
-  useFocusEffect(
-    useCallback(() => {
-      loadPhotos();
-    }, [loadPhotos]),
-  );
+  // Kampbilder — egen query-sti (P6-splitten): et mål re-laster aldri
+  // bildene. Feiler den, lever kampsiden videre (isError ignoreres bevisst —
+  // stripa vises bare når det finnes bilder).
+  const photosQuery = useMatchPhotos(eventId, isMatchEvent);
+  const matchPhotos = photosQuery.data ?? NO_PHOTOS;
+  const refetchPhotos = photosQuery.refetch;
 
   // Kampen er i gang (også i pause — da telles minuttene fortsatt).
   const isUnderway =
     event?.matchStatus === 'live' || event?.matchStatus === 'halfTime';
   const liveMatchSessionId = isUnderway ? event?.matchSessionId : undefined;
+
+  // Fokus-broen (B2): 60 s-regelen fra P6. (Skjermen refetchet før ved HVERT
+  // fokus — dette er selve kallbesparelsen i skiven.) Live-kampens behov for
+  // ferskvare løses IKKE med lavere staleMs her — en staleMs som flipper når
+  // kampen blir live, re-fyrer fokus-effekten og ga dobbelhenting ved åpning
+  // (adversariell review 2026-08-17, bevist med ekte timere). I stedet
+  // markerer realtime-oppryddingen under cachen stale ved blur: broen ser
+  // `isInvalidated` ved retur og resyncer straks, uansett 60 s-regelen.
+  useScreenFocusRefetch(eventDetailKey(eventId));
+  useScreenFocusRefetch(matchPhotosKey(eventId));
 
   // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
   // ville stillingen stått stille til hun selv dro for å oppdatere.
@@ -335,19 +312,32 @@ export function EventDetailScreen({route, navigation}: Props) {
       const unsubscribe = subscribeToMatch(liveMatchSessionId, eventId, {
         onMatchChange: () => {
           if (eventTimer) clearTimeout(eventTimer);
-          eventTimer = setTimeout(loadEvent, 400);
+          eventTimer = setTimeout(() => {
+            eventTimer = null;
+            invalidateEventDetail(eventId);
+          }, 400);
         },
         onPhotoPost: () => {
           if (photoTimer) clearTimeout(photoTimer);
-          photoTimer = setTimeout(loadPhotos, 400);
+          photoTimer = setTimeout(() => {
+            photoTimer = null;
+            invalidateMatchPhotos(eventId);
+          }, 400);
         },
       });
       return () => {
+        // Live-abonnementet rives (blur/unmount/statusbytte): fra nå av er
+        // appen DØV for kampen, så cachen markeres stale — UTEN å hente
+        // (F19: observeren står montert bak neste skjerm; markFeedStale-
+        // broen). Fokus-broen ser `isInvalidated` ved retur og resyncer
+        // straks — det som skjedde i mellomtiden kan aldri bli stående.
         if (eventTimer) clearTimeout(eventTimer);
         if (photoTimer) clearTimeout(photoTimer);
+        markEventDetailStale(eventId);
+        markMatchPhotosStale(eventId);
         unsubscribe();
       };
-    }, [liveMatchSessionId, eventId, loadEvent, loadPhotos]),
+    }, [liveMatchSessionId, eventId]),
   );
 
   // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
@@ -371,7 +361,7 @@ export function EventDetailScreen({route, navigation}: Props) {
     }, [watchedEventId, watchEvent]),
   );
 
-  if (loading) {
+  if (eventQuery.isLoading) {
     return (
       <View style={styles.screen}>
         <BackBar title="Hendelse" />
@@ -397,13 +387,17 @@ export function EventDetailScreen({route, navigation}: Props) {
     );
   }
 
-  if (error || !event) {
+  // Behold-ved-feil (samme regel som kalenderbolken): en feilet REFETCH river
+  // ikke ned en side som alt viser data — feilflaten er kun for tomt utfall.
+  if (!event) {
     return (
       <View style={styles.screen}>
         <BackBar title="Hendelse" />
         <View style={styles.centered}>
           <Text style={styles.emptyText}>
-            {error ?? 'Fant ikke hendelsen.'}
+            {eventQuery.isError
+              ? 'Kunne ikke laste hendelsen.'
+              : 'Fant ikke hendelsen.'}
           </Text>
         </View>
       </View>
@@ -423,6 +417,9 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Avlyst er en egen tilstand, ikke «ferdig»: kampen kan settes opp igjen.
   const isCancelledMatch =
     event.type === 'kamp' && event.matchStatus === 'cancelled';
+  // Optimistiske reporterbytter er alt patchet inn i cachen
+  // (handleSelectReporter) — event.reporterId ER visningsverdien.
+  const reporterId = event.reporterId;
   const isCurrentUserReporter = reporterId === currentUser?.id;
   // Samme rolleregel som is_team_admin() i RLS — en lagleder skal se det
   // samme som en trener.
@@ -450,9 +447,10 @@ export function EventDetailScreen({route, navigation}: Props) {
 
   const attendees = event.attendees;
 
-  // Serveren teller allerede mitt svar. Vis derfor mitt valg som en endring
-  // fra det lagrede svaret: trekk fra det gamle, legg til det nye.
-  const rsvp = applyMyStatus(event.rsvp, myStatus);
+  // Optimistiske RSVP-valg er alt patchet inn i cachen (handleRsvp), så
+  // event.rsvp ER visningstallene — ingen speil-state å regne sammen.
+  const rsvp = event.rsvp;
+  const myStatus = rsvp.myStatus;
 
   // Nøyaktig én knapp er fremhevet av gangen, og den valgte skal skifte flate —
   // ikke bare ramme. `secondary` og `ghost` er begge gjennomsiktige, så et
@@ -467,19 +465,28 @@ export function EventDetailScreen({route, navigation}: Props) {
         : 'secondary';
   const notComingVariant = myStatus === 'kan_ikke' ? 'selected' : 'ghost';
 
-  // Svaret vises med én gang og lagres i bakgrunnen. Refetchen etterpå er det
-  // som får deg inn i oppmøtelisten — den kan vi ikke gjette oss til lokalt.
+  // Svaret vises med én gang (optimistisk patch — applyMyStatus flytter
+  // telleren i cachen) og lagres i bakgrunnen. setRsvp invaliderer
+  // ['event', id] i api-laget, og refetchen derfra er det som får deg inn i
+  // oppmøtelisten — den kan vi ikke gjette oss til lokalt.
   const handleRsvp = async (status: RSVPStatus) => {
     if (savingRsvp || status === myStatus) return;
 
     const previous = myStatus;
-    setMyStatus(status);
+    patchEventDetail(eventId, d => ({
+      ...d,
+      rsvp: applyMyStatus(d.rsvp, status),
+    }));
     setSavingRsvp(true);
     try {
       await setRsvp(eventId, status);
-      await loadEvent();
     } catch {
-      setMyStatus(previous);
+      // applyMyStatus tilbake til forrige svar er eksakt revers av patchen —
+      // og en no-op hvis en mellomlandet refetch alt viser serverens fasit.
+      patchEventDetail(eventId, d => ({
+        ...d,
+        rsvp: applyMyStatus(d.rsvp, previous),
+      }));
       Alert.alert(
         'Kunne ikke lagre svaret',
         'Sjekk nettforbindelsen og prøv igjen.',
@@ -504,8 +511,9 @@ export function EventDetailScreen({route, navigation}: Props) {
       if (savingCancelled) return;
       setSavingCancelled(true);
       try {
+        // setMatchCancelled invaliderer ['event', id] selv — refetchen som
+        // flipper statusen er alt i gang når kallet returnerer.
         await setMatchCancelled(eventId, next);
-        await loadEvent();
       } catch (e) {
         Alert.alert(
           next ? 'Kunne ikke avlyse kampen' : 'Kunne ikke sette den opp igjen',
@@ -541,7 +549,9 @@ export function EventDetailScreen({route, navigation}: Props) {
     setStartingMatch(true);
     try {
       await startMatch(eventId);
-      await loadEvent();
+      // start_match har ingen invalidering i api-laget — hent selv (refetch
+      // hopper over staleTime), så skjermen flipper til live-modus nå.
+      await refetchEvent();
     } catch (e) {
       Alert.alert(
         'Kunne ikke starte kampen',
@@ -574,7 +584,7 @@ export function EventDetailScreen({route, navigation}: Props) {
       // Ingen banner til reporteren: hun trykket nettopp knappen, og ser
       // stillingen og kampforløpet oppdatere seg. Varselet går til de andre,
       // via realtime-abonnementet lenger oppe.
-      await loadEvent();
+      await refetchEvent();
     } catch (e) {
       Alert.alert(
         'Kunne ikke rapportere',
@@ -643,7 +653,7 @@ export function EventDetailScreen({route, navigation}: Props) {
         matchEventId,
       });
       setPendingPhoto(null);
-      await loadPhotos();
+      await refetchPhotos();
     } catch {
       Alert.alert(
         'Kunne ikke legge ut bildet',
@@ -654,9 +664,9 @@ export function EventDetailScreen({route, navigation}: Props) {
     }
   };
 
-  // Samme mønster som handleRsvp: vis valget med én gang, lagre, refetch.
-  // `loadEvent` svelger sine egne feil, så catch-en fyrer kun når selve
-  // skrivingen feiler — rollbacken kan ikke bli falsk-positiv.
+  // Samme mønster som handleRsvp: vis valget med én gang (optimistisk patch),
+  // lagre, refetch. `refetch` svelger sine egne feil, så catch-en fyrer kun
+  // når selve skrivingen feiler — rollbacken kan ikke bli falsk-positiv.
   const handleSelectReporter = async (userId: string) => {
     setReporterSheetVisible(false);
     if (savingReporter || userId === reporterId || !event.matchSessionId) {
@@ -664,16 +674,17 @@ export function EventDetailScreen({route, navigation}: Props) {
     }
 
     const previous = reporterId;
-    setReporterId(userId);
+    patchEventDetail(eventId, d => ({...d, reporterId: userId}));
     setSavingReporter(true);
     try {
       await setMatchReporter(event.matchSessionId, userId);
-      // Ingen banner: `setReporterId` over har allerede oppdatert ReporterBar
-      // med det nye navnet. Banneret er for nyheter fra andre, ikke et ekko
-      // av det du selv nettopp gjorde.
-      await loadEvent();
+      // Ingen banner: patchen over har allerede oppdatert ReporterBar med
+      // det nye navnet. Banneret er for nyheter fra andre, ikke et ekko av
+      // det du selv nettopp gjorde. setMatchReporter invaliderer ikke selv
+      // — refetch her, så neste åpning ikke leser et utdatert navn.
+      await refetchEvent();
     } catch {
-      setReporterId(previous);
+      patchEventDetail(eventId, d => ({...d, reporterId: previous}));
       Alert.alert(
         'Kunne ikke bytte kampreporter',
         'Sjekk nettforbindelsen og prøv igjen.',

@@ -98,9 +98,43 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   MatchTimeline rendrer ALLE kampbilder i display-variant i EventDetails
   ytre ScrollView — ta den i event-detalj-skiven.
 
-**GJENSTÅR I B:** B2 event-detalj-skiven (EventDetailScreen over på
-queries + MatchTimeline-virtualisering/thumb-variant, se punktet over),
-B3 payload-realtime (P6-tabellen) + Sentry,
+- ✅ B2 event-detalj-skiven (2026-08-17): EventDetailScreen over på
+  query-cachen (`src/lib/queries/eventDetail.ts`, P7-nøklene
+  `['event', id]` + `['matchPhotos', id]`); optimistisk RSVP/reporter som
+  CACHE-patch (`patchEventDetail`, patchFeedItem-mønsteret — speil-staten
+  myStatus/reporterId er borte); fokus-broen med 60 s-regelen — live-
+  kampens ferskvare løses IKKE med staleMs 0 (en staleMs som flipper
+  re-fyrer fokus-effekten → dobbelhenting ved åpning av live kamp;
+  FUNNET av adversariell review, bevist med ekte timere), men ved at
+  realtime-OPPRYDDINGEN alltid markerer begge nøklene stale (refetchType
+  'none'): appen er døv for kampen fra blur-øyeblikket, broen ser
+  `isInvalidated` ved retur og resyncer straks (B3-status-callbacks
+  løser reconnect-hullet ordentlig);
+  redigeringsmodal-fella dekkes av updateEvents invalidering (observeren
+  står montert under modalen). setMatchReporter/startMatch/
+  reportMatchEvent invaliderer IKKE i api-laget — skjermen refetcher
+  eksplisitt (bevisst: samme som før, vurder api-invalidering i B3).
+  Turneringskamplisten står BEVISST imperativt (P7-avgrensningen).
+  EGRESS-FIKSEN: MatchTimeline + MatchEventRow over på thumb-variant
+  (display bor kun i galleriet) + **migrasjon 00061** — get_match_photos
+  returnerer nå thumbnail_path (uten den falt thumb STILLE tilbake til
+  2048px-masteren; railen fra feed-skiven hadde samme hull!); DROP+CREATE
+  med gjenskapte 00060-grants. **00061 er PUSHET TIL PROD 2026-08-17**
+  (`supabase db push`, verifisert med `supabase migration list`).
+  getMatchPhotos primer begge varianter i én batch. NY VAKT:
+  `__tests__/eventDetailRefetch.test.tsx` (trening = 1 RPC og gjenåpning
+  innen 60 s = 0; ferdig kamp = 3 RPC + thumb-bevis for BEGGE
+  renderstiene — MatchEventRow og timelinens frittstående gren; live =
+  én kanal, burst = én event-refetch og INGEN bilde-refetch). Testtriks:
+  TanStacks notifyManager varsler via setTimeout → `flushWaves()` for
+  avhengige queries, og den flytter klokka 1 ms per runde — med frossen
+  klokke er vakten blind for tid-avhengige dobbelhentinger. Adversariell
+  review kjørt (to bekreftede funn, begge fikset: dobbelhenting ved
+  staleMs-flip + utestet MatchEventRow-thumb). ⚠️ Reviewen kostet
+  ~1,15 M tokens i subagenter og traff sesjonstaket — bruk LETTERE
+  review på småskiver fremover. Suiten grønn (154), lint ren.
+
+**GJENSTÅR I B:** B3 payload-realtime (P6-tabellen) + Sentry,
 B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
 compressor-thumb → uploadAsync; Brage kjører pod install + nytt
 dev-bygg). Deretter: PR + merge når GitHub virker, TestFlight (A+B),
