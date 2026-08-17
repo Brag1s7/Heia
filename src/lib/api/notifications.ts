@@ -31,17 +31,42 @@ function scopeToTeam(teamSpaceId: string): string {
   return `team_space_id.eq.${teamSpaceId},team_space_id.is.null`;
 }
 
-/** Egne varsler for det aktive laget, nyeste først. */
+export interface GetNotificationsOpts {
+  limit?: number;
+  /** Keyset bakover: kun rader ELDRE enn dette (paginering på scroll). */
+  before?: Date;
+  /** Keyset fremover: kun rader NYERE enn dette (inkrementell resync, B2). */
+  after?: Date;
+}
+
+/**
+ * Egne varsler for det aktive laget, nyeste først.
+ *
+ * `before`/`after` er rene klient-filtre på `created_at` — ingen RPC trengs,
+ * og indeksen idx_notifications_user_all (00013: user_id, created_at DESC)
+ * dekker begge. Strikt `<`/`>` betyr at rader med identisk timestamp på en
+ * sidegrense kan hoppes over (triggere skriver flere rader i samme
+ * transaksjon) — flettingen deduper på id, og neste fulle last rydder opp.
+ * Merk at team-scopet (inkl. null-grenen for systemvarsler) alltid står PÅ
+ * begge filtrene — de kombineres med AND av PostgREST.
+ */
 export async function getNotifications(
   teamSpaceId: string,
-  limit = 50,
+  {limit = 50, before, after}: GetNotificationsOpts = {},
 ): Promise<HeiaNotification[]> {
-  const {data, error} = await supabase
+  let query = supabase
     .from('notifications')
     .select(
       'id, category, title, body, data, read_at, created_at, team_space_id',
     )
-    .or(scopeToTeam(teamSpaceId))
+    .or(scopeToTeam(teamSpaceId));
+  if (before) {
+    query = query.lt('created_at', before.toISOString());
+  }
+  if (after) {
+    query = query.gt('created_at', after.toISOString());
+  }
+  const {data, error} = await query
     .order('created_at', {ascending: false})
     .limit(limit);
 

@@ -1,5 +1,5 @@
-import React from 'react';
-import {View, Text, Pressable, ScrollView, StyleSheet} from 'react-native';
+import React, {useCallback} from 'react';
+import {View, Text, Pressable, FlatList, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius} from '../theme';
 import {MediaImage} from '../lib/media/MediaImage';
 import type {MatchPhoto} from '../lib/api/feed';
@@ -9,14 +9,40 @@ interface MatchPhotoRailProps {
   onPressPhoto: (photo: MatchPhoto) => void;
 }
 
+const photoKeyExtractor = (photo: MatchPhoto) => photo.id;
+
+// Gapet bor i separatoren, ikke i contentContainer-gap (B2): virtualiserte
+// celler + container-gap gir små offsetfeil når celler av- og påmonteres.
+const ThumbGap = () => <View style={styles.thumbGap} />;
+
 /**
  * Kompakt inngang til kampens bilder — kun på ferdigspilte kamper.
  *
  * Under kampen ville den konkurrert med stillingen og kampforløpet, som er
  * det man er der for. Etterpå snur det: da er bildene det man kom tilbake
  * for, mens forløpet er konteksten. Bildene blir uansett stående i forløpet.
+ *
+ * FlatList med windowSize 3 (B2): en kamp med mange bilder laster bare de
+ * synlige thumbene (+ ett viewport hver vei), ikke hele railen ved mount.
  */
 export function MatchPhotoRail({photos, onPressPhoto}: MatchPhotoRailProps) {
+  const renderThumb = useCallback(
+    ({item}: {item: MatchPhoto}) => (
+      <Pressable
+        onPress={() => onPressPhoto(item)}
+        style={({pressed}) => [styles.thumb, pressed && styles.pressed]}>
+        {/* 96 pt-rute → thumb-varianten (480 px holder i massevis). */}
+        <MediaImage
+          media={item.media}
+          variant="thumb"
+          style={styles.thumbImage}
+          resizeMode="cover"
+        />
+      </Pressable>
+    ),
+    [onPressPhoto],
+  );
+
   if (photos.length === 0) return null;
 
   return (
@@ -27,25 +53,18 @@ export function MatchPhotoRail({photos, onPressPhoto}: MatchPhotoRailProps) {
           {photos.length === 1 ? '1 bilde' : `${photos.length} bilder`}
         </Text>
       </View>
-      <ScrollView
+      <FlatList
+        data={photos}
+        renderItem={renderThumb}
+        keyExtractor={photoKeyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.rail}>
-        {photos.map(photo => (
-          <Pressable
-            key={photo.id}
-            onPress={() => onPressPhoto(photo)}
-            style={({pressed}) => [styles.thumb, pressed && styles.pressed]}>
-            {/* 96 pt-rute → thumb-varianten (480 px holder i massevis). */}
-            <MediaImage
-              media={photo.media}
-              variant="thumb"
-              style={styles.thumbImage}
-              resizeMode="cover"
-            />
-          </Pressable>
-        ))}
-      </ScrollView>
+        contentContainerStyle={styles.rail}
+        ItemSeparatorComponent={ThumbGap}
+        windowSize={3}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+      />
     </View>
   );
 }
@@ -69,7 +88,9 @@ const styles = StyleSheet.create({
   },
   rail: {
     paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
+  },
+  thumbGap: {
+    width: spacing.sm,
   },
   thumb: {
     width: 96,

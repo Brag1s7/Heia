@@ -66,9 +66,41 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   Kalenderbolkens regler fulgt: kun datalaget rørt, behold-ved-feil
   bevart (keepPreviousData + isError-mapping). Suiten grønn (141).
 
-**GJENSTÅR I B:** B2 skjermene (feed useInfiniteQuery+FlatList,
-event-detalj, notifications inkrementell,
-galleri windowSize 3), B3 payload-realtime (P6-tabellen) + Sentry,
+- ✅ B2 feed-skiven (2026-08-17): feeden over på `useInfiniteQuery`
+  (`src/lib/queries/feed.ts`; cursor-parameteren fra 00029 endelig i bruk,
+  nøkkel = låste `['feed', ts]`); pinned-fellene løst i REN modul
+  `src/shared/feedPaging.ts` (cursor = eldste U-pinnede rad, dedupe på id
+  på tvers av sider) med egen testfil. TeamHome er FlatList: compose i
+  ListHeaderComponent som ELEMENT (remount-fella), memoisert `FeedRow` med
+  stabile callbacks, onEndReached → neste side, optimistiske oppdateringer
+  (👏/unpin/slett) via `patchFeedItem`/`removeFeedItem` rett i cachen;
+  fokus-resync = 60 s-regelen + NY `markFeedStale`-bro (blur midt i
+  realtime-debouncen markerer stale uten fetch — F19 består, og
+  `useScreenFocusRefetch` resyncer straks ved retur via `isInvalidated`).
+  Inbox er FlatList (blokk-granularitet: kort/kampkort/overskrift) med
+  inkrementell henting: `getNotifications` fikk `{before, after}`,
+  realtime-burst henter kun nyere-enn-nyeste, eldre sider pagineres på
+  scroll, `mergeNotifications` (shared/inbox) deduper med readAt-vern
+  (nedgraderer aldri lokal lest-markering); hull-vakt (disjunkt topp-50 →
+  nullstill, aldri flett over et usynlig gap) + generasjonsvern mot
+  lagbytte-/reset-racer. Galleri + kampbilde-rail er FlatList med
+  windowSize 3. KALLBUDSJETT-VAKTEN feedRefetch.test.tsx passerte
+  UENDRET (åpning 2 rpc + 2 events + 1 kanal; burst = én refetch, rpc 4 /
+  from 3). Suiten grønn (151), lint ren. Adversariell review kjørt;
+  bekreftede funn fikset (hull-vakten, generasjonsvernet, readAt-vernet,
+  markFeedStale, LayoutAnimation-gating). AKSEPTERTE kjente grenser,
+  dokumentert i kode: ms-trunkert cursor uten id-tiebreaker (fiks = ny
+  RPC-signatur + gjenskapte 00060-grants, tas ved observasjon); refetch av
+  ALLE lastede sider ved invalidering (dyp scroll × realtime — `maxPages`
+  er knappen hvis det svir, men den klipper synlig liste); Android-clipping
+  av composeren i ListHeader (removeClippedSubviews-default — irrelevant
+  før Android-runden). NESTE EGRESS-KANDIDAT funnet i kartleggingen:
+  MatchTimeline rendrer ALLE kampbilder i display-variant i EventDetails
+  ytre ScrollView — ta den i event-detalj-skiven.
+
+**GJENSTÅR I B:** B2 event-detalj-skiven (EventDetailScreen over på
+queries + MatchTimeline-virtualisering/thumb-variant, se punktet over),
+B3 payload-realtime (P6-tabellen) + Sentry,
 B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
 compressor-thumb → uploadAsync; Brage kjører pod install + nytt
 dev-bygg). Deretter: PR + merge når GitHub virker, TestFlight (A+B),

@@ -135,18 +135,26 @@ function mapFeedRow(row: any): FeedItem {
 }
 
 /**
- * Henter ekte lag-feed via get_team_feed RPC (nyeste først, pinned øverst).
- * `myUserId` kommer fra kallerens context (P5) — feeden er den varmeste
- * lesestien, og skal ikke betale en auth-rundtur for å vite hvem du er.
+ * Henter ÉN side av lag-feeden via get_team_feed RPC (nyeste først, pinned
+ * øverst). `myUserId` kommer fra kallerens context (P5) — feeden er den
+ * varmeste lesestien, og skal ikke betale en auth-rundtur for å vite hvem
+ * du er.
+ *
+ * `cursor` (B2) er keyset-parameteren RPC-en har hatt siden 00029: kun rader
+ * med `created_at < cursor`. Cursor-VALGET og pinned-fellene bor i
+ * `shared/feedPaging` — dette laget sender bare verdien videre.
  */
 export async function getTeamFeed(
   teamSpaceId: string,
   myUserId?: string,
   limit = 20,
+  cursor?: string,
 ): Promise<FeedItem[]> {
   const {data, error} = await supabase.rpc('get_team_feed', {
     ts_id: teamSpaceId,
     lim: limit,
+    // Utelates på første side — RPC-ens DEFAULT NULL betyr «fra toppen».
+    ...(cursor ? {cursor} : {}),
   });
 
   if (error) {

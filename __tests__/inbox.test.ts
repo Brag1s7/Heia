@@ -1,4 +1,9 @@
-import {buildEntries, groupByAge, mapNotificationRow} from '../src/shared/inbox';
+import {
+  buildEntries,
+  groupByAge,
+  mapNotificationRow,
+  mergeNotifications,
+} from '../src/shared/inbox';
 import {matchEventLine, stripLeadingGlyph} from '../src/shared/matchCopy';
 
 // ---------------------------------------------------------------------------
@@ -455,5 +460,76 @@ describe('Varsler — bolkene', () => {
       'I dag',
       'Tidligere',
     ]);
+  });
+});
+
+describe('Varsler — inkrementell fletting (B2)', () => {
+  const at = (id: string, iso: string, readAt: string | null = null) =>
+    mapNotificationRow({
+      id,
+      category: 'system',
+      title: 't',
+      body: 'b',
+      read_at: readAt,
+      created_at: iso,
+      team_space_id: 'ts-1',
+      data: {},
+    });
+
+  it('fletter nyere rader inn øverst (realtime-resync)', () => {
+    const existing = [
+      at('b', '2026-08-06T18:00:00Z'),
+      at('a', '2026-08-06T17:00:00Z'),
+    ];
+    const fresh = [at('c', '2026-08-06T19:00:00Z')];
+
+    expect(mergeNotifications(existing, fresh).map(n => n.id)).toEqual([
+      'c',
+      'b',
+      'a',
+    ]);
+  });
+
+  it('fletter eldre sider inn nederst (paginering)', () => {
+    const existing = [
+      at('c', '2026-08-06T19:00:00Z'),
+      at('b', '2026-08-06T18:00:00Z'),
+    ];
+    const older = [at('a', '2026-08-06T17:00:00Z')];
+
+    expect(mergeNotifications(existing, older).map(n => n.id)).toEqual([
+      'c',
+      'b',
+      'a',
+    ]);
+  });
+
+  it('deduper på id — den innkommende raden vinner (ferskest readAt)', () => {
+    // Sidegrense-overlapp og fokus-resync leverer rader lista alt har;
+    // serverens versjon skal vinne, for det er den som vet at raden er lest.
+    const existing = [
+      at('b', '2026-08-06T18:00:00Z', null),
+      at('a', '2026-08-06T17:00:00Z'),
+    ];
+    const fresh = [
+      at('c', '2026-08-06T19:00:00Z'),
+      at('b', '2026-08-06T18:00:00Z', '2026-08-06T18:30:00Z'),
+    ];
+
+    const merged = mergeNotifications(existing, fresh);
+    expect(merged.map(n => n.id)).toEqual(['c', 'b', 'a']);
+    expect(merged[1].readAt?.toISOString()).toBe('2026-08-06T18:30:00.000Z');
+  });
+
+  it('nedgraderer ALDRI en lokal lest-markering til ulest', () => {
+    // Tidslinjen vernet dekker: bruker trykker raden (lokal readAt=now,
+    // markAsRead i flukt) mens en fokus-henting alt var ute — snapshotet
+    // dens bærer read_at=null fra FØR skrivet committet.
+    const existing = [at('b', '2026-08-06T18:00:00Z', '2026-08-06T18:30:00Z')];
+    const fresh = [at('b', '2026-08-06T18:00:00Z', null)];
+
+    const merged = mergeNotifications(existing, fresh);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].readAt?.toISOString()).toBe('2026-08-06T18:30:00.000Z');
   });
 });

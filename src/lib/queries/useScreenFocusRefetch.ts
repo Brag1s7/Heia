@@ -30,7 +30,15 @@ export function useScreenFocusRefetch(
       if (state?.fetchStatus === 'fetching') {
         return;
       }
-      if (!state?.dataUpdatedAt || Date.now() - state.dataUpdatedAt > staleMs) {
+      // `isInvalidated` = noen har markert queryen stale uten å hente
+      // (refetchType 'none' — f.eks. en realtime-hendelse som traff i
+      // blur-øyeblikket). Da vet appen at data ER utdatert, og 60 s-regelen
+      // skal ikke utsette resyncen.
+      if (
+        state?.isInvalidated ||
+        !state?.dataUpdatedAt ||
+        Date.now() - state.dataUpdatedAt > staleMs
+      ) {
         queryClient.invalidateQueries({queryKey: key});
       }
     }, [keyHash, staleMs]),
