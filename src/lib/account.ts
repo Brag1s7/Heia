@@ -5,6 +5,7 @@ import {
   deleteAccount,
 } from './api';
 import {clearMediaUrlCache} from './media/resolver';
+import {queryClient} from './queries/queryClient';
 
 // Skjermnære modul-cacher (f.eks. «Min støtte» i ProfilScreen) registrerer
 // seg her ved modul-last. account.ts kan ikke importere fra screens/ selv —
@@ -35,6 +36,9 @@ export async function clearLocalCaches(): Promise<void> {
   }
   clearOpsAdminCache();
   clearPaymentManagerCache();
+  // Query-cachen bærer feed/medlemmer/varsler — personlige data som ikke
+  // skal overleve til neste bruker på samme enhet (samme P1-funn som over).
+  queryClient.clear();
   await clearMediaUrlCache();
 }
 

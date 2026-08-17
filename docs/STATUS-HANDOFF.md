@@ -29,13 +29,34 @@ mergen (blokkert av GitHub-trøbbel den kvelden, ikke av oss):**
   Backfill-miljøet (sharp/tsx) ble satt opp i scratchpad, IKKE i
   prosjektets node_modules (Metro kjørte).
 
-**GJENSTÅR, i rekkefølge:** (1) PR Brage→main + merge når GitHub virker
-igjen (PR opprettes eksplisitt når Brage sier fra), (2) TestFlight-bygg,
-(3) les av exit-kriteriet: dags-egress −80 %+ innen 48 t etter
-flåteoppdatering, feedåpning ≤ 6 kall, cached > uncached i Usage.
-**Deretter Fase B** (B1 media/expo-image, B2 TanStack+FlatList, B3
-payload-realtime+sikkerhet+Sentry+CI) — Brage har sagt at B tas i en NY
-samtale.
+**FASE B ER PÅBEGYNT 2026-08-17** (Brages beslutning: GitHub var nede,
+og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
+
+- ✅ B3 grunnmur: migrasjon 00059 (REPLICA IDENTITY FULL på reactions)
+  + 00060 (alle P10 må+bør-fiksene) + `.github/workflows/ci.yml`.
+  Migrasjonene er committet, IKKE kjørt mot prod ennå (`supabase db push`
+  når Brage sier fra — begge er trygge for dagens app).
+- ✅ B2 fundament: @tanstack/react-query 5.101.4 installert;
+  `src/lib/queries/` (queryClient med P6-defaults 60 s/retry 1, låste
+  P7-queryKeys, members-query); QueryClientProvider + focusManager i
+  App.tsx; `queryClient.clear()` i clearLocalCaches;
+  CommentsScreen-medlemsdubletten fjernet via `ensureQueryData`.
+  Suiten grønn (141), lint ren (kun gamle kjente advarsler).
+- Kartleggingsnotater (fra agentkart 2026-08-17): `get_team_feed` har
+  UBRUKT cursor-param (klar for useInfiniteQuery); stillingen ligger
+  komplett i match_sessions-payload; INGEN kanaler har status-callbacks
+  (payload-først MÅ få resync-ved-SUBSCRIBED samtidig, ellers tapes
+  hendelser ved reconnect); getTeamEvents mangler {from,to,limit};
+  notifications-paginering krever nytt `before`-argument; TeamHome/
+  Inbox/galleri er ScrollView (B2 gjør dem til FlatList).
+
+**GJENSTÅR I B:** B2 skjermene (feed useInfiniteQuery+FlatList,
+events-deling Hjem/Kalender, event-detalj, notifications inkrementell,
+galleri windowSize 3), B3 payload-realtime (P6-tabellen) + Sentry,
+B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
+compressor-thumb → uploadAsync; Brage kjører pod install + nytt
+dev-bygg). Deretter: PR + merge når GitHub virker, TestFlight (A+B),
+exit-avlesning (−80 % egress; P13-lista).
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
