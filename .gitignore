@@ -84,3 +84,6 @@ yarn-error.log
 # Python (scripts/)
 __pycache__/
 *.pyc
+
+# Backfill-manifester (lokale spor til media-originalene - skal ikke i git)
+scripts/backfill-manifest-*.json
