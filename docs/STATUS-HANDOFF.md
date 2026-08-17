@@ -1,11 +1,45 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: FASE A ER BYGGET — BASELINE + TELEFONTEST GJENSTÅR FØR MERGE
+## ▶️ NESTE SAMTALE: KUN MERGE + TESTFLIGHT GJENSTÅR AV FASE A — SÅ FASE B
+
+**Status 2026-08-17 kveld — alt av Fase A-arbeid er FERDIG unntatt selve
+mergen (blokkert av GitHub-trøbbel den kvelden, ikke av oss):**
+
+- ✅ **Telefontestet OK** (Brage 2026-08-17): «Alt ser ut til å fungere
+  helt fint på telefon.»
+- ✅ **Bucket-limits SATT og verifisert** (via Storage-API med
+  service-nøkkel): feed-media 10 MiB, club-logos 2 MiB, begge låst til
+  image/jpeg+png+webp+heic. (Var helt åpne før — global 50 MiB.)
+- ✅ **Backfill KJØRT med `--apply`**: 38/38 bilder konvertert, 0 feil.
+  Snitt 2,4 MB → 479 kB (~5×), alle rader har thumbnail_path. Manifest:
+  `scripts/backfill-manifest-2026-08-17T150558.json` (gitignorert — TA
+  VARE PÅ DEN til pre-launch-beslutningen om originalene). SAFEGUARD
+  holdt: originalobjektene står urørt i bucketen. NB: gamle TestFlight-
+  klienter får ALLEREDE de lette variantene (de signerer storage_path
+  ferskt), så egressen skal synke i Usage før mergen også.
+- ✅ **Baseline regnes som dekket**: Q1–Q7 ble kjørt og verifisert mot
+  ekte edge_logs 2026-08-12 (Management-API), H1 og H2 er bevist med
+  tall. Hovedbeviset for exit-kriteriet leses uansett av
+  Usage→Bandwidth-HISTORIKKEN (før/etter). Valgfritt, ikke blokkerende:
+  et kvelds-snapshot av Q1–Q7 før TestFlight-bygget skipper.
+- 🔧 **Praktisk**: Supabase-CLI-en på maskinen er innlogget mot
+  prosjektet (`supabase projects list` virker). Service-nøkkelen hentes
+  med `supabase projects api-keys --project-ref sswncdrbsrfieudkdmhj`
+  — slik ble både bucket-limits og backfillen kjørt uten dashboard.
+  Backfill-miljøet (sharp/tsx) ble satt opp i scratchpad, IKKE i
+  prosjektets node_modules (Metro kjørte).
+
+**GJENSTÅR, i rekkefølge:** (1) PR Brage→main + merge når GitHub virker
+igjen (PR opprettes eksplisitt når Brage sier fra), (2) TestFlight-bygg,
+(3) les av exit-kriteriet: dags-egress −80 %+ innen 48 t etter
+flåteoppdatering, feedåpning ≤ 6 kall, cached > uncached i Usage.
+**Deretter Fase B** (B1 media/expo-image, B2 TanStack+FlatList, B3
+payload-realtime+sikkerhet+Sentry+CI) — Brage har sagt at B tas i en NY
+samtale.
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
-`git log`). Suiten er grønn (8 filer, 141 tester), lint ren. IKKE
-telefontestet, IKKE merget. Innholdet:
+`git log`). Suiten er grønn (8 filer, 141 tester), lint ren. Innholdet:
 
 - **A0** — netMetrics + skjermattribusjon + regresjonsvakter +
   auditdokumentene (var bygget 7. aug, nå committet).
@@ -35,31 +69,9 @@ telefontestet, IKKE merget. Innholdet:
   `--apply` for alvor; manifest med original→variant er gitignorert).
   SAFEGUARD står: originalobjektene slettes ALDRI av scriptet.
 
-**Brages håndgrep — i denne rekkefølgen:**
-1. **Baseline FØR merge** (A0s exit-kriterium — beviset for effekten):
-   Q1–Q7 + curl-testen i `docs/audit-observability.md` (alle queriene er
-   verifisert kjørbare 2026-08-12; ⚠️ tidsvindu ≤ 24 t, kjør en kveld
-   etter reell bruk; Q3/cf_cache_status beviser H1; media-SQL alt kjørt:
-   H2 BEKREFTET — 33 jpg, snitt 3588 px/2,4 MB), Usage→Bandwidth-avlesning,
-   skriptet brukerreise på telefonen (dev-bygg, `netMetrics.dump()` — nå
-   finnes også `imageMetrics.dump()` for bilderepetisjon), rapportmalen.
-2. **Telefontest av Fase A** (dev-bygg fra Brage-branchen): feed med
-   bilder, kampside live (mål = 1 refetch, 0 bildelastinger i
-   `imageMetrics`), «scroll feeden to ganger → 0 nye bildenedlastinger»,
-   logg ut/inn, EXIF-orientering på nytt opplastet bilde (pickeren
-   resizer nå).
-3. **Bucket-limits via dashboard/Management API** (IKKE SQL): feed-media
-   10 MiB + image/jpeg,png,webp,heic; club-logos 2 MiB + bildetyper.
-4. **Backfill**: `npm install --no-save sharp tsx`, kjør scriptet uten
-   flagg (tørrkjøring), så med `--apply`. Trygt før eller etter merge —
-   originalene røres ikke, og gamle appversjoner får bare lettere filer.
-5. Merge (PR opprettes eksplisitt når du sier fra), TestFlight, og les
-   av exit-kriteriet: dags-egress −80 %+ innen 48 t etter flåteoppdatering;
-   feedåpning ≤ 6 kall; cached > uncached-trend i Usage.
-
-**Deretter: Fase B** (launch-fundamentet, 3 PR-er — B1 media/expo-image,
-B2 TanStack+FlatList, B3 payload-realtime+sikkerhet+Sentry+CI) når A er
-verifisert stabil på TestFlight. Fase C er terskelstyrt — bygg ingenting.
+(Den gamle femtrinnslista over håndgrep er UTFØRT per 2026-08-17 —
+se statusblokka øverst. Kun merge → TestFlight → exit-avlesning står
+igjen. Fase C er fortsatt terskelstyrt — bygg ingenting.)
 
 Dokumentene: `docs/IMPLEMENTATION_HANDOFF.md` (rekkefølge/safeguard),
 `docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md` (P1–P13 + faseplan).
