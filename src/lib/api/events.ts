@@ -1,4 +1,5 @@
 import {supabase} from '../supabase';
+import {acquireChannel} from '../realtimeChannels';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {EditableEvent} from '../../shared/eventForm';
 import type {
@@ -613,11 +614,19 @@ export async function reportMatchEvent(
 }
 
 /**
- * Lytter på en pågående kamp og kaller `onChange` når noe skjer.
+ * Lytter på en pågående kamp. To adskilte callbacks (P6-splitten):
+ * `onMatchChange` for stilling/forløp, `onPhotoPost` KUN for nye kampbilder.
  *
- * Vi refetcher i stedet for å flette inn payloaden: en `match_events`-INSERT
- * må uansett inn i kampforløpet i riktig rekkefølge, og en refetch kan ikke
- * komme ut av synk med serveren. Realtime respekterer RLS, så bare lagets
+ * Splitten er halve realtime-hygienen: `report_match_event` skriver tre
+ * tabeller i én transaksjon (match_events + match_sessions + feed-posten),
+ * så ett mål ga tre meldinger — og før dette utløste hver av dem BÅDE
+ * event-refetch og re-lasting av alle kampbilder (F18). Nå treffer et mål
+ * kun `onMatchChange` (kalleren debouncer tre meldinger til én refetch),
+ * og bare et faktisk bilde (`type = 'bilde'`) rører fotostien.
+ *
+ * Vi refetcher fortsatt i stedet for å flette inn payloaden: en
+ * `match_events`-INSERT må uansett inn i kampforløpet i riktig rekkefølge.
+ * Payload-først kommer i B (P6). Realtime respekterer RLS, så bare lagets
  * medlemmer får hendelsene.
  *
  * Returnerer en oppryddingsfunksjon — kall den når skjermen forlates, ellers
@@ -626,48 +635,60 @@ export async function reportMatchEvent(
 export function subscribeToMatch(
   matchSessionId: string,
   eventId: string,
-  onChange: () => void,
+  handlers: {onMatchChange: () => void; onPhotoPost: () => void},
 ): () => void {
-  const channel = supabase
-    .channel(`match:${matchSessionId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'match_events',
-        filter: `match_session_id=eq.${matchSessionId}`,
-      },
-      () => onChange(),
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'match_sessions',
-        filter: `id=eq.${matchSessionId}`,
-      },
-      () => onChange(),
-    )
-    // Kampbilder er feed_posts med event_id (00028) — de rører verken
-    // match_events eller match_sessions, så uten denne dukket reporterens
-    // bilde først opp hos andre etter en manuell refresh.
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'feed_posts',
-        filter: `event_id=eq.${eventId}`,
-      },
-      () => onChange(),
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return acquireChannel(
+    `match:${matchSessionId}`,
+    (channel, emit) => {
+      channel
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'match_events',
+            filter: `match_session_id=eq.${matchSessionId}`,
+          },
+          () => emit({kind: 'match'}),
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'match_sessions',
+            filter: `id=eq.${matchSessionId}`,
+          },
+          () => emit({kind: 'match'}),
+        )
+        // Kampbilder er feed_posts med event_id (00028) — de rører verken
+        // match_events eller match_sessions, så uten denne dukket reporterens
+        // bilde først opp hos andre etter en manuell refresh. Målpostene
+        // (type match_event/resultat) kommer også hit — de gates bort på
+        // type, ellers ville hvert mål re-lastet alle kampbildene.
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'feed_posts',
+            filter: `event_id=eq.${eventId}`,
+          },
+          payload => {
+            if ((payload.new as any)?.type === 'bilde') {
+              emit({kind: 'photo'});
+            }
+          },
+        );
+    },
+    payload => {
+      if ((payload as {kind: string}).kind === 'photo') {
+        handlers.onPhotoPost();
+      } else {
+        handlers.onMatchChange();
+      }
+    },
+  );
 }
 
 function mapAttendees(rows: any): EventAttendee[] {

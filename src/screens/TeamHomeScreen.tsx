@@ -14,6 +14,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
+  useFocusEffect,
   useNavigation,
   useRoute,
   type NavigationProp,
@@ -203,27 +204,35 @@ export function TeamHomeScreen() {
     }
   }, [activeTeamSpaceId]);
 
-  // Last feed når aktivt lag endres.
-  useEffect(() => {
-    setLoading(true);
-    loadFeed();
-  }, [loadFeed]);
-
-  // Live feed (00025). Debounce: én burst med 👏 fra flere foreldre skal bli
-  // ÉN refetch, ikke ti. loadFeed setter ikke `loading`, så oppdateringen
-  // skjer uten at spinneren blinker.
-  useEffect(() => {
-    if (!activeTeamSpaceId) return;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const unsubscribe = subscribeToFeed(activeTeamSpaceId, () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(loadFeed, 400);
-    });
-    return () => {
-      if (timer) clearTimeout(timer);
-      unsubscribe();
-    };
-  }, [activeTeamSpaceId, loadFeed]);
+  // FOKUS-bundet lasting + abonnement (fase A, F19-fiksen): en TeamHome bak
+  // kampsiden eller en annen fane skal hverken lytte eller refetche. Ved
+  // fokus lastes ferskt (fanger det som skjedde mens skjermen var ubevoktet
+  // — abonnementet var jo nede), ved blur rives kanal og ventende debounce.
+  // Skjelettet vises kun første gang per lag; resync ved re-fokus er stille.
+  //
+  // Debounce på realtime (00025): én burst med 👏 fra flere foreldre skal
+  // bli ÉN refetch, ikke ti. loadFeed setter ikke `loading`, så
+  // oppdateringen skjer uten at spinneren blinker.
+  const loadedTeamRef = useRef<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeTeamSpaceId) return;
+      if (loadedTeamRef.current !== activeTeamSpaceId) {
+        loadedTeamRef.current = activeTeamSpaceId;
+        setLoading(true);
+      }
+      loadFeed();
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const unsubscribe = subscribeToFeed(activeTeamSpaceId, () => {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(loadFeed, 400);
+      });
+      return () => {
+        if (timer) clearTimeout(timer);
+        unsubscribe();
+      };
+    }, [activeTeamSpaceId, loadFeed]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

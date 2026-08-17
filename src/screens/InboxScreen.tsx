@@ -11,6 +11,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   useFocusEffect,
+  useIsFocused,
   useNavigation,
   type NavigationProp,
 } from '@react-navigation/native';
@@ -85,19 +86,41 @@ export function InboxScreen() {
     }
   }, [activeTeamSpaceId, refreshUnread]);
 
+  // Fokus-gating (fase A, F16-fiksen): skjermen står montert bak de andre
+  // fanene, og lastet før på HVERT varsel — også når ingen så på. Nå: last
+  // ved fokus (det dekker alt som kom mens skjermen var ubevoktet), og
+  // regn varslene frem til nå som håndtert.
+  const isFocused = useIsFocused();
+  const handledNonceRef = useRef(0);
+  const nonceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveNonceRef = useRef(liveNonce);
+  liveNonceRef.current = liveNonce;
+
   useFocusEffect(
     useCallback(() => {
+      handledNonceRef.current = liveNonceRef.current;
       load();
+      return () => {
+        if (nonceTimerRef.current) {
+          clearTimeout(nonceTimerRef.current);
+          nonceTimerRef.current = null;
+        }
+      };
     }, [load]),
   );
 
-  // Står du på skjermen når varselet kommer, skal raden dukke opp av seg selv.
-  // Kanalen bor i NotificationsContext — den teller opp liveNonce.
+  // Står du på skjermen når varselet kommer, skal raden dukke opp av seg
+  // selv. Kanalen bor i NotificationsContext — den teller opp liveNonce.
+  // Debounced: en burst (mål + kommentar i samme sekund) blir ÉN reload.
   useEffect(() => {
-    if (liveNonce > 0) {
+    if (!isFocused || liveNonce === handledNonceRef.current) return;
+    handledNonceRef.current = liveNonce;
+    if (nonceTimerRef.current) clearTimeout(nonceTimerRef.current);
+    nonceTimerRef.current = setTimeout(() => {
+      nonceTimerRef.current = null;
       load();
-    }
-  }, [liveNonce, load]);
+    }, 400);
+  }, [isFocused, liveNonce, load]);
 
   // Tikker kun når en kamp faktisk pågår — ingen timer i bakgrunnen ellers.
   useEffect(() => {

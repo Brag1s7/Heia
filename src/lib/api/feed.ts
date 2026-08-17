@@ -1,6 +1,7 @@
 import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
+import {acquireChannel} from '../realtimeChannels';
 import {FEED_MEDIA_BUCKET, primeMediaUrls} from '../media/resolver';
 import type {MediaRef} from '../media/types';
 import type {FeedItem, UserRole} from '../../shared/types';
@@ -253,33 +254,33 @@ export function subscribeToFeed(
   teamSpaceId: string,
   onChange: () => void,
 ): () => void {
-  const channel = supabase
-    .channel(`feed:${teamSpaceId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'feed_posts',
-        filter: `team_space_id=eq.${teamSpaceId}`,
-      },
-      () => onChange(),
-    )
-    .on(
-      'postgres_changes',
-      {event: '*', schema: 'public', table: 'reactions'},
-      () => onChange(),
-    )
-    .on(
-      'postgres_changes',
-      {event: '*', schema: 'public', table: 'comments'},
-      () => onChange(),
-    )
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
+  return acquireChannel(
+    `feed:${teamSpaceId}`,
+    (channel, emit) => {
+      channel
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'feed_posts',
+            filter: `team_space_id=eq.${teamSpaceId}`,
+          },
+          emit,
+        )
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'reactions'},
+          emit,
+        )
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'comments'},
+          emit,
+        );
+    },
+    () => onChange(),
+  );
 }
 
 /**
