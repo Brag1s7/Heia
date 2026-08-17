@@ -28,6 +28,7 @@ import {
   handleDeepLinkUrl,
 } from './deepLink';
 import {isTeamAdmin} from '../shared/roles';
+import {noteScreen} from '../lib/netMetrics';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
 import {NewEventScreen} from '../screens/NewEventScreen';
@@ -461,7 +462,14 @@ export function AppNavigator() {
     <NavigationContainer
       ref={navigationRef}
       theme={navTheme}
-      onReady={flushPendingDeepLink}>
+      onReady={() => {
+        // A0-skjermattribusjon (P9): netMetrics stempler hvert Supabase-kall
+        // med fokusert rute. Før dette punktet attribueres alt til
+        // «(oppstart)» — boot-kallene er et eget, interessant tall.
+        noteScreen(navigationRef.getCurrentRoute()?.name);
+        flushPendingDeepLink();
+      }}
+      onStateChange={() => noteScreen(navigationRef.getCurrentRoute()?.name)}>
       {session && profile && hasTeam ? (
         <MainTabs />
       ) : (

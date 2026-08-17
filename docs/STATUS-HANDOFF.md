@@ -1,10 +1,58 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: EGRESS
+## ▶️ NESTE SAMTALE: FASE A (EGRESS/MEDIA) — BASELINE MÅ DOKUMENTERES FØR A MERGES
 
-Brage 2026-08-07: neste tema er **egress**, og han kommer med instruksene
-selv i en lang melding. Ikke begynn å grave før den er lest — det er hans
-ramme som avgjør hva som skal måles.
+**Fase A0 er BYGGET og grønn 2026-08-07** (denne samtalen, ikke telefontestet):
+- `src/lib/netMetrics.ts` — fetch-interceptor (P9 lag 1) koblet inn via
+  `global.fetch` i `supabase.ts`: kall/kjente bytes/varighet/status per
+  normalisert endepunkt og per skjerm. Dev: per-kall-logg + `netMetrics.dump()`
+  i Metro-konsollen. Prod: kun aggregater i minnet — query-strengen (tokenet)
+  strippes ALLTID, og `__tests__/netMetrics.test.ts` beviser det ende til ende
+  (mutasjonstestet: rå URL inn i record() feiler suiten).
+- Skjermattribusjon i `AppNavigator.tsx` (`onReady`/`onStateChange` →
+  `noteScreen`); alt før navigatoren er klar telles som «(oppstart)».
+- `__tests__/feedRefetch.test.tsx` — regresjonsvakten (P9 lag 5):
+  TeamHome-åpning = NØYAKTIG 2 rpc + 2 events-spørringer + 1 kanal; burst på 5
+  realtime-hendelser = ÉN debounced refetch; hendelse rett før exit = INGEN
+  refetch etter unmount; med bilde i feeden = ÉN signeringsbatch + ÉN
+  reactions-runde. Alle tallene er mutasjonstestet.
+- `docs/audit-observability.md` (NY) — loggqueriene Q1–Q7 (fila Del V
+  refererte til men som aldri fantes), media-SQL, curl-testen av
+  Cache-Control på signerte URL-er, skriptet brukerreise og
+  baseline-rapportmalen. Adversarial review kjørt: 4 funn fikset (bl.a.
+  BigQuery-ulovlig æøå-alias i Q7), 5 avvist med begrunnelse.
+
+**Brages håndgrep før Fase A merges** (A0s exit-kriterium — baseline er
+beviset for effekten):
+1. Kjør Q1–Q7 + curl-testen i `docs/audit-observability.md`. **Alle queriene
+   er kjørt og verifisert mot prosjektets ekte logger 2026-08-12** (via
+   Management-API-et) — de virker som de står. ⚠️ Tidsvindu ≤ 24 t: utenfor
+   retensjonen gir Logs Explorer STILLE 0 rader, ingen feilmelding. Kjør dem
+   en kveld etter at flåten faktisk har brukt appen (12. aug var flåten
+   nesten idle: 172 requests, 1 storage-GET). Q3 (cf_cache_status) er den
+   som beviser/avkrefter rotårsak H1. **Media-SQL-en er allerede kjørt: H2
+   BEKREFTET** (33 jpg, snitt 3588 px / 2,4 MB — kameraoriginaler).
+2. Les av Settings → Usage → Bandwidth for perioden.
+3. Skriptet brukerreise på telefonen (dev-bygg) + `netMetrics.dump()`.
+4. Fyll inn rapportmalen nederst i `docs/audit-observability.md`.
+
+**Neste agent implementerer Fase A** (7 punkter i
+`docs/IMPLEMENTATION_HANDOFF.md`, hver = egen skipbar commit) — den kan
+BYGGES parallelt med at Brage måler, men merges først når baseline står.
+
+Start her, i denne rekkefølgen:
+1. `docs/IMPLEMENTATION_HANDOFF.md` — rekkefølge, låste beslutninger, safeguard.
+2. `docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md` — fullt beslutningsgrunnlag
+   (Del I audit m/fil:linje-bevis, Del II beslutningene P1–P13, Del III
+   faseplan m/exit-kriterier).
+
+Kortversjon av funnet: 9,5 GB egress/uke med 78 MB lagret skyldes fire
+multiplikatorer (ny signert URL per henting = 100 % cache-miss; 12
+MP-originaler uten varianter; realtime→full refetch; alt lastes uansett
+scroll). Fristen: mulig HTTP 402 fra 5. sept 2026 — Fase A skal være ute
+på TestFlight i god tid før det. Arkitekturplanen er **GODKJENT av Brage
+2026-08-07** (med én safeguard: eksisterende kameraoriginaler slettes
+IKKE — eksplisitt beslutning før launch).
 
 Redigeringsskiva før den er **GODKJENT OG VERIFISERT PÅ TELEFON av Brage
 2026-08-07** («det funker på telefon»), og migrasjon `00057` er i prod.
