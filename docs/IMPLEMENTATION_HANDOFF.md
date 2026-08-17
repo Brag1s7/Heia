@@ -3,9 +3,11 @@
 > Opprettet 7. aug 2026. Arkitekturplanen er **GODKJENT av Brage** (med én safeguard, se under).
 > Fullt beslutningsgrunnlag: [EGRESS-MEDIA-ARKITEKTUR-2026-08.md](EGRESS-MEDIA-ARKITEKTUR-2026-08.md)
 > (Del I = audit med fil:linje-bevis, Del II = beslutningene P1–P13, Del III = faseplan + exit-kriterier).
-> **Fase A0 er BYGGET 2026-08-07** (netMetrics + skjermattribusjon + regresjonstester +
-> [audit-observability.md](audit-observability.md) med Q1–Q7). Neste agent starter på **Fase A** —
-> men A merges ikke før Brage har fylt ut baseline-rapporten (se «Neste agent starter med»).
+> **Fase A0 er BYGGET 2026-08-07; hele Fase A (punkt 1–7) er BYGGET 2026-08-17** som
+> 8 skipbare commits på Brage-branchen (suite grønn, ikke telefontestet, ikke merget).
+> **GJENSTÅR før merge:** baseline-rapporten (Brage), telefontest, bucket-limits via
+> dashboard, backfill-kjøringen — se [STATUS-HANDOFF.md](STATUS-HANDOFF.md) for
+> rekkefølgen. Deretter: **Fase B** når A er verifisert stabil på TestFlight.
 
 ## Hvorfor (én setning)
 

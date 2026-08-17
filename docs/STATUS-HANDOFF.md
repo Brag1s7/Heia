@@ -1,56 +1,75 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ NESTE SAMTALE: FASE A (EGRESS/MEDIA) — BASELINE MÅ DOKUMENTERES FØR A MERGES
+## ▶️ NESTE SAMTALE: FASE A ER BYGGET — BASELINE + TELEFONTEST GJENSTÅR FØR MERGE
 
-**Fase A0 er BYGGET og grønn 2026-08-07** (denne samtalen, ikke telefontestet):
-- `src/lib/netMetrics.ts` — fetch-interceptor (P9 lag 1) koblet inn via
-  `global.fetch` i `supabase.ts`: kall/kjente bytes/varighet/status per
-  normalisert endepunkt og per skjerm. Dev: per-kall-logg + `netMetrics.dump()`
-  i Metro-konsollen. Prod: kun aggregater i minnet — query-strengen (tokenet)
-  strippes ALLTID, og `__tests__/netMetrics.test.ts` beviser det ende til ende
-  (mutasjonstestet: rå URL inn i record() feiler suiten).
-- Skjermattribusjon i `AppNavigator.tsx` (`onReady`/`onStateChange` →
-  `noteScreen`); alt før navigatoren er klar telles som «(oppstart)».
-- `__tests__/feedRefetch.test.tsx` — regresjonsvakten (P9 lag 5):
-  TeamHome-åpning = NØYAKTIG 2 rpc + 2 events-spørringer + 1 kanal; burst på 5
-  realtime-hendelser = ÉN debounced refetch; hendelse rett før exit = INGEN
-  refetch etter unmount; med bilde i feeden = ÉN signeringsbatch + ÉN
-  reactions-runde. Alle tallene er mutasjonstestet.
-- `docs/audit-observability.md` (NY) — loggqueriene Q1–Q7 (fila Del V
-  refererte til men som aldri fantes), media-SQL, curl-testen av
-  Cache-Control på signerte URL-er, skriptet brukerreise og
-  baseline-rapportmalen. Adversarial review kjørt: 4 funn fikset (bl.a.
-  BigQuery-ulovlig æøå-alias i Q7), 5 avvist med begrunnelse.
+**Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
+Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
+`git log`). Suiten er grønn (8 filer, 141 tester), lint ren. IKKE
+telefontestet, IKKE merget. Innholdet:
 
-**Brages håndgrep før Fase A merges** (A0s exit-kriterium — baseline er
-beviset for effekten):
-1. Kjør Q1–Q7 + curl-testen i `docs/audit-observability.md`. **Alle queriene
-   er kjørt og verifisert mot prosjektets ekte logger 2026-08-12** (via
-   Management-API-et) — de virker som de står. ⚠️ Tidsvindu ≤ 24 t: utenfor
-   retensjonen gir Logs Explorer STILLE 0 rader, ingen feilmelding. Kjør dem
-   en kveld etter at flåten faktisk har brukt appen (12. aug var flåten
-   nesten idle: 172 requests, 1 storage-GET). Q3 (cf_cache_status) er den
-   som beviser/avkrefter rotårsak H1. **Media-SQL-en er allerede kjørt: H2
-   BEKREFTET** (33 jpg, snitt 3588 px / 2,4 MB — kameraoriginaler).
-2. Les av Settings → Usage → Bandwidth for perioden.
-3. Skriptet brukerreise på telefonen (dev-bygg) + `netMetrics.dump()`.
-4. Fyll inn rapportmalen nederst i `docs/audit-observability.md`.
+- **A0** — netMetrics + skjermattribusjon + regresjonsvakter +
+  auditdokumentene (var bygget 7. aug, nå committet).
+- **A1** — `src/lib/media/` (P4): MediaRef-kontrakten (UI ser aldri
+  leverandør-URL-er), resolver med signert-URL-cache (TTL 24 t,
+  AsyncStorage, 6 t-fornyingsmargin, inflight-dedupe, prefiks-purge),
+  `primeMediaUrls` = ÉN signeringsbatch per skjermlast, `MediaImage`
+  (innebygd lastemåling + onError-fornying 1/min/path) på alle 6
+  bildeflater. Ny vakt: `__tests__/mediaResolver.test.ts`.
+- **A2** — pickeren resizer til 2048 px/q0.85 (P2-masteren, låst).
+- **A3** — `cacheControl` ved upload: 86400 feed-media / 31536000
+  club-logos (P1, kan ikke endres i etterkant).
+- **A4** — realtime-hygiene: subscribeToMatch SPLITTET (score vs. bilde,
+  gatet på payload-type) + debounce i EventDetail; fokus-gating på
+  TeamHome/EventDetail/Inbox; INSERT-gate FØR refetch i
+  NotificationsContext; kanal-registry (`src/lib/realtimeChannels.ts`).
+- **A5** — `auth.getUser()` fjernet fra alle 9 kallsteder (P5):
+  `getUserId()`/`getUserIdOrNull()` i `src/lib/api/authUser.ts` for
+  skrivene, id som parameter fra context for lesestiene
+  (`getProfile(userId)`, `getUserMemberships(userId)`,
+  `getTeamFeed(ts, myId)`); AppState-styrt start/stopAutoRefresh i App.tsx.
+- **A6** — livssyklus: `clearLocalCaches()` i account.ts kalles fra selve
+  `signOut` i UserContext (WelcomeIntent-lekkasjen tett); deletePost
+  invaliderer URL-cachen; TeamContext resyncer memberships ved AppState
+  active og purger lag-prefikset ved medlemskapstap.
+- **A7** — `scripts/backfill-media-variants.ts` (tørrkjøring default,
+  `--apply` for alvor; manifest med original→variant er gitignorert).
+  SAFEGUARD står: originalobjektene slettes ALDRI av scriptet.
 
-**Neste agent implementerer Fase A** (7 punkter i
-`docs/IMPLEMENTATION_HANDOFF.md`, hver = egen skipbar commit) — den kan
-BYGGES parallelt med at Brage måler, men merges først når baseline står.
+**Brages håndgrep — i denne rekkefølgen:**
+1. **Baseline FØR merge** (A0s exit-kriterium — beviset for effekten):
+   Q1–Q7 + curl-testen i `docs/audit-observability.md` (alle queriene er
+   verifisert kjørbare 2026-08-12; ⚠️ tidsvindu ≤ 24 t, kjør en kveld
+   etter reell bruk; Q3/cf_cache_status beviser H1; media-SQL alt kjørt:
+   H2 BEKREFTET — 33 jpg, snitt 3588 px/2,4 MB), Usage→Bandwidth-avlesning,
+   skriptet brukerreise på telefonen (dev-bygg, `netMetrics.dump()` — nå
+   finnes også `imageMetrics.dump()` for bilderepetisjon), rapportmalen.
+2. **Telefontest av Fase A** (dev-bygg fra Brage-branchen): feed med
+   bilder, kampside live (mål = 1 refetch, 0 bildelastinger i
+   `imageMetrics`), «scroll feeden to ganger → 0 nye bildenedlastinger»,
+   logg ut/inn, EXIF-orientering på nytt opplastet bilde (pickeren
+   resizer nå).
+3. **Bucket-limits via dashboard/Management API** (IKKE SQL): feed-media
+   10 MiB + image/jpeg,png,webp,heic; club-logos 2 MiB + bildetyper.
+4. **Backfill**: `npm install --no-save sharp tsx`, kjør scriptet uten
+   flagg (tørrkjøring), så med `--apply`. Trygt før eller etter merge —
+   originalene røres ikke, og gamle appversjoner får bare lettere filer.
+5. Merge (PR opprettes eksplisitt når du sier fra), TestFlight, og les
+   av exit-kriteriet: dags-egress −80 %+ innen 48 t etter flåteoppdatering;
+   feedåpning ≤ 6 kall; cached > uncached-trend i Usage.
 
-Start her, i denne rekkefølgen:
-1. `docs/IMPLEMENTATION_HANDOFF.md` — rekkefølge, låste beslutninger, safeguard.
-2. `docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md` — fullt beslutningsgrunnlag
-   (Del I audit m/fil:linje-bevis, Del II beslutningene P1–P13, Del III
-   faseplan m/exit-kriterier).
+**Deretter: Fase B** (launch-fundamentet, 3 PR-er — B1 media/expo-image,
+B2 TanStack+FlatList, B3 payload-realtime+sikkerhet+Sentry+CI) når A er
+verifisert stabil på TestFlight. Fase C er terskelstyrt — bygg ingenting.
+
+Dokumentene: `docs/IMPLEMENTATION_HANDOFF.md` (rekkefølge/safeguard),
+`docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md` (P1–P13 + faseplan).
 
 Kortversjon av funnet: 9,5 GB egress/uke med 78 MB lagret skyldes fire
 multiplikatorer (ny signert URL per henting = 100 % cache-miss; 12
 MP-originaler uten varianter; realtime→full refetch; alt lastes uansett
-scroll). Fristen: mulig HTTP 402 fra 5. sept 2026 — Fase A skal være ute
-på TestFlight i god tid før det. Arkitekturplanen er **GODKJENT av Brage
+scroll). Fase A fjerner de tre første; virtualisering (nr. 4) kommer i B2.
+Fristen: mulig HTTP 402 fra 5. sept 2026 — Fase A skal være ute på
+TestFlight i god tid før det. Arkitekturplanen er **GODKJENT av Brage
 2026-08-07** (med én safeguard: eksisterende kameraoriginaler slettes
 IKKE — eksplisitt beslutning før launch).
 
