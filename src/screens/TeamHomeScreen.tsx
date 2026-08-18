@@ -45,6 +45,9 @@ import {
   removeFeedItem,
   invalidateFeed,
   markFeedStale,
+  adjustFeedItemCounts,
+  applyFeedPostUpdate,
+  refetchFeedFirstPage,
 } from '../lib/queries/feed';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {tournamentTitleFor} from '../shared/calendarList';
@@ -272,21 +275,77 @@ export function TeamHomeScreen() {
   // kanal og ventende debounce. Feedens fokus-RESYNC eies nå av
   // useScreenFocusRefetch (60 s-regelen) — heroene hentes fortsatt per fokus.
   //
-  // Debounce på realtime (00025): én burst med 👏 fra flere foreldre skal
-  // bli ÉN refetch, ikke ti. invalidateFeed refetcher via cachen uten å
-  // røre skjelett-tilstanden, så oppdateringen skjer uten spinner-blink.
+  // Payload-først (B3, P6-tabellen): 👏 og kommentarer justerer tellerne
+  // RETT i cachen (null kall — før kostet en 👏-burst full refetch + heroer),
+  // post-endringer patcher/fjerner raden, og kun et NYTT innlegg havner i
+  // debouncen (00025: én burst = ÉN henting) — som nå henter KUN side 1.
+  // Full invalidering er igjen for to unntak: fallback (payload manglet
+  // felter — hygienen fra A som sikkerhetsnett) og resync (kanalen har vært
+  // nede; hendelser kan være tapt, P6-reconnect-raden).
   useFocusEffect(
     useCallback(() => {
       if (!activeTeamSpaceId) return;
       loadHeroes();
       let timer: ReturnType<typeof setTimeout> | null = null;
-      const unsubscribe = subscribeToFeed(activeTeamSpaceId, () => {
+      // 'full' slår 'top': har én hendelse i vinduet krevd full refetch,
+      // skal debouncen ikke nedgradere den til en side 1-henting.
+      let pending: 'top' | 'full' = 'top';
+      const schedule = (mode: 'top' | 'full') => {
+        if (mode === 'full') pending = 'full';
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           timer = null;
-          invalidateFeed(activeTeamSpaceId);
+          if (pending === 'full') {
+            invalidateFeed(activeTeamSpaceId);
+          } else {
+            refetchFeedFirstPage(activeTeamSpaceId, myId);
+          }
+          pending = 'top';
+          // Heroene (live kamp + lagkassa) rir kun på post-hendelser:
+          // match_start/-end/resultat ER feed-poster, mens en 👏 aldri
+          // endrer dem.
           loadHeroes();
         }, 400);
+      };
+      const unsubscribe = subscribeToFeed(activeTeamSpaceId, myId, evt => {
+        switch (evt.kind) {
+          case 'reaction':
+            adjustFeedItemCounts(activeTeamSpaceId, evt.postId, {
+              heia: evt.delta,
+            });
+            break;
+          case 'commentDelta':
+            adjustFeedItemCounts(activeTeamSpaceId, evt.postId, {
+              comments: evt.delta,
+            });
+            break;
+          case 'postUpdate': {
+            const applied = applyFeedPostUpdate(activeTeamSpaceId, evt.row);
+            // pinChanged: pinnede poster resorteres øverst (00029) — en
+            // patch-in-place kan ikke flytte raden, så side 1 må hentes.
+            // miss + is_pinned: posten ligger utenfor lastede sider men
+            // hører nå hjemme øverst — samme henting dekker den.
+            if (
+              applied === 'pinChanged' ||
+              (applied === 'miss' && evt.row.is_pinned)
+            ) {
+              schedule('top');
+            }
+            break;
+          }
+          case 'postNew':
+            schedule('top');
+            break;
+          case 'fallback':
+            schedule('full');
+            break;
+          case 'resync':
+            // Reconnect er sjeldent og alvorlig (tapte hendelser) — hent
+            // straks, uten debounce.
+            invalidateFeed(activeTeamSpaceId);
+            loadHeroes();
+            break;
+        }
       });
       return () => {
         if (timer) {
@@ -299,7 +358,7 @@ export function TeamHomeScreen() {
         }
         unsubscribe();
       };
-    }, [activeTeamSpaceId, loadHeroes]),
+    }, [activeTeamSpaceId, loadHeroes, myId]),
   );
 
   const onRefresh = useCallback(() => {
@@ -372,8 +431,14 @@ export function TeamHomeScreen() {
       setSelectedImage(null);
       setBroadcast(false);
       await refetchFeed();
-    } catch {
-      Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
+    } catch (e: any) {
+      // Dev-bygg viser årsaken rett i alerten (upload-helperen legger
+      // serverens svar i meldingen); prod beholder den rolige varianten.
+      if (__DEV__) console.warn('[compose] publisering feilet:', e);
+      Alert.alert(
+        'Kunne ikke publisere',
+        __DEV__ && e?.message ? String(e.message) : 'Prøv igjen om litt.',
+      );
     } finally {
       setPosting(false);
     }

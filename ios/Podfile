@@ -1,3 +1,4 @@
+require File.join(File.dirname(`node --print "require.resolve('expo/package.json')"`), "scripts/autolinking")
 # Resolve react_native_pods.rb with node to allow for hoisting
 require Pod::Executable.execute_command('node', ['-p',
   'require.resolve(
@@ -15,7 +16,24 @@ if linkage != nil
 end
 
 target 'Heia2' do
-  config = use_native_modules!
+  use_expo_modules!
+
+  if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
+    config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];
+  else
+    config_command = [
+      'node',
+      '--no-warnings',
+      '--eval',
+      'require(require.resolve(\'expo-modules-autolinking\', { paths: [require.resolve(\'expo/package.json\')] }))(process.argv.slice(1))',
+      'react-native-config',
+      '--json',
+      '--platform',
+      'ios'
+    ]
+  end
+
+  config = use_native_modules!(config_command)
 
   use_react_native!(
     :path => config[:reactNativePath],
@@ -47,6 +65,22 @@ target 'Heia2' do
             '#if FMT_USE_CONSTEVAL && !defined(__apple_build_version__)'
           )
         )
+      end
+    end
+
+    # Mellomrommet i prosjektstien («Heia Prod») knekker EXConstants-fasen:
+    # `bash -l -c "$PODS_TARGET_SRCROOT/…"` ordsplittes av bash på mellomrom,
+    # som prøver å kjøre `/Users/…/Heia` → hele Pods-bygget stopper (og
+    # AppDelegate får følgefeilen «No such module 'Expo'»). Pakk stien i
+    # egne fnutter. Idempotent: skriver kun når fasen mangler fiksen.
+    fixed_script =
+      'bash -l -c "\"$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh\""'
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'EXConstants'
+      target.build_phases.each do |phase|
+        next unless phase.respond_to?(:name) &&
+                    phase.name.to_s.include?('Generate app.config')
+        phase.shell_script = fixed_script if phase.shell_script != fixed_script
       end
     end
   end

@@ -5,6 +5,7 @@ import {
   type Asset,
   type ImagePickerResponse,
 } from 'react-native-image-picker';
+import {Image as ImageCompressor} from 'react-native-compressor';
 import type {ImagePostInput} from './api/feed';
 
 /** Valgt bilde + `uri` til lokal forhåndsvisning før det er lastet opp. */
@@ -14,10 +15,11 @@ export type PickedImage = ImagePostInput & {uri: string};
 // Heia lagrer en høyoppløselig visningsmaster, ikke kameraoriginalen —
 // opplasterens kamerarull ER originalarkivet. ~0,3-0,6 MB i stedet for
 // 2-6 MB per foto var den største enkeltfaktoren i egress-auditen (F1).
-// B supplerer med en 480-thumb fra denne fila; selve masteren står.
+// B1 avleder i tillegg en 480-thumb fra denne fila (makeThumb under).
+// includeBase64 er AV siden B1: opplastingen streamer fil-URI-en direkte
+// (expo-file-system uploadAsync) — base64-brua er borte.
 const PICKER_OPTIONS = {
   mediaType: 'photo',
-  includeBase64: true,
   selectionLimit: 1,
   maxWidth: 2048,
   maxHeight: 2048,
@@ -32,16 +34,50 @@ const LOGO_PICKER_OPTIONS = {
   maxHeight: 512,
 } as const;
 
+/**
+ * 480 px / JPEG q0.7 (P2, LÅST — samme parametre som backfill-scriptet i A).
+ * Avledes fra pickerens 2048-master, IKKE fra kameraoriginalen: pickeren kan
+ * ikke levere to størrelser fra ett kall (verifisert i arkitekturrunden).
+ * `null` = generering feilet — innlegget går videre uten thumb, og visningen
+ * faller tilbake til masteren (mediaPathFor). Dårligere egress for det ene
+ * bildet, aldri et blokkert innlegg.
+ */
+async function makeThumb(displayUri: string): Promise<string | null> {
+  try {
+    return await ImageCompressor.compress(displayUri, {
+      compressionMethod: 'manual',
+      maxWidth: 480,
+      maxHeight: 480,
+      quality: 0.7,
+      input: 'uri',
+      output: 'jpg',
+      returnableOutputType: 'uri',
+    });
+  } catch {
+    return null;
+  }
+}
+
+// Pickeren rapporterer 'image/jpg' på iOS — en UGYLDIG MIME-type (riktig er
+// 'image/jpeg'), og bucket-grensene fra A avviser den med 415
+// InvalidMimeType. Før grensene ble satt slapp den gjennom, så feilen var
+// usynlig frem til B1-telefontesten.
+function normalizeMime(type: string | undefined): string {
+  const t = type?.toLowerCase();
+  return !t || t === 'image/jpg' ? 'image/jpeg' : t;
+}
+
 function toPickedImage(asset: Asset | undefined): PickedImage | null {
-  if (!asset?.base64 || !asset.uri) return null;
+  if (!asset?.uri) return null;
   return {
     uri: asset.uri,
-    base64: asset.base64,
-    mimeType: asset.type ?? 'image/jpeg',
+    fileUri: asset.uri,
+    // Fylles av runPicker for lagbilder; logoer trenger ingen (512-master).
+    thumbUri: null,
+    mimeType: normalizeMime(asset.type),
     fileName: asset.fileName ?? 'bilde.jpg',
-    // base64-lengden er en overestimering (~4/3), men brukes bare som
-    // metadata på media-raden — aldri til å avvise et bilde.
-    sizeBytes: asset.fileSize ?? asset.base64.length,
+    // Kun metadata på media-raden — aldri brukt til å avvise et bilde.
+    sizeBytes: asset.fileSize ?? 0,
     width: asset.width,
     height: asset.height,
   };
@@ -49,6 +85,7 @@ function toPickedImage(asset: Asset | undefined): PickedImage | null {
 
 async function runPicker(
   launch: () => Promise<ImagePickerResponse>,
+  options: {thumb: boolean},
 ): Promise<PickedImage | null> {
   let result: ImagePickerResponse;
   try {
@@ -95,6 +132,9 @@ async function runPicker(
     Alert.alert('Kunne ikke hente bildet', 'Prøv et annet bilde.');
     return null;
   }
+  if (options.thumb) {
+    picked.thumbUri = await makeThumb(picked.fileUri);
+  }
   return picked;
 }
 
@@ -104,7 +144,9 @@ async function runPicker(
  * `null` betyr avbrutt/feilet; feilmeldingen er allerede vist.
  */
 export function pickLogoImage(): Promise<PickedImage | null> {
-  return runPicker(() => launchImageLibrary(LOGO_PICKER_OPTIONS));
+  return runPicker(() => launchImageLibrary(LOGO_PICKER_OPTIONS), {
+    thumb: false,
+  });
 }
 
 /**
@@ -124,11 +166,12 @@ export async function pickTeamImage(
 ): Promise<PickedImage | null> {
   const camera = {
     text: 'Ta bilde',
-    onPress: () => runPicker(() => launchCamera(PICKER_OPTIONS)),
+    onPress: () => runPicker(() => launchCamera(PICKER_OPTIONS), {thumb: true}),
   };
   const library = {
     text: 'Velg fra kamerarullen',
-    onPress: () => runPicker(() => launchImageLibrary(PICKER_OPTIONS)),
+    onPress: () =>
+      runPicker(() => launchImageLibrary(PICKER_OPTIONS), {thumb: true}),
   };
   const ordered = options.preferCamera ? [camera, library] : [library, camera];
 

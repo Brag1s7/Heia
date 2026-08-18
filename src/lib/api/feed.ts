@@ -1,13 +1,13 @@
-import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
 import {getUserId, getUserIdOrNull} from './authUser';
-import {acquireChannel} from '../realtimeChannels';
+import {acquireChannel, isChannelResync} from '../realtimeChannels';
 import {
   FEED_MEDIA_BUCKET,
   invalidateMediaCache,
   primeMediaUrls,
 } from '../media/resolver';
+import {uploadFileToBucket} from '../media/upload';
 import type {MediaRef} from '../media/types';
 import type {FeedItem, UserRole} from '../../shared/types';
 
@@ -19,7 +19,13 @@ export {FEED_MEDIA_BUCKET};
 
 /** Bilde valgt fra image-picker, klart for opplasting. */
 export interface ImagePostInput {
-  base64: string;
+  /** Lokal fil-URI til 2048-masteren fra pickeren (P2). */
+  fileUri: string;
+  /**
+   * Lokal fil-URI til 480-thumben (compressor, B1). `null` = genereringen
+   * feilet — posten lastes opp uten, og visningen leser masteren (P4).
+   */
+  thumbUri: string | null;
   mimeType: string;
   fileName: string;
   sizeBytes: number;
@@ -40,11 +46,14 @@ export interface MatchPhoto {
 }
 
 /**
- * Laster opp ETT bilde til privat Storage og oppretter media-raden.
- * Returnerer `media.id`, som kallstedet fester på sin egen entitet.
+ * Laster opp ETT bilde (master + ev. thumb) til privat Storage og oppretter
+ * media-raden. Returnerer `media.id`, som kallstedet fester på sin egen
+ * entitet.
  *
- * Delt av vanlige bildeposter og kampbilder — RN-fella (base64 → ArrayBuffer,
- * ALDRI fil-URI rett inn i `.upload()`) skal bo nøyaktig ett sted.
+ * Delt av vanlige bildeposter og kampbilder. B1: begge variantene streames
+ * fra fil via uploadAsync (media/upload.ts) — base64-brua er borte.
+ * Navnekonvensjonen (`-d2048`/`-t480`) er backfill-scriptets, så nye
+ * opplastinger er selvbeskrivende og hoppes over av en ev. re-kjøring.
  */
 async function uploadTeamImage(
   teamSpaceId: string,
@@ -56,24 +65,40 @@ async function uploadTeamImage(
   const ext = image.fileName.includes('.')
     ? image.fileName.split('.').pop()
     : 'jpg';
-  const objectName = `${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}.${ext}`;
-  const storagePath = `${teamSpaceId}/${objectName}`;
+  const base = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const storagePath = `${teamSpaceId}/${base}-d2048.${ext}`;
 
-  const {error: uploadError} = await supabase.storage
-    .from(FEED_MEDIA_BUCKET)
-    .upload(storagePath, decode(image.base64), {
-      contentType: image.mimeType,
-      upsert: false,
-      // 24 t (P1, LÅST): en CDN-/OS-cachet kopi av et barnebilde skal ikke
-      // overleve tilgangsvinduet (24 t signert URL) vesentlig, og Free-CDN
-      // invaliderer ikke ved sletting. KAN IKKE endres per objekt i
-      // etterkant — må være riktig ved upload.
-      cacheControl: '86400',
-    });
-  if (uploadError) {
-    throw uploadError;
+  // 24 t (P1, LÅST): en CDN-/OS-cachet kopi av et barnebilde skal ikke
+  // overleve tilgangsvinduet (24 t signert URL) vesentlig, og Free-CDN
+  // invaliderer ikke ved sletting. KAN IKKE endres per objekt i
+  // etterkant — må være riktig ved upload.
+  await uploadFileToBucket({
+    bucket: FEED_MEDIA_BUCKET,
+    path: storagePath,
+    fileUri: image.fileUri,
+    contentType: image.mimeType,
+    cacheControlS: 86400,
+  });
+
+  // Thumben er en optimalisering, aldri en blokker: feiler den, får raden
+  // thumbnail_path null og thumb-oppslagene leser masteren (mediaPathFor).
+  let thumbnailPath: string | null = null;
+  if (image.thumbUri) {
+    const thumbPath = `${teamSpaceId}/${base}-t480.jpg`;
+    try {
+      await uploadFileToBucket({
+        bucket: FEED_MEDIA_BUCKET,
+        path: thumbPath,
+        fileUri: image.thumbUri,
+        // Compressor leverer alltid JPEG (output: 'jpg' i makeThumb).
+        contentType: 'image/jpeg',
+        cacheControlS: 86400,
+      });
+      thumbnailPath = thumbPath;
+    } catch {
+      // Foreldreløs fil kan ikke oppstå her: thumben lastes bare opp
+      // ETTER at masteren lyktes, og feiler selve thumben finnes ingen fil.
+    }
   }
 
   const {data: mediaRow, error: mediaError} = await supabase
@@ -83,6 +108,7 @@ async function uploadTeamImage(
       team_space_id: teamSpaceId,
       bucket: FEED_MEDIA_BUCKET,
       storage_path: storagePath,
+      thumbnail_path: thumbnailPath,
       file_name: image.fileName,
       mime_type: image.mimeType,
       size_bytes: image.sizeBytes,
@@ -259,20 +285,59 @@ export async function deletePost(postId: string): Promise<void> {
 }
 
 /**
- * Live feed: kaller onChange ved nytt innlegg, reaksjon eller kommentar.
+ * Klassifiserte feed-hendelser (B3, P6-tabellen): api-laget oversetter rå
+ * postgres_changes-payloads til hendelser skjermen kan applisere rett i
+ * query-cachen — transporten (postgres_changes i dag, Broadcast i C) forblir
+ * usynlig for kalleren.
  *
- * Kalleren REFETCHER i stedet for å flette inn payloaden — feeden må uansett
- * sorteres (pinnet øverst). Bilde-URL-ene gjenbrukes fra resolver-cachen
- * (P1), så en refetch koster data, aldri bildebytes.
+ * `fallback` er P6s sikkerhetsnett: payloaden manglet felter vi trenger
+ * (skjemadrift, replica identity rullet tilbake) → kalleren skal debounced
+ * refetche i stedet for å applisere noe galt. `resync` = kanalen har vært
+ * nede (reconnect) → hendelser kan være tapt, full refetch.
+ */
+export type FeedRealtimeEvent =
+  | {kind: 'postNew'}
+  | {kind: 'postUpdate'; row: any}
+  | {kind: 'reaction'; postId: string; delta: 1 | -1}
+  | {kind: 'commentDelta'; postId: string; delta: 1 | -1}
+  | {kind: 'fallback'}
+  | {kind: 'resync'};
+
+/**
+ * Live feed, payload-først (P6): reaksjoner og kommentarer justerer tellere
+ * lokalt, post-endringer patcher/fjerner posten, og kun et NYTT innlegg
+ * koster en (side 1-)refetch hos kalleren — feeden må uansett sorteres og
+ * forfatter-joines, så payloaden alene kan ikke bygge raden.
+ *
+ * `myUserId` filtrerer bort egne reaksjons-ekko: de er alt applisert
+ * optimistisk, og et ekko ville talt dobbelt. Kommentarer har IKKE eget
+ * filter — CommentsScreen patcher via api-kallet, og mens den er åpen er
+ * TeamHome blurret (kanalen nede), så ekkoet kan aldri treffe cachen dobbelt.
  *
  * `reactions`/`comments` har ingen team_space_id å filtrere på, så vi
  * abonnerer ufiltrert. Det er trygt: RLS slipper kun gjennom rader du
- * uansett kunne lest, altså poster i dine egne lag.
+ * uansett kunne lest — og patchingen er en no-op for poster utenfor cachen.
+ * DELETE på reactions krever REPLICA IDENTITY FULL (00059) for at old-raden
+ * skal ha feed_post_id/user_id — mangler de, faller vi tilbake.
  */
 export function subscribeToFeed(
   teamSpaceId: string,
-  onChange: () => void,
+  myUserId: string | undefined,
+  onEvent: (event: FeedRealtimeEvent) => void,
 ): () => void {
+  const classifyReaction = (
+    row: any,
+    delta: 1 | -1,
+  ): FeedRealtimeEvent | null => {
+    if (!row?.feed_post_id) {
+      return {kind: 'fallback'};
+    }
+    if (row.user_id === myUserId || row.emoji !== HEIA_EMOJI) {
+      return null; // eget ekko / annen emoji enn 👏-telleren
+    }
+    return {kind: 'reaction', postId: row.feed_post_id, delta};
+  };
+
   return acquireChannel(
     `feed:${teamSpaceId}`,
     (channel, emit) => {
@@ -285,20 +350,76 @@ export function subscribeToFeed(
             table: 'feed_posts',
             filter: `team_space_id=eq.${teamSpaceId}`,
           },
-          emit,
+          payload => {
+            const p = payload as any;
+            if (p.eventType === 'INSERT') {
+              // En INSERT som alt er soft-slettet finnes ikke i praksis —
+              // men den skal i så fall ikke koste en refetch.
+              if (!p.new?.deleted_at) emit({kind: 'postNew'});
+            } else if (p.eventType === 'UPDATE') {
+              emit(
+                p.new?.id
+                  ? {kind: 'postUpdate', row: p.new}
+                  : {kind: 'fallback'},
+              );
+            }
+            // Hard DELETE skjer ikke i appflyten (soft_delete_post er UPDATE)
+            // — og filteret på team_space_id matcher uansett ikke old-raden.
+          },
         )
         .on(
           'postgres_changes',
           {event: '*', schema: 'public', table: 'reactions'},
-          emit,
+          payload => {
+            const p = payload as any;
+            const evt =
+              p.eventType === 'INSERT'
+                ? classifyReaction(p.new, 1)
+                : p.eventType === 'DELETE'
+                ? classifyReaction(p.old, -1)
+                : null;
+            if (evt) emit(evt);
+          },
         )
         .on(
           'postgres_changes',
           {event: '*', schema: 'public', table: 'comments'},
-          emit,
+          payload => {
+            const p = payload as any;
+            if (p.eventType === 'INSERT') {
+              emit(
+                p.new?.feed_post_id
+                  ? {
+                      kind: 'commentDelta',
+                      postId: p.new.feed_post_id,
+                      delta: 1,
+                    }
+                  : {kind: 'fallback'},
+              );
+            } else if (p.eventType === 'UPDATE' && p.new?.deleted_at) {
+              // Soft-delete (00041). RPC-en er idempotent-gardert, så det
+              // kommer nøyaktig én slik UPDATE per sletting; en REDIGERING
+              // har deleted_at null og skal ikke røre telleren.
+              emit(
+                p.new?.feed_post_id
+                  ? {
+                      kind: 'commentDelta',
+                      postId: p.new.feed_post_id,
+                      delta: -1,
+                    }
+                  : {kind: 'fallback'},
+              );
+            }
+          },
         );
     },
-    () => onChange(),
+    payload => {
+      if (isChannelResync(payload)) {
+        onEvent({kind: 'resync'});
+      } else {
+        onEvent(payload as FeedRealtimeEvent);
+      }
+    },
   );
 }
 
@@ -449,17 +570,29 @@ export async function getMatchPhotos(eventId: string): Promise<MatchPhoto[]> {
   const rows = (data || []) as any[];
   if (rows.length === 0) return [];
 
-  // Én oppvarmingsbatch (P4) — MediaImage leser fra cachen. RPC-en (00028)
-  // returnerer ikke thumbnail_path; thumb-varianten faller tilbake til path.
-  await primeMediaUrls(rows.map(r => r.storage_path as string));
-
-  return rows.map(r => ({
+  const photos = rows.map(r => ({
     id: r.post_id as string,
-    media: {path: r.storage_path as string},
+    media: {
+      path: r.storage_path as string,
+      // 00061. Mangler den (eldre opplastinger før B1-thumbs, eller RPC-en
+      // fra 00028 mot en gammel klient) faller thumb-varianten til path.
+      thumbPath: (r.thumbnail_path as string | null) ?? null,
+    },
     caption: (r.content as string) || undefined,
     authorName: (r.author_name as string) ?? 'Ukjent',
     authorAvatarUrl: (r.author_avatar as string) ?? undefined,
     createdAt: new Date(r.created_at),
     matchEventId: (r.match_event_id as string) ?? undefined,
   }));
+
+  // Én oppvarmingsbatch (P4) for begge variantene — kampforløpet og railen
+  // leser thumb, galleriet display. MediaImage treffer cachen for begge.
+  const paths: string[] = [];
+  for (const photo of photos) {
+    paths.push(photo.media.path);
+    if (photo.media.thumbPath) paths.push(photo.media.thumbPath);
+  }
+  await primeMediaUrls(paths);
+
+  return photos;
 }

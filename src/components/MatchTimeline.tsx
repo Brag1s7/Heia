@@ -166,9 +166,11 @@ export function MatchTimeline({
                   styles.photo,
                   pressed && styles.photoPressed,
                 ]}>
+                {/* Thumb i forløpet (B2): raden er en forhåndsvisning på
+                    ~180 pt — trykket åpner galleriet, som laster display. */}
                 <MediaImage
                   media={entry.photo.media}
-                  variant="display"
+                  variant="thumb"
                   style={styles.photoImage}
                   resizeMode="cover"
                 />

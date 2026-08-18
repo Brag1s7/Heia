@@ -98,13 +98,165 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   MatchTimeline rendrer ALLE kampbilder i display-variant i EventDetails
   ytre ScrollView — ta den i event-detalj-skiven.
 
-**GJENSTÅR I B:** B2 event-detalj-skiven (EventDetailScreen over på
-queries + MatchTimeline-virtualisering/thumb-variant, se punktet over),
-B3 payload-realtime (P6-tabellen) + Sentry,
-B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
-compressor-thumb → uploadAsync; Brage kjører pod install + nytt
-dev-bygg). Deretter: PR + merge når GitHub virker, TestFlight (A+B),
-exit-avlesning (−80 % egress; P13-lista).
+- ✅ B2 event-detalj-skiven (2026-08-17): EventDetailScreen over på
+  query-cachen (`src/lib/queries/eventDetail.ts`, P7-nøklene
+  `['event', id]` + `['matchPhotos', id]`); optimistisk RSVP/reporter som
+  CACHE-patch (`patchEventDetail`, patchFeedItem-mønsteret — speil-staten
+  myStatus/reporterId er borte); fokus-broen med 60 s-regelen — live-
+  kampens ferskvare løses IKKE med staleMs 0 (en staleMs som flipper
+  re-fyrer fokus-effekten → dobbelhenting ved åpning av live kamp;
+  FUNNET av adversariell review, bevist med ekte timere), men ved at
+  realtime-OPPRYDDINGEN alltid markerer begge nøklene stale (refetchType
+  'none'): appen er døv for kampen fra blur-øyeblikket, broen ser
+  `isInvalidated` ved retur og resyncer straks (B3-status-callbacks
+  løser reconnect-hullet ordentlig);
+  redigeringsmodal-fella dekkes av updateEvents invalidering (observeren
+  står montert under modalen). setMatchReporter/startMatch/
+  reportMatchEvent invaliderer IKKE i api-laget — skjermen refetcher
+  eksplisitt (bevisst: samme som før, vurder api-invalidering i B3).
+  Turneringskamplisten står BEVISST imperativt (P7-avgrensningen).
+  EGRESS-FIKSEN: MatchTimeline + MatchEventRow over på thumb-variant
+  (display bor kun i galleriet) + **migrasjon 00061** — get_match_photos
+  returnerer nå thumbnail_path (uten den falt thumb STILLE tilbake til
+  2048px-masteren; railen fra feed-skiven hadde samme hull!); DROP+CREATE
+  med gjenskapte 00060-grants. **00061 er PUSHET TIL PROD 2026-08-17**
+  (`supabase db push`, verifisert med `supabase migration list`).
+  getMatchPhotos primer begge varianter i én batch. NY VAKT:
+  `__tests__/eventDetailRefetch.test.tsx` (trening = 1 RPC og gjenåpning
+  innen 60 s = 0; ferdig kamp = 3 RPC + thumb-bevis for BEGGE
+  renderstiene — MatchEventRow og timelinens frittstående gren; live =
+  én kanal, burst = én event-refetch og INGEN bilde-refetch). Testtriks:
+  TanStacks notifyManager varsler via setTimeout → `flushWaves()` for
+  avhengige queries, og den flytter klokka 1 ms per runde — med frossen
+  klokke er vakten blind for tid-avhengige dobbelhentinger. Adversariell
+  review kjørt (to bekreftede funn, begge fikset: dobbelhenting ved
+  staleMs-flip + utestet MatchEventRow-thumb). ⚠️ Reviewen kostet
+  ~1,15 M tokens i subagenter og traff sesjonstaket — bruk LETTERE
+  review på småskiver fremover. Suiten grønn (154), lint ren.
+
+- ✅ B3 payload-realtime + Sentry (2026-08-18): hele P6-tabellen
+  implementert — realtime-handlerne applisererer payloads rett i
+  query-cachen (P7-nøklene) i stedet for refetch-per-hendelse:
+  * **Kanal-laget** (`realtimeChannels.ts`): `.subscribe()` har fått
+    status-callback overalt. `createResyncStatusHandler` (eksportert, ren)
+    roper resync ved SUBSCRIBED etter frafall ELLER etter tidligere
+    SUBSCRIBED (socket-rejoin) — men ALDRI ved første join (ellers
+    dobbelhenting ved åpning, staleMs-flip-lærdommen). Registryet deler ut
+    sentinelen `CHANNEL_RESYNC` til alle lyttere; `isChannelResync` i
+    konsumentene. DETTE var forutsetningen for payload-først: uten
+    resync-ved-SUBSCRIBED tapes hendelser ved reconnect. Egen vakt:
+    `__tests__/realtimeChannels.test.ts`.
+  * **Feed** (`subscribeToFeed` klassifiserer nå payloads → typed events;
+    ny signatur med `myUserId`): andres 👏 = teller-patch i cachen (0 kall,
+    0 hero-refetch — før: full refetch + heroer per burst!), egne
+    reaksjons-ekko filtreres (00059 gir full old-rad på DELETE), kommentar
+    inn/soft-ut = ±1 `commentCount`, feed_posts UPDATE = patch/fjern lokalt
+    (pin-flip → side 1-henting, posten resorteres), feed_posts INSERT =
+    debounced henting av KUN side 1 (`refetchFeedFirstPage` skjøter inn
+    pages[0]; dype sider urørt — B2-grensen «alle sider per invalidering»
+    gjelder nå kun reconnect/fokus). Fallback (payload uten felter) =
+    debounced FULL invalidering (hygienen fra A som nett).
+  * **Kamp** (`subscribeToMatch` → typed events): match_events INSERT
+    appenderes i `['event', id]` fra payload via eksportert
+    `mapMatchEventRow` (SAMME mapping som getEventDetail; dedupe på id —
+    reporterens eksplisitte refetch og ekkoet kolliderer aldri);
+    match_sessions UPDATE patcher stilling/status/reporter/startedAt fra
+    raden (komplett i payloaden). Ett mål hos N tilskuere = 0 refetch.
+    Foto-stien uendret (debounced loadPhotos, P6). Cache-miss → fallback.
+  * **Varsler** (NotificationsContext): INSERT = +1 lokalt (team-scopet,
+    null = global — samme scope som getUnreadCount), INGEN count-spørring
+    per varsel lenger; InboxScreens loadNewer dropper også sin. HEAD-
+    spørringen er nå henvist til resync-stiene (fokus/forgrunn/reconnect/
+    lest-markering). Kanalens resync bumper også liveNonce → fokusert
+    inbox drar inkrementell henting (hull-vakten der tar store gap).
+  * **CommentsScreen**: egne kommentarer patcher `commentCount` i
+    feed-cachen direkte (±1) — ekko kan ikke doble (feed-kanalen er
+    fokus-bundet til TeamHome som er blurret mens tråden er åpen).
+  * **Sentry** (`src/lib/sentry.ts`, init i index.js): helt AV uten
+    SENTRY_DSN i .env (modulen lastes ikke engang); tracesSampleRate 0,
+    sendDefaultPii false. JS-feil fanges så snart DSN settes; NATIVE
+    crash-handler krever pod install + nytt bygg (tas i B1-runden).
+    ⚠️ EKSTERNE STEG FOR BRAGE: opprett Sentry-prosjekt → legg DSN i .env
+    (+ TestFlight-byggets env). `pod install` er KJØRT 2026-08-18 (RNSentry
+    8.23.0 i Podfile.lock) — nativedelen er med fra NESTE bygg.
+  * Vaktene OPPDATERT + utvidet: feedRefetch (payload-først-test: 👏 = 0
+    kall og ingen heroer, ekko ignorert, DELETE-teller, kommentar ±,
+    post-patch/-fjerning, nytt innlegg = kun side 1, reconnect = resync),
+    eventDetailRefetch (mål = cache-patch 0 kall, duplikat-ekko, reconnect
+    resyncer begge stier; gamle bursts er nå eksplisitt FALLBACK-bevis),
+    mockene fikk `__fire(table, payload)` + `__reconnect()`. Suiten grønn
+    (160), lint ren.
+  * BEVISSTE grenser: CommentsScreen har ingen live-append av andres
+    kommentarer (ingen P7-nøkkel — kald sti, tråden refetcher ved fokus);
+    match_events DELETE (korreksjoner = delete+reinsert) lyttes ikke på —
+    ingen app-flyt skriver den ennå, refetch-stiene healer; reconnect
+    refetcher fortsatt ALLE lastede feed-sider (akseptert, sjeldent).
+    setMatchReporter/startMatch/reportMatchEvent beholder eksplisitt
+    refetch i skjermen (reporterens fasit; dedupen gjør ekkoet ufarlig).
+
+- ✅ B1 JS-delen (2026-08-18, rett på Brage-branchen — Brages beslutning,
+  git-commits er sikkerhetsnettet): expo-image 55.0.11 + expo-file-system
+  55.0.25 + expo 55.0.29 + react-native-compressor 2.0.3 installert
+  (SDK 55-linjen matcher RN 0.83, som planlagt).
+  * **MediaImage** er expo-image: `source.cacheKey = storage_path` (disk-
+    cachen nøkles på PATH — roterende `?token=` er ikke lenger cache-miss),
+    `cachePolicy: 'disk'`, `configureCache({maxDiskSize: 150 MB})` ved
+    modul-last; `resizeMode`-prop-en beholdt utad og oversettes til
+    `contentFit` (kallstedene urørt). Målingen (imageMetrics) og
+    onError→refreshMediaUrl-fornyingen står.
+  * **Opplasting**: `src/lib/media/upload.ts` (uploadAsync + Bearer fra
+    getSession + P1-headerne; utenom netMetrics — bevisst, det er ingress);
+    pickeren har `includeBase64` AV, base64-arraybuffer er AVINSTALLERT;
+    compressor lager thumb 480/q0.7 av 2048-masteren ved pick (feilet
+    thumb = null, aldri blokkert innlegg); uploadTeamImage laster opp
+    BEGGE med backfill-navnene (`-d2048`/`-t480`) og skriver
+    thumbnail_path; logo-stien (teams.ts) bruker samme helper.
+  * `clearLocalCaches` tømmer også expo-images disk-cache (P1, delt enhet).
+  * NY VAKT: `__tests__/mediaUpload.test.ts` (2 kall m/ headere +
+    thumbnail_path; uten thumb; feilet thumb blokkerer ikke; ingen økt =
+    feil før bytes). Suiten grønn (164), lint ren. Diffen manuelt
+    gjennomgått før commit.
+  * PROSESSNOTAT: `install-expo-modules` ble IKKE kjørt av Claude
+    (permission-klassifisereren blokkerte kjøringen, og den ville uansett
+    endt i pod install — Brages steg). JS-pakkene er installert manuelt i
+    stedet; native-wiringen gjenstår (under).
+
+- ✅ B1 native-runden (2026-08-18): `npx install-expo-modules@latest`
+  kjørt av Brage (nei til Expo CLI-integrasjonen — vi bruker expo-modules
+  som BIBLIOTEKER, ikke Expo som toolchain), pods installert (36 s!),
+  **dev-bygg GRØNT på telefon**. To byggefeil underveis, begge fikset og
+  committet:
+  * Mellomrommet i prosjektstien («Heia Prod») knakk EXConstants-
+    scriptfasen (`bash -l -c "$PODS_TARGET_SRCROOT/…"` ordsplittes).
+    Fikset med fnutter — patchet i Pods-prosjektet OG som idempotent
+    post_install-hook i Podfilen (overlever pod install). Følgefeilen
+    «No such module 'Expo'» forsvant med den.
+  * AppDelegate: `override` på de fire app-event-metodene
+    ExpoAppDelegate også implementerer (deep links + push); oppførsel
+    uendret, super bevisst ikke kalt (ingen av våre expo-moduler lytter).
+  * PROSESSLÆRDOM: `npm run ios` passer IKKE Brages flyt — den spawner
+    egen Metro i eget terminalvindu (port 8081-konflikt-risiko). Flyten
+    er: Metro via `npm start` i Cursor, bygg fra Xcode.
+
+- ✅ **B1 TELEFONTESTET OK (Brage, 2026-08-18): HELE FASE B ER FERDIG.**
+  Rotasjon/EXIF i orden (kamera + kamerarull), opplasting virker, bildene
+  «lastes inn med en gang» (disk-cachen + thumbs i praksis). Ett funn under
+  testen, fikset og committet: pickeren rapporterer ugyldige `image/jpg`
+  som bucket-grensene fra A avviser med 415 — normaliseres nå til
+  `image/jpeg` i pickeren. Feilen VAR svelget i to ledd (composerens
+  tomme catch + upload uten svarkropp); dev-alerter viser nå serverens
+  feilmelding, prod er fortsatt rolig. Valgfritt, ikke gjort: eksplisitt
+  flymodus-test av disk-cachen og thumbnail_path-sjekk i DB.
+
+**GJENSTÅR AV EGRESS-PLANEN (Fase A+B er kode-KOMPLETT og verifisert):**
+1. PR + merge til main når GitHub virker (Brage merger selv, PR opprettes
+   eksplisitt på forespørsel; branchen er MANGE commits foran origin —
+   husk push først).
+2. TestFlight (A+B som ÉN slipp). EKSTERNT valgfritt før den:
+   Sentry-prosjekt + DSN i .env (nativedelen er i bygget).
+3. Exit-avlesning: −80 % egress i Usage→Bandwidth over ~2 uker (P13).
+4. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
+Fase C er terskelstyrt — bygg ingenting.
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se

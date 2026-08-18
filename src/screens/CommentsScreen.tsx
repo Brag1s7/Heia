@@ -26,6 +26,7 @@ import {
   getFeedPost,
 } from '../lib/api/comments';
 import {toggleReaction, deletePost} from '../lib/api/feed';
+import {adjustFeedItemCounts} from '../lib/queries/feed';
 import {promptReport} from '../lib/moderation';
 import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
 
@@ -184,6 +185,12 @@ export function CommentsScreen({route, navigation}: Props) {
                     );
                     try {
                       await deleteComment(comment.id);
+                      // Feed-cachen: −1 rett i posten (B3, P6). Realtime-
+                      // ekkoet kan ikke doble — feed-kanalen er fokus-bundet
+                      // til TeamHome, som er blurret mens tråden er åpen.
+                      adjustFeedItemCounts(teamSpaceId, postId, {
+                        comments: -1,
+                      });
                     } catch {
                       Alert.alert('Kunne ikke slette', 'Prøv igjen om litt.');
                     }
@@ -201,7 +208,7 @@ export function CommentsScreen({route, navigation}: Props) {
         buttons,
       );
     },
-    [myId, amAdmin, load],
+    [myId, amAdmin, teamSpaceId, postId, load],
   );
 
   const handleSend = useCallback(async () => {
@@ -209,6 +216,9 @@ export function CommentsScreen({route, navigation}: Props) {
     setSending(true);
     try {
       await createComment(postId, text);
+      // Feed-cachen: +1 rett i posten (B3, P6) — telleren på TeamHome er
+      // riktig i det du går tilbake, uten å vente på 60 s-regelen.
+      adjustFeedItemCounts(teamSpaceId, postId, {comments: 1});
       setText('');
       await load();
     } catch {
@@ -216,7 +226,7 @@ export function CommentsScreen({route, navigation}: Props) {
     } finally {
       setSending(false);
     }
-  }, [postId, text, sending, load]);
+  }, [teamSpaceId, postId, text, sending, load]);
 
   return (
     <KeyboardAvoidingView

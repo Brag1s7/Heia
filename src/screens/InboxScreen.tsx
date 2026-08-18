@@ -197,11 +197,13 @@ export function InboxScreen() {
         setItems(prev => mergeNotifications(prev, fresh));
       }
       setLiveMatch(live);
-      refreshUnread();
+      // Badgen: +1 skjedde alt lokalt i NotificationsContext (B3, P6 —
+      // «ingen count-spørring» per varsel); full load() og lest-markeringer
+      // resyncer fasit.
     } catch {
       // Stille — realtime-resync er best effort.
     }
-  }, [activeTeamSpaceId, load, refreshUnread]);
+  }, [activeTeamSpaceId, load]);
 
   // Eldre sider på scroll (B2): keyset bakover fra eldste kjente rad.
   // Guardene bor her (ikke i onEndReached) så en rask dobbel-trigger aldri

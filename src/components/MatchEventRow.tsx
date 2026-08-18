@@ -125,9 +125,11 @@ export function MatchEventRow({
             key={photo.id}
             onPress={onPressPhoto ? () => onPressPhoto(photo) : undefined}
             style={({pressed}) => [styles.photo, pressed && styles.photoPressed]}>
+            {/* Thumb her også (B2): samme forhåndsvisningsflate som resten
+                av forløpet — display bor i galleriet. */}
             <MediaImage
               media={photo.media}
-              variant="display"
+              variant="thumb"
               style={styles.photoImage}
               resizeMode="cover"
             />

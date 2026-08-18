@@ -8,4 +8,5 @@
 //      = Heia2/Heia2-Bridging-Header.h
 //
 #import <UserNotifications/UserNotifications.h>
+#import <Expo/Expo.h>
 #import <RNCPushNotificationIOS/RNCPushNotificationIOS.h>

@@ -1,5 +1,5 @@
-import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
+import {uploadFileToBucket} from '../media/upload';
 import type {
   EnrichedMembership,
   InviteCodeResult,
@@ -19,7 +19,8 @@ export const CLUB_LOGOS_BUCKET = 'club-logos';
 
 /** Bilde fra logo-pickeren, klart for opplasting (PickedImage passer). */
 export interface LogoImageInput {
-  base64: string;
+  /** Lokal fil-URI til 512-masteren fra logo-pickeren. */
+  fileUri: string;
   mimeType: string;
   fileName: string;
 }
@@ -226,20 +227,17 @@ async function uploadLogo(
     : 'jpg';
   const path = `${folderId}/logo-${Date.now()}.${ext}`;
 
-  const {error} = await supabase.storage
-    .from(CLUB_LOGOS_BUCKET)
-    .upload(path, decode(image.base64), {
-      contentType: image.mimeType,
-      upsert: false,
-      // 1 år (P1): filnavnet er unikt per opplasting (immutable), og bucketen
-      // er public — dette er den ene flaten der CDN-en skal få jobbe. Uten
-      // den revalideres hver logo hver time (F3, hovedkilde til cached
-      // egress).
-      cacheControl: '31536000',
-    });
-  if (error) {
-    throw error;
-  }
+  // 1 år (P1): filnavnet er unikt per opplasting (immutable), og bucketen
+  // er public — dette er den ene flaten der CDN-en skal få jobbe. Uten
+  // den revalideres hver logo hver time (F3, hovedkilde til cached
+  // egress).
+  await uploadFileToBucket({
+    bucket: CLUB_LOGOS_BUCKET,
+    path,
+    fileUri: image.fileUri,
+    contentType: image.mimeType,
+    cacheControlS: 31536000,
+  });
   return supabase.storage.from(CLUB_LOGOS_BUCKET).getPublicUrl(path).data
     .publicUrl;
 }

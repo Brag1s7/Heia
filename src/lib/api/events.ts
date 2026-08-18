@@ -1,7 +1,7 @@
 import {supabase} from '../supabase';
 import {getUserIdOrNull} from './authUser';
 import {invalidateEventQueries} from '../queries/invalidate';
-import {acquireChannel} from '../realtimeChannels';
+import {acquireChannel, isChannelResync} from '../realtimeChannels';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {EditableEvent} from '../../shared/eventForm';
 import type {
@@ -639,22 +639,31 @@ export async function reportMatchEvent(
  * Splitten er halve realtime-hygienen: `report_match_event` skriver tre
  * tabeller i én transaksjon (match_events + match_sessions + feed-posten),
  * så ett mål ga tre meldinger — og før dette utløste hver av dem BÅDE
- * event-refetch og re-lasting av alle kampbilder (F18). Nå treffer et mål
- * kun `onMatchChange` (kalleren debouncer tre meldinger til én refetch),
- * og bare et faktisk bilde (`type = 'bilde'`) rører fotostien.
+ * event-refetch og re-lasting av alle kampbilder (F18). Bare et faktisk
+ * bilde (`type = 'bilde'`) rører fotostien.
  *
- * Vi refetcher fortsatt i stedet for å flette inn payloaden: en
- * `match_events`-INSERT må uansett inn i kampforløpet i riktig rekkefølge.
- * Payload-først kommer i B (P6). Realtime respekterer RLS, så bare lagets
+ * Payload-først (B3, P6): et mål hos N tilskuere er nå N payload-appliseringer
+ * og NULL refetch — `matchEvent` bærer selve match_events-raden (append i
+ * cachen) og `session` den oppdaterte match_sessions-raden (stillingen ligger
+ * komplett i den). `fallback` = payload manglet felter → kalleren refetcher
+ * debounced (P6s sikkerhetsnett). `resync` = kanalen har vært nede → full
+ * refetch, hendelser kan være tapt. Realtime respekterer RLS, så bare lagets
  * medlemmer får hendelsene.
  *
  * Returnerer en oppryddingsfunksjon — kall den når skjermen forlates, ellers
  * blir kanalen liggende åpen.
  */
+export type MatchRealtimeEvent =
+  | {kind: 'matchEvent'; row: any}
+  | {kind: 'session'; row: any}
+  | {kind: 'photo'}
+  | {kind: 'fallback'}
+  | {kind: 'resync'};
+
 export function subscribeToMatch(
   matchSessionId: string,
   eventId: string,
-  handlers: {onMatchChange: () => void; onPhotoPost: () => void},
+  onEvent: (event: MatchRealtimeEvent) => void,
 ): () => void {
   return acquireChannel(
     `match:${matchSessionId}`,
@@ -668,7 +677,15 @@ export function subscribeToMatch(
             table: 'match_events',
             filter: `match_session_id=eq.${matchSessionId}`,
           },
-          () => emit({kind: 'match'}),
+          payload => {
+            const row = (payload.new ?? {}) as any;
+            // minute kan være 0 (avspark) — sjekk mot undefined, ikke falsy.
+            emit(
+              row.id && row.type && row.minute !== undefined
+                ? {kind: 'matchEvent', row}
+                : {kind: 'fallback'},
+            );
+          },
         )
         .on(
           'postgres_changes',
@@ -678,7 +695,16 @@ export function subscribeToMatch(
             table: 'match_sessions',
             filter: `id=eq.${matchSessionId}`,
           },
-          () => emit({kind: 'match'}),
+          payload => {
+            const row = (payload.new ?? {}) as any;
+            emit(
+              row.home_score !== undefined &&
+                row.away_score !== undefined &&
+                row.status
+                ? {kind: 'session', row}
+                : {kind: 'fallback'},
+            );
+          },
         )
         // Kampbilder er feed_posts med event_id (00028) — de rører verken
         // match_events eller match_sessions, så uten denne dukket reporterens
@@ -701,10 +727,10 @@ export function subscribeToMatch(
         );
     },
     payload => {
-      if ((payload as {kind: string}).kind === 'photo') {
-        handlers.onPhotoPost();
+      if (isChannelResync(payload)) {
+        onEvent({kind: 'resync'});
       } else {
-        handlers.onMatchChange();
+        onEvent(payload as MatchRealtimeEvent);
       }
     },
   );
@@ -751,29 +777,44 @@ function describeMatchEvent(
   return {description: description || fallback[type] || ''};
 }
 
+/**
+ * Én `match_events`-rad → MatchEvent. Eksportert for B3: realtime-payloaden
+ * er nøyaktig en slik rad, og queries/eventDetail appender den i cachen med
+ * SAMME mapping som getEventDetail — én kilde til beskrivelses-/spillerlogikk.
+ * `opponent` trengs for tekstene («1–0 til motstanderen»); kalleren har den
+ * fra sesjonen eller den cachede detaljen.
+ */
+export function mapMatchEventRow(
+  me: any,
+  matchSessionId: string,
+  opponent: string,
+): MatchEvent {
+  const teamSide = (me.team_side as 'home' | 'away' | null) ?? undefined;
+  const {description, player} = describeMatchEvent(
+    me.type as MatchEventType,
+    teamSide,
+    me.description ?? undefined,
+    opponent,
+  );
+
+  return {
+    id: me.id,
+    matchId: matchSessionId,
+    type: me.type as MatchEventType,
+    minute: me.minute,
+    player: me.player_name ?? player,
+    description,
+    teamSide,
+    reportedBy: me.reported_by ?? undefined,
+  };
+}
+
 function mapMatchEvents(session: any): MatchEvent[] {
   const opponent = (session.opponent as string) ?? 'motstanderen';
 
-  return ((session.match_events ?? []) as any[]).map(me => {
-    const teamSide = (me.team_side as 'home' | 'away' | null) ?? undefined;
-    const {description, player} = describeMatchEvent(
-      me.type as MatchEventType,
-      teamSide,
-      me.description ?? undefined,
-      opponent,
-    );
-
-    return {
-      id: me.id,
-      matchId: session.id,
-      type: me.type as MatchEventType,
-      minute: me.minute,
-      player: me.player_name ?? player,
-      description,
-      teamSide,
-      reportedBy: me.reported_by ?? undefined,
-    };
-  });
+  return ((session.match_events ?? []) as any[]).map(me =>
+    mapMatchEventRow(me, session.id, opponent),
+  );
 }
 
 /**
