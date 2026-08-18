@@ -19,7 +19,7 @@
     "@sentry/react-native": "8.23.0",
     "@supabase/supabase-js": "^2.100.1",
     "@tanstack/react-query": "^5.101.4",
-    "expo": "^55.0.29",
+    "expo": "~55.0.0",
     "expo-file-system": "^55.0.25",
     "expo-image": "^55.0.11",
     "lucide-react-native": "^1.28.0",
