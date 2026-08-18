@@ -238,22 +238,25 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
     egen Metro i eget terminalvindu (port 8081-konflikt-risiko). Flyten
     er: Metro via `npm start` i Cursor, bygg fra Xcode.
 
-**GJENSTÅR I B1 — KUN TELEFONTEST FØR FRYS (bygget er grønt):**
-1. ROTASJON/EXIF (skiva fryses ikke før denne er OK): portrett + landskap,
-   kamera OG kamerarull; sjekk at bildet står riktig vei i feed (display),
-   kampforløp/rail (thumb) og galleri. Compressor-EXIF er den kjente
-   risikoen — fallback er compressor 1.19.4 (samme API), byttet tar
-   minutter.
-2. Opplasting: nytt bildeinnlegg → vises i feed; kampbilde → vises i
-   forløpet (raden i media-tabellen skal ha thumbnail_path — kan
-   verifiseres i etterkant).
-3. Disk-cache-beviset: bla i feeden, drep appen, FLYMODUS, åpne igjen —
-   bildene skal vises fra disk.
-4. Vanlig røyk-test: innlogging, feed, event, live-kamp, varsler.
-Deretter: PR + merge når GitHub virker (Brage merger selv, PR opprettes
-eksplisitt), TestFlight (A+B som ÉN slipp), exit-avlesning (−80 % egress
-i Usage→Bandwidth over ~2 uker; P13-lista). EKSTERNT (valgfritt før
-TestFlight): Sentry-prosjekt + DSN i .env (nativedelen er nå i bygget).
+- ✅ **B1 TELEFONTESTET OK (Brage, 2026-08-18): HELE FASE B ER FERDIG.**
+  Rotasjon/EXIF i orden (kamera + kamerarull), opplasting virker, bildene
+  «lastes inn med en gang» (disk-cachen + thumbs i praksis). Ett funn under
+  testen, fikset og committet: pickeren rapporterer ugyldige `image/jpg`
+  som bucket-grensene fra A avviser med 415 — normaliseres nå til
+  `image/jpeg` i pickeren. Feilen VAR svelget i to ledd (composerens
+  tomme catch + upload uten svarkropp); dev-alerter viser nå serverens
+  feilmelding, prod er fortsatt rolig. Valgfritt, ikke gjort: eksplisitt
+  flymodus-test av disk-cachen og thumbnail_path-sjekk i DB.
+
+**GJENSTÅR AV EGRESS-PLANEN (Fase A+B er kode-KOMPLETT og verifisert):**
+1. PR + merge til main når GitHub virker (Brage merger selv, PR opprettes
+   eksplisitt på forespørsel; branchen er MANGE commits foran origin —
+   husk push først).
+2. TestFlight (A+B som ÉN slipp). EKSTERNT valgfritt før den:
+   Sentry-prosjekt + DSN i .env (nativedelen er i bygget).
+3. Exit-avlesning: −80 % egress i Usage→Bandwidth over ~2 uker (P13).
+4. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
+Fase C er terskelstyrt — bygg ingenting.
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
