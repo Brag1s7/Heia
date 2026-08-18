@@ -58,6 +58,15 @@ async function makeThumb(displayUri: string): Promise<string | null> {
   }
 }
 
+// Pickeren rapporterer 'image/jpg' på iOS — en UGYLDIG MIME-type (riktig er
+// 'image/jpeg'), og bucket-grensene fra A avviser den med 415
+// InvalidMimeType. Før grensene ble satt slapp den gjennom, så feilen var
+// usynlig frem til B1-telefontesten.
+function normalizeMime(type: string | undefined): string {
+  const t = type?.toLowerCase();
+  return !t || t === 'image/jpg' ? 'image/jpeg' : t;
+}
+
 function toPickedImage(asset: Asset | undefined): PickedImage | null {
   if (!asset?.uri) return null;
   return {
@@ -65,7 +74,7 @@ function toPickedImage(asset: Asset | undefined): PickedImage | null {
     fileUri: asset.uri,
     // Fylles av runPicker for lagbilder; logoer trenger ingen (512-master).
     thumbUri: null,
-    mimeType: asset.type ?? 'image/jpeg',
+    mimeType: normalizeMime(asset.type),
     fileName: asset.fileName ?? 'bilde.jpg',
     // Kun metadata på media-raden — aldri brukt til å avvise et bilde.
     sizeBytes: asset.fileSize ?? 0,

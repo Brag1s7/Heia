@@ -52,6 +52,9 @@ export async function uploadFileToBucket(opts: {
   );
 
   if (result.status !== 200) {
-    throw new Error(`Opplastingen feilet (HTTP ${result.status}).`);
+    // Storage-API-et sier ALLTID hvorfor i kroppen («mime type not
+    // supported», RLS-avslag, duplikat …) — uten den er feilen ulesbar.
+    const body = (result.body ?? '').slice(0, 300);
+    throw new Error(`Opplastingen feilet (HTTP ${result.status}): ${body}`);
   }
 }

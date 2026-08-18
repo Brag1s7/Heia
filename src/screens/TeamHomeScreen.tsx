@@ -431,8 +431,14 @@ export function TeamHomeScreen() {
       setSelectedImage(null);
       setBroadcast(false);
       await refetchFeed();
-    } catch {
-      Alert.alert('Kunne ikke publisere', 'Prøv igjen om litt.');
+    } catch (e: any) {
+      // Dev-bygg viser årsaken rett i alerten (upload-helperen legger
+      // serverens svar i meldingen); prod beholder den rolige varianten.
+      if (__DEV__) console.warn('[compose] publisering feilet:', e);
+      Alert.alert(
+        'Kunne ikke publisere',
+        __DEV__ && e?.message ? String(e.message) : 'Prøv igjen om litt.',
+      );
     } finally {
       setPosting(false);
     }
