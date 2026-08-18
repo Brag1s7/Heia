@@ -39,7 +39,10 @@ class AppDelegate: ExpoAppDelegate, UNUserNotificationCenterDelegate {
   // MARK: - Deep links (heia://-skjemaet + Universal Links fra heiaapp.no)
 
   // heia:// — «Åpne Heia-appen»-knappen på landingssidene (web/betaling).
-  func application(
+  // `override` (B1): ExpoAppDelegate implementerer også denne og de tre under.
+  // Vi beholder vår oppførsel uendret — ingen av Heias expo-moduler
+  // (image/file-system) lytter på app-events, så super hoppes bevisst over.
+  override func application(
     _ app: UIApplication,
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
@@ -48,7 +51,7 @@ class AppDelegate: ExpoAppDelegate, UNUserNotificationCenterDelegate {
   }
 
   // Universal Links — krever applinks:heiaapp.no i entitlements + AASA på domenet.
-  func application(
+  override func application(
     _ application: UIApplication,
     continue userActivity: NSUserActivity,
     restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
@@ -64,7 +67,7 @@ class AppDelegate: ExpoAppDelegate, UNUserNotificationCenterDelegate {
   // signatur (Swift-bro-navnene kan variere litt mellom versjoner).
 
   // 'register'-eventet i JS: APNs ga oss enhetens token.
-  func application(
+  override func application(
     _ application: UIApplication,
     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
   ) {
@@ -77,7 +80,7 @@ class AppDelegate: ExpoAppDelegate, UNUserNotificationCenterDelegate {
   // JS-siden håndterer fraværet stille. Kan legges til igjen senere.)
 
   // Innkommende remote-varsel (app i bakgrunn/oppe). Må kalle completion.
-  func application(
+  override func application(
     _ application: UIApplication,
     didReceiveRemoteNotification userInfo: [AnyHashable: Any],
     fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
