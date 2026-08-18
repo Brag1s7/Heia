@@ -221,21 +221,39 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
     endt i pod install — Brages steg). JS-pakkene er installert manuelt i
     stedet; native-wiringen gjenstår (under).
 
-**GJENSTÅR I B1 — NATIVE-RUNDEN (Brage, i egen terminal):** ⚠️ appen KAN
-IKKE kjøre på det gamle bygget nå — expo-image/expo-file-system/compressor
-er native moduler som mangler der. Ikke reload appen før nytt bygg.
-1. Stopp Metro. Kjør `npx install-expo-modules@latest` — den gjør
-   native-wiringen (Podfile/AppDelegate/android; ser at expo alt er i
-   package.json) og AVSLUTTER MED pod install: 20–60 min på denne
-   maskinen, ser død ut på «Configuring the target …» — IKKE Ctrl+C.
-2. Nytt dev-bygg (samme bygg aktiverer Sentry-nativedelen fra B3).
-3. TELEFONTEST FØR FRYS: bilderotasjon/EXIF (portrett + landskap, kamera
-   OG kamerarull; sjekk at både thumb i forløpet og display i galleriet
-   står riktig vei — compressor-EXIF er den kjente risikoen, fallback er
-   compressor 1.19.4 samme dag), opplasting m/ thumbnail_path, og
-   disk-cache-beviset (bilder vises i flymodus etter første lasting).
-Deretter: PR + merge når GitHub virker, TestFlight (A+B),
-exit-avlesning (−80 % egress; P13-lista).
+- ✅ B1 native-runden (2026-08-18): `npx install-expo-modules@latest`
+  kjørt av Brage (nei til Expo CLI-integrasjonen — vi bruker expo-modules
+  som BIBLIOTEKER, ikke Expo som toolchain), pods installert (36 s!),
+  **dev-bygg GRØNT på telefon**. To byggefeil underveis, begge fikset og
+  committet:
+  * Mellomrommet i prosjektstien («Heia Prod») knakk EXConstants-
+    scriptfasen (`bash -l -c "$PODS_TARGET_SRCROOT/…"` ordsplittes).
+    Fikset med fnutter — patchet i Pods-prosjektet OG som idempotent
+    post_install-hook i Podfilen (overlever pod install). Følgefeilen
+    «No such module 'Expo'» forsvant med den.
+  * AppDelegate: `override` på de fire app-event-metodene
+    ExpoAppDelegate også implementerer (deep links + push); oppførsel
+    uendret, super bevisst ikke kalt (ingen av våre expo-moduler lytter).
+  * PROSESSLÆRDOM: `npm run ios` passer IKKE Brages flyt — den spawner
+    egen Metro i eget terminalvindu (port 8081-konflikt-risiko). Flyten
+    er: Metro via `npm start` i Cursor, bygg fra Xcode.
+
+**GJENSTÅR I B1 — KUN TELEFONTEST FØR FRYS (bygget er grønt):**
+1. ROTASJON/EXIF (skiva fryses ikke før denne er OK): portrett + landskap,
+   kamera OG kamerarull; sjekk at bildet står riktig vei i feed (display),
+   kampforløp/rail (thumb) og galleri. Compressor-EXIF er den kjente
+   risikoen — fallback er compressor 1.19.4 (samme API), byttet tar
+   minutter.
+2. Opplasting: nytt bildeinnlegg → vises i feed; kampbilde → vises i
+   forløpet (raden i media-tabellen skal ha thumbnail_path — kan
+   verifiseres i etterkant).
+3. Disk-cache-beviset: bla i feeden, drep appen, FLYMODUS, åpne igjen —
+   bildene skal vises fra disk.
+4. Vanlig røyk-test: innlogging, feed, event, live-kamp, varsler.
+Deretter: PR + merge når GitHub virker (Brage merger selv, PR opprettes
+eksplisitt), TestFlight (A+B som ÉN slipp), exit-avlesning (−80 % egress
+i Usage→Bandwidth over ~2 uker; P13-lista). EKSTERNT (valgfritt før
+TestFlight): Sentry-prosjekt + DSN i .env (nativedelen er nå i bygget).
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
