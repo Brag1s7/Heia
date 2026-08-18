@@ -177,8 +177,8 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
     sendDefaultPii false. JS-feil fanges så snart DSN settes; NATIVE
     crash-handler krever pod install + nytt bygg (tas i B1-runden).
     ⚠️ EKSTERNE STEG FOR BRAGE: opprett Sentry-prosjekt → legg DSN i .env
-    (+ TestFlight-byggets env); `@sentry/react-native@8.23.0` er i
-    package.json, så NESTE pod install plukker nativedelen automatisk.
+    (+ TestFlight-byggets env). `pod install` er KJØRT 2026-08-18 (RNSentry
+    8.23.0 i Podfile.lock) — nativedelen er med fra NESTE bygg.
   * Vaktene OPPDATERT + utvidet: feedRefetch (payload-først-test: 👏 = 0
     kall og ingen heroer, ekko ignorert, DELETE-teller, kommentar ±,
     post-patch/-fjerning, nytt innlegg = kun side 1, reconnect = resync),
