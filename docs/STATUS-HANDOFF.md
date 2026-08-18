@@ -273,7 +273,7 @@ Fase C er terskelstyrt — bygg ingenting.
    **Status: GODKJENT AV BRAGE 2026-08-18 (B1–B6 avgjort; B4 web-stack
    åpen til fase B) — ✅ FASE A1 (backend) BYGGET OG DEPLOYET TIL PROD
    2026-08-18 (kveld):** migrasjon `00062_autoritetsmodell` +
-   `00063_autoritet_varsling` pushet (backfill ren: 0 foreldreløse,
+   `00063_autoritet_varsling` + `00064_redeem_outcomes` pushet (backfill ren: 0 foreldreløse,
    alle 5 manager-rader enhets-scopet — Ridabu/Stange/Nes);
    Edge Functions deployet: NY `payments-notify` (varslingsnav +
    token-eierskap B3), NY `submit-club-claim` (server-side brreg),
@@ -281,11 +281,22 @@ Fase C er terskelstyrt — bygg ingenting.
    død server-side), `claim-notify` (nominee-bevis). Røyktestet:
    anon → 42501 på alle nye RPC-er, payments-notify/submit uten
    auth → 401, `heia_support_defaults` = 7900/2405/6000.
-   **GJENSTÅR FØR A1-EXIT: kjør
-   `~/Documents/Heia-Stripe-Spike/verify-00062.sql` i SQL-editoren**
-   (selvforsynt, 37 tester, ruller ALLTID tilbake — rapporten kommer
-   som avsluttende exception «VERIFY-RAPPORT»; management-API-tokenet
-   i nøkkelringen matchet ikke API-et, derfor manuell kjøring).
+   **VERIFY-KJØRING 1 (Brage, 2026-08-18): 36/37 grønt — den ene røde
+   var et EKTE FUNN, ikke en testfeil:** PL/pgSQL ruller tilbake alt
+   arbeid i en funksjon som avslutter med RAISE EXCEPTION, så
+   forsøkslogging (`invite_attempt_invalid`), utløps-statusflippen og
+   sikkerhetsvarselet ved suspendert utsteder forsvant sammen med
+   feilmeldingen — tre låste krav var ikke oppfylt i praksis (rollen
+   ble aldri gitt, så sikkerheten var intakt; det var sporet som
+   manglet). Fikset i **00064**: forventede utfall returneres som
+   outcome (`accepted|awaiting_review|invalid|expired|suspended` /
+   `declined|invalid` / `issued|suspended`) — BINDENDE KONTRAKT for A2
+   og web. **GJENSTÅR FØR A1-EXIT: kjør oppdatert
+   `~/Documents/Heia-Stripe-Spike/verify-00062.sql` i SQL-editoren på
+   nytt** (nå 38 tester inkl. decline-flyten og bevis for at logging/
+   utløp overlever; ruller ALLTID tilbake — rapporten kommer som
+   avsluttende exception «VERIFY-RAPPORT». Velg «Run without RLS»:
+   verify_results er en TEMP-tabell, sesjonsprivat og rullet tilbake).
    Deretter fase A2 (appflatene). NB: `WEB_INVITE_BASE_URL`-secreten
    er BEVISST ikke satt — invitasjons-e-post er strukturelt av til
    web-landingen finnes (fase B); «En annen»-valget i appen bygges

@@ -395,6 +395,23 @@ betalingssporet.
 15. Grants-hygiene (GRANT authenticated + REVOKE PUBLIC/anon på alt nytt;
     service-role-only der det hører hjemme).
 
+**Migrasjon `00064_redeem_outcomes.sql`** (funnet av verify-00062
+test 21): PL/pgSQL ruller tilbake ALT arbeid i en funksjon som
+avslutter med `RAISE EXCEPTION` — også hendelsesloggingen og
+statusflippen. Tre låste krav var derfor ikke oppfylt i praksis
+(«alle forsøk logges», «utløp håndheves ved innløsning»,
+sikkerhetsvarsel ved suspendert utsteder). Sikkerheten var aldri
+svekket — ingen fikk rolle — men sporet forsvant. **Fiks:** forventede
+utfall RETURNERES som outcome i stedet for exception, så sideeffektene
+committer. **Kontrakt (bindende for A2 + web):**
+`redeem_manager_invitation` → `accepted | awaiting_review | invalid |
+expired | suspended`; `decline_manager_invitation` → `declined |
+invalid`; `issue_manager_invitation` → `issued (+invitation_id) |
+suspended`. Exceptions beholdes kun der ingen sideeffekt skal bevares
+(ikke innlogget, uverifisert e-post, ugyldig input, duplikat, manglende
+rolle). `invalid` skiller bevisst ikke ukjent/brukt/trukket token —
+ops ser forskjellen i hendelsesloggen.
+
 **Migrasjon `00063_autoritet_varsling.sql`:** cron-jobb
 `heia-manager-invitations` (daglig: reminder dag 7, expiry dag 14 med
 status-flip, claimant-varsler og managerløs-sjekk; `cron.unschedule`-
@@ -424,7 +441,7 @@ guard som 00055). NB: selve pg_net-hjelperen
   nominee-info i e-posten).
 
 **Verifikasjon `verify-00062.sql`** (spike-mappe-mønsteret, selvforsynt,
-ruller alltid tilbake) — minimum: backfill-korrekthet (Ridabu → enhet;
+ruller alltid tilbake; dekker 00062+00063+00064, 38 tester) — minimum: backfill-korrekthet (Ridabu → enhet;
 foreldreløse slettet) · orgnr-unik åpen claim (race) · submit-stopp mot
 aktivert enhet og åpen prosess · approve-hardstopp mot aktiv link/påbegynt
 konto · selv-nominasjon → rolle + event, ingen rolle ved annen-nominasjon ·
@@ -433,8 +450,9 @@ utløp lat; revoke/reissue · ops-review-beslutningene · siste-aktive-vernet
 (remove avvises; suspend tillates) · kontosletting → event + managerløs ·
 `approve_team_support` krever kanonisk aktiv + defaults; reject uten ·
 delfeil-telleren · enhets-scopet overview · lagflytting auditert ·
-forbid_mutation på events · anon=false på ALT nytt (PUBLIC-revoke
-verifisert i prod, 00046-lærdommen).
+forbid_mutation på events · at forsøkslogg, utløpsflipp og
+sikkerhetsvarsel OVERLEVER (00064) · decline-flyten · anon=false på ALT
+nytt (PUBLIC-revoke verifisert i prod, 00046-lærdommen).
 
 **Backfill-/migreringssikkerhet:** dump av `club_payment_managers` og
 `club_claims` til spike-mappen FØR push (service-nøkkel; kommandoen i
