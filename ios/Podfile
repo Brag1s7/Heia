@@ -67,5 +67,21 @@ target 'Heia2' do
         )
       end
     end
+
+    # Mellomrommet i prosjektstien («Heia Prod») knekker EXConstants-fasen:
+    # `bash -l -c "$PODS_TARGET_SRCROOT/…"` ordsplittes av bash på mellomrom,
+    # som prøver å kjøre `/Users/…/Heia` → hele Pods-bygget stopper (og
+    # AppDelegate får følgefeilen «No such module 'Expo'»). Pakk stien i
+    # egne fnutter. Idempotent: skriver kun når fasen mangler fiksen.
+    fixed_script =
+      'bash -l -c "\"$PODS_TARGET_SRCROOT/../scripts/get-app-config-ios.sh\""'
+    installer.pods_project.targets.each do |target|
+      next unless target.name == 'EXConstants'
+      target.build_phases.each do |phase|
+        next unless phase.respond_to?(:name) &&
+                    phase.name.to_s.include?('Generate app.config')
+        phase.shell_script = fixed_script if phase.shell_script != fixed_script
+      end
+    end
   end
 end
