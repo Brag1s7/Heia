@@ -281,26 +281,58 @@ Fase C er terskelstyrt — bygg ingenting.
    død server-side), `claim-notify` (nominee-bevis). Røyktestet:
    anon → 42501 på alle nye RPC-er, payments-notify/submit uten
    auth → 401, `heia_support_defaults` = 7900/2405/6000.
-   **VERIFY-KJØRING 1 (Brage, 2026-08-18): 36/37 grønt — den ene røde
-   var et EKTE FUNN, ikke en testfeil:** PL/pgSQL ruller tilbake alt
-   arbeid i en funksjon som avslutter med RAISE EXCEPTION, så
-   forsøkslogging (`invite_attempt_invalid`), utløps-statusflippen og
+   **✅ A1 ER FERDIG OG VERIFISERT 2026-08-18: verify-00062.sql kjørt
+   av Brage i SQL-editoren — 38/38 GRØNT** (selvforsynt, rullet
+   tilbake). Første kjøring ga 36/37 og avdekket et EKTE FUNN, ikke en
+   testfeil: PL/pgSQL ruller tilbake alt arbeid i en funksjon som
+   avslutter med RAISE EXCEPTION, så forsøkslogging
+   (`invite_attempt_invalid`), utløps-statusflippen og
    sikkerhetsvarselet ved suspendert utsteder forsvant sammen med
-   feilmeldingen — tre låste krav var ikke oppfylt i praksis (rollen
-   ble aldri gitt, så sikkerheten var intakt; det var sporet som
-   manglet). Fikset i **00064**: forventede utfall returneres som
-   outcome (`accepted|awaiting_review|invalid|expired|suspended` /
-   `declined|invalid` / `issued|suspended`) — BINDENDE KONTRAKT for A2
-   og web. **GJENSTÅR FØR A1-EXIT: kjør oppdatert
-   `~/Documents/Heia-Stripe-Spike/verify-00062.sql` i SQL-editoren på
-   nytt** (nå 38 tester inkl. decline-flyten og bevis for at logging/
-   utløp overlever; ruller ALLTID tilbake — rapporten kommer som
-   avsluttende exception «VERIFY-RAPPORT». Velg «Run without RLS»:
-   verify_results er en TEMP-tabell, sesjonsprivat og rullet tilbake).
-   Deretter fase A2 (appflatene). NB: `WEB_INVITE_BASE_URL`-secreten
-   er BEVISST ikke satt — invitasjons-e-post er strukturelt av til
-   web-landingen finnes (fase B); «En annen»-valget i appen bygges
-   bak featureflagg i A2. Beslutningsfrys
+   feilmeldingen — tre låste krav var ikke oppfylt i praksis (ingen
+   rolle ble gitt, så sikkerheten var intakt; det var SPORET som
+   manglet). Fikset i **00064**, som gir den BINDENDE KONTRAKTEN for
+   A2 og web: `redeem_manager_invitation` →
+   `accepted|awaiting_review|invalid|expired|suspended`,
+   `decline_manager_invitation` → `declined|invalid`,
+   `issue_manager_invitation` → `issued (+invitation_id)|suspended`.
+   Exceptions kun der ingen sideeffekt skal bevares. Verify dekker nå
+   38 tester (17/21/24 beviser at loggingen OVERLEVER, 38 = decline).
+
+   **▶️ NESTE: FASE A2 — APPFLATENE** (ren JS, Metro-reload, ingen
+   native, ingen migrasjoner). Innholdet, fra faseplanens Del V:
+   * `SupportSetupScreen`: nominasjonsvalget «Jeg» / «En annen i
+     klubben» (sistnevnte BAK FEATUREFLAGG til web-landingen er live —
+     ingen død brukerreise); nye `awaiting_manager`-kort
+     (invitert/avslått/utløpt → kontaktvei hello@heiaapp.no);
+     KYC-kortet viser CTA kun ved `can_onboard` (aktiv
+     betalingsansvarlig), ellers «venter på at [navn] fullfører hos
+     Stripe»; **Share-arket FJERNES** (gaten er alt død server-side);
+     `submitClubClaim` går over til Edge-funksjonen `submit-club-claim`
+     (dev-bygg beholder direkte-RPC som «Send likevel (testdata)»).
+   * `ClubPaymentsScreen`: enhets-gruppering (payload har nå `entity`,
+     `clubs[]`, `managers[]`, `invitations[]`); rolleadmin-seksjon med
+     «Inviter ny betalingsansvarlig»; **«Fullfør deaktiveringen»** når
+     `unresolved_cancellations > 0` (delfeil-fiksen fra gamle K2);
+     designavstemming (ikoner i stedet for emoji-loggen, tokens i
+     stedet for hardkodet gult #FFF4D6).
+   * Ops: `OpsClaimDetailScreen` viser nominee + tildelingsutfall; NY
+     `OpsEntitiesScreen` («Klubber og roller» i Profil-stacken) på
+     `ops_list_payment_entities` — enheter, managere, invitasjoner,
+     REVIEW-KØEN (bekreft/avvis avvik), suspender/reaktiver/fjern,
+     utsted/trekk invitasjon, flytt lag (`ops_move_team_to_club`).
+   * API-laget (`payments.ts`, `clubPayments.ts`, `ops.ts`): nye typer
+     + outcome-håndtering etter 00064-kontrakten.
+   * Exit A2: suite grønn + lint ren, alle nye flater navigerbare i
+     dev-bygg, «En annen»-flagget AV, ingen døde CTA-er.
+   Deretter: **profilryddingen** (B6 — etter A2, før lanserings-QA),
+   så **A3 dogfood** (selvnominasjon på Ridabu J2019, seks scenarier),
+   så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbbetalinger
+   /ops på web → full nominasjon-av-annen-dogfood). Stange/Nes-testdata
+   ryddes FØRST etter fase B-dogfooden (de er motpart i testene).
+   NB: `WEB_INVITE_BASE_URL`-secreten er BEVISST ikke satt —
+   invitasjons-e-post er strukturelt av til web-landingen finnes.
+
+   Beslutningsfrys
    + komplett faseplan (A1 backend / A2 app / A3 selvnominasjon-dogfood
    / B web + full dogfood, med verify-scripts, exit-kriterier og
    rollback): `docs/AUTORITET-KLUBBBETALINGER-2026-08.md` + PAYMENTS.md
