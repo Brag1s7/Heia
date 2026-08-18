@@ -27,6 +27,7 @@ import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar, ListRow, ListRowSkeleton, TeamBadge} from '../components';
 import {
   Bell,
+  Building2,
   Check,
   ChevronRight,
   FileText,
@@ -527,6 +528,17 @@ export function ProfilScreen() {
               subtitle="Klubbsøknader til behandling"
               right={<RowChevron />}
               onPress={() => navigation.navigate('OpsClaims')}
+            />
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Building2 size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Klubber og roller"
+              subtitle="Betalingsansvarlige, invitasjoner og avvikskontroll"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('OpsEntities')}
               showBorder={false}
             />
           </View>

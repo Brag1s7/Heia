@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TextInput,
+  Pressable,
   ScrollView,
   Alert,
   AppState,
@@ -10,7 +11,6 @@ import {
   Linking,
   Platform,
   RefreshControl,
-  Share,
   StyleSheet,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -22,11 +22,14 @@ import {useActiveTeam, useAuth} from '../context';
 import {
   getSupportActivationStatus,
   submitClubClaim,
+  submitClubClaimDirect,
   startStripeOnboarding,
   requestTeamSupportApproval,
+  type ClaimNominee,
   type SupportActivationStatus,
 } from '../lib/api';
 import {lookupBrregEnhet} from '../lib/brreg';
+import {WEB_INVITE_LANDING_LIVE} from '../shared/flags';
 import type {ProfilStackParamList} from '../shared/types';
 
 /**
@@ -34,7 +37,23 @@ import type {ProfilStackParamList} from '../shared/types';
  * via Laginnstillinger. Flyten: søknad (claim) → manuell Heia-review →
  * Stripe-onboarding via kortlevd lenke → aktiv. All status kommer fra
  * get_support_activation_status; webhookene (fase 2) flytter den.
+ *
+ * Autoritetsmodellen v2 (LÅST 2026-08-18, docs/AUTORITET-KLUBBBETALINGER-
+ * 2026-08.md) endrer tre ting her:
+ *  1. NOMINASJON — «Hvem skal være betalingsansvarlig?» stilles i skjemaet.
+ *     «En annen i klubben» ender i en invitasjon som bare kan aksepteres på
+ *     nettsiden, og er derfor featureflagget til web-landingen er live
+ *     (`WEB_INVITE_LANDING_LIVE`) — ingen død brukerreise.
+ *  2. KYC-GATEN — Account Link genereres kun av AKTIV betalingsansvarlig
+ *     (`canOnboard`). Share-arket er FJERNET: lenken skal aldri distribueres
+ *     via e-post/melding (Stripes føringer, II.8).
+ *  3. `awaiting_manager` — verifisert klubb uten aktiv betalingsansvarlig.
+ *     Treneren skal se HVA som mangler og hvem det venter på, ikke en CTA
+ *     serveren uansett ville avvist.
  */
+
+/** Kontaktkanalen når en nominasjon har gått i stå (II.6). */
+const CONTACT = 'hello@heiaapp.no';
 export function SupportSetupScreen() {
   const insets = useSafeAreaInsets();
   const navigation =
@@ -54,6 +73,12 @@ export function SupportSetupScreen() {
   const [role, setRole] = useState('');
   const [email, setEmail] = useState(session?.user?.email ?? '');
   const [phone, setPhone] = useState('');
+  // Nominasjonen (v2). Default er «Jeg» — og det ENESTE valget til
+  // web-landingen finnes, se WEB_INVITE_LANDING_LIVE.
+  const [nomineeIsSelf, setNomineeIsSelf] = useState(true);
+  const [nomineeName, setNomineeName] = useState('');
+  const [nomineeEmail, setNomineeEmail] = useState('');
+  const [nomineePhone, setNomineePhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [linkLoading, setLinkLoading] = useState(false);
   const [requesting, setRequesting] = useState(false);
@@ -92,18 +117,35 @@ export function SupportSetupScreen() {
     setRefreshing(false);
   }, [load]);
 
-  // Selve innsendingen — registerets navn er autoritativt når vi har det.
+  // Nominasjonen som DB-en/Edge-funksjonen forstår. «En annen» kan bare
+  // oppstå når flagget er på — vaktene i submit_club_claim krever navn +
+  // e-post, og skjemaet slipper deg ikke til uten.
+  const buildNominee = useCallback((): ClaimNominee => {
+    if (nomineeIsSelf || !WEB_INVITE_LANDING_LIVE) return {isSelf: true};
+    return {
+      isSelf: false,
+      name: nomineeName.trim(),
+      email: nomineeEmail.trim(),
+      phone: nomineePhone.trim() || undefined,
+    };
+  }, [nomineeIsSelf, nomineeName, nomineeEmail, nomineePhone]);
+
+  // Selve innsendingen. Prod-veien går ALLTID gjennom Edge-funksjonen
+  // `submit-club-claim` (server-side Brønnøysund-håndhevelse, II.10);
+  // `direct` er dev-bygg-veien for testdata som ikke finnes i registeret.
   const doSubmit = useCallback(
-    async (clubId: string, submitLegalName: string) => {
+    async (clubId: string, submitLegalName: string, direct = false) => {
+      const input = {
+        clubId,
+        orgNumber,
+        legalName: submitLegalName,
+        role,
+        contactEmail: email,
+        contactPhone: phone.trim() || undefined,
+        nominee: buildNominee(),
+      };
       try {
-        await submitClubClaim({
-          clubId,
-          orgNumber,
-          legalName: submitLegalName,
-          role,
-          contactEmail: email,
-          contactPhone: phone.trim() || undefined,
-        });
+        await (direct ? submitClubClaimDirect(input) : submitClubClaim(input));
         setShowForm(false);
         await load();
       } catch (e: any) {
@@ -112,7 +154,7 @@ export function SupportSetupScreen() {
         setSubmitting(false);
       }
     },
-    [orgNumber, role, email, phone, load],
+    [orgNumber, role, email, phone, buildNominee, load],
   );
 
   // Produksjonsvalidering mot Brønnøysund FØR innsending (Brages beslutning
@@ -133,7 +175,9 @@ export function SupportSetupScreen() {
         buttons.push({
           text: 'Send likevel (testdata)',
           style: 'destructive',
-          onPress: () => doSubmit(clubId, legalName),
+          // Direkte på RPC-en: Edge-funksjonen ville avvist et orgnr som
+          // ikke finnes i registeret — det er hele poenget med den.
+          onPress: () => doSubmit(clubId, legalName, true),
         });
       }
       Alert.alert(
@@ -187,17 +231,6 @@ export function SupportSetupScreen() {
     if (url) Linking.openURL(url);
   }, [fetchOnboardingUrl]);
 
-  const handleShareLink = useCallback(async () => {
-    const url = await fetchOnboardingUrl();
-    if (!url) return;
-    await Share.share({
-      message:
-        'Her er lenken for å registrere klubben hos Stripe, slik at ' +
-        'supporterstøtten i Heia kan utbetales til klubben. Lenken varer ' +
-        `bare en kort stund — åpne den med en gang: ${url}`,
-    });
-  }, [fetchOnboardingUrl]);
-
   // Klubbdøren (00047): «Be om godkjenning» — null friksjon, ingenting å
   // fylle ut. Betalingsansvarlig i klubben får varsel og godkjenner med
   // ett trykk; laget arver klubbens standardtilbud automatisk.
@@ -218,11 +251,133 @@ export function SupportSetupScreen() {
   }, [activeTeamSpaceId, requesting, load]);
 
   const clubName = status?.club?.name ?? activeTeam?.club?.name ?? 'klubben';
+  const nomineeOk =
+    nomineeIsSelf ||
+    !WEB_INVITE_LANDING_LIVE ||
+    (nomineeName.trim().length > 0 && nomineeEmail.includes('@'));
   const canSubmit =
     orgNumber.replace(/\D/g, '').length === 9 &&
     legalName.trim().length > 0 &&
     role.trim().length > 0 &&
-    email.includes('@');
+    email.includes('@') &&
+    nomineeOk;
+
+  // ------------------------------------------------------------------
+  // Avledet tekst for autoritetsmodellens ventetilstander (v2).
+  // ------------------------------------------------------------------
+  const pending = status?.managerPending ?? null;
+  const pendingName = pending?.invitedName ?? null;
+
+  // `awaiting_manager`: klubben er godkjent, men ingen har rollen. Hva som
+  // står i veien avhenger av siste invitasjon — og alle blindveier ender i
+  // en kontaktvei, aldri i en knapp som ikke gjør noe.
+  const awaitingManagerBody = (() => {
+    const who = pendingName ?? 'den som ble nominert';
+    switch (pending?.status) {
+      case 'invited':
+        return `${who} er invitert til å være betalingsansvarlig for klubben. Støtten åpner når invitasjonen er akseptert — vi purrer automatisk.`;
+      case 'in_review':
+        return `${who} har takket ja, og Heia bekrefter identiteten før rollen aktiveres. Det pleier å gå raskt.`;
+      case 'declined':
+        return `${who} takket nei til å være betalingsansvarlig. Skriv til ${CONTACT}, så setter vi opp en ny nominasjon.`;
+      case 'expired':
+        return `Invitasjonen til ${who} gikk ut på tid. Skriv til ${CONTACT}, så sender vi en ny.`;
+      case 'revoked':
+        return `Invitasjonen til ${who} ble trukket tilbake. Skriv til ${CONTACT}, så setter vi opp en ny nominasjon.`;
+      default:
+        return `Klubben er godkjent, men ingen står registrert som betalingsansvarlig ennå. Heia er varslet og ordner det — haster det, skriv til ${CONTACT}.`;
+    }
+  })();
+
+  // Brukes der KYC-CTA-en er borte fordi du ikke er betalingsansvarlig.
+  // NB: payloaden bærer navnet kun i `awaiting_manager` (manager_pending) —
+  // i de øvrige tilstandene finnes en aktiv ansvarlig, men navnet hens er
+  // ikke med i get_support_activation_status. Teksten er derfor presis uten
+  // å påstå et navn vi ikke har.
+  const waitingForManagerLine = pendingName
+    ? `Vi venter på at ${pendingName} fullfører registreringen hos Stripe.`
+    : 'Vi venter på at klubbens betalingsansvarlige fullfører registreringen hos Stripe.';
+
+  // Klubbdøren (port 3) — samme kort i `active` og `awaiting_manager`.
+  // `managerless` = ingen aktiv betalingsansvarlig: forespørselen forsvinner
+  // ikke, den går til Heia som fallback-mottaker (II.9), og det SIER kortet.
+  const renderDoorCard = (managerless: boolean) => {
+    const doorState = status?.team?.supportState ?? 'none';
+    const approval = status?.team?.approval ?? null;
+
+    if (doorState === 'collecting') {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.pillActive}>SAMLER INN</Text>
+          <Text style={styles.cardTitle}>Laget samler inn støtte</Text>
+          <Text style={styles.body}>
+            «Støtt laget» er åpen for alle i laget — foreldre og supportere
+            finner den på Hjem og i lagkassa.
+          </Text>
+        </View>
+      );
+    }
+
+    if (doorState === 'pending') {
+      return (
+        <View style={styles.card}>
+          <Text style={styles.pillPending}>TIL GODKJENNING</Text>
+          <Text style={styles.cardTitle}>Venter på klubbens godkjenning</Text>
+          <Text style={styles.body}>
+            {managerless
+              ? `Forespørselen er registrert, og Heia er varslet fordi klubben ikke har en betalingsansvarlig ennå. Du får varsel her når laget er godkjent.`
+              : 'Klubbens betalingsansvarlige har fått beskjed og godkjenner laget med ett trykk — du får varsel når det er gjort.'}
+          </Text>
+        </View>
+      );
+    }
+
+    const again =
+      approval?.status === 'rejected' ||
+      doorState === 'paused' ||
+      doorState === 'deactivated';
+
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>
+          {doorState === 'paused'
+            ? 'Støtten er satt på pause'
+            : doorState === 'deactivated'
+              ? 'Støtten er deaktivert'
+              : 'Siste steg: klubbens godkjenning'}
+        </Text>
+        {approval?.status === 'rejected' && approval.note ? (
+          <View style={styles.infoRequestBox}>
+            <Text style={styles.infoRequestTitle}>
+              Forrige forespørsel ble ikke godkjent
+            </Text>
+            <Text style={styles.body}>{approval.note}</Text>
+          </View>
+        ) : null}
+        <Text style={styles.body}>
+          {doorState === 'paused' || doorState === 'deactivated'
+            ? 'Klubbens betalingsansvarlige har stoppet nye ' +
+              'støttespillere for laget. Vil dere åpne igjen, ber ' +
+              'du om godkjenning på nytt.'
+            : 'Klubben bestemmer hvilke lag som samler inn støtte. ' +
+              'Be om godkjenning — betalingsansvarlig får varsel og ' +
+              'godkjenner med ett trykk. Ingenting mer å fylle ut.'}
+        </Text>
+        {managerless && (
+          <Text style={styles.hint}>
+            Klubben mangler en betalingsansvarlig akkurat nå. Forespørselen
+            din går til Heia, som følger den opp.
+          </Text>
+        )}
+        <Button
+          title={again ? 'Be om godkjenning på nytt' : 'Be om godkjenning'}
+          onPress={handleRequestApproval}
+          loading={requesting}
+          style={styles.cardButton}
+        />
+      </View>
+    );
+  };
 
   const renderContent = () => {
     if (loading) {
@@ -297,6 +452,35 @@ export function SupportSetupScreen() {
           </View>
         );
 
+      // Verifisert klubb UTEN aktiv betalingsansvarlig (v2). Ingen KYC-CTA
+      // her — den ville uansett blitt avvist av gaten i stripe-onboarding.
+      case 'awaiting_manager':
+        return (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.pillApproved}>GODKJENT</Text>
+              <Text style={styles.cardTitle}>
+                Venter på klubbens betalingsansvarlige
+              </Text>
+              <Text style={styles.body}>{awaitingManagerBody}</Text>
+              <View style={styles.factBox}>
+                <FactRow
+                  label="Organisasjonsnummer"
+                  value={status.entity?.orgNumber ?? '—'}
+                />
+                <FactRow
+                  label="Mottaker"
+                  value={status.entity?.legalName ?? '—'}
+                />
+              </View>
+              <Text style={styles.hint}>
+                Stemmer ikke dette? Skriv til {CONTACT}.
+              </Text>
+            </View>
+            {renderDoorCard(true)}
+          </>
+        );
+
       case 'pending_onboarding':
       case 'onboarding_started':
       case 'restricted':
@@ -308,35 +492,43 @@ export function SupportSetupScreen() {
                 ? 'Stripe trenger mer informasjon'
                 : `${status.entity?.legalName ?? clubName} er godkjent`}
             </Text>
-            <Text style={styles.body}>
-              {status.state === 'restricted'
-                ? 'Registreringen hos Stripe er ikke helt i mål — fortsett der du slapp, så sier Stripe hva som mangler.'
-                : 'Siste steg: klubben registrerer seg hos Stripe, som håndterer utbetalingene. Den som fullfører bør ha fullmakt til å representere klubben — gjerne kasserer eller styreleder. Du kan også dele lenken med dem.'}
-            </Text>
-            <Button
-              title="Fortsett hos Stripe"
-              onPress={handleOpenStripe}
-              loading={linkLoading}
-              style={styles.cardButton}
-            />
-            <Button
-              title="Del lenken med klubben"
-              variant="ghost"
-              onPress={handleShareLink}
-              disabled={linkLoading}
-            />
-            <Text style={styles.hint}>
-              Lenken varer bare en kort stund — den som får den bør åpne den
-              med en gang.
-            </Text>
+            {status.canOnboard ? (
+              <>
+                <Text style={styles.body}>
+                  {status.state === 'restricted'
+                    ? 'Registreringen hos Stripe er ikke helt i mål — fortsett der du slapp, så sier Stripe hva som mangler.'
+                    : 'Siste steg: du registrerer klubben hos Stripe, som håndterer utbetalingene. Du trenger klubbens organisasjonsopplysninger og kontonummer.'}
+                </Text>
+                <Button
+                  title="Fortsett hos Stripe"
+                  onPress={handleOpenStripe}
+                  loading={linkLoading}
+                  style={styles.cardButton}
+                />
+                <Text style={styles.hint}>
+                  Lenken er personlig og varer bare en kort stund — den kan
+                  ikke deles videre.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.body}>
+                  {waitingForManagerLine} Du får varsel her når klubben er klar
+                  for støtte.
+                </Text>
+                <Text style={styles.hint}>
+                  Registreringen hos Stripe kan bare gjøres av klubbens
+                  betalingsansvarlige — lenken er personlig og deles aldri.
+                  Står det stille, skriv til {CONTACT}.
+                </Text>
+              </>
+            )}
           </View>
         );
 
       case 'active': {
         // Klubben (port 1+2) er åpen — resten avgjøres av klubbdøren
         // (port 3, 00047): lagets egen godkjenning fra betalingsansvarlig.
-        const doorState = status.team?.supportState ?? 'none';
-        const approval = status.team?.approval ?? null;
         return (
           <>
             <View style={styles.card}>
@@ -350,82 +542,29 @@ export function SupportSetupScreen() {
                 <FactRow label="Organisasjonsnummer" value={status.entity?.orgNumber ?? '—'} />
                 <FactRow label="Mottaker" value={status.entity?.legalName ?? '—'} />
               </View>
-              {status.account?.actionNeeded && (
-                <>
+              {status.account?.actionNeeded &&
+                (status.canOnboard ? (
+                  <>
+                    <Text style={styles.body}>
+                      Stripe ber om litt mer informasjon fra klubben.
+                    </Text>
+                    <Button
+                      title="Åpne hos Stripe"
+                      variant="secondary"
+                      onPress={handleOpenStripe}
+                      loading={linkLoading}
+                      style={styles.cardButton}
+                    />
+                  </>
+                ) : (
                   <Text style={styles.body}>
-                    Stripe ber om litt mer informasjon fra klubben.
+                    Stripe ber om litt mer informasjon fra klubben.{' '}
+                    {waitingForManagerLine}
                   </Text>
-                  <Button
-                    title="Åpne hos Stripe"
-                    variant="secondary"
-                    onPress={handleOpenStripe}
-                    loading={linkLoading}
-                    style={styles.cardButton}
-                  />
-                </>
-              )}
+                ))}
             </View>
 
-            {doorState === 'collecting' ? (
-              <View style={styles.card}>
-                <Text style={styles.pillActive}>SAMLER INN</Text>
-                <Text style={styles.cardTitle}>Laget samler inn støtte</Text>
-                <Text style={styles.body}>
-                  «Støtt laget» er åpen for alle i laget — foreldre og
-                  supportere finner den på Hjem og i lagkassa.
-                </Text>
-              </View>
-            ) : doorState === 'pending' ? (
-              <View style={styles.card}>
-                <Text style={styles.pillPending}>TIL GODKJENNING</Text>
-                <Text style={styles.cardTitle}>
-                  Venter på klubbens godkjenning
-                </Text>
-                <Text style={styles.body}>
-                  Klubbens betalingsansvarlige har fått beskjed og godkjenner
-                  laget med ett trykk — du får varsel når det er gjort.
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>
-                  {doorState === 'paused'
-                    ? 'Støtten er satt på pause'
-                    : doorState === 'deactivated'
-                      ? 'Støtten er deaktivert'
-                      : 'Siste steg: klubbens godkjenning'}
-                </Text>
-                {approval?.status === 'rejected' && approval.note ? (
-                  <View style={styles.infoRequestBox}>
-                    <Text style={styles.infoRequestTitle}>
-                      Forrige forespørsel ble ikke godkjent
-                    </Text>
-                    <Text style={styles.body}>{approval.note}</Text>
-                  </View>
-                ) : null}
-                <Text style={styles.body}>
-                  {doorState === 'paused' || doorState === 'deactivated'
-                    ? 'Klubbens betalingsansvarlige har stoppet nye ' +
-                      'støttespillere for laget. Vil dere åpne igjen, ber ' +
-                      'du om godkjenning på nytt.'
-                    : 'Klubben bestemmer hvilke lag som samler inn støtte. ' +
-                      'Be om godkjenning — betalingsansvarlig får varsel og ' +
-                      'godkjenner med ett trykk. Ingenting mer å fylle ut.'}
-                </Text>
-                <Button
-                  title={
-                    approval?.status === 'rejected' ||
-                    doorState === 'paused' ||
-                    doorState === 'deactivated'
-                      ? 'Be om godkjenning på nytt'
-                      : 'Be om godkjenning'
-                  }
-                  onPress={handleRequestApproval}
-                  loading={requesting}
-                  style={styles.cardButton}
-                />
-              </View>
-            )}
+            {renderDoorCard(false)}
 
             {status.isPaymentManager && (
               <View style={styles.card}>
@@ -538,6 +677,79 @@ export function SupportSetupScreen() {
             placeholderTextColor={colors.textTertiary}
           />
 
+          {/* Nominasjonen (v2, II.2). «En annen» er featureflagget til
+              web-landingen er live — se WEB_INVITE_LANDING_LIVE. Med flagget
+              AV er «Jeg» eneste vei, og da er hele valget skjult: ett valg
+              er ikke et valg, det er støy. */}
+          {WEB_INVITE_LANDING_LIVE && (
+            <>
+              <Text style={styles.fieldLabel}>
+                Hvem skal være betalingsansvarlig?
+              </Text>
+              <Text style={styles.hint}>
+                Den betalingsansvarlige registrerer klubben hos Stripe og
+                godkjenner hvilke lag som samler inn støtte. Det er ofte
+                kasserer eller styreleder.
+              </Text>
+              <View style={styles.choiceRow}>
+                <ChoiceCard
+                  title="Jeg"
+                  subtitle="Jeg gjør det selv"
+                  selected={nomineeIsSelf}
+                  onPress={() => setNomineeIsSelf(true)}
+                />
+                <ChoiceCard
+                  title="En annen i klubben"
+                  subtitle="Vi inviterer hen"
+                  selected={!nomineeIsSelf}
+                  onPress={() => setNomineeIsSelf(false)}
+                />
+              </View>
+
+              {!nomineeIsSelf && (
+                <>
+                  <Text style={styles.fieldLabel}>Navn</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={nomineeName}
+                    onChangeText={setNomineeName}
+                    autoCapitalize="words"
+                    placeholder="Fullt navn, slik det står i registeret"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+
+                  <Text style={styles.fieldLabel}>E-post</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={nomineeEmail}
+                    onChangeText={setNomineeEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    placeholder="Invitasjonen sendes hit"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+
+                  <Text style={styles.fieldLabel}>Telefon (valgfritt)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={nomineePhone}
+                    onChangeText={setNomineePhone}
+                    keyboardType="phone-pad"
+                    placeholder="Hvis Heia trenger å ringe"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+
+                  <Text style={styles.hint}>
+                    Heia verifiserer personen før invitasjonen sendes. Den
+                    kan bare aksepteres av en innlogget Heia-konto med samme
+                    e-postadresse.
+                  </Text>
+                </>
+              )}
+            </>
+          )}
+
           <Button
             title="Send søknad"
             onPress={handleSubmit}
@@ -573,6 +785,36 @@ export function SupportSetupScreen() {
         {renderContent()}
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+/** Nominasjonsvalget — to like store kort, «valgt»-språket fra chipsene. */
+function ChoiceCard({
+  title,
+  subtitle,
+  selected,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{selected}}
+      style={({pressed}) => [
+        styles.choiceCard,
+        selected && styles.choiceCardSelected,
+        pressed && styles.choicePressed,
+      ]}>
+      <Text style={[styles.choiceTitle, selected && styles.choiceTitleSelected]}>
+        {title}
+      </Text>
+      <Text style={styles.choiceSubtitle}>{subtitle}</Text>
+    </Pressable>
   );
 }
 
@@ -644,19 +886,54 @@ const styles = StyleSheet.create({
   submitButton: {
     marginTop: spacing.sm,
   },
+  choiceRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  choiceCard: {
+    flex: 1,
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: 2,
+  },
+  choiceCardSelected: {
+    backgroundColor: colors.heiaSoft,
+    borderColor: colors.heia,
+  },
+  choicePressed: {
+    opacity: 0.7,
+  },
+  choiceTitle: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  choiceTitleSelected: {
+    color: colors.heiaInk,
+  },
+  choiceSubtitle: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
   cardButton: {
     alignSelf: 'flex-start',
   },
   infoRequestBox: {
-    backgroundColor: '#FFF4D6',
+    backgroundColor: colors.sun,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.sunBorder,
     padding: spacing.md,
     gap: spacing.xs,
   },
   infoRequestTitle: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: '#8A6D1A',
+    color: colors.goldInk,
   },
   factBox: {
     backgroundColor: colors.background,

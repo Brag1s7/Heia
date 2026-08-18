@@ -13,11 +13,28 @@ export type SupportActivationState =
   | 'claim_submitted'
   | 'claim_in_review'
   | 'claim_rejected'
+  /** Autoritetsmodellen v2 (00062): verifisert enhet UTEN aktiv
+   *  betalingsansvarlig — KYC og port 3 venter på at rollen er på plass. */
+  | 'awaiting_manager'
   | 'pending_onboarding'
   | 'onboarding_started'
   | 'restricted'
   | 'active'
   | 'disabled';
+
+/**
+ * Grovkornet invitasjonsstatus for trenerkortet i `awaiting_manager`.
+ * Serveren mapper `pending → invited` og `awaiting_review → in_review`;
+ * resten er invitasjonsstatusen rå. Treneren ser aldri e-postadressen —
+ * bare navnet som ble nominert, og hva som skjedde.
+ */
+export type ManagerPendingStatus =
+  | 'invited'
+  | 'in_review'
+  | 'declined'
+  | 'expired'
+  | 'revoked'
+  | 'accepted';
 
 export interface SupportActivationStatus {
   state: SupportActivationState;
@@ -46,6 +63,17 @@ export interface SupportActivationStatus {
   } | null;
   /** Er JEG betalingsansvarlig i klubben? (kontekstuell snarvei) */
   isPaymentManager: boolean;
+  /**
+   * KYC-gaten (II.8, LÅST): kun en AKTIV betalingsansvarlig for enheten kan
+   * generere Account Link. Er den false, viser skjermen status og hvem den
+   * venter på — aldri en CTA som uansett ville blitt avvist server-side.
+   */
+  canOnboard: boolean;
+  /** Kun i `awaiting_manager`: siste invitasjon for enheten, grovkornet. */
+  managerPending: {
+    invitedName: string;
+    status: ManagerPendingStatus;
+  } | null;
 }
 
 /** RPC-en returnerer NULL for alle som ikke er lagadmin i laget. */
@@ -96,24 +124,98 @@ export async function getSupportActivationStatus(
         }
       : null,
     isPaymentManager: !!data.is_payment_manager,
+    canOnboard: !!data.can_onboard,
+    managerPending: data.manager_pending
+      ? {
+          invitedName: data.manager_pending.invited_name,
+          status: data.manager_pending.status as ManagerPendingStatus,
+        }
+      : null,
   };
 }
 
-export async function submitClubClaim(input: {
+/**
+ * Nominasjonen (autoritetsmodellen v2, II.2): hvem skal ha myndighet over
+ * klubbens betalinger? Selv-nominasjon gir rollen eksplisitt ved
+ * ops-godkjenning; «en annen» gir en sikker invitasjon ETTER godkjenning
+ * (aksept skjer på nettsiden — se NOMINATE_OTHER_ENABLED).
+ */
+export type ClaimNominee =
+  | {isSelf: true}
+  | {isSelf: false; name: string; email: string; phone?: string};
+
+export interface SubmitClubClaimInput {
   clubId: string;
   orgNumber: string;
   legalName: string;
   role: string;
   contactEmail: string;
   contactPhone?: string;
-}): Promise<string> {
+  nominee: ClaimNominee;
+}
+
+function claimBody(input: SubmitClubClaimInput) {
+  const n = input.nominee;
+  return {
+    club_id: input.clubId,
+    org_number: input.orgNumber,
+    legal_name: input.legalName,
+    role: input.role,
+    contact_email: input.contactEmail,
+    contact_phone: input.contactPhone ?? null,
+    nominee_is_self: n.isSelf,
+    nominee_name: n.isSelf ? null : n.name,
+    nominee_email: n.isSelf ? null : n.email,
+    nominee_phone: n.isSelf ? null : (n.phone ?? null),
+  };
+}
+
+/**
+ * Søknaden går gjennom Edge-funksjonen `submit-club-claim` (v2, II.10):
+ * Brønnøysund-håndhevelsen bor SERVER-SIDE, så en ny klient (web senere)
+ * aldri kan senke listen. RPC-ens egne vakter — lagadmin-gate,
+ * duplikatvernene per klubbrad OG per orgnr, nominasjonsvalideringen —
+ * gjelder uendret, siden funksjonen kaller med brukerens JWT.
+ *
+ * Klientens eget brreg-oppslag beholdes som UX (navne-prefill + rask
+ * feilmelding), ikke som vakt.
+ */
+export async function submitClubClaim(
+  input: SubmitClubClaimInput,
+): Promise<string> {
+  const {data, error} = await supabase.functions.invoke('submit-club-claim', {
+    body: claimBody(input),
+  });
+
+  if (error) {
+    throw new Error(await edgeMessage(error, 'Kunne ikke sende søknaden.'));
+  }
+  if (!data?.claim_id) {
+    throw new Error('Søknaden ble ikke registrert — prøv igjen om litt.');
+  }
+  return data.claim_id as string;
+}
+
+/**
+ * DEV-ONLY testdatavei: forbi Edge-funksjonens registerhåndhevelse, rett på
+ * RPC-en. Brukes av «Send likevel (testdata)» i dev-bygg når orgnummeret
+ * ikke finnes i Brønnøysund. Alle DB-vaktene gjelder fortsatt.
+ */
+export async function submitClubClaimDirect(
+  input: SubmitClubClaimInput,
+): Promise<string> {
+  const b = claimBody(input);
   const {data, error} = await supabase.rpc('submit_club_claim', {
-    p_club_id: input.clubId,
-    p_org_number: input.orgNumber,
-    p_legal_name: input.legalName,
-    p_role: input.role,
-    p_contact_email: input.contactEmail,
-    p_contact_phone: input.contactPhone ?? null,
+    p_club_id: b.club_id,
+    p_org_number: b.org_number,
+    p_legal_name: b.legal_name,
+    p_role: b.role,
+    p_contact_email: b.contact_email,
+    p_contact_phone: b.contact_phone,
+    p_nominee_is_self: b.nominee_is_self,
+    p_nominee_name: b.nominee_name,
+    p_nominee_email: b.nominee_email,
+    p_nominee_phone: b.nominee_phone,
   });
 
   if (error) {
@@ -124,8 +226,11 @@ export async function submitClubClaim(input: {
 
 /**
  * Henter en FERSK onboarding-lenke (Account Links er kortlevde og lagres
- * aldri — fase 0-funn #6). Åpnes i Safari; kan også deles videre til den
- * i klubben som har fullmakt til å fullføre hos Stripe.
+ * aldri — fase 0-funn #6). Åpnes i Safari av den innloggede brukeren.
+ *
+ * v2 (II.8, LÅST): lenken DELES ALDRI videre — Share-arket er fjernet, og
+ * gaten i `stripe-onboarding` er aktiv betalingsansvarlig for enheten
+ * (+ ops-unntak). Kall den derfor kun når `canOnboard` er sann.
  */
 export async function startStripeOnboarding(
   teamSpaceId: string,
@@ -302,8 +407,25 @@ export async function startSupportCheckout(
   return invokeForUrl('stripe-checkout', teamSpaceId, 'betalingslenke');
 }
 
-// Felles for URL-funksjonene: {error: 'norsk melding'} på 4xx/5xx
-// graves frem så Alert-en i skjermen sier noe forståelig.
+// Edge Functions svarer {error: 'norsk melding'} på 4xx/5xx — graves frem
+// her så Alert-en i skjermen sier noe forståelig i stedet for «non-2xx».
+export async function edgeMessage(
+  error: unknown,
+  fallback: string,
+): Promise<string> {
+  try {
+    const ctx = (error as {context?: Response}).context;
+    if (ctx) {
+      const body = await ctx.json();
+      if (body?.error) return String(body.error);
+    }
+  } catch {
+    // behold standardmeldingen
+  }
+  return fallback;
+}
+
+// Felles for URL-funksjonene.
 async function invokeForUrl(
   fn: 'stripe-onboarding' | 'stripe-checkout' | 'stripe-portal',
   teamSpaceId: string | null,
@@ -314,17 +436,9 @@ async function invokeForUrl(
   });
 
   if (error) {
-    let message = 'Noe gikk galt — prøv igjen om litt.';
-    try {
-      const ctx = (error as {context?: Response}).context;
-      if (ctx) {
-        const body = await ctx.json();
-        if (body?.error) message = body.error;
-      }
-    } catch {
-      // behold standardmeldingen
-    }
-    throw new Error(message);
+    throw new Error(
+      await edgeMessage(error, 'Noe gikk galt — prøv igjen om litt.'),
+    );
   }
   if (!data?.url) {
     throw new Error(`Fikk ingen ${what} — prøv igjen om litt.`);

@@ -47,6 +47,7 @@ import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {TeamSettingsScreen} from '../screens/TeamSettingsScreen';
 import {SupportSetupScreen} from '../screens/SupportSetupScreen';
 import {OpsClaimsScreen} from '../screens/OpsClaimsScreen';
+import {OpsEntitiesScreen} from '../screens/OpsEntitiesScreen';
 import {OpsClaimDetailScreen} from '../screens/OpsClaimDetailScreen';
 import {ClubPaymentsScreen} from '../screens/ClubPaymentsScreen';
 import {InboxScreen} from '../screens/InboxScreen';
@@ -211,6 +212,7 @@ function ProfilStackNavigator() {
         name="OpsClaimDetail"
         component={OpsClaimDetailScreen}
       />
+      <ProfilNav.Screen name="OpsEntities" component={OpsEntitiesScreen} />
       <ProfilNav.Screen name="ClubPayments" component={ClubPaymentsScreen} />
       <ProfilNav.Screen name="Invite" component={InviteScreen} />
       <ProfilNav.Screen name="JoinTeamCode" component={JoinTeamCodeScreen} />

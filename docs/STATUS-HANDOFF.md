@@ -298,8 +298,12 @@ Fase C er terskelstyrt — bygg ingenting.
    Exceptions kun der ingen sideeffekt skal bevares. Verify dekker nå
    38 tester (17/21/24 beviser at loggingen OVERLEVER, 38 = decline).
 
-   **▶️ NESTE: FASE A2 — APPFLATENE** (ren JS, Metro-reload, ingen
-   native, ingen migrasjoner). Innholdet, fra faseplanens Del V:
+   **✅ FASE A2 ER FERDIG 2026-08-18 (ren JS — ingen migrasjoner, ingen
+   native). Suiten grønn (164), lint identisk med baseline (13 kjente),
+   og TELEFONTESTET OK av Brage samme kveld: «Alt funker på
+   telefonen.»** Alt under er implementert; to kjente avvik er
+   DOKUMENTERT nederst i bolken (ingen av dem blokkerer A3).
+   Innholdet, fra faseplanens Del V:
    * `SupportSetupScreen`: nominasjonsvalget «Jeg» / «En annen i
      klubben» (sistnevnte BAK FEATUREFLAGG til web-landingen er live —
      ingen død brukerreise); nye `awaiting_manager`-kort
@@ -324,8 +328,81 @@ Fase C er terskelstyrt — bygg ingenting.
      + outcome-håndtering etter 00064-kontrakten.
    * Exit A2: suite grønn + lint ren, alle nye flater navigerbare i
      dev-bygg, «En annen»-flagget AV, ingen døde CTA-er.
-   Deretter: **profilryddingen** (B6 — etter A2, før lanserings-QA),
-   så **A3 dogfood** (selvnominasjon på Ridabu J2019, seks scenarier),
+
+   **SLIK BLE A2 BYGGET (filer + avgjørelser):**
+   * NY `src/shared/flags.ts` → `WEB_INVITE_LANDING_LIVE = false`.
+     UTVIDET SCOPE mot faseplanen, bevisst: flagget skjuler BEGGE
+     inngangene som ender i en invitasjon — «En annen i klubben» i
+     SupportSetup OG «Inviter ny betalingsansvarlig» i
+     ClubPayments-rolleadmin. Grunn: aksept skjer kun på web, e-posten
+     er gated på `WEB_INVITE_BASE_URL`, og rå-tokenet finnes ALDRI i
+     basen (B3) — en manager-utstedt invitasjon i dag kan derfor ikke
+     innløses av noen, heller ikke med ops-hjelp. Det er en død CTA, og
+     exit-kriteriet forbyr dem. Ops-flatens «Utsted invitasjon» er
+     BEVISST ikke flagget (behandlet beslutning m/ begrunnelse, og
+     flaten viser selv «IKKE SENDT»). ÉN flipp i fase B-1 slår på alt.
+   * `payments.ts`: `awaiting_manager` + `canOnboard` + `managerPending`
+     i statustypen; `submitClubClaim` går nå via Edge-funksjonen
+     (`submitClubClaimDirect` er dev-veien for «Send likevel
+     (testdata)»); `edgeMessage` trukket ut og delt med clubPayments.
+   * `clubPayments.ts`: enhets-payloaden (`entity.id`, `clubs[]`,
+     `managers[]`, `invitations[]`, `unresolvedCancellations`) +
+     `issueManagerInvitation` med 00064-utfallet som DATA
+     (`issued|suspended` — aldri exception, ellers ryker
+     sikkerhetsvarselet).
+   * `ops.ts`: `opsListPaymentEntities` + hele ops-settet (utsted/trekk,
+     bekreft/avvis review, suspender/reaktiver/fjern, flytt lag),
+     `opsApproveClaim` returnerer nå tildelingsutfallet, og brreg-
+     snapshotet mapper nominee-feltene (`nomineeIsSelf`,
+     `nominertIRegisteret`, `matchNominert`). `opsListTeamsForClubs`
+     leser `teams` direkte (RLS: alle innloggede, 00005) — grunnlaget
+     for «Flytt lag» uten ny RPC.
+   * `SupportSetupScreen`: nominasjonsvalget (to ChoiceCards, bak
+     flagg), `awaiting_manager`-kortene med kontaktvei per
+     invitasjonsutfall, KYC-CTA kun ved `canOnboard`, Share-arket +
+     `Share`-importen BORTE, klubbdør-kortet trukket ut i
+     `renderDoorCard(managerless)` (gjenbrukt i `active` og
+     `awaiting_manager`; managerløs variant sier at Heia er varslet —
+     II.9-fallbacken).
+   * `ClubPaymentsScreen`: enhets-gruppering (juridisk navn som
+     overskrift, klubbrader listet når det er flere),
+     BETALINGSANSVARLIGE-seksjon (managere + åpne invitasjoner),
+     «Fullfør deaktiveringen» i eget solskinnskort per lag med
+     `unresolvedCancellations > 0`, emoji-loggen → Lucide-ikoner,
+     `#FFF4D6`/`#8A6D1A` → `colors.sun`/`sunBorder`/`goldInk`.
+   * NY `OpsEntitiesScreen` + rute `OpsEntities` i Profil-stacken (rad
+     «Klubber og roller» under Heia internt). AVVIKSKØEN ligger øverst
+     på tvers av enheter. Begrunnelse er påkrevd i alle skrivende
+     RPC-er, så skjermen har ÉN felles `Modal`-prompt i stedet for
+     `Alert.prompt` (den finnes kun på iOS).
+   * `OpsClaimDetailScreen`: nominasjonsraden + ★/◆-markering i
+     registerrollene, og en bekreftelse etter godkjenning som sier hva
+     som skjedde med myndigheten (rolle vs. invitasjon vs. ingen).
+
+   **TO KJENTE AVVIK (begge krever backend — derfor IKKE gjort i A2).
+   INGEN av dem blokkerer A3, som kun kjører SELV-nominasjon; de biter
+   først i fase B-4 (nominasjon av en annen person). Begge løses av ÉN
+   liten, rent additiv migrasjon (foreslått `00065_ops_payload_nominee`)
+   — ta den som oppvarming til fase B:**
+   1. `ops_claim_payload` (00046) bærer ikke `nominee_is_self`/
+      `nominee_name`/`nominee_email`/`nominee_phone`. Ops-detaljskjermen
+      kan derfor si AT en annen er nominert (lest fra
+      `brreg_snapshot.checks.nominee_is_self`, som claim-notify skriver)
+      og markere registertreff med ◆, men ikke vise navn/e-post — de
+      står kun i claim-notify-e-posten. Fiks = `CREATE OR REPLACE
+      ops_claim_payload` med de fire feltene; appen mapper dem allerede
+      strukturelt likt resten.
+   2. `get_support_activation_status` bærer manager-navnet KUN i
+      `awaiting_manager` (`manager_pending`). Når `canOnboard` er false
+      fordi en ANNEN er aktiv betalingsansvarlig, kan kortet derfor
+      ikke si «venter på at [navn] fullfører hos Stripe» — teksten sier
+      «klubbens betalingsansvarlige» i stedet (presist, uten å påstå et
+      navn vi ikke har). Fiks = legg `manager: {name}` på payloaden.
+   **▶️ NESTE SAMTALE: FASE A3 — DOGFOOD AV SELVNOMINASJON** (telefon +
+   Stripe sandbox, seks scenarier a–f, se Del V i AUTORITET-dokumentet).
+   Ingenting nytt skal bygges først; A3 er å KJØRE flyten og fikse det
+   som faller ut. Deretter:
+   **profilryddingen** (B6 — etter A2, før lanserings-QA),
    så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbbetalinger
    /ops på web → full nominasjon-av-annen-dogfood). Stange/Nes-testdata
    ryddes FØRST etter fase B-dogfooden (de er motpart i testene).

@@ -315,6 +315,9 @@ export type ProfilStackParamList = {
    *  raden på Profil vises kun for ops, og RPC-ene er vaktene. */
   OpsClaims: undefined;
   OpsClaimDetail: {claimId: string};
+  /** «Klubber og roller» — ops-flaten for autoritetsmodellen v2 (00062):
+   *  enheter, betalingsansvarlige, invitasjoner og avvikskontrollen. */
+  OpsEntities: undefined;
   /** «Klubbbetalinger» (klubbdøren, 00047) — kun betalingsansvarlige.
    *  DB-gatet på club_payment_managers; raden på Profil er speilet. */
   ClubPayments: undefined;
