@@ -194,9 +194,11 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
     setMatchReporter/startMatch/reportMatchEvent beholder eksplisitt
     refetch i skjermen (reporterens fasit; dedupen gjør ekkoet ufarlig).
 
-**GJENSTÅR I B:** B1 i EGEN TESTBRANCH (install-expo-modules →
-expo-image i MediaImage → compressor-thumb → uploadAsync; Brage kjører
-pod install + nytt dev-bygg — samme bygg aktiverer Sentry-nativedelen).
+**GJENSTÅR I B:** B1 media-pipeline, RETT PÅ BRAGE-BRANCHEN (Brages
+beslutning 2026-08-18 — ingen egen testbranch; git-commits er
+sikkerhetsnettet, revert ved trøbbel): install-expo-modules →
+expo-image i MediaImage → compressor-thumb → uploadAsync; pod install
++ nytt dev-bygg underveis (samme bygg aktiverer Sentry-nativedelen).
 Deretter: PR + merge når GitHub virker, TestFlight (A+B),
 exit-avlesning (−80 % egress; P13-lista).
 
