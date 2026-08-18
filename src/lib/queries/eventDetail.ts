@@ -3,7 +3,11 @@ import {queryClient} from './queryClient';
 import {queryKeys} from './keys';
 // Direkte fil-importer (ikke api-barrelen) — samme sirkelvern som members.ts,
 // events.ts og feed.ts.
-import {getEventDetail} from '../api/events';
+import {
+  getEventDetail,
+  mapMatchEventRow,
+  MATCH_STATUS_MAP,
+} from '../api/events';
 import {getMatchPhotos} from '../api/feed';
 import type {HeiaEventDetail} from '../../shared/types';
 
@@ -63,6 +67,63 @@ export function patchEventDetail(
     eventDetailKey(eventId),
     detail => detail && patch(detail),
   );
+}
+
+/**
+ * match_events-INSERT fra payload (B3, P6: «append til tidslinjen, ingen
+ * refetch»). Mapper raden med SAMME logikk som getEventDetail
+ * (mapMatchEventRow) og appender — payloadene kommer i commit-rekkefølge
+ * (= sequence-rekkefølge, som RPC-en sorterer på), så append bevarer den.
+ * Dedupe på id: reporterens egen skriving refetcher eksplisitt (fasit fra
+ * server), og ekkoet hennes skal ikke gi dobbel rad.
+ *
+ * Returnerer false når cachen ikke kan ta imot (ingen detalj lastet ennå)
+ * — kalleren faller da tilbake til debounced refetch (P6s sikkerhetsnett).
+ */
+export function applyMatchEventInsert(eventId: string, row: any): boolean {
+  const detail = queryClient.getQueryData<HeiaEventDetail>(
+    eventDetailKey(eventId),
+  );
+  if (!detail) {
+    return false;
+  }
+  if (detail.matchEvents?.some(e => e.id === row.id)) {
+    return true; // alt applisert (eget ekko etter refetch)
+  }
+  const mapped = mapMatchEventRow(
+    row,
+    detail.matchSessionId ?? row.match_session_id,
+    detail.opponent ?? 'motstanderen',
+  );
+  patchEventDetail(eventId, d => ({
+    ...d,
+    matchEvents: [...(d.matchEvents ?? []), mapped],
+  }));
+  return true;
+}
+
+/**
+ * match_sessions-UPDATE fra payload (B3, P6: «scoreboard fra payload —
+ * stillingen ligger komplett i raden»). Patcher stilling, status, reporter
+ * og starttid; feltene mappes som i mapEventRow (home = oss, alltid).
+ * Returnerer false uten cachet detalj — kalleren refetcher debounced.
+ */
+export function applyMatchSessionUpdate(eventId: string, row: any): boolean {
+  const detail = queryClient.getQueryData<HeiaEventDetail>(
+    eventDetailKey(eventId),
+  );
+  if (!detail) {
+    return false;
+  }
+  patchEventDetail(eventId, d => ({
+    ...d,
+    score: {home: row.home_score, away: row.away_score},
+    matchStatus: MATCH_STATUS_MAP[row.status as string] ?? d.matchStatus,
+    reporterId: row.reporter_id ?? undefined,
+    opponent: row.opponent ?? d.opponent,
+    startedAt: row.started_at ? new Date(row.started_at) : d.startedAt,
+  }));
+  return true;
 }
 
 /** Refetch via cachen — realtime-debouncen på kampskjermen. Aktiv observer

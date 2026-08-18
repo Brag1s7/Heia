@@ -42,6 +42,8 @@ import {useAuth, useActiveTeam, useNotifications} from '../context';
 import type {TeamMember} from '../lib/api/members';
 import {useTeamMembers} from '../lib/queries/members';
 import {
+  applyMatchEventInsert,
+  applyMatchSessionUpdate,
   eventDetailKey,
   invalidateEventDetail,
   invalidateMatchPhotos,
@@ -294,10 +296,13 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
   // ville stillingen stått stille til hun selv dro for å oppdatere.
   //
-  // Realtime-hygienen (fase A): FOKUS-bundet (skjermen står i tre stacks —
-  // en bakgrunnsinstans skal ikke arbeide), DEBOUNCED (ett mål = tre
-  // meldinger i én transaksjon = ÉN refetch), og SPLITTET (stilling og
-  // kampbilder har hver sin sti — et mål re-laster aldri bildene).
+  // Payload-først (B3, P6): ett mål hos tilskuerne er nå to cache-patcher
+  // (match_events-append + stilling fra match_sessions-raden) og NULL
+  // refetch — før kostet det én debounced get_event_with_rsvp per tilskuer.
+  // Refetch-debouncen står igjen som P6s sikkerhetsnett (payload manglet
+  // felter, eller detaljen er ikke i cachen ennå) og for resync etter
+  // reconnect. Hygienen fra A består: FOKUS-bundet (skjermen står i tre
+  // stacks) og SPLITTET (et mål re-laster aldri bildene).
   //
   // Varselet ligger IKKE her lenger: det er `NotificationBanner` over fanene,
   // matet av `notifications`-kanalen. Databasen bestemmer allerede hvem som
@@ -309,21 +314,44 @@ export function EventDetailScreen({route, navigation}: Props) {
       if (!liveMatchSessionId) return;
       let eventTimer: ReturnType<typeof setTimeout> | null = null;
       let photoTimer: ReturnType<typeof setTimeout> | null = null;
-      const unsubscribe = subscribeToMatch(liveMatchSessionId, eventId, {
-        onMatchChange: () => {
-          if (eventTimer) clearTimeout(eventTimer);
-          eventTimer = setTimeout(() => {
-            eventTimer = null;
+      const scheduleEventRefetch = () => {
+        if (eventTimer) clearTimeout(eventTimer);
+        eventTimer = setTimeout(() => {
+          eventTimer = null;
+          invalidateEventDetail(eventId);
+        }, 400);
+      };
+      const unsubscribe = subscribeToMatch(liveMatchSessionId, eventId, evt => {
+        switch (evt.kind) {
+          case 'matchEvent':
+            if (!applyMatchEventInsert(eventId, evt.row)) {
+              scheduleEventRefetch();
+            }
+            break;
+          case 'session':
+            if (!applyMatchSessionUpdate(eventId, evt.row)) {
+              scheduleEventRefetch();
+            }
+            break;
+          case 'fallback':
+            scheduleEventRefetch();
+            break;
+          case 'photo':
+            if (photoTimer) clearTimeout(photoTimer);
+            photoTimer = setTimeout(() => {
+              photoTimer = null;
+              invalidateMatchPhotos(eventId);
+            }, 400);
+            break;
+          case 'resync':
+            // Kanalen har vært nede — hendelser kan være tapt. Hent begge
+            // stiene straks (P6-reconnect-raden); dette er også broen som
+            // lukker reconnect-hullet fokus-broen ikke ser (appen sto jo
+            // i fokus hele tiden).
             invalidateEventDetail(eventId);
-          }, 400);
-        },
-        onPhotoPost: () => {
-          if (photoTimer) clearTimeout(photoTimer);
-          photoTimer = setTimeout(() => {
-            photoTimer = null;
             invalidateMatchPhotos(eventId);
-          }, 400);
-        },
+            break;
+        }
       });
       return () => {
         // Live-abonnementet rives (blur/unmount/statusbytte): fra nå av er

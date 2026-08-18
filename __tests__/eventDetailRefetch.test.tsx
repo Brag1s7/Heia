@@ -37,6 +37,11 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 // ---------------------------------------------------------------------------
 jest.mock('../src/lib/supabase', () => {
   const realtimeHandlers: Array<(payload: unknown) => void> = [];
+  // B3: klassifiseringen ruter per tabell (__fire), og __reconnect simulerer
+  // frafall + rejoin for resync-stien — samme oppsett som feedRefetch.
+  const handlersByTable: Record<string, Array<(payload: unknown) => void>> =
+    {};
+  const statusCallbacks: Array<(status: string) => void> = [];
 
   const makeQuery = () => {
     const result = {data: [], error: null};
@@ -62,11 +67,19 @@ jest.mock('../src/lib/supabase', () => {
   };
 
   const channelObj: any = {
-    on: jest.fn((_type: string, _filter: unknown, cb: (p: unknown) => void) => {
+    on: jest.fn((_type: string, filter: any, cb: (p: unknown) => void) => {
       realtimeHandlers.push(cb);
+      const table = (filter?.table as string) ?? '*';
+      (handlersByTable[table] = handlersByTable[table] ?? []).push(cb);
       return channelObj;
     }),
-    subscribe: jest.fn(() => channelObj),
+    subscribe: jest.fn((cb?: (status: string) => void) => {
+      if (cb) {
+        statusCallbacks.push(cb);
+        cb('SUBSCRIBED');
+      }
+      return channelObj;
+    }),
   };
 
   const storageApi = {
@@ -105,12 +118,28 @@ jest.mock('../src/lib/supabase', () => {
       },
     },
     __storageApi: storageApi,
-    /** Fyrer alle registrerte realtime-callbacks n ganger med gitt payload. */
+    /** Fyrer alle registrerte realtime-callbacks n ganger med gitt payload.
+     *  Uten meningsfulle felter er dette FALLBACK-stien (P6-nettet). */
     __burst: (n: number, payload: unknown = {eventType: 'INSERT'}) => {
       for (let i = 0; i < n; i++) {
         for (const handler of [...realtimeHandlers]) {
           handler(payload);
         }
+      }
+    },
+    /** Målrettet payload til én tabells handlere (B3 payload-først). */
+    __fire: (table: string, payload: unknown, n = 1) => {
+      for (let i = 0; i < n; i++) {
+        for (const handler of [...(handlersByTable[table] ?? [])]) {
+          handler(payload);
+        }
+      }
+    },
+    /** Frafall + rejoin på alle abonnement → resync-signalet (B3). */
+    __reconnect: () => {
+      for (const cb of [...statusCallbacks]) {
+        cb('CHANNEL_ERROR');
+        cb('SUBSCRIBED');
       }
     },
   };
@@ -401,7 +430,11 @@ test('ferdig kamp: 3 RPC, signering én batch med begge varianter, forløpet vis
   });
 });
 
-test('live kamp: én kanal; kamp-burst = én event-refetch og INGEN bilde-refetch', async () => {
+test('live kamp: én kanal; DEFEKT payload-burst (fallback-nettet) = én event-refetch og INGEN bilde-refetch', async () => {
+  // __burst sender payloads uten felter → alle handlerne velger 'fallback'
+  // (P6s sikkerhetsnett). At nettet debouncer til ÉN refetch og aldri rører
+  // fotostien er nøyaktig det denne testen alltid har bevist — payload-
+  // GRØNNSTIEN har fått sin egen test under.
   jest.useFakeTimers();
   const {supabase, __burst} = jest.requireMock('../src/lib/supabase');
   jest.clearAllMocks();
@@ -468,4 +501,93 @@ test('live kamp: én kanal; kamp-burst = én event-refetch og INGEN bilde-refetc
   });
   expect(rpcCalls('get_event_with_rsvp')).toBe(3);
   expect(rpcCalls('get_match_photos')).toBe(2);
+});
+
+test('live kamp payload-først (B3): mål = cache-patch og NULL refetch; reconnect = full resync', async () => {
+  jest.useFakeTimers();
+  const {supabase, __fire, __reconnect} = jest.requireMock(
+    '../src/lib/supabase',
+  );
+  jest.clearAllMocks();
+  mockRpc({
+    get_event_with_rsvp: kampRow('live'),
+    get_match_photos: [],
+    get_team_members: [],
+  });
+
+  const cachedDetail = () =>
+    queryClient.getQueryData<any>(['event', 'evt-1']);
+
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+  await flushWaves(true);
+  expect(rpcCalls('get_event_with_rsvp')).toBe(1);
+  expect(supabase.channel).toHaveBeenCalledTimes(1);
+
+  // --- Et mål hos en TILSKUER = to payloads i én transaksjon: raden
+  // appenderes i forløpet og stillingen patches fra sesjonsraden — og
+  // INGEN av dem koster et kall (P6: «append/scoreboard fra payload»). ---
+  await ReactTestRenderer.act(async () => {
+    __fire('match_events', {
+      eventType: 'INSERT',
+      new: {
+        id: 'me-2',
+        match_session_id: 'ms-1',
+        type: 'mål',
+        minute: 31,
+        team_side: 'home',
+        description: null,
+        player_name: 'Nora',
+        sequence: 2,
+      },
+    });
+    __fire('match_sessions', {
+      eventType: 'UPDATE',
+      new: {
+        id: 'ms-1',
+        opponent: 'Lyn',
+        home_score: 3,
+        away_score: 1,
+        is_home: true,
+        status: 'live',
+        reporter_id: 'user-2',
+        started_at: '2026-08-20T17:00:00Z',
+      },
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(rpcCalls('get_event_with_rsvp')).toBe(1); // fortsatt bare åpningen
+  expect(rpcCalls('get_match_photos')).toBe(1);
+  const detail = cachedDetail();
+  expect(detail?.matchEvents?.map((e: any) => e.id)).toEqual(['me-1', 'me-2']);
+  expect(detail?.matchEvents?.[1]?.minute).toBe(31);
+  expect(detail?.score).toEqual({home: 3, away: 1});
+
+  // --- Duplikat-ekko (reporterens refetch + realtime om hverandre):
+  // samme id appenderes ALDRI dobbelt. ---
+  await ReactTestRenderer.act(async () => {
+    __fire('match_events', {
+      eventType: 'INSERT',
+      new: {id: 'me-2', match_session_id: 'ms-1', type: 'mål', minute: 31},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedDetail()?.matchEvents).toHaveLength(2);
+  expect(rpcCalls('get_event_with_rsvp')).toBe(1);
+
+  // --- Reconnect: kanalen har vært nede → BEGGE stiene resyncer straks
+  // (P6-reconnect-raden — dette er lukkingen av hullet fra kartleggingen:
+  // uten status-callbacks var tapte hendelser usynlige til neste fokus). ---
+  await ReactTestRenderer.act(async () => {
+    __reconnect();
+  });
+  await flushWaves(true);
+  expect(rpcCalls('get_event_with_rsvp')).toBe(2);
+  expect(rpcCalls('get_match_photos')).toBe(2);
+
+  await ReactTestRenderer.act(async () => {
+    renderer?.unmount();
+  });
 });

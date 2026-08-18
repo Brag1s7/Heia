@@ -134,10 +134,70 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   ~1,15 M tokens i subagenter og traff sesjonstaket — bruk LETTERE
   review på småskiver fremover. Suiten grønn (154), lint ren.
 
-**GJENSTÅR I B:** B3 payload-realtime (P6-tabellen) + Sentry,
-B1 i EGEN TESTBRANCH (install-expo-modules → expo-image i MediaImage →
-compressor-thumb → uploadAsync; Brage kjører pod install + nytt
-dev-bygg). Deretter: PR + merge når GitHub virker, TestFlight (A+B),
+- ✅ B3 payload-realtime + Sentry (2026-08-18): hele P6-tabellen
+  implementert — realtime-handlerne applisererer payloads rett i
+  query-cachen (P7-nøklene) i stedet for refetch-per-hendelse:
+  * **Kanal-laget** (`realtimeChannels.ts`): `.subscribe()` har fått
+    status-callback overalt. `createResyncStatusHandler` (eksportert, ren)
+    roper resync ved SUBSCRIBED etter frafall ELLER etter tidligere
+    SUBSCRIBED (socket-rejoin) — men ALDRI ved første join (ellers
+    dobbelhenting ved åpning, staleMs-flip-lærdommen). Registryet deler ut
+    sentinelen `CHANNEL_RESYNC` til alle lyttere; `isChannelResync` i
+    konsumentene. DETTE var forutsetningen for payload-først: uten
+    resync-ved-SUBSCRIBED tapes hendelser ved reconnect. Egen vakt:
+    `__tests__/realtimeChannels.test.ts`.
+  * **Feed** (`subscribeToFeed` klassifiserer nå payloads → typed events;
+    ny signatur med `myUserId`): andres 👏 = teller-patch i cachen (0 kall,
+    0 hero-refetch — før: full refetch + heroer per burst!), egne
+    reaksjons-ekko filtreres (00059 gir full old-rad på DELETE), kommentar
+    inn/soft-ut = ±1 `commentCount`, feed_posts UPDATE = patch/fjern lokalt
+    (pin-flip → side 1-henting, posten resorteres), feed_posts INSERT =
+    debounced henting av KUN side 1 (`refetchFeedFirstPage` skjøter inn
+    pages[0]; dype sider urørt — B2-grensen «alle sider per invalidering»
+    gjelder nå kun reconnect/fokus). Fallback (payload uten felter) =
+    debounced FULL invalidering (hygienen fra A som nett).
+  * **Kamp** (`subscribeToMatch` → typed events): match_events INSERT
+    appenderes i `['event', id]` fra payload via eksportert
+    `mapMatchEventRow` (SAMME mapping som getEventDetail; dedupe på id —
+    reporterens eksplisitte refetch og ekkoet kolliderer aldri);
+    match_sessions UPDATE patcher stilling/status/reporter/startedAt fra
+    raden (komplett i payloaden). Ett mål hos N tilskuere = 0 refetch.
+    Foto-stien uendret (debounced loadPhotos, P6). Cache-miss → fallback.
+  * **Varsler** (NotificationsContext): INSERT = +1 lokalt (team-scopet,
+    null = global — samme scope som getUnreadCount), INGEN count-spørring
+    per varsel lenger; InboxScreens loadNewer dropper også sin. HEAD-
+    spørringen er nå henvist til resync-stiene (fokus/forgrunn/reconnect/
+    lest-markering). Kanalens resync bumper også liveNonce → fokusert
+    inbox drar inkrementell henting (hull-vakten der tar store gap).
+  * **CommentsScreen**: egne kommentarer patcher `commentCount` i
+    feed-cachen direkte (±1) — ekko kan ikke doble (feed-kanalen er
+    fokus-bundet til TeamHome som er blurret mens tråden er åpen).
+  * **Sentry** (`src/lib/sentry.ts`, init i index.js): helt AV uten
+    SENTRY_DSN i .env (modulen lastes ikke engang); tracesSampleRate 0,
+    sendDefaultPii false. JS-feil fanges så snart DSN settes; NATIVE
+    crash-handler krever pod install + nytt bygg (tas i B1-runden).
+    ⚠️ EKSTERNE STEG FOR BRAGE: opprett Sentry-prosjekt → legg DSN i .env
+    (+ TestFlight-byggets env); `@sentry/react-native@8.23.0` er i
+    package.json, så NESTE pod install plukker nativedelen automatisk.
+  * Vaktene OPPDATERT + utvidet: feedRefetch (payload-først-test: 👏 = 0
+    kall og ingen heroer, ekko ignorert, DELETE-teller, kommentar ±,
+    post-patch/-fjerning, nytt innlegg = kun side 1, reconnect = resync),
+    eventDetailRefetch (mål = cache-patch 0 kall, duplikat-ekko, reconnect
+    resyncer begge stier; gamle bursts er nå eksplisitt FALLBACK-bevis),
+    mockene fikk `__fire(table, payload)` + `__reconnect()`. Suiten grønn
+    (160), lint ren.
+  * BEVISSTE grenser: CommentsScreen har ingen live-append av andres
+    kommentarer (ingen P7-nøkkel — kald sti, tråden refetcher ved fokus);
+    match_events DELETE (korreksjoner = delete+reinsert) lyttes ikke på —
+    ingen app-flyt skriver den ennå, refetch-stiene healer; reconnect
+    refetcher fortsatt ALLE lastede feed-sider (akseptert, sjeldent).
+    setMatchReporter/startMatch/reportMatchEvent beholder eksplisitt
+    refetch i skjermen (reporterens fasit; dedupen gjør ekkoet ufarlig).
+
+**GJENSTÅR I B:** B1 i EGEN TESTBRANCH (install-expo-modules →
+expo-image i MediaImage → compressor-thumb → uploadAsync; Brage kjører
+pod install + nytt dev-bygg — samme bygg aktiverer Sentry-nativedelen).
+Deretter: PR + merge når GitHub virker, TestFlight (A+B),
 exit-avlesning (−80 % egress; P13-lista).
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på

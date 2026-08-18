@@ -84,6 +84,96 @@ export function patchFeedItem(
   );
 }
 
+/**
+ * Realtime-tellerne (B3, P6): andres 👏 og kommentarer justerer posten rett
+ * i cachen — null refetch. Klemmes i 0: et DELETE-ekko som treffer en post
+ * hentet ETTER slettingen skal ikke gi −1. No-op når posten ikke er i
+ * cachen (annet lag, eldre enn lastede sider).
+ */
+export function adjustFeedItemCounts(
+  teamSpaceId: string,
+  postId: string,
+  deltas: {heia?: number; comments?: number},
+): void {
+  patchFeedItem(teamSpaceId, postId, item => ({
+    ...item,
+    ...(deltas.heia !== undefined && {
+      heiaCount: Math.max(0, (item.heiaCount ?? 0) + deltas.heia),
+    }),
+    ...(deltas.comments !== undefined && {
+      commentCount: Math.max(0, (item.commentCount ?? 0) + deltas.comments),
+    }),
+  }));
+}
+
+/**
+ * feed_posts-UPDATE fra payload (B3): soft-delete fjerner posten, ellers
+ * patches feltene payloaden faktisk eier (innhold + pin). Returnerer
+ * 'pinChanged' når pin-status flippet — DA må kalleren refetche side 1,
+ * for pinnede poster resorteres øverst (00029) og en patch-in-place kan
+ * ikke flytte raden.
+ */
+export function applyFeedPostUpdate(
+  teamSpaceId: string,
+  row: any,
+): 'removed' | 'patched' | 'pinChanged' | 'miss' {
+  if (row.deleted_at) {
+    removeFeedItem(teamSpaceId, row.id);
+    return 'removed';
+  }
+  let result: 'patched' | 'pinChanged' | 'miss' = 'miss';
+  patchFeedItem(teamSpaceId, row.id, item => {
+    const isPinned = !!row.is_pinned;
+    result = isPinned !== !!item.isPinned ? 'pinChanged' : 'patched';
+    return {
+      ...item,
+      content: typeof row.content === 'string' ? row.content : item.content,
+      isPinned,
+    };
+  });
+  return result;
+}
+
+/**
+ * Nytt innlegg (B3): hent KUN side 1 og skjøt den inn — de dype sidene står
+ * urørt (dedupe i flattenFeedPages svelger overlapp når sidegrensene har
+ * flyttet seg). Dette erstatter full invalidering per INSERT, som refetchet
+ * ALLE lastede sider (B2s aksepterte grense — nå kun ved reconnect/fokus).
+ *
+ * Vern: pågår det alt en henting (åpningsfetch, fokus-resync) leverer den
+ * ferskere data enn oss — ikke skriv oppå. Uten cache finnes ingen sider å
+ * skjøte i — da vanlig invalidering (henter kun med aktiv observer).
+ */
+export async function refetchFeedFirstPage(
+  teamSpaceId: string,
+  myUserId: string | undefined,
+): Promise<void> {
+  const key = queryKeys.feed(teamSpaceId);
+  if (queryClient.isFetching({queryKey: key}) > 0) {
+    return;
+  }
+  if (!queryClient.getQueryData<FeedData>(key)) {
+    invalidateFeed(teamSpaceId);
+    return;
+  }
+  try {
+    const page = await getTeamFeed(
+      teamSpaceId,
+      myUserId,
+      FEED_PAGE_SIZE,
+      undefined,
+    );
+    queryClient.setQueryData<FeedData>(
+      key,
+      data => data && {...data, pages: [page, ...data.pages.slice(1)]},
+    );
+  } catch {
+    // Nettglipp: marker stale i stedet for å prøve igjen her — fokus-broen
+    // (isInvalidated) resyncer, og neste realtime-hendelse gir nytt forsøk.
+    markFeedStale(teamSpaceId);
+  }
+}
+
 /** Optimistisk fjerning (slett): posten forsvinner med én gang, refetch
  *  healer sidene etterpå. */
 export function removeFeedItem(teamSpaceId: string, postId: string): void {

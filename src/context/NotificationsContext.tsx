@@ -12,6 +12,7 @@ import {AppState} from 'react-native';
 import {useAuth} from './UserContext';
 import {useActiveTeam} from './TeamContext';
 import {supabase} from '../lib/supabase';
+import {createResyncStatusHandler} from '../lib/realtimeChannels';
 import {
   getUnreadCount,
   markAsRead,
@@ -23,9 +24,10 @@ import {
  * Varsler-fanen (AppNavigator) og InboxScreen, som senker den i det du leser
  * en rad. Uten en delt tilstand ville badgen blitt stående til neste omstart.
  *
- * `notifications` er ikke i `supabase_realtime`-publiseringen, så det finnes
- * ingen push-oppdatering av telleren. Vi refresher i stedet ved fane-fokus og
- * når appen kommer i forgrunn — billig (én HEAD-spørring med count).
+ * Payload-først (B3, P6): et INSERT på kanalen teller +1 lokalt — ingen
+ * count-spørring per varsel. HEAD-spørringen (getUnreadCount) er RESYNC-en:
+ * fane-fokus, forgrunn, reconnect og lest-markeringer henter fasit, så
+ * lokal drift aldri overlever lenge.
  */
 interface NotificationsContextValue {
   unreadCount: number;
@@ -132,18 +134,28 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
           filter: `user_id=eq.${userId}`,
         },
         payload => {
-          // INSERT-gaten står FØR refetch-kallene (fase A, F16-fiksen):
+          // INSERT-gaten står FØR alt annet (fase A, F16-fiksen):
           // kanalen lytter på '*', men en UPDATE er «markert som lest» og en
           // DELETE er opprydding — begge er ekko av noe klienten alt vet.
-          // Før sto gaten etter refreshUnread/liveNonce, så «merk alle som
-          // lest» av N varsler ga N meldinger → N tellerspørringer og N
-          // inbox-reloads. Kun et NYTT varsel skal koste noe.
+          // Kun et NYTT varsel skal koste noe.
           if (payload.eventType !== 'INSERT') return;
 
-          refreshUnread();
-          setLiveNonce(n => n + 1);
-
           const row = payload.new as any;
+
+          // Payload-først (B3, P6): badgen teller per lag, og raden bærer
+          // team_space_id (null = globalt systemvarsel, teller i alle lag —
+          // samme scope som getUnreadCount). +1 lokalt; HEAD-spørringen er
+          // henvist til resync-stiene (fokus/forgrunn/reconnect). Mangler
+          // feltene (skjemadrift) → tell fasit (P6s fallback).
+          if (row?.id == null) {
+            refreshUnread();
+          } else if (
+            row.team_space_id == null ||
+            row.team_space_id === activeTeamSpaceId
+          ) {
+            setUnreadCount(c => c + 1);
+          }
+          setLiveNonce(n => n + 1);
           // Står du på kampsiden, ER dette øyeblikket skjermen foran deg
           // (scoren spretter, forløpet ruller). Demp banneret for den
           // kampen — badgen/inboxen over er allerede oppdatert.
@@ -159,12 +171,22 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
           }
         },
       )
-      .subscribe();
+      // Resync ved reconnect (B3, P6): kanalen har vært nede → +1-strømmen
+      // kan ha mistet rader. Hent fasit-telleren og dytt liveNonce, så en
+      // fokusert inbox drar sin inkrementelle resync (hull-vakten der tar
+      // store gap). Første SUBSCRIBED er IKKE resync — mount-effekten over
+      // har alt hentet telleren.
+      .subscribe(
+        createResyncStatusHandler(() => {
+          refreshUnread();
+          setLiveNonce(n => n + 1);
+        }),
+      );
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, refreshUnread]);
+  }, [userId, activeTeamSpaceId, refreshUnread]);
 
   const markRead = useCallback(
     async (ids: string[]) => {

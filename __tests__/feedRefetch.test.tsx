@@ -12,11 +12,14 @@
  *      get_team_support_summary), 2 tabell-spørringer (live kamp + hendelser,
  *      begge mot events) og 1 realtime-kanal. Tom feed gjør at hverken
  *      signering, auth.getUser eller reactions-oppslaget utløses.
- *   2. En BURST av realtime-hendelser (👏 fra mange foreldre samtidig) = ÉN
- *      debounced refetch, aldri én per hendelse — og en hendelse rett før
- *      exit gir INGEN refetch etter unmount.
+ *   2. En BURST av DEFEKTE realtime-payloads (fallback-stien, P6s
+ *      sikkerhetsnett) = ÉN debounced refetch, aldri én per hendelse — og en
+ *      hendelse rett før exit gir INGEN refetch etter unmount.
  *   3. Med bilde i feeden (egen test): signering skjer som ÉN batch og
  *      reactions-oppslaget som ÉN runde — aldri per post/bilde.
+ *   4. PAYLOAD-FØRST (B3, egen test): andres 👏/kommentarer = 0 kall (tellere
+ *      patches i cachen), egne ekko ignoreres, nytt innlegg = KUN side 1,
+ *      og reconnect = full resync.
  *
  * Endrer du datalastingen på TeamHome, SKAL denne testen brekke — oppdater
  * tallene bevisst, og skriv i commiten hvorfor budsjettet flyttet seg.
@@ -37,6 +40,12 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 // ---------------------------------------------------------------------------
 jest.mock('../src/lib/supabase', () => {
   const realtimeHandlers: Array<(payload: unknown) => void> = [];
+  // B3: payload-klassifiseringen ruter per TABELL — mocken må kunne fyre
+  // målrettet (__fire) i tillegg til bredside (__burst). Status-callbackene
+  // samles så __reconnect kan simulere frafall + rejoin (resync-stien).
+  const handlersByTable: Record<string, Array<(payload: unknown) => void>> =
+    {};
+  const statusCallbacks: Array<(status: string) => void> = [];
 
   /** Kjedbar spørring som kan await-es: alle metoder → seg selv, tomt svar. */
   const makeQuery = () => {
@@ -63,11 +72,20 @@ jest.mock('../src/lib/supabase', () => {
   };
 
   const channelObj: any = {
-    on: jest.fn((_type: string, _filter: unknown, cb: (p: unknown) => void) => {
+    on: jest.fn((_type: string, filter: any, cb: (p: unknown) => void) => {
       realtimeHandlers.push(cb);
+      const table = (filter?.table as string) ?? '*';
+      (handlersByTable[table] = handlersByTable[table] ?? []).push(cb);
       return channelObj;
     }),
-    subscribe: jest.fn(() => channelObj),
+    subscribe: jest.fn((cb?: (status: string) => void) => {
+      if (cb) {
+        statusCallbacks.push(cb);
+        // Som ekte klient: join lykkes. Første SUBSCRIBED er IKKE resync.
+        cb('SUBSCRIBED');
+      }
+      return channelObj;
+    }),
   };
 
   // ETT delt objekt, ikke ett per from()-kall — ellers kan ikke testen telle
@@ -111,12 +129,29 @@ jest.mock('../src/lib/supabase', () => {
       },
     },
     __storageApi: storageApi,
-    /** Fyrer alle registrerte realtime-callbacks n ganger — «n 👏 på rappen». */
+    /** Fyrer alle registrerte realtime-callbacks n ganger — «n 👏 på rappen».
+     *  Payloaden mangler felter med vilje: dette er nå FALLBACK-stien
+     *  (P6s sikkerhetsnett — full debounced refetch, som før B3). */
     __burst: (n: number) => {
       for (let i = 0; i < n; i++) {
         for (const handler of [...realtimeHandlers]) {
           handler({eventType: 'INSERT'});
         }
+      }
+    },
+    /** Målrettet payload til én tabells handlere (B3 payload-først). */
+    __fire: (table: string, payload: unknown, n = 1) => {
+      for (let i = 0; i < n; i++) {
+        for (const handler of [...(handlersByTable[table] ?? [])]) {
+          handler(payload);
+        }
+      }
+    },
+    /** Frafall + rejoin på alle abonnement → resync-signalet (B3). */
+    __reconnect: () => {
+      for (const cb of [...statusCallbacks]) {
+        cb('CHANNEL_ERROR');
+        cb('SUBSCRIBED');
       }
     },
   };
@@ -299,6 +334,163 @@ test('TeamHome med bilde i feeden: signering er ÉN batch, reactions ÉN runde',
   expect(supabase.auth.getUser).not.toHaveBeenCalled();
   expect(supabase.from).toHaveBeenCalledTimes(3); // 2× events + 1× reactions
   expect(supabase.from).toHaveBeenCalledWith('reactions');
+
+  await ReactTestRenderer.act(async () => {
+    renderer?.unmount();
+  });
+});
+
+test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt innlegg, resync ved reconnect', async () => {
+  jest.useFakeTimers();
+  const {supabase, __fire, __reconnect} = jest.requireMock(
+    '../src/lib/supabase',
+  );
+  jest.clearAllMocks();
+  supabase.rpc.mockImplementation((name: string) =>
+    Promise.resolve(
+      name === 'get_team_feed'
+        ? {
+            data: [
+              {
+                id: 'post-1',
+                type: 'melding',
+                author_id: 'user-2',
+                author_name: 'Testforelder',
+                created_at: '2026-08-18T12:00:00Z',
+                content: 'Heia!',
+                media: [],
+                reaction_counts: {},
+                comment_count: 0,
+              },
+            ],
+            error: null,
+          }
+        : {data: null, error: null},
+    ),
+  );
+  const feedCalls = () =>
+    supabase.rpc.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'get_team_feed',
+    ).length;
+  const heroCalls = () =>
+    supabase.rpc.mock.calls.filter(
+      (c: unknown[]) => c[0] === 'get_team_support_summary',
+    ).length;
+  const cachedPost = () => {
+    const data = queryClient.getQueryData<{pages: any[][]}>(['feed', 'ts-1']);
+    return data?.pages.flat().find(p => p.id === 'post-1');
+  };
+
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+  expect(feedCalls()).toBe(1);
+  const heroesAfterOpen = heroCalls();
+
+  // --- Andres 👏: teller patches i cachen — INGEN refetch, INGEN heroer ---
+  await ReactTestRenderer.act(async () => {
+    __fire(
+      'reactions',
+      {
+        eventType: 'INSERT',
+        new: {feed_post_id: 'post-1', user_id: 'user-2', emoji: '👏'},
+      },
+      3,
+    );
+    jest.advanceTimersByTime(1000);
+  });
+  expect(feedCalls()).toBe(1);
+  expect(heroCalls()).toBe(heroesAfterOpen);
+  expect(cachedPost()?.heiaCount).toBe(3);
+
+  // --- Eget ekko (user-1) og fremmed emoji: ignoreres helt ---
+  await ReactTestRenderer.act(async () => {
+    __fire('reactions', {
+      eventType: 'INSERT',
+      new: {feed_post_id: 'post-1', user_id: 'user-1', emoji: '👏'},
+    });
+    __fire('reactions', {
+      eventType: 'INSERT',
+      new: {feed_post_id: 'post-1', user_id: 'user-2', emoji: '🎉'},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedPost()?.heiaCount).toBe(3);
+  expect(feedCalls()).toBe(1);
+
+  // --- DELETE (angret 👏, full old-rad takket være 00059) → −1 ---
+  await ReactTestRenderer.act(async () => {
+    __fire('reactions', {
+      eventType: 'DELETE',
+      old: {feed_post_id: 'post-1', user_id: 'user-2', emoji: '👏'},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedPost()?.heiaCount).toBe(2);
+
+  // --- Kommentar inn og soft-slettet ut: teller opp og ned, 0 kall ---
+  await ReactTestRenderer.act(async () => {
+    __fire('comments', {
+      eventType: 'INSERT',
+      new: {id: 'c1', feed_post_id: 'post-1'},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedPost()?.commentCount).toBe(1);
+  await ReactTestRenderer.act(async () => {
+    __fire('comments', {
+      eventType: 'UPDATE',
+      new: {id: 'c1', feed_post_id: 'post-1', deleted_at: '2026-08-18T13:00:00Z'},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedPost()?.commentCount).toBe(0);
+  expect(feedCalls()).toBe(1);
+
+  // --- feed_posts UPDATE: redigering patches i cachen (pin uendret) … ---
+  await ReactTestRenderer.act(async () => {
+    __fire('feed_posts', {
+      eventType: 'UPDATE',
+      new: {id: 'post-1', content: 'Redigert', is_pinned: false},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedPost()?.content).toBe('Redigert');
+  expect(feedCalls()).toBe(1);
+
+  // --- … og soft-delete fjerner posten uten kall ---
+  await ReactTestRenderer.act(async () => {
+    __fire('feed_posts', {
+      eventType: 'UPDATE',
+      new: {id: 'post-1', deleted_at: '2026-08-18T13:30:00Z'},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedPost()).toBeUndefined();
+  expect(feedCalls()).toBe(1);
+
+  // --- Nytt innlegg: debounced henting av KUN side 1 + heroene ---
+  await ReactTestRenderer.act(async () => {
+    __fire('feed_posts', {
+      eventType: 'INSERT',
+      new: {id: 'post-2', team_space_id: 'ts-1'},
+    });
+  });
+  expect(feedCalls()).toBe(1); // debouncen holder igjen
+  await ReactTestRenderer.act(async () => {
+    jest.advanceTimersByTime(400);
+  });
+  expect(feedCalls()).toBe(2);
+  expect(heroCalls()).toBe(heroesAfterOpen + 1);
+
+  // --- Reconnect: kanalen har vært nede → full resync + heroer ---
+  await ReactTestRenderer.act(async () => {
+    __reconnect();
+    jest.advanceTimersByTime(1000);
+  });
+  expect(feedCalls()).toBe(3);
+  expect(heroCalls()).toBe(heroesAfterOpen + 2);
 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();
