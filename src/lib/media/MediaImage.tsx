@@ -1,18 +1,30 @@
 /**
  * <MediaImage media={ref} variant="display" …> — appens eneste vei fra
  * MediaRef til piksler (P4). Kallstedene vet path + variant; signering,
- * utløp og fornying bor her. I B byttes innmaten til expo-image med
- * `cacheKey = storage_path` — props-kontrakten er den samme.
+ * utløp og fornying bor her.
+ *
+ * B1: innmaten er expo-image med `cacheKey = storage_path`. Disk-cachen
+ * nøkles dermed på PATH, ikke URL — et nytt signert token er fortsatt et
+ * cache-treff (F9-rotårsaken fra auditen: roterende `?token=` ga 100 %
+ * miss i RN-Image). Cache-treff er derfor TTL-uavhengige: den signerte
+ * URL-en trengs bare når bytes faktisk skal hentes fra nettet.
  *
  * Innebygd måling (P9 lag 2): lastinger telles per path (uten token), så
  * «samme objekt lastet N ganger» kan leses rett ut av dev-konsollen
- * (`imageMetrics.dump()`). Bildebytes kan IKKE måles fra JS (F27) — antall
- * og repetisjon er det klienten kan bevise, bytes bor i serverloggene.
+ * (`imageMetrics.dump()`). MERK etter B1: onLoadStart/End fyrer kun ved
+ * FAKTISK lasting (disk eller nett) — et minne-cache-treff er stille, og
+ * det er nettopp poenget. Bildebytes kan IKKE måles fra JS (F27).
  */
 import React, {useEffect, useRef, useState} from 'react';
-import {Image, View, type ImageProps} from 'react-native';
+import {View, type StyleProp, type ImageStyle} from 'react-native';
+import {Image} from 'expo-image';
 import {mediaPathFor, type MediaRef, type MediaVariant} from './types';
 import {peekMediaUrl, refreshMediaUrl, resolveMediaUrl} from './resolver';
+
+// 150 MB LRU (B1-beslutningen fra arkitekturplanen): rommer et par lags
+// feed + gallerier i thumb/display-variantene, og er lite nok til aldri å
+// bli et lagringsproblem på telefonen. Tømmes ved signOut (clearLocalCaches).
+Image.configureCache({maxDiskSize: 150 * 1024 * 1024});
 
 // Samme dev-gating som netMetrics: aldri konsoll i prod, aldri støy i jest.
 const IS_DEV =
@@ -63,16 +75,22 @@ if (IS_DEV) {
   };
 }
 
-interface MediaImageProps extends Omit<ImageProps, 'source'> {
+interface MediaImageProps {
   media: MediaRef;
   variant?: MediaVariant;
+  style?: StyleProp<ImageStyle>;
+  /**
+   * RN-navnet beholdt ved expo-image-byttet så kallstedene slapp å endres —
+   * oversettes til `contentFit`. Kun verdiene appen faktisk bruker.
+   */
+  resizeMode?: 'cover' | 'contain';
 }
 
 export function MediaImage({
   media,
   variant = 'display',
   style,
-  ...imageProps
+  resizeMode = 'cover',
 }: MediaImageProps) {
   const path = mediaPathFor(media, variant);
   const [url, setUrl] = useState<string | null>(() => peekMediaUrl(path));
@@ -105,9 +123,10 @@ export function MediaImage({
 
   return (
     <Image
-      {...imageProps}
       style={style}
-      source={{uri: url}}
+      source={{uri: url, cacheKey: path}}
+      cachePolicy="disk"
+      contentFit={resizeMode}
       onLoadStart={() => {
         loadStartedAt.current = Date.now();
       }}
@@ -115,6 +134,8 @@ export function MediaImage({
         recordLoad(path, Date.now() - loadStartedAt.current);
       }}
       onError={() => {
+        // Utløpt token etter lang bakgrunn er normaltilfellet her. Disk-
+        // cachen overlever (path-nøklet) — kun netthentingen trengte ny URL.
         if (refreshedFor.current === path) return;
         refreshedFor.current = path;
         refreshMediaUrl(path).then(fresh => {

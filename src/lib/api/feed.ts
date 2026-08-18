@@ -1,4 +1,3 @@
-import {decode} from 'base64-arraybuffer';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
 import {getUserId, getUserIdOrNull} from './authUser';
@@ -8,6 +7,7 @@ import {
   invalidateMediaCache,
   primeMediaUrls,
 } from '../media/resolver';
+import {uploadFileToBucket} from '../media/upload';
 import type {MediaRef} from '../media/types';
 import type {FeedItem, UserRole} from '../../shared/types';
 
@@ -19,7 +19,13 @@ export {FEED_MEDIA_BUCKET};
 
 /** Bilde valgt fra image-picker, klart for opplasting. */
 export interface ImagePostInput {
-  base64: string;
+  /** Lokal fil-URI til 2048-masteren fra pickeren (P2). */
+  fileUri: string;
+  /**
+   * Lokal fil-URI til 480-thumben (compressor, B1). `null` = genereringen
+   * feilet — posten lastes opp uten, og visningen leser masteren (P4).
+   */
+  thumbUri: string | null;
   mimeType: string;
   fileName: string;
   sizeBytes: number;
@@ -40,11 +46,14 @@ export interface MatchPhoto {
 }
 
 /**
- * Laster opp ETT bilde til privat Storage og oppretter media-raden.
- * Returnerer `media.id`, som kallstedet fester på sin egen entitet.
+ * Laster opp ETT bilde (master + ev. thumb) til privat Storage og oppretter
+ * media-raden. Returnerer `media.id`, som kallstedet fester på sin egen
+ * entitet.
  *
- * Delt av vanlige bildeposter og kampbilder — RN-fella (base64 → ArrayBuffer,
- * ALDRI fil-URI rett inn i `.upload()`) skal bo nøyaktig ett sted.
+ * Delt av vanlige bildeposter og kampbilder. B1: begge variantene streames
+ * fra fil via uploadAsync (media/upload.ts) — base64-brua er borte.
+ * Navnekonvensjonen (`-d2048`/`-t480`) er backfill-scriptets, så nye
+ * opplastinger er selvbeskrivende og hoppes over av en ev. re-kjøring.
  */
 async function uploadTeamImage(
   teamSpaceId: string,
@@ -56,24 +65,40 @@ async function uploadTeamImage(
   const ext = image.fileName.includes('.')
     ? image.fileName.split('.').pop()
     : 'jpg';
-  const objectName = `${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2, 10)}.${ext}`;
-  const storagePath = `${teamSpaceId}/${objectName}`;
+  const base = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const storagePath = `${teamSpaceId}/${base}-d2048.${ext}`;
 
-  const {error: uploadError} = await supabase.storage
-    .from(FEED_MEDIA_BUCKET)
-    .upload(storagePath, decode(image.base64), {
-      contentType: image.mimeType,
-      upsert: false,
-      // 24 t (P1, LÅST): en CDN-/OS-cachet kopi av et barnebilde skal ikke
-      // overleve tilgangsvinduet (24 t signert URL) vesentlig, og Free-CDN
-      // invaliderer ikke ved sletting. KAN IKKE endres per objekt i
-      // etterkant — må være riktig ved upload.
-      cacheControl: '86400',
-    });
-  if (uploadError) {
-    throw uploadError;
+  // 24 t (P1, LÅST): en CDN-/OS-cachet kopi av et barnebilde skal ikke
+  // overleve tilgangsvinduet (24 t signert URL) vesentlig, og Free-CDN
+  // invaliderer ikke ved sletting. KAN IKKE endres per objekt i
+  // etterkant — må være riktig ved upload.
+  await uploadFileToBucket({
+    bucket: FEED_MEDIA_BUCKET,
+    path: storagePath,
+    fileUri: image.fileUri,
+    contentType: image.mimeType,
+    cacheControlS: 86400,
+  });
+
+  // Thumben er en optimalisering, aldri en blokker: feiler den, får raden
+  // thumbnail_path null og thumb-oppslagene leser masteren (mediaPathFor).
+  let thumbnailPath: string | null = null;
+  if (image.thumbUri) {
+    const thumbPath = `${teamSpaceId}/${base}-t480.jpg`;
+    try {
+      await uploadFileToBucket({
+        bucket: FEED_MEDIA_BUCKET,
+        path: thumbPath,
+        fileUri: image.thumbUri,
+        // Compressor leverer alltid JPEG (output: 'jpg' i makeThumb).
+        contentType: 'image/jpeg',
+        cacheControlS: 86400,
+      });
+      thumbnailPath = thumbPath;
+    } catch {
+      // Foreldreløs fil kan ikke oppstå her: thumben lastes bare opp
+      // ETTER at masteren lyktes, og feiler selve thumben finnes ingen fil.
+    }
   }
 
   const {data: mediaRow, error: mediaError} = await supabase
@@ -83,6 +108,7 @@ async function uploadTeamImage(
       team_space_id: teamSpaceId,
       bucket: FEED_MEDIA_BUCKET,
       storage_path: storagePath,
+      thumbnail_path: thumbnailPath,
       file_name: image.fileName,
       mime_type: image.mimeType,
       size_bytes: image.sizeBytes,

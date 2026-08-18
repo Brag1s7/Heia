@@ -1,4 +1,5 @@
 import {Alert} from 'react-native';
+import {Image as ExpoImage} from 'expo-image';
 import {
   clearOpsAdminCache,
   clearPaymentManagerCache,
@@ -40,6 +41,11 @@ export async function clearLocalCaches(): Promise<void> {
   // skal overleve til neste bruker på samme enhet (samme P1-funn som over).
   queryClient.clear();
   await clearMediaUrlCache();
+  // B1: expo-images disk-cache er nøklet på storage_path og kan bære
+  // barnebilder — den skal ikke overleve brukeren på en delt enhet (P1,
+  // samme funn som URL-cachen over). Best-effort: en feilet tømming skal
+  // ikke stoppe utloggingen.
+  await ExpoImage.clearDiskCache().catch(() => false);
 }
 
 /**

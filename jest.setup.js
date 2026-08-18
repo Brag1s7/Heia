@@ -61,6 +61,37 @@ jest.mock('@react-native-async-storage/async-storage', () =>
  * uten at noe feiler. Det er den farligste varianten av en grønn test.
  * Mocken gir provideren faste innsettinger, slik at treet faktisk tegnes.
  */
+/**
+ * B1-mediapipelinen: tre native moduler. Alle tre feiler ved IMPORT i Node
+ * (expo-image/expo-file-system via expo-modules-core `requireNativeModule`,
+ * react-native-compressor via Nitro) — og importene ligger i moduler
+ * App-treet drar inn (MediaImage, media.ts, account.ts).
+ *
+ * expo-image-mocken rendrer en host-'Image' med props-ene videre — vaktene
+ * (eventDetailRefetch) beviser thumb/display ved å lese `source.uri` av
+ * host-elementer, og den kontrakten skal bestå. De statiske funksjonene er
+ * jest.fn så clearLocalCaches-stien kan asserters.
+ */
+jest.mock('expo-image', () => {
+  const React = require('react');
+  const Image = props => React.createElement('Image', props);
+  Image.configureCache = jest.fn();
+  Image.clearDiskCache = jest.fn(async () => true);
+  Image.getCachePathAsync = jest.fn(async () => null);
+  return {Image};
+});
+
+jest.mock('expo-file-system/legacy', () => ({
+  uploadAsync: jest.fn(async () => ({status: 200, headers: {}, body: ''})),
+  FileSystemUploadType: {BINARY_CONTENT: 0, MULTIPART: 1},
+}));
+
+jest.mock('react-native-compressor', () => ({
+  // Identitet som standard: «thumben» er samme fil-URI. Tester som vil
+  // skille variantene overstyrer med mockResolvedValue.
+  Image: {compress: jest.fn(async uri => uri)},
+}));
+
 jest.mock('react-native-safe-area-context', () => {
   const inset = {top: 0, right: 0, bottom: 0, left: 0};
   return {
