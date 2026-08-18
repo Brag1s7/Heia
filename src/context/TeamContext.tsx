@@ -9,6 +9,7 @@ import React, {
   type PropsWithChildren,
 } from 'react';
 import {AppState} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from './UserContext';
 import {registerTeamSwitcher} from '../navigation/deepLink';
 import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
@@ -39,6 +40,12 @@ interface TeamContextValue {
 
 const TeamContext = createContext<TeamContextValue | undefined>(undefined);
 
+// Sist aktive lag overlever app-omstart (telefonfunn 2026-08-18: bruker med
+// tre lag ble kastet til lag 1 ved hver oppstart). Kun ID-en lagres —
+// gyldigheten avgjøres ALLTID mot ferske memberships før den brukes, så en
+// som er fjernet fra laget faller trygt tilbake til første lag.
+const ACTIVE_TEAM_KEY = 'heia:activeTeamSpace:v1';
+
 export function TeamProvider({children}: PropsWithChildren) {
   const {session} = useAuth();
   const [activeTeamSpaceId, setActiveTeamSpaceId] = useState<string | null>(
@@ -48,6 +55,18 @@ export function TeamProvider({children}: PropsWithChildren) {
     EnrichedMembership[]
   >([]);
   const [loading, setLoading] = useState(false);
+
+  // Husket lagvalg fra forrige økt. undefined = ikke lest ennå (auto-valget
+  // venter på lesingen — den er lokal og langt raskere enn membership-
+  // fetchen, så ingen synlig forsinkelse); null = ingenting lagret.
+  const [storedTeamSpaceId, setStoredTeamSpaceId] = useState<
+    string | null | undefined
+  >(undefined);
+  useEffect(() => {
+    AsyncStorage.getItem(ACTIVE_TEAM_KEY)
+      .then(v => setStoredTeamSpaceId(v))
+      .catch(() => setStoredTeamSpaceId(null));
+  }, []);
 
   // Se kommentaren i UserContext: ID-en er stabil, mens `session.user` får ny
   // objekt-identitet ved hver token-refresh.
@@ -129,19 +148,42 @@ export function TeamProvider({children}: PropsWithChildren) {
     setActiveTeamSpaceId(userMemberships[0]?.teamSpaceId ?? null);
   }, [userId, userMemberships, activeTeamSpaceId]);
 
-  // Auto-velg første lag ved innlogging. Funksjonell oppdatering: et
-  // push-trykk ved kaldstart kan allerede ha køet et lagvalg i samme
-  // commit (lagbytteren kjører i barne-effekter, denne i foreldre-
-  // effekten) — auto-valget skal fylle tomrommet, aldri overstyre et
-  // valg som alt er tatt.
+  // Auto-velg lag ved innlogging: husket valg hvis det fortsatt er gyldig,
+  // ellers første lag. Funksjonell oppdatering: et push-trykk ved kaldstart
+  // kan allerede ha køet et lagvalg i samme commit (lagbytteren kjører i
+  // barne-effekter, denne i foreldre-effekten) — auto-valget skal fylle
+  // tomrommet, aldri overstyre et valg som alt er tatt.
   useEffect(() => {
     if (userId && userMemberships.length > 0 && !activeTeamSpaceId) {
-      setActiveTeamSpaceId(prev => prev ?? userMemberships[0].teamSpaceId);
+      // Vent til det lagrede valget er lest — ellers ville lag 1 vinne
+      // kappløpet ved hver kaldstart og gjøre husk-funksjonen død.
+      if (storedTeamSpaceId === undefined) {
+        return;
+      }
+      const remembered =
+        storedTeamSpaceId &&
+        userMemberships.some(m => m.teamSpaceId === storedTeamSpaceId)
+          ? storedTeamSpaceId
+          : null;
+      setActiveTeamSpaceId(
+        prev => prev ?? remembered ?? userMemberships[0].teamSpaceId,
+      );
     }
     if (!userId) {
       setActiveTeamSpaceId(null);
+      // Utlogging: neste bruker på enheten skal ikke arve lagvalget.
+      AsyncStorage.removeItem(ACTIVE_TEAM_KEY).catch(() => {});
     }
-  }, [userId, userMemberships, activeTeamSpaceId]);
+  }, [userId, userMemberships, activeTeamSpaceId, storedTeamSpaceId]);
+
+  // Ett sted for persistering: uansett HVEM som satte laget (bruker-bytte,
+  // push-trykk, medlemskapstap-fallback, auto-valg) er det gjeldende valget
+  // det som skal huskes til neste oppstart.
+  useEffect(() => {
+    if (userId && activeTeamSpaceId) {
+      AsyncStorage.setItem(ACTIVE_TEAM_KEY, activeTeamSpaceId).catch(() => {});
+    }
+  }, [userId, activeTeamSpaceId]);
 
   const activeTeamSpace = useMemo(
     () =>
