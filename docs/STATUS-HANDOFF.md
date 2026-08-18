@@ -248,15 +248,30 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   feilmelding, prod er fortsatt rolig. Valgfritt, ikke gjort: eksplisitt
   flymodus-test av disk-cachen og thumbnail_path-sjekk i DB.
 
-**GJENSTÅR AV EGRESS-PLANEN (Fase A+B er kode-KOMPLETT og verifisert):**
-1. PR + merge til main når GitHub virker (Brage merger selv, PR opprettes
-   eksplisitt på forespørsel; branchen er MANGE commits foran origin —
-   husk push først).
-2. TestFlight (A+B som ÉN slipp). EKSTERNT valgfritt før den:
-   Sentry-prosjekt + DSN i .env (nativedelen er i bygget).
-3. Exit-avlesning: −80 % egress i Usage→Bandwidth over ~2 uker (P13).
-4. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
+**SLIPPEN ER UTE (2026-08-18 kveld):** PR merget til main (Brage),
+Sentry satt opp (EU-region; DSN i gitignorert .env, VERIFISERT bakt inn
+i binæren), TestFlight-bygg **1.0 (4)** lastet opp og i Testing hos
+interne + Friends and family (main.jsbundle verifisert i arkivet FØR
+upload — regelen fra bygg 1.0 (2) holdt). Sentry-lesetilgang for Claude
+er BEVISST utsatt til første ekte feil (DSN er skrivevei; lesing krever
+User Auth Token som Brage lager da).
+
+**GJENSTÅR AV EGRESS-PLANEN (kun avlesning — intet arbeid):**
+1. Exit-avlesning: −80 % egress i Usage→Bandwidth over ~2 uker fra nå
+   (P13-lista er feilsøkingskartet hvis grafen skuffer).
+2. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
 Fase C er terskelstyrt — bygg ingenting.
+
+**NESTE BYGGESPOR (rekkefølge LÅST av Brage 2026-08-18, se også
+memory payments-architecture-freeze):**
+1. **Klubbdør-skiva** (tre porter, betalingsansvarlig-rollen,
+   «Klubbbetalinger»-flaten på Profil inkl. profilsiderydding,
+   pause/deaktiver) — ALT i Stripe testmodus.
+2. **Nettsiden** (heiaapp.no, eget prosjekt + web-admin) — starter når
+   klubbdør-skiva er ferdig, venter IKKE på live-byttet.
+3. **Stripe live-bytte som ALLER SISTE steg** når AS-et er klart
+   (sjekkliste i payments-memoryen: live-KYC m/ ledetid, live-nøkler +
+   nye webhooks, Apple-konto→AS, vilkår m/ orgnr, én ekte E2E-betaling).
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se
