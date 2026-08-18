@@ -262,13 +262,49 @@ User Auth Token som Brage lager da).
 2. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
 Fase C er terskelstyrt — bygg ingenting.
 
-**NESTE BYGGESPOR (rekkefølge LÅST av Brage 2026-08-18, se også
-memory payments-architecture-freeze):**
-1. **Klubbdør-skiva** (tre porter, betalingsansvarlig-rollen,
-   «Klubbbetalinger»-flaten på Profil inkl. profilsiderydding,
-   pause/deaktiver) — ALT i Stripe testmodus.
-2. **Nettsiden** (heiaapp.no, eget prosjekt + web-admin) — starter når
-   klubbdør-skiva er ferdig, venter IKKE på live-byttet.
+**NESTE BYGGESPOR (revidert 2026-08-18 — ERSTATTER den gamle
+«klubbdør-skiva»-definisjonen):**
+1. **AUTORITETSSKIVA for klubbbetalinger** — produksjonsklar v1 av
+   hvem-får-myndighet-modellen: nominasjon i «Aktiver støtte»-skjemaet,
+   eksplisitt rolletildeling ved ops-godkjenning, sikre invitasjoner m/
+   avvikskontroll (aksept på WEB), enhets-scope for betalingsansvarlig,
+   KYC-gate (Share-arket fjernes), varslingsmatrise, ops-flater i stedet
+   for SQL-runbooks. ALT i Stripe testmodus.
+   **Status: GODKJENT AV BRAGE 2026-08-18 (B1–B6 avgjort; B4 web-stack
+   åpen til fase B) — ✅ FASE A1 (backend) BYGGET OG DEPLOYET TIL PROD
+   2026-08-18 (kveld):** migrasjon `00062_autoritetsmodell` +
+   `00063_autoritet_varsling` pushet (backfill ren: 0 foreldreløse,
+   alle 5 manager-rader enhets-scopet — Ridabu/Stange/Nes);
+   Edge Functions deployet: NY `payments-notify` (varslingsnav +
+   token-eierskap B3), NY `submit-club-claim` (server-side brreg),
+   `stripe-onboarding` (gate = aktiv betalingsansvarlig, Share-flyt
+   død server-side), `claim-notify` (nominee-bevis). Røyktestet:
+   anon → 42501 på alle nye RPC-er, payments-notify/submit uten
+   auth → 401, `heia_support_defaults` = 7900/2405/6000.
+   **GJENSTÅR FØR A1-EXIT: kjør
+   `~/Documents/Heia-Stripe-Spike/verify-00062.sql` i SQL-editoren**
+   (selvforsynt, 37 tester, ruller ALLTID tilbake — rapporten kommer
+   som avsluttende exception «VERIFY-RAPPORT»; management-API-tokenet
+   i nøkkelringen matchet ikke API-et, derfor manuell kjøring).
+   Deretter fase A2 (appflatene). NB: `WEB_INVITE_BASE_URL`-secreten
+   er BEVISST ikke satt — invitasjons-e-post er strukturelt av til
+   web-landingen finnes (fase B); «En annen»-valget i appen bygges
+   bak featureflagg i A2. Beslutningsfrys
+   + komplett faseplan (A1 backend / A2 app / A3 selvnominasjon-dogfood
+   / B web + full dogfood, med verify-scripts, exit-kriterier og
+   rollback): `docs/AUTORITET-KLUBBBETALINGER-2026-08.md` + PAYMENTS.md
+   §«Autoritetsmodellen v2». Nøkkelavgjørelser: avvik ved aksept →
+   `awaiting_review` FØR aktiv rolle (B1); global defaults-rad med ren
+   kopi-semantikk + `club_support_defaults` re-scopes til enheten (B2);
+   token kun i URL-fragment, generert i payments-notify, reminder
+   roterer (B3); ingen rutinemessig ops-e-post på managerinvitasjoner
+   (B5); profilrydding ETTER A2, før lanserings-QA (B6). Produksjonsklar
+   v1 — rå SQL er aldri normal flyt. Kartleggingen bak ligger i
+   chatloggen 2026-08-18.
+2. **Nettsiden** (heiaapp.no, eget prosjekt) — fase B av autoritetsskiva
+   ER nettsidens første betalingsleveranse (invitasjonslanding →
+   Klubbbetalinger/rolleadmin → Heia Ops på web); starter når A-fasene
+   er ferdige, venter IKKE på live-byttet.
 3. **Stripe live-bytte som ALLER SISTE steg** når AS-et er klart
    (sjekkliste i payments-memoryen: live-KYC m/ ledetid, live-nøkler +
    nye webhooks, Apple-konto→AS, vilkår m/ orgnr, én ekte E2E-betaling).

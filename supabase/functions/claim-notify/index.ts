@@ -74,9 +74,18 @@ function nameMatches(a: string, b: string): boolean {
   return wa.every((w) => inB.has(w)) || wb.every((w) => inA.has(w));
 }
 
-type RolePerson = {label: string; name: string; match: boolean};
+type RolePerson = {
+  label: string;
+  name: string;
+  match: boolean;
+  nomineeMatch: boolean;
+};
 
-function parseRoller(roller: Json | null, claimantName: string): RolePerson[] {
+function parseRoller(
+  roller: Json | null,
+  claimantName: string,
+  nomineeName: string,
+): RolePerson[] {
   const out: RolePerson[] = [];
   for (const gruppe of roller?.rollegrupper ?? []) {
     for (const rolle of gruppe?.roller ?? []) {
@@ -90,6 +99,7 @@ function parseRoller(roller: Json | null, claimantName: string): RolePerson[] {
         label: rolle?.type?.beskrivelse ?? rolle?.type?.kode ?? 'Rolle',
         name,
         match: claimantName ? nameMatches(name, claimantName) : false,
+        nomineeMatch: nomineeName ? nameMatches(name, nomineeName) : false,
       });
     }
   }
@@ -123,6 +133,14 @@ Deno.serve(async (req) => {
 
   const org = String(record.claimed_org_number ?? '');
 
+  // Autoritetsmodellen v2 (00062): den som skal FÅ myndigheten er
+  // den nominerte — matchen mot styret gjøres for nominee i tillegg
+  // til claimanten (selv-nominasjon: samme person).
+  const nomineeIsSelf = record.nominee_is_self !== false;
+  const nomineeName = nomineeIsSelf
+    ? claimantName
+    : String(record.nominee_name ?? '');
+
   // --- Brønnøysund: enhet + roller (åpne API-er, best-effort) ---
   const enhet = await fetchJson(`${BRREG}/enheter/${org}`);
   const roller = enhet && !enhet.notFound
@@ -150,8 +168,9 @@ Deno.serve(async (req) => {
     if (enhet.konkurs) flags.push('KONKURS');
     if (enhet.underAvvikling) flags.push('UNDER AVVIKLING');
 
-    const people = parseRoller(roller, claimantName);
+    const people = parseRoller(roller, claimantName, nomineeName);
     const matched = people.filter((p) => p.match);
+    const nomineeMatched = people.filter((p) => p.nomineeMatch);
 
     snapshot.enhet = {
       navn: regName,
@@ -166,10 +185,13 @@ Deno.serve(async (req) => {
       rolle: p.label,
       navn: p.name,
       match_soker: p.match,
+      match_nominert: p.nomineeMatch,
     }));
     snapshot.checks = {
       navn_match: nameOk,
       soker_i_registeret: matched.length > 0,
+      nominert_i_registeret: nomineeMatched.length > 0,
+      nominee_is_self: nomineeIsSelf,
     };
 
     const lines: string[] = [];
@@ -187,12 +209,29 @@ Deno.serve(async (req) => {
     if (flags.length > 0) lines.push(`❌ FLAGG: ${flags.join(', ')} — avslå`);
 
     lines.push('');
+    if (nomineeIsSelf) {
+      lines.push(`NOMINASJON: søkeren vil selv være betalingsansvarlig.`);
+    } else {
+      lines.push(`NOMINASJON: søkeren peker på «${nomineeName || '(mangler navn)'}» <${record.nominee_email ?? '?'}> som betalingsansvarlig — DET er personen som skal verifiseres (rollen tildeles/inviteres ved godkjenning).`);
+    }
     lines.push(`Autorisasjonen (søker: «${claimantName || 'ukjent profilnavn'}», oppgitt rolle: «${record.claimed_role}»):`);
+    if (!nomineeIsSelf) {
+      if (nomineeMatched.length > 0) {
+        for (const p of nomineeMatched) {
+          lines.push(`✓ DEN NOMINERTE STÅR I REGISTERET: ${p.label} — ${p.name}`);
+        }
+        lines.push('→ Sterkt bevis på den nominertes fullmakt.');
+      } else if (people.length > 0) {
+        lines.push('✗ Den nominerte står IKKE i registerets roller. Beviser');
+        lines.push('  ingenting (kasserer kan ha reell fullmakt) — verifiser via');
+        lines.push('  klubbens registrerte kanal eller styret under.');
+      }
+    }
     if (matched.length > 0) {
       for (const p of matched) {
         lines.push(`✓ SØKEREN STÅR I REGISTERET: ${p.label} — ${p.name}`);
       }
-      lines.push('→ Sterkt bevis på fullmakt.');
+      if (nomineeIsSelf) lines.push('→ Sterkt bevis på fullmakt.');
     } else if (people.length > 0) {
       lines.push('✗ Søkeren står IKKE i registerets roller. Beviser ingenting');
       lines.push('  (kasserer/trener kan ha reell fullmakt) — verifiser via');
@@ -202,9 +241,13 @@ Deno.serve(async (req) => {
     }
     if (people.length > 0) {
       lines.push('');
-      lines.push('Registrerte roller:');
+      lines.push('Registrerte roller (★ = søker, ◆ = nominert):');
       for (const p of people) {
-        lines.push(`  ${p.match ? '★' : '·'} ${p.label}: ${p.name}`);
+        const mark = p.match && p.nomineeMatch ? '★◆'
+          : p.match ? '★ '
+          : p.nomineeMatch ? '◆ '
+          : '· ';
+        lines.push(`  ${mark} ${p.label}: ${p.name}`);
       }
     }
     if (enhet.epostadresse || enhet.telefon || enhet.mobil) {
@@ -239,6 +282,7 @@ ${opsLink}
 Klubb (søknad): ${record.claimed_legal_name}
 Orgnr:          ${org}
 Søker:          ${claimantName || '(ukjent)'} — oppgitt rolle: ${record.claimed_role}
+Nominert:       ${nomineeIsSelf ? 'søkeren selv' : `${nomineeName || '(mangler)'} <${record.nominee_email ?? '?'}>`}
 Kontakt:        ${record.contact_email ?? '(mangler)'}${record.contact_phone ? ` / ${record.contact_phone}` : ''}
 Sendt:          ${record.created_at}
 Claim-id:       ${record.id}
