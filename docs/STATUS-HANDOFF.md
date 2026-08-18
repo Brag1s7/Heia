@@ -194,11 +194,46 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
     setMatchReporter/startMatch/reportMatchEvent beholder eksplisitt
     refetch i skjermen (reporterens fasit; dedupen gjør ekkoet ufarlig).
 
-**GJENSTÅR I B:** B1 media-pipeline, RETT PÅ BRAGE-BRANCHEN (Brages
-beslutning 2026-08-18 — ingen egen testbranch; git-commits er
-sikkerhetsnettet, revert ved trøbbel): install-expo-modules →
-expo-image i MediaImage → compressor-thumb → uploadAsync; pod install
-+ nytt dev-bygg underveis (samme bygg aktiverer Sentry-nativedelen).
+- ✅ B1 JS-delen (2026-08-18, rett på Brage-branchen — Brages beslutning,
+  git-commits er sikkerhetsnettet): expo-image 55.0.11 + expo-file-system
+  55.0.25 + expo 55.0.29 + react-native-compressor 2.0.3 installert
+  (SDK 55-linjen matcher RN 0.83, som planlagt).
+  * **MediaImage** er expo-image: `source.cacheKey = storage_path` (disk-
+    cachen nøkles på PATH — roterende `?token=` er ikke lenger cache-miss),
+    `cachePolicy: 'disk'`, `configureCache({maxDiskSize: 150 MB})` ved
+    modul-last; `resizeMode`-prop-en beholdt utad og oversettes til
+    `contentFit` (kallstedene urørt). Målingen (imageMetrics) og
+    onError→refreshMediaUrl-fornyingen står.
+  * **Opplasting**: `src/lib/media/upload.ts` (uploadAsync + Bearer fra
+    getSession + P1-headerne; utenom netMetrics — bevisst, det er ingress);
+    pickeren har `includeBase64` AV, base64-arraybuffer er AVINSTALLERT;
+    compressor lager thumb 480/q0.7 av 2048-masteren ved pick (feilet
+    thumb = null, aldri blokkert innlegg); uploadTeamImage laster opp
+    BEGGE med backfill-navnene (`-d2048`/`-t480`) og skriver
+    thumbnail_path; logo-stien (teams.ts) bruker samme helper.
+  * `clearLocalCaches` tømmer også expo-images disk-cache (P1, delt enhet).
+  * NY VAKT: `__tests__/mediaUpload.test.ts` (2 kall m/ headere +
+    thumbnail_path; uten thumb; feilet thumb blokkerer ikke; ingen økt =
+    feil før bytes). Suiten grønn (164), lint ren. Diffen manuelt
+    gjennomgått før commit.
+  * PROSESSNOTAT: `install-expo-modules` ble IKKE kjørt av Claude
+    (permission-klassifisereren blokkerte kjøringen, og den ville uansett
+    endt i pod install — Brages steg). JS-pakkene er installert manuelt i
+    stedet; native-wiringen gjenstår (under).
+
+**GJENSTÅR I B1 — NATIVE-RUNDEN (Brage, i egen terminal):** ⚠️ appen KAN
+IKKE kjøre på det gamle bygget nå — expo-image/expo-file-system/compressor
+er native moduler som mangler der. Ikke reload appen før nytt bygg.
+1. Stopp Metro. Kjør `npx install-expo-modules@latest` — den gjør
+   native-wiringen (Podfile/AppDelegate/android; ser at expo alt er i
+   package.json) og AVSLUTTER MED pod install: 20–60 min på denne
+   maskinen, ser død ut på «Configuring the target …» — IKKE Ctrl+C.
+2. Nytt dev-bygg (samme bygg aktiverer Sentry-nativedelen fra B3).
+3. TELEFONTEST FØR FRYS: bilderotasjon/EXIF (portrett + landskap, kamera
+   OG kamerarull; sjekk at både thumb i forløpet og display i galleriet
+   står riktig vei — compressor-EXIF er den kjente risikoen, fallback er
+   compressor 1.19.4 samme dag), opplasting m/ thumbnail_path, og
+   disk-cache-beviset (bilder vises i flymodus etter første lasting).
 Deretter: PR + merge når GitHub virker, TestFlight (A+B),
 exit-avlesning (−80 % egress; P13-lista).
 
