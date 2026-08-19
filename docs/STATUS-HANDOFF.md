@@ -94,6 +94,23 @@ SQL/service-rolle, tas sammen med «Legg ned laget»-skiva ·
 medlemstall teller fortsatt rader, ikke personer (kjent restanse §6) ·
 `author_role` NULL på historiske feed-innlegg (kosmetisk, §6).
 
+**TRE BLINDVEIER SOM ALLE ENDER I §3f-5 (funnet i reviewen 2026-08-19,
+BEVISST ikke fikset — de krever ops-flaten, som er neste skive):**
+1. **Trener i et lag der alle andre er spillerkontoer kan ikke gå.**
+   Siste-admin-vakten blokkerer (det finnes andre aktive medlemmer),
+   og `set_member_role` nekter å promotere spillere (§2 sier «spillere
+   kan ikke promoteres i v1»). Begge halvdelene er låst i frysdokumentet
+   — konsekvensen er en ekte blindvei til ops kan overdra rollen.
+2. **Tidligere trener som er tilbake som forelder kan ikke gjenåpne.**
+   `join_team_space` sin reopen-gren krever at nyeste PERSONLIGE rad er
+   `removed`+`left` — en som alt bor i laget treffer aldri den grenen.
+   Oppstår når laget mistet sin siste admin via KONTOSLETTING (ikke via
+   utmelding, som vakten hindrer). Ops må tildele rollen.
+3. **Trenerforespørsel i et låst lag varsler ingen.** `requested_role`
+   blir stående som §3f-3 krever, men det finnes ingen aktive admins å
+   varsle, og ingen ops-e-post sendes. Ops ser den først ved oppslag.
+   Vurder en `notify_payments_event`-gren når ops-flaten bygges.
+
 **DERETTER (uendret rekkefølge):** Profilbilde (avatar-opplasting, punkt
 2b under) · cache-persistering · fase B (nettsiden).
 

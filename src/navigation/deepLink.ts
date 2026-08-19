@@ -136,11 +136,16 @@ export function openNotificationTarget(data: Record<string, unknown>): void {
       : null;
 
   const screen = data.screen;
-  if (screen === 'club_payments' || screen === 'support_setup') {
+  if (
+    screen === 'club_payments' ||
+    screen === 'support_setup' ||
+    screen === 'team_members'
+  ) {
     // club_payments er KLUBBNIVÅ — betalingsansvarlig er ikke nødvendigvis
     // medlem av laget som spør (varselet er globalt), så der byttes aldri
-    // lag. support_setup er lagets egen flate → bytt dit først.
-    if (screen === 'support_setup') {
+    // lag. support_setup og team_members er lagets egne flater → bytt dit
+    // først, ellers viser lagoversikten et ANNET lag enn varselet gjaldt.
+    if (screen === 'support_setup' || screen === 'team_members') {
       const outcome = switchTeamFor(teamSpaceId);
       if (outcome === 'pending') {
         pendingNotificationData = data;
@@ -158,7 +163,11 @@ export function openNotificationTarget(data: Record<string, unknown>): void {
       navigationRef.navigate(
         'ProfilStack',
         profilEntry(
-          screen === 'club_payments' ? 'ClubPayments' : 'SupportSetup',
+          screen === 'club_payments'
+            ? 'ClubPayments'
+            : screen === 'team_members'
+              ? 'TeamMembers'
+              : 'SupportSetup',
         ),
       );
     } catch {
