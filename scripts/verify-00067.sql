@@ -134,9 +134,16 @@ BEGIN
         THEN '✅' ELSE '❌ ' || v::text END));
 
     -- ── §5: lagleder/admin avvises som innløserrolle ─────────
+    -- ⚠️ FELLE (funnet i første kjøring 2026-08-19): set_config MÅ stå
+    -- UTENFOR BEGIN…EXCEPTION. En fanget exception ruller tilbake
+    -- subtransaksjonen — OG GUC-verdiene satt i den, siden set_config
+    -- med is_local=true er transaksjonsbundet. Sto claimet inne i
+    -- blokka, falt det tilbake til FORRIGE bruker, og neste test kjørte
+    -- som feil person («Du er allerede medlem av laget»). Gjelder alle
+    -- fire avvisningstestene under.
+    PERFORM set_config('request.jwt.claims',
+      jsonb_build_object('sub', u_e, 'role', 'authenticated')::text, true);
     BEGIN
-      PERFORM set_config('request.jwt.claims',
-        jsonb_build_object('sub', u_e, 'role', 'authenticated')::text, true);
       v := join_team_space('XVRF67AA', 'lagleder');
       r := r || jsonb_build_array(jsonb_build_array(
         '§5: lagleder avvises som innløserrolle', '❌ slapp inn'));
@@ -219,9 +226,9 @@ BEGIN
       CASE WHEN v_bool THEN '✅' ELSE '❌' END));
 
     -- ── §3b: fjernet sist → koden virker ikke (levende lag) ──
+    PERFORM set_config('request.jwt.claims',
+      jsonb_build_object('sub', u_d, 'role', 'authenticated')::text, true);
     BEGIN
-      PERFORM set_config('request.jwt.claims',
-        jsonb_build_object('sub', u_d, 'role', 'authenticated')::text, true);
       v := join_team_space('XVRF67AA', 'supporter');
       r := r || jsonb_build_array(jsonb_build_array(
         '§3b: fjernet bruker avvises av koden', '❌ slapp inn'));
@@ -274,9 +281,9 @@ BEGIN
     PERFORM set_config('request.jwt.claims',
       jsonb_build_object('sub', u_a, 'role', 'authenticated')::text, true);
     PERFORM remove_team_member(ts1, u_h);
+    PERFORM set_config('request.jwt.claims',
+      jsonb_build_object('sub', u_h, 'role', 'authenticated')::text, true);
     BEGIN
-      PERFORM set_config('request.jwt.claims',
-        jsonb_build_object('sub', u_h, 'role', 'authenticated')::text, true);
       v := join_team_space('XVRF67AA', 'supporter');
       r := r || jsonb_build_array(jsonb_build_array(
         '§3b: eldre left gir ALDRI adgang etter senere fjerning', '❌ slapp inn'));
@@ -375,9 +382,9 @@ BEGIN
       CASE WHEN v_bool = false AND v_bool2 = true THEN '✅' ELSE '❌' END));
 
     -- ── §3a: ukjent kodebruker avvises i låst lag ────────────
+    PERFORM set_config('request.jwt.claims',
+      jsonb_build_object('sub', u_e, 'role', 'authenticated')::text, true);
     BEGIN
-      PERFORM set_config('request.jwt.claims',
-        jsonb_build_object('sub', u_e, 'role', 'authenticated')::text, true);
       v := join_team_space('XVRF67AB', 'supporter');
       r := r || jsonb_build_array(jsonb_build_array(
         '§3a: ukjent bruker avvises i låst lag', '❌ slapp inn'));
