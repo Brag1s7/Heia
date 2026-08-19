@@ -19,7 +19,12 @@ import React, {useEffect, useRef, useState} from 'react';
 import {View, type StyleProp, type ImageStyle} from 'react-native';
 import {Image} from 'expo-image';
 import {mediaPathFor, type MediaRef, type MediaVariant} from './types';
-import {peekMediaUrl, refreshMediaUrl, resolveMediaUrl} from './resolver';
+import {
+  FEED_MEDIA_BUCKET,
+  peekMediaUrl,
+  refreshMediaUrl,
+  resolveMediaUrl,
+} from './resolver';
 
 // 150 MB LRU (B1-beslutningen fra arkitekturplanen): rommer et par lags
 // feed + gallerier i thumb/display-variantene, og er lite nok til aldri å
@@ -84,6 +89,12 @@ interface MediaImageProps {
    * oversettes til `contentFit`. Kun verdiene appen faktisk bruker.
    */
   resizeMode?: 'cover' | 'contain';
+  /**
+   * Kalles med `false` så lenge det ikke finnes en brukbar URL (usignert
+   * eller død path), `true` når bildet har en. Brukes av `Avatar` til å la
+   * initialene stå fremme i stedet for en tom sirkel.
+   */
+  onResolved?: (hasUrl: boolean) => void;
 }
 
 export function MediaImage({
@@ -91,18 +102,29 @@ export function MediaImage({
   variant = 'display',
   style,
   resizeMode = 'cover',
+  onResolved,
 }: MediaImageProps) {
+  const bucket = media.bucket ?? FEED_MEDIA_BUCKET;
   const path = mediaPathFor(media, variant);
-  const [url, setUrl] = useState<string | null>(() => peekMediaUrl(path));
+  // Disk-cachen nøkles på bucket+path: to buckets kan ha samme path, og en
+  // avatar skal aldri kunne serveres fra et feed-bildes cache-oppføring.
+  const key = `${bucket}/${path}`;
+  const [url, setUrl] = useState<string | null>(() =>
+    peekMediaUrl(path, bucket),
+  );
   const loadStartedAt = useRef(0);
   // Én fornying per path per montering — resolverens 1/min-grense er
   // sikkerhetsnettet under, dette stopper en lokal error→retry-løkke.
   const refreshedFor = useRef<string | null>(null);
+  // Satt når fornyingen har gitt opp: URL-en finnes, men det gjør ikke
+  // objektet. Skilles fra «ingen URL ennå», som er en helt annen tilstand.
+  const [dead, setDead] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const warm = peekMediaUrl(path);
+    const warm = peekMediaUrl(path, bucket);
     setUrl(warm);
+    setDead(false);
     if (!warm) {
       resolveMediaUrl(media, variant).then(resolved => {
         if (!cancelled && resolved) setUrl(resolved);
@@ -111,9 +133,22 @@ export function MediaImage({
     return () => {
       cancelled = true;
     };
-    // path er avledet av media+variant og dekker begge.
+    // key er avledet av bucket+media+variant og dekker alle tre.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path]);
+  }, [key]);
+
+  // Kallsteder som tegner noe UNDER bildet (Avatar tegner initialer) må vite
+  // om det faktisk kommer piksler. Uten dette signalet ville en død path —
+  // et fjernet profilbilde — etterlatt en tom flate i stedet for initialene.
+  //
+  // `dead` er halvparten av poenget: et FJERNET profilbilde kan fortsatt ha
+  // en gyldig signert URL i inntil 24 t hos alle ANDRE enheter (den som
+  // slettet invaliderer bare sin egen cache). Uten dette ville URL-en vært
+  // «til stede», bytene borte, og sirkelen stått tom hos hele laget til
+  // tokenet utløp.
+  useEffect(() => {
+    onResolved?.(url !== null && !dead);
+  }, [url, dead, onResolved]);
 
   if (!url) {
     // Flaten (bakgrunnsfargen bor i kallstedets stil) til URL-en er klar —
@@ -124,7 +159,7 @@ export function MediaImage({
   return (
     <Image
       style={style}
-      source={{uri: url, cacheKey: path}}
+      source={{uri: url, cacheKey: key}}
       cachePolicy="disk"
       contentFit={resizeMode}
       onLoadStart={() => {
@@ -136,10 +171,16 @@ export function MediaImage({
       onError={() => {
         // Utløpt token etter lang bakgrunn er normaltilfellet her. Disk-
         // cachen overlever (path-nøklet) — kun netthentingen trengte ny URL.
-        if (refreshedFor.current === path) return;
-        refreshedFor.current = path;
-        refreshMediaUrl(path).then(fresh => {
+        if (refreshedFor.current === key) {
+          setDead(true);
+          return;
+        }
+        refreshedFor.current = key;
+        refreshMediaUrl(path, bucket).then(fresh => {
+          // null = rate-limitet ELLER objektet er faktisk borte. Begge
+          // betyr «ingen piksler nå», og kallstedet må få vite det.
           if (fresh) setUrl(fresh);
+          else setDead(true);
         });
       }}
     />

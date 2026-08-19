@@ -5,7 +5,10 @@
  * være én ny resolver.ts, ikke en jakt gjennom skjermene.
  */
 export interface MediaRef {
-  /** Objektets sti i feed-media: `{team_space_id}/{filnavn}`. */
+  /**
+   * Objektets sti i bucketen. `feed-media`: `{team_space_id}/{filnavn}`.
+   * `avatars`: `{user_id}/avatar-{ms}.jpg`.
+   */
   path: string;
   /**
    * 480px-varianten (media.thumbnail_path). Skrives av backfill-scriptet i A
@@ -13,12 +16,22 @@ export interface MediaRef {
    * `thumb`-oppslaget faller da tilbake til `path`.
    */
   thumbPath?: string | null;
+  /**
+   * Bucketen path-en bor i. Utelatt = `feed-media` (alt som fantes før
+   * profilbilde-skiva). Feltet er valgfritt MED VILJE: kallstedene for
+   * feed/kamp/galleri er uendret, og en ref uten bucket kan aldri havne i
+   * feil bucket ved et uhell.
+   */
+  bucket?: string;
 }
 
 /**
  * `display` = 2048-masteren (P2). `thumb` = 480-varianten med fallback til
  * `path`. `full` finnes bevisst IKKE: display ER master — ingen
  * kameraoriginal lagres hos Heia for nye opplastinger.
+ *
+ * Profilbilder har KUN én variant (256 px, se media.ts): begge verdiene
+ * peker da på samme path, og `thumb` er default fra `Avatar`.
  */
 export type MediaVariant = 'thumb' | 'display';
 

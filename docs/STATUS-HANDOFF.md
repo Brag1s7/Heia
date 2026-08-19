@@ -1,6 +1,259 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER GODKJENT OG LUKKET. NESTE SAMTALE: PROFILBILDE-SKIVA, punkt 2b)
+## ▶️▶️ START HER (oppdatert 2026-08-19 — PROFILBILDE-SKIVA ER GODKJENT OG LUKKET, BEGGE DELER. NESTE: cache-persistering)
+
+**✅ PROFILBILDE ER TELEFONTESTET OG GODKJENT AV BRAGE 2026-08-19: «Alt
+funker på telefon!»** Del to av skiva — SELVVALGT AVATARFARGE — er bygget
+rett etterpå, på Brages bestilling.
+
+---
+
+### 🎨 DEL TO: SELVVALGT AVATARFARGE (✅ TELEFONGODKJENT 2026-08-19 — «Alt fungerer»)
+
+**BRAGES BESLUTNING (LÅST, og den overstyrer min anbefaling om å vente på
+piloten — ikke relitigér):** fargen er **ikke** en unik identifikator og
+skal ikke behandles som en. Den gir personlighet, og den er et godt
+alternativ for brukere som **bevisst ikke vil ha profilbilde**. Det er et
+reelt segment i en app for ungdomslag, og for dem er avataren ellers to
+bokstaver i en farge de ikke har valgt.
+
+- ✅ **Migrasjon `00070_avatar_farge.sql` PUSHET TIL PROD.**
+  `profiles.avatar_color` (FORMAT-check `^#[0-9a-fA-F]{6}$`, ikke
+  verdi-check — paletten er kuratert i appen, samme valg som
+  `team_spaces.color` tok, så en ny farge aldri krever en migrasjon).
+  **NULL = ingen valgt farge**, og da gjelder navne-hashen som før: ingen
+  backfill, ingen default, alle eksisterende kontoer ser nøyaktig like ut
+  som før migrasjonen.
+- ✅ **Tre leseflater bærer fargen** — den er verdiløs hvis den bare vises
+  for deg selv: `get_team_feed` (+`author_avatar_color`),
+  `get_team_members` og `get_team_authors` (+`avatar_color`). Alle tre er
+  DROP+CREATE med **gjenskapte 00060-grants** (00061-fella).
+- ✅ **VERIFISERT MOT EKTE PROD, 7/7**, med samme engangsrigg-metode som
+  storage-beviset (egen klubb/lag/brukere, alt revet ned; kontrollert
+  etterpå: 0 igjen, og 0 profiler i prod har farge satt). Bevist: bruker
+  kan sette sin egen farge · ugyldig verdi avvises av CHECK-en (400) ·
+  **alle tre RPC-ene svarer 200 og bærer fargen** (altså overlevde
+  grantene DROP+CREATE) · farge kan tilbakestilles til null · **kan ikke
+  settes på en ANNEN** (RLS treffer null rader).
+- ✅ **Appen:** `src/shared/avatarColors.ts` med **TO lister, og det er
+  hele poenget**: `AVATAR_HASH_COLORS` er **FROSSET** (den avgjør fargen
+  til alle som ikke har valgt — endrer du innhold ELLER rekkefølge,
+  flytter `% length` seg og halve laget bytter farge over natten), mens
+  `AVATAR_COLORS` er valgpaletten på 12 som kan vokse fritt og som
+  INNEHOLDER alle åtte hash-fargene (så den som liker fargen sin kan
+  velge nettopp den). `Avatar` tar `color`; ny `AvatarColorPicker` er en
+  bevisst tvilling av `TeamColorPicker`. Inngangen er SAMME ark som
+  bildevalget («Velg farge»), så «gjør avataren min» er én inngang og
+  ikke to konkurrerende — og velgeren har en **levende forhåndsvisning**,
+  som er selve forklaringen på hva fargen gjør.
+- ✅ **Gult er med i paletten med vilje** — den eneste virkelig lyse
+  tonen, uten den er alt mørkt og alvorlig. `inkOnAvatarColor` flipper
+  initialene til mørkt blekk der det trengs, og delegerer til lagfargens
+  luminans-regel (samme spørsmål, én terskel).
+- ✅ **VARSLENE ER BEVISST IKKE MED I MIGRASJONEN.**
+  `notifications.data` FRYSER avsenderen (00051: «et varsel er et
+  historisk faktum»), og det er riktig for navn og bilde — de VAR sånn da
+  det skjedde. **En farge er ikke et historisk faktum, den er en stående
+  preferanse**; fryses den, viser et gammelt varsel en farge personen
+  forlot. Varsellista slår derfor opp fargen LIVE fra forfatter-cachen
+  (ny `useTeamAuthors`-hook, samme 5-min-cache kommentartråden bruker).
+  Ingen av de tre trigger-funksjonene er rørt.
+- ✅ Suiten grønn: **218 tester, 19 filer** (ny `avatarColors.test.ts`
+  vokter den frosne hash-poolen med GULLVERDIER — det er den ene
+  endringen som ellers ville vært helt stille; pluss to nye
+  render-tester). Lint gikk 13 → **12** kjente (no-bitwise-advarselen
+  forsvant da hashen flyttet til shared med eslint-disable).
+
+**✅ TELEFONTESTET OG GODKJENT AV BRAGE 2026-08-19: «Alt fungerer.»**
+Runden (behold som regresjonssjekk hvis noen rører avataren igjen):
+avatar → «Velg farge» → forhåndsvisning · fargen slår gjennom i feeden,
+kommentarer, lagoversikten og varslene · «Tilbakestill farge» → tilbake
+til navne-hashen · gult har lesbare mørke initialer · en som HAR bilde
+ser fortsatt bildet, ikke fargen.
+
+**HELE PROFILBILDE-SKIVA ER DERMED GODKJENT OG LUKKET.** Ikke rør den
+uten grunn — og ruller du den likevel, les de to delene her FØRST.
+**NESTE SKIVE: cache-persistering** (punkt 3 lenger nede), deretter
+fase B (nettsiden).
+
+**KJENT OG AKSEPTERT:** `delete_account_data` nuller `display_name` og
+`avatar_url`, men ikke `avatar_color` — funksjonen er 150 linjer og ble
+ikke rørt for én linjes gevinst. Det lekker ingenting: spøkelsene har
+allerede hver sin profil-id som appen ser, så fargen skiller ikke to
+slettede brukere på noen måte id-en ikke allerede gjør. Tas hvis
+funksjonen uansett skal endres.
+
+---
+
+### 📸 DEL ÉN: PROFILBILDE (telefongodkjent 2026-08-19)
+
+**PROFILBILDE (avatar-opplasting) ER BYGGET 2026-08-19.** Migrasjonen er
+PUSHET TIL PROD og `report-notify` er DEPLOYET. Appsiden er ren JS —
+Metro-reload holder, ingen nye pakker, ingen native-endringer.
+
+**TO PRODUKTBESLUTNINGER, LÅST AV BRAGE 2026-08-19 (ikke relitigér):**
+
+1. **HVEM: alle med konto.** Grunnlaget er at det ikke finnes noen
+   barne-rolle å skille ut. Alle rollene som faktisk brukes er designet
+   for voksne — `forelder`, `supporter` (00045 sier det rett ut:
+   «besteforeldre/tanter/venner … eneste forskjell er etiketten») og
+   lagadmin. `spiller` godtas av `join_team_space` server-side, men
+   appens innmeldingsskjerm tilbyr den ikke (Forelder/Supporter/Trener),
+   og `set_member_role` nekter å gi den til noen — i praksis finnes det
+   null spillerkontoer. **Moderasjonsvaktene ble bygget i SAMME skive**,
+   som en del av beslutningen.
+2. **BUCKET: privat** (feed-media-mønsteret), ikke klubblogo-mønsteret.
+
+   ⚠️ **RAMMEN I DEN GAMLE 2b HOLDT IKKE, og det er verdt å huske:** 2b
+   sa at hvem-valget «avgjør også bucket-spørsmålet». Det gjør det ikke.
+   Norske foreldre bruker ofte et bilde av barnet sitt som profilbilde,
+   så spørsmålet «kan et bilde av et barn havne her?» har svaret JA i
+   hvert eneste alternativ som skiper opplasting. Bucket-valget måtte
+   derfor avgjøres av dét, ikke av hvem. **Det som faktisk avgjorde det:**
+   `delete_account_data` nuller `avatar_url` men sletter ALDRI fila
+   (00042:99) — i en offentlig bucket ville bildet overlevd en
+   GDPR-sletting på en åpen URL. I tillegg serverer en offentlig bucket
+   bytene helt utenom RLS, og akkurat den klassen feil traff dette
+   repoet én gang alt: 00060 måtte stramme club-logos fordi anon kunne
+   LISTE hele bucketen.
+
+**LEVERANSEN:**
+
+- ✅ **Migrasjon `00068_profilbilde.sql` PUSHET TIL PROD.** Privat bucket
+  `avatars` (2 MiB, kun bilde-mime — grensene satt i SQL, altså
+  versjonert, i motsetning til feed-media/club-logos som ble satt via
+  Storage-API-et i fase A) · `shares_team_with(uuid)` = leserettens
+  kanoniske definisjon · storage-policyer (skriv kun i EGEN mappe; se
+  eget + alt fra folk du deler lag med; slett eget ELLER som lagadmin) ·
+  profiles-UPDATE-policyen strammet med en WITH CHECK som hindrer at du
+  setter en ANNENS path på deg selv · `remove_member_avatar` ·
+  `content_reports`/`report_content` utvidet med `'avatar'`.
+- ✅ **Migrasjon `00069_avatar_path_cleanup.sql` PUSHET** — etterslep fra
+  00068, funnet ved gjennomlesing etter push. Den nye WITH CHECK-en
+  evaluerer HELE den nye raden, ikke bare kolonnene som endres: lå det en
+  verdi i `avatar_url` som ikke pekte på eierens egen mappe, ville
+  profilen blitt umulig å oppdatere i det hele tatt — brukeren hadde ikke
+  fått endret telefonnummeret sitt engang, med «new row violates
+  row-level security policy» som eneste forklaring. **Kjøringen ga 0
+  rader**, altså var ingen faktisk rammet — men nå er det verifisert i
+  stedet for antatt.
+- ✅ **`report-notify` DEPLOYET** — «profilbilde» som entitetsnavn, og
+  e-posten viser path-en + SQL-en som fjerner bildet.
+- ✅ **Appen:** `Avatar` er flyttet INN i mediepipelinen (expo-image,
+  150 MB disk-cache, `cacheKey = bucket/path`) — den var utenfor, og å
+  koble på opplasting uten det ville vært en egress-regresjon på appens
+  MEST gjentatte bilde. Initialene ligger nå ALLTID under bildet, så
+  ingen tilstand gir tom sirkel. `resolver.ts` er bucket-bevisst
+  (cache-nøkkel `bucket/path`, AsyncStorage-nøkkel bumpet til v2).
+  Inngangen er å trykke på avataren i profilheaderen — velg/bytt/fjern.
+  Lagoversiktens ⋯ har fått «Rapporter profilbildet» (ALLE medlemmer,
+  også mot en trener) og «Fjern profilbildet» (kun lagadmin).
+- ✅ **Navnet er ærlig på appsiden:** feltet heter `avatarPath` overalt,
+  ikke `avatarUrl`. **DB-kolonnen heter fortsatt `avatar_url` og BÆRER
+  EN PATH** — bevisst: åtte deployede RPC-er leser `p.avatar_url` inne i
+  plpgsql-kropper, og plpgsql binder kolonnenavn ved FØRSTE KJØRING. Et
+  `RENAME COLUMN` ville ikke feilet i migrasjonen, men i produksjon, én
+  RPC av gangen. `COMMENT ON COLUMN` er kanonisk.
+- ✅ Suiten grønn: **208 tester, 18 filer** (nye: `avatarMedia.test.ts` —
+  bucket-isolasjon, én signeringsbatch, opplastingskontrakten;
+  `avatarFallback.test.tsx` — initialene under, inkludert det stygge
+  tilfellet: FJERNET bilde med fortsatt levende signert token hos alle
+  ANDRE enheter). Lint uendret på de 13 kjente.
+
+**✅ VERIFY KJØRT AV BRAGE 2026-08-19: 25/26** (`scripts/verify-00068.sql`
+i SQL-editoren). Alt grønt unntatt ett ⚠️-hopp, som er en egenskap ved
+Supabase — ikke ved skiva. **NB i SQL-editoren: velg «Run without RLS».**
+Dialogen advarer mot at skriptet lager en tabell uten RLS; det er
+`CREATE TEMP TABLE`-resultattabellen, som bor i din egen sesjon.
+«Run and enable RLS» kan gjøre den avsluttende SELECT-en tom.
+
+**BEVIST som `authenticated` (altså som en ekte bruker, ikke som
+postgres):** bucketen er privat med grenser · `shares_team_with` i alle
+fire retninger, inkludert asymmetrien · opplasting i EGEN mappe godtas
+og i en ANNENS avvises · eier og lagkamerat ser bildet, **en FREMMED gjør
+det ikke** (selve personvernsgrensen) · identitetsvakten på profiles
+(du kan ikke sette en annens path på deg selv) · hele
+`remove_member_avatar` med vaktene · avatar-rapportering + at
+feed_post-grenen og kontoslettingens anonymisering fortsatt virker.
+
+**⛔ FUNN: SLETTE-POLICYEN KAN IKKE TESTES I SQL.** Supabase avviser ALL
+direkte `DELETE FROM storage.objects` («Direct deletion from storage
+tables is not allowed. Use the Storage API instead»), og vakten fyrer
+etter alt å dømme på STATEMENT-nivå — da er «kastet» og «0 rader» ikke
+til å skille fra hverandre, og en test der ville påstått noe den ikke
+vet. INSERT slipper derimot gjennom (C1/C2 beviser det); asymmetrien er
+Supabase sin. Skriptet er ryddet: de to slettetestene er FJERNET og
+erstattet av C8/C9, som beviser at policyene er installert med rett navn
+og rett kommando. **Appen er upåvirket** — `deleteAvatarFile` går via
+Storage-API-et, som er nettopp det vakten ber om.
+**Å kjøre skriptet på nytt er valgfritt og gir lite:** de 25 grønne er
+uendret, og C8/C9 vil nesten sikkert passere siden migrasjonen gikk rent.
+
+**✅ TELEFONTESTET OG GODKJENT AV BRAGE 2026-08-19: «Alt funker på
+telefon!»** Runden som ble kjørt (behold som regresjonssjekk hvis noen
+rører avataren igjen): sett bilde fra kamerarull og
+   kamera · se at det dukker opp i feed, kommentarer, lagoversikt og
+   varsler · bytt bilde (gammelt skal forsvinne) · fjern bilde
+   (initialer tilbake) · som trener: ⋯ → «Fjern profilbildet» på et
+   annet medlem · som VANLIG medlem: ⋯ → «Rapporter profilbildet» skal
+   finnes, «Fjern» skal IKKE · sjekk at rapport-e-posten lander.
+
+✅ **SLETTE-POLICYEN ER NÅ BEVIST — hele storage-matrisen er grønn.**
+   Kjørt av Claude 2026-08-19 mot ekte prod-Storage-API med en ENGANGSRIGG
+   (engangsklubb, engangslag, fire engangsbrukere opprettet med
+   service-nøkkelen, alt revet ned etterpå — verifisert: 0 klubber, 0 lag,
+   0 lagrom, 0 testbrukere, 0 objekter igjen). Ingen ekte konto eller lag
+   ble rørt. **9/9 grønt:**
+   opplasting i EGEN mappe · opplasting i en ANNENS mappe avvist (400) ·
+   eier ser sitt eget · lagkamerat ser det · **FREMMED ser det ikke** ·
+   fremmed kan ikke slette · **vanlig medlem kan ikke slette andres** ·
+   **LAGADMIN KAN slette en lagkamerats** (moderasjonsknappen virker) ·
+   eier kan slette sin egen.
+
+   ⚠️ **NYANSEN SOM GJØR EN NAIV SJEKK VERDILØS, og som kjøringen bekreftet
+   svart på hvitt:** Storage svarte **HTTP 200 med «0 slettet»** på begge
+   avslagene. Bulk-DELETE returnerer en LISTE over det som faktisk ble
+   slettet, og tom liste er det normale utfallet av et RLS-avslag.
+   Statuskoden beviser INGENTING. Enhver test her må asserte på om
+   objektet FINNES etterpå — en variant som sjekker `res.ok` ville vist
+   grønt på en vidåpen policy.
+
+   Riggen lå i scratchpad og er borte. Den varige, IKKE-destruktive
+   varianten for to eksisterende testkontoer står i repoet:
+   `scripts/verify-avatar-storage.mjs` (EIER/ANNEN/ADMIN som env-variabler)
+   — bruk den hvis policyene endres senere.
+
+**BEVISSTE GRENSER (ikke glemt):**
+- **Barn UTEN konto får IKKE bilde.** `managed_children.avatar_url` finnes
+  i basen (00003:90) og er fortsatt ubrukt. Å la foreldre legge bilde på
+  barna sine er et HELT annet produkt: bildet er da av et barn per
+  definisjon, lagt inn av en annen enn den avbildede. Døra står lukket.
+- **Ett format, én variant:** 256 px (56 pt × 3 = 168 px er det største
+  som tegnes). Ingen thumb avledes — `avatarRef()` setter bevisst ikke
+  `thumbPath`, så en fremtidig thumb kan legges til uten å røre et eneste
+  kallsted.
+- **Fjerning er best-effort på selve fila** (som `updateTeamLogo` og
+  `deletePost`): DB-kolonnen er fasiten, og er den NULL er bildet borte
+  fra alle levende flater med én gang. Kun frosne varselrader (00051
+  `actor_avatar`) bærer den gamle path-en videre, og de faller til
+  initialer i det fila faktisk er slettet — det er nettopp derfor
+  `MediaImage` nå melder fra om døde objekter.
+- **Signerte avatar-URL-er purges ikke ved medlemskapstap.**
+  `purgeMediaCacheByPrefix` er lag-scopet (`{team_space_id}/…`); avatarer
+  er person-scopet, så det finnes ingen prefiks. En gammel signert URL
+  lever til den utløper (≤ 24 t). Selve BILDET er utilgjengelig med én
+  gang — `shares_team_with` nekter ny signering.
+- **INVARIANT for hele `storage.objects`:** flere permissive policyer
+  OR-es, så avatars-policyens `::uuid`-cast evalueres også mot rader i
+  feed-media og club-logos. Det holder fordi ALLE tre bucketene har en
+  uuid som første mappesegment. **Legger du til en bucket: første segment
+  MÅ være en uuid.** (00018 har nøyaktig samme forutsetning.)
+
+**DERETTER (uendret rekkefølge):** cache-persistering · fase B (nettsiden).
+
+---
+
+## ✅ «FORLAT LAG»-SKIVA — GODKJENT OG LUKKET 2026-08-19
 
 **«FORLAT LAG»-SKIVA (dormant-modellen) ER BYGGET, PUSHET OG DEPLOYET
 2026-08-19.** Modellen står FROSSET i `docs/FORLAT-LAG-DORMANT-2026-08.md`
@@ -117,8 +370,9 @@ BEVISST ikke fikset — de krever ops-flaten, som er neste skive):**
    varsle, og ingen ops-e-post sendes. Ops ser den først ved oppslag.
    Vurder en `notify_payments_event`-gren når ops-flaten bygges.
 
-**DERETTER (uendret rekkefølge):** Profilbilde (avatar-opplasting, punkt
-2b under) · cache-persistering · fase B (nettsiden).
+**DERETTER:** ~~Profilbilde (avatar-opplasting)~~ — ✅ BYGGET
+2026-08-19, se START HER øverst · cache-persistering · fase B
+(nettsiden).
 
 **ÉN produksjonsendring fra B6 står utenfor koden:** dashboard-bryteren
 «Require current password when updating» = PÅ. Se punkt 1b under og
@@ -903,7 +1157,14 @@ Fase C er terskelstyrt — bygg ingenting.
          resten av skiva — men den rører onboarding, som er LÅST
          (se onboarding-memoryen), så den må avklares eksplisitt.
 
-   2b. **PROFILBILDE (avatar-opplasting) — SAMTALEN ETTER (Fable).**
+   2b. **PROFILBILDE (avatar-opplasting) — ✅ BYGGET 2026-08-19.**
+      **Kartleggingen under er HISTORIKK og beholdt fordi funnene
+      fortsatt stemmer — men beslutningene er tatt og skiva er bygget:
+      se START HER øverst i fila.** Ett forbehold: anbefalingen nederst
+      om at hvem-valget avgjør bucket-valget viste seg å IKKE holde
+      (en forelders profilbilde er ofte et bilde av barnet), og
+      begrunnelsen for privat bucket ble en annen — den står øverst.
+
       Brages beslutning 2026-08-19: egen jobb, ETTER «forlat lag». Ikke et
       lanseringskrav. Krav fra Brage: **«samme cache-løsning osv. som
       resten av appen»** — og det er nettopp der jobben er større enn den
@@ -956,8 +1217,8 @@ Fase C er terskelstyrt — bygg ingenting.
       Teknisk hindring finnes ikke — valget om hvem funksjonen gjelder for
       må tas først, og det avgjør også bucket-spørsmålet over.
 
-   3. **Cache-persistering** — Brages beslutning 2026-08-19: tas FØR
-      nettsiden, og settes ut til Fable. NB: det finnes INGEN egress-jobb
+   3. **Cache-persistering** — NESTE SKIVE. Brages beslutning 2026-08-19:
+      tas FØR nettsiden, og settes ut til Fable. NB: det finnes INGEN egress-jobb
       (se under) — oppdraget er cache alene.
    4. **Fase B (nettsiden)**, som starter med B4-stackbeslutningen.
 

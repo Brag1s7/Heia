@@ -11,7 +11,18 @@
 export interface Profile {
   id: string;
   displayName: string;
-  avatarUrl: string | null;
+  /**
+   * PATH i den private `avatars`-bucketen (00068) — ALDRI en URL. Signerte
+   * URL-er utløper, så en URL kan ikke lagres. Bruk `avatarRef()` for å
+   * gjøre den om til noe `Avatar` kan tegne. DB-kolonnen heter fortsatt
+   * `avatar_url` (begrunnelsen står i migrasjonen).
+   */
+  avatarPath: string | null;
+  /**
+   * Selvvalgt avatarfarge (#RRGGBB, 00070). NULL = navne-hashen gjelder.
+   * Vises bare når det ikke er noe profilbilde over den.
+   */
+  avatarColor: string | null;
   phone: string | null;
   locale: string;
   onboardingCompleted: boolean;

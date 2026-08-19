@@ -740,7 +740,7 @@ function mapAttendees(rows: any): EventAttendee[] {
   return ((rows ?? []) as any[]).map(a => ({
     id: a.id,
     name: a.name ?? 'Medlem',
-    avatarUrl: a.avatar ?? undefined,
+    avatarPath: a.avatar ?? undefined,
     childName: a.child_name ?? undefined,
   }));
 }

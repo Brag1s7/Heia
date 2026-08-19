@@ -29,6 +29,7 @@ const REASON_LABELS: Record<string, string> = {
 const ENTITY_LABELS: Record<string, string> = {
   feed_post: 'innlegg',
   comment: 'kommentar',
+  avatar: 'profilbilde',
 };
 
 Deno.serve(async (req) => {
@@ -58,8 +59,17 @@ Deno.serve(async (req) => {
   const entity = ENTITY_LABELS[String(record.entity_type)] ??
     String(record.entity_type);
   const details = record.details ? String(record.details) : '(ingen)';
+  const isAvatar = record.entity_type === 'avatar';
+  // Et profilbilde har ingen tekst å fryse — snapshotet er storage-path-en.
+  // MERK forskjellen fra tekst: en frossen tekst overlever at innholdet
+  // slettes, en frossen path gjør det IKKE. Får du 404 under, har personen
+  // (eller en trener) alt fjernet bildet, og saken er løst av seg selv.
   const snapshot = record.content_snapshot
-    ? String(record.content_snapshot)
+    ? isAvatar
+      ? `Profilbilde, privat bucket «avatars»:\n  ${record.content_snapshot}\n\n` +
+        '  Se på det: Storage → avatars → naviger til path-en over.\n' +
+        `  Fjern det: UPDATE profiles SET avatar_url = NULL WHERE id = '${record.entity_id}';`
+      : String(record.content_snapshot)
     : '(ikke noe tekstinnhold — trolig et bilde)';
 
   const text = `Noen har rapportert et ${entity} i Heia.
@@ -76,6 +86,7 @@ ${snapshot}
 
 Forventningen (Apple 1.2) er reaksjon innen ~24 timer. Det meste kan
 løses i appen: slett innholdet som trener/lagleder, eller la det stå.
+Profilbilder kan lagadmin fjerne selv (⋯ i lagoversikten).
 
 Lukk saken i SQL-editoren (Supabase-dashboardet):
 

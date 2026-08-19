@@ -3,6 +3,7 @@ import {View, Text, Pressable, StyleSheet, Animated} from 'react-native';
 import {colors, spacing, radius} from '../theme';
 import {stripLeadingGlyph} from '../shared/matchCopy';
 import {Avatar} from './Avatar';
+import {avatarRef} from '../lib/media/avatar';
 import {
   Ball,
   Bell,
@@ -20,6 +21,13 @@ import type {
 
 interface NotificationRowProps {
   item: HeiaNotification;
+  /**
+   * Avsenderens NÅVÆRENDE avatarfarge (00070), slått opp av skjermen fra
+   * forfatter-cachen. Bevisst ikke lest fra `item.actor`: `data` fryser
+   * avsenderen (00051), og et frosset fargevalg ville vist en farge
+   * personen har byttet bort. Utelatt = navne-hashen, som før.
+   */
+  actorColor?: string;
   onPress?: () => void;
   showBorder?: boolean;
 }
@@ -73,6 +81,7 @@ function timeAgo(date: Date): string {
 
 export function NotificationRow({
   item,
+  actorColor,
   onPress,
   showBorder = true,
 }: NotificationRowProps) {
@@ -125,7 +134,12 @@ export function NotificationRow({
           {backgroundColor: unreadSurface},
         ]}>
       {actor ? (
-        <Avatar uri={actor.avatarUrl} name={actor.name} size="md" />
+        <Avatar
+          media={avatarRef(actor.avatarPath)}
+          name={actor.name}
+          color={actorColor}
+          size="md"
+        />
       ) : changes ? (
         /* En endring er ikke en ny hendelse — eget ikon, så den ikke
            forveksles med «nytt arrangement» i lista. */

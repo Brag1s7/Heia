@@ -75,7 +75,8 @@ export async function getFeedPost(
     author: {
       id: data.author_id ?? '',
       name: member?.name ?? 'Medlem',
-      avatarUrl: member?.avatarUrl,
+      avatarPath: member?.avatarPath,
+      avatarColor: member?.avatarColor,
       role: member?.role,
     },
     createdAt: new Date(data.created_at),
@@ -134,7 +135,8 @@ export async function getComments(
       author: {
         id: row.author_id ?? '',
         name: member?.name ?? 'Medlem',
-        avatarUrl: member?.avatarUrl,
+        avatarPath: member?.avatarPath,
+        avatarColor: member?.avatarColor,
         role: member?.role,
       },
       createdAt: new Date(row.created_at),

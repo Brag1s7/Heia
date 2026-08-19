@@ -28,6 +28,7 @@ import {
 import {toggleReaction, deletePost} from '../lib/api/feed';
 import {adjustFeedItemCounts} from '../lib/queries/feed';
 import {promptReport} from '../lib/moderation';
+import {avatarRef} from '../lib/media/avatar';
 import type {FeedComment, FeedItem, HomeStackParamList} from '../shared/types';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'Comments'>;
@@ -243,7 +244,8 @@ export function CommentsScreen({route, navigation}: Props) {
               <Avatar
                 name={post.author.name}
                 size="sm"
-                uri={post.author.avatarUrl}
+                media={avatarRef(post.author.avatarPath)}
+                color={post.author.avatarColor}
               />
               <View style={styles.postHeaderText}>
                 <Text style={styles.postAuthor}>{post.author.name}</Text>
@@ -336,7 +338,12 @@ export function CommentsScreen({route, navigation}: Props) {
         ) : (
           comments.map(c => (
             <View key={c.id} style={styles.comment}>
-              <Avatar name={c.author.name} size="sm" uri={c.author.avatarUrl} />
+              <Avatar
+                name={c.author.name}
+                size="sm"
+                media={avatarRef(c.author.avatarPath)}
+                color={c.author.avatarColor}
+              />
               {/* Boble per kommentar — uten flate fløt kommentarene rett på
                   kremen og så uferdige ut ved siden av innleggskortet. */}
               <View style={styles.commentBubble}>

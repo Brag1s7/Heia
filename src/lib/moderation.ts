@@ -8,6 +8,12 @@ import {reportContent, type ReportableEntity} from './api/reports';
  * Takk-svaret er det samme også når rapporten alt fantes (RPC-en er
  * idempotent) — «du har allerede sagt fra» er et svar ingen trenger.
  */
+const REPORT_TITLES: Record<ReportableEntity, string> = {
+  feed_post: 'Hva er galt med innholdet?',
+  comment: 'Hva er galt med innholdet?',
+  avatar: 'Hva er galt med profilbildet?',
+};
+
 export function promptReport(entityType: ReportableEntity, entityId: string) {
   const send = async (reason: 'upassende' | 'trakassering' | 'annet') => {
     try {
@@ -21,7 +27,7 @@ export function promptReport(entityType: ReportableEntity, entityId: string) {
     }
   };
 
-  Alert.alert('Rapporter til Heia', 'Hva er galt med innholdet?', [
+  Alert.alert('Rapporter til Heia', REPORT_TITLES[entityType], [
     {text: 'Upassende innhold', onPress: () => send('upassende')},
     {text: 'Mobbing eller trakassering', onPress: () => send('trakassering')},
     {text: 'Noe annet', onPress: () => send('annet')},

@@ -42,6 +42,7 @@ export {
 } from './notifications';
 export {
   getTeamMembers,
+  removeMemberAvatar,
   removeTeamMember,
   type TeamMember,
 } from './members';

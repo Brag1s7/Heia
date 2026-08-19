@@ -66,6 +66,7 @@ import {
 } from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {promptReport} from '../lib/moderation';
+import {avatarRef} from '../lib/media/avatar';
 import type {
   FeedItem,
   HeiaEvent,
@@ -110,7 +111,7 @@ function toGalleryPhoto(item: FeedItem): MatchPhoto[] {
       media: item.media,
       caption: item.content || undefined,
       authorName: item.author.name,
-      authorAvatarUrl: item.author.avatarUrl,
+      authorAvatarPath: item.author.avatarPath,
       createdAt: item.createdAt,
     },
   ];
@@ -664,7 +665,8 @@ export function TeamHomeScreen() {
         <View style={styles.composeRow}>
           <Avatar
             name={profile?.displayName ?? 'Du'}
-            uri={profile?.avatarUrl ?? undefined}
+            media={avatarRef(profile?.avatarPath)}
+            color={profile?.avatarColor}
             size="md"
           />
           <View style={styles.composeField}>

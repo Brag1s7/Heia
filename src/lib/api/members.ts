@@ -1,4 +1,5 @@
 import {supabase} from '../supabase';
+import {deleteAvatarFile, primeAvatars} from '../media/avatar';
 import type {User, UserRole} from '../../shared/types';
 
 /** Et lagmedlem slik appen bruker det: en person med en rolle i lagrommet. */
@@ -31,7 +32,10 @@ export type TeamMember = User & {
 export interface TeamAuthor {
   id: string;
   name: string;
-  avatarUrl?: string;
+  /** Path i `avatars`-bucketen (00068), ikke URL. Se avatarRef(). */
+  avatarPath?: string;
+  /** Selvvalgt avatarfarge (00070). Utelatt = navne-hashen. */
+  avatarColor?: string;
   role: UserRole;
 }
 
@@ -68,7 +72,8 @@ export async function getTeamMembers(
     byUser.set(row.user_id, {
       id: row.user_id,
       name: row.display_name ?? 'Medlem',
-      avatarUrl: row.avatar_url ?? undefined,
+      avatarPath: row.avatar_url ?? undefined,
+      avatarColor: row.avatar_color ?? undefined,
       role: row.role as UserRole,
       status: row.status === 'invited' ? 'invited' : 'active',
       joinedAt: row.joined_at ? new Date(row.joined_at) : undefined,
@@ -78,7 +83,11 @@ export async function getTeamMembers(
     });
   }
 
-  return [...byUser.values()];
+  const members = [...byUser.values()];
+  // ÉN signeringsbatch for hele lagoversikten (P1) — uten den ville hver
+  // rad signert sitt eget bilde da den rullet inn i skjermen.
+  await primeAvatars(members.map(m => m.avatarPath));
+  return members;
 }
 
 /**
@@ -97,12 +106,17 @@ export async function getTeamAuthors(
   if (error) {
     throw error;
   }
-  return ((data || []) as any[]).map(row => ({
+  const authors = ((data || []) as any[]).map(row => ({
     id: row.user_id,
     name: row.display_name ?? 'Medlem',
-    avatarUrl: row.avatar_url ?? undefined,
+    avatarPath: (row.avatar_url as string | null) ?? undefined,
+    avatarColor: (row.avatar_color as string | null) ?? undefined,
     role: row.role as UserRole,
   }));
+  // Kommentartråden tegner én avatar per kommentar, alle fra dette
+  // oppslaget — så batchen hører hjemme her, ikke i skjermen.
+  await primeAvatars(authors.map(a => a.avatarPath));
+  return authors;
 }
 
 /**
@@ -138,6 +152,37 @@ export async function declineRoleRequest(
   });
   if (error) {
     throw error;
+  }
+}
+
+/**
+ * Fjerner et medlems PROFILBILDE (00068) — lagadmins moderasjonsknapp.
+ *
+ * Frem til profilbilde-skiva var «Fjern fra laget» eneste maktmiddel mot et
+ * upassende profilbilde: en trener måtte kaste ut en forelder for å bli
+ * kvitt et bilde. Dette er den forholdsmessige knappen.
+ *
+ * RPC-en nuller kolonnen (fasiten — bildet er da borte fra feed,
+ * kommentarer, lagoversikt og profil med én gang) og returnerer path-en så
+ * selve fila kan slettes. Slettingen er best-effort, som `updateTeamLogo`:
+ * feiler den, blir en ubrukt fil liggende, men den vises ingen steder —
+ * bortsett fra i frosne varselrader (00051), som faller til initialer så
+ * snart fila faktisk er borte.
+ */
+export async function removeMemberAvatar(
+  teamSpaceId: string,
+  userId: string,
+): Promise<void> {
+  const {data, error} = await supabase.rpc('remove_member_avatar', {
+    p_team_space_id: teamSpaceId,
+    p_user_id: userId,
+  });
+  if (error) {
+    throw error;
+  }
+  const path = (data as {path?: string} | null)?.path;
+  if (path) {
+    await deleteAvatarFile(path);
   }
 }
 

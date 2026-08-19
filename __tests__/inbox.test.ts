@@ -123,7 +123,7 @@ describe('Varsler — kampen er ett objekt', () => {
         team_space_id: 'ts-1',
         actor_id: 'u-emma',
         actor_name: 'Emma',
-        actor_avatar: 'https://example.test/emma.png',
+        actor_avatar: 'u-emma/avatar-1.jpg',
       },
     });
 
@@ -206,14 +206,16 @@ describe('Varsler — mennesket bak varselet', () => {
         feed_post_id: 'fp-y',
         actor_id: 'u-brage',
         actor_name: 'Brage',
-        actor_avatar: 'https://example.test/b.png',
+        actor_avatar: 'u-brage/avatar-1.jpg',
       },
     });
 
+    // Avataren er en PATH i `avatars`-bucketen (00068), aldri en URL —
+    // signerte URL-er utløper og kan ikke fryses i en varselrad.
     expect(n.actor).toEqual({
       id: 'u-brage',
       name: 'Brage',
-      avatarUrl: 'https://example.test/b.png',
+      avatarPath: 'u-brage/avatar-1.jpg',
     });
     // Tittelen bærer handlingen, body-en er innholdsutdraget (00052).
     expect(n.title).toBe('Brage heiet på innlegget ditt');

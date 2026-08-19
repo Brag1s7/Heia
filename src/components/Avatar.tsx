@@ -1,12 +1,25 @@
-import React from 'react';
-import {View, Text, Image, StyleSheet, type ViewStyle} from 'react-native';
-import {colors, radius} from '../theme';
+import React, {useState} from 'react';
+import {View, Text, StyleSheet, type ViewStyle} from 'react-native';
+import {radius} from '../theme';
+import {avatarColorFor, inkOnAvatarColor} from '../shared/avatarColors';
+import {MediaImage} from '../lib/media/MediaImage';
+import type {MediaRef} from '../lib/media/types';
 
 type AvatarSize = 'sm' | 'md' | 'lg';
 
 interface AvatarProps {
-  uri?: string;
+  /**
+   * Profilbildet som MediaRef (00068) — path i den PRIVATE `avatars`-
+   * bucketen, aldri en URL. Bruk `avatarRef()` fra lib/media/avatar.
+   * Utelatt/null = initialer.
+   */
+  media?: MediaRef | null;
   name: string;
+  /**
+   * Selvvalgt bakgrunnsfarge (00070). Utelatt/null = navne-hashen, som
+   * før. Vises kun når det ikke er noe bilde over den.
+   */
+  color?: string | null;
   size?: AvatarSize;
   style?: ViewStyle;
 }
@@ -23,18 +36,6 @@ const fontSizeMap: Record<AvatarSize, number> = {
   lg: 20,
 };
 
-// Stabile bakgrunnsfarger for initialer — varme, rolige toner
-const avatarColors = [
-  '#7C3AED', // lilla
-  '#2563EB', // blå
-  '#059669', // grønn
-  '#D97706', // gyllen
-  '#DC2626', // rød
-  '#0891B2', // cyan
-  '#7C2D12', // brun
-  '#4338CA', // indigo
-];
-
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
@@ -43,17 +44,37 @@ function getInitials(name: string): string {
   return (parts[0]?.[0] ?? '?').toUpperCase();
 }
 
-function getColorForName(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return avatarColors[Math.abs(hash) % avatarColors.length];
-}
-
-export function Avatar({uri, name, size = 'md', style}: AvatarProps) {
+/**
+ * Avataren er appens mest gjentatte bilde — én per feed-rad, én per
+ * kommentar, én per varsel. Derfor går den gjennom `MediaImage` som alt
+ * annet media (P4): expo-images 150 MB disk-cache, nøklet på bucket+path,
+ * så et ferskt signert token fortsatt er et cache-TREFF. Frem til
+ * profilbilde-skiva brukte den RNs vanlige `<Image>` og lå UTENFOR hele
+ * mediepipelinen — å koble på opplasting uten dette ville vært en
+ * egress-regresjon på nettopp det bildet som gjentas mest.
+ *
+ * INITIALENE LIGGER ALLTID UNDER. Bildet tegnes oppå, og det gjør
+ * fallbacken gratis i alle tre tilfellene som faktisk oppstår: ingen path,
+ * path som ennå ikke er signert, og path som peker på en fil som er borte
+ * (fjernet profilbilde — frosne varselrader fra 00051 bærer den gamle
+ * path-en videre). Ingen tom sirkel noe sted.
+ */
+export function Avatar({
+  media,
+  name,
+  color,
+  size = 'md',
+  style,
+}: AvatarProps) {
   const dim = sizeMap[size];
   const fontSize = fontSizeMap[size];
+  const bg = avatarColorFor(name, color);
+  // Stabil setter — sendes rett til MediaImage uten useCallback-seremoni.
+  const [hasImage, setHasImage] = useState(false);
+  // `media` leses med i vurderingen, ikke bare `hasImage`: blir bildet
+  // FJERNET mens raden står montert, unmountes MediaImage og rekker aldri
+  // å melde fra — uten dette ville sirkelen blitt stående tom.
+  const showInitials = !media || !hasImage;
 
   const containerStyle: ViewStyle = {
     width: dim,
@@ -62,43 +83,43 @@ export function Avatar({uri, name, size = 'md', style}: AvatarProps) {
     overflow: 'hidden',
   };
 
-  if (uri) {
-    return (
-      <View style={[containerStyle, style]}>
-        <Image
-          source={{uri}}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      </View>
-    );
-  }
-
   return (
     <View
       style={[
         containerStyle,
-        {backgroundColor: getColorForName(name)},
+        {backgroundColor: bg},
         styles.initialsContainer,
         style,
       ]}
     >
-      <Text style={[styles.initials, {fontSize}]}>{getInitials(name)}</Text>
+      {/* Skjules når bildet faktisk er der — ellers ville et halvgjennom-
+          siktig PNG vist bokstaver gjennom ansiktet. */}
+      {showInitials && (
+        <Text
+          style={[styles.initials, {fontSize, color: inkOnAvatarColor(bg)}]}>
+          {getInitials(name)}
+        </Text>
+      )}
+      {!!media && (
+        <MediaImage
+          media={media}
+          variant="thumb"
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          onResolved={setHasImage}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  image: {
-    width: '100%',
-    height: '100%',
-  },
   initialsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   initials: {
-    color: colors.surface,
+    // Fargen settes per avatar (lys palett-farge krever mørkt blekk).
     fontWeight: '600',
   },
 });

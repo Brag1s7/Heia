@@ -30,6 +30,7 @@ import {getNotifications} from '../lib/api/notifications';
 import {buildEntries, groupByAge, mergeNotifications} from '../shared/inbox';
 import type {Entry, HeiaNotification} from '../shared/inbox';
 import {getLiveMatch} from '../lib/api/events';
+import {useTeamAuthors} from '../lib/queries/members';
 import type {HeiaEvent} from '../shared/types';
 import type {InboxStackParamList} from '../shared/types';
 
@@ -72,6 +73,21 @@ export function InboxScreen() {
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   const teamName = activeTeamSpace?.displayName ?? 'laget';
+
+  // Avatarfargen til den som utløste varselet (00070). Egen, delt cache
+  // (5 min) — samme som kommentartråden bruker, så den er som regel varm.
+  // Se useTeamAuthors for hvorfor fargen IKKE leses fra det frosne
+  // varselet slik navnet og bildet gjør.
+  const {data: authors} = useTeamAuthors(activeTeamSpaceId);
+  const authorColors = useMemo(
+    () =>
+      new Map(
+        (authors ?? [])
+          .filter(a => a.avatarColor)
+          .map(a => [a.id, a.avatarColor as string]),
+      ),
+    [authors],
+  );
   const firstLoad = useRef(true);
   // Flette-kallene trenger nyeste/eldste rad uten å avhenge av `items` i
   // dep-arrayene sine — ellers ville fokus-effekten revet og bygget
@@ -464,6 +480,11 @@ export function InboxScreen() {
             <NotificationRow
               key={entry.key}
               item={entry.item}
+              actorColor={
+                entry.item.actor
+                  ? authorColors.get(entry.item.actor.id)
+                  : undefined
+              }
               showBorder={i < item.rows.length - 1}
               onPress={() => handlePress(entry.item)}
             />
@@ -471,7 +492,7 @@ export function InboxScreen() {
         </View>
       );
     },
-    [teamName, openEvent, handlePress],
+    [teamName, openEvent, handlePress, authorColors],
   );
 
   if (!activeTeamSpaceId) return null;

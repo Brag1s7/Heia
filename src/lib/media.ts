@@ -34,6 +34,29 @@ const LOGO_PICKER_OPTIONS = {
   maxHeight: 512,
 } as const;
 
+// Profilbilder rendres 32/40/56 pt — 56 × 3 = 168 px er det største som
+// noen gang tegnes, så 256 px er master OG eneste variant (~25 kB). Det er
+// bevisst mindre enn logoens 512: avataren er appens MEST gjentatte bilde
+// (én per feed-rad, én per kommentar, én per varsel), og alt over det
+// rendrede er ren egress uten et eneste synlig piksel i retur.
+// Ingen thumb avledes — se avatarRef() i lib/media/avatar.ts.
+const AVATAR_PICKER_OPTIONS = {
+  ...PICKER_OPTIONS,
+  maxWidth: 256,
+  maxHeight: 256,
+} as const;
+
+/**
+ * De tre variantene over, felles nevner. Bevisst avledet fra PICKER_OPTIONS
+ * i stedet for bibliotekets `CameraOptions & ImageLibraryOptions`: da er
+ * `quality` fortsatt den samme literal-typen som kallstedene alltid har
+ * sendt, og delingen kan ikke endre hva typesjekkeren mener om dem.
+ */
+type PickerOptions = Omit<typeof PICKER_OPTIONS, 'maxWidth' | 'maxHeight'> & {
+  readonly maxWidth: number;
+  readonly maxHeight: number;
+};
+
 /**
  * 480 px / JPEG q0.7 (P2, LÅST — samme parametre som backfill-scriptet i A).
  * Avledes fra pickerens 2048-master, IKKE fra kameraoriginalen: pickeren kan
@@ -150,6 +173,16 @@ export function pickLogoImage(): Promise<PickedImage | null> {
 }
 
 /**
+ * Velger et profilbilde. Samme «ta bilde eller velg fra kamerarullen?»-ark
+ * som lagbilder, men kamerarullen står FØRST: et profilbilde er nesten
+ * alltid et bilde som allerede finnes, ikke et som tas der og da.
+ * `null` betyr avbrutt/feilet; meldingen er allerede vist.
+ */
+export function pickAvatarImage(): Promise<PickedImage | null> {
+  return pickWithSource('Profilbilde', AVATAR_PICKER_OPTIONS, false);
+}
+
+/**
  * Spør «ta bilde eller velg fra kamerarullen?» og returnerer bildet klart for
  * opplasting. `null` betyr avbrutt eller feilet — den viser i så fall selv
  * meldingen til brukeren, så kallstedet trenger bare å sjekke for null.
@@ -161,25 +194,43 @@ export function pickLogoImage(): Promise<PickedImage | null> {
  * MERK: kamera krever `NSCameraUsageDescription` i Info.plist. Uten den
  * avslutter iOS appen i det kameraet åpnes — den spør ikke, og avslår ikke.
  */
-export async function pickTeamImage(
+export function pickTeamImage(
   options: {preferCamera?: boolean} = {},
+): Promise<PickedImage | null> {
+  return pickWithSource(
+    'Legg ved bilde',
+    PICKER_OPTIONS,
+    true,
+    options.preferCamera,
+  );
+}
+
+/**
+ * Kilde-arket, delt av lagbilder og profilbilder. `thumb` styrer om den
+ * 480 px lette varianten avledes (kun lagbilder — et profilbilde ER
+ * allerede lite).
+ */
+function pickWithSource(
+  title: string,
+  pickerOptions: PickerOptions,
+  thumb: boolean,
+  preferCamera = false,
 ): Promise<PickedImage | null> {
   const camera = {
     text: 'Ta bilde',
-    onPress: () => runPicker(() => launchCamera(PICKER_OPTIONS), {thumb: true}),
+    onPress: () => runPicker(() => launchCamera(pickerOptions), {thumb}),
   };
   const library = {
     text: 'Velg fra kamerarullen',
-    onPress: () =>
-      runPicker(() => launchImageLibrary(PICKER_OPTIONS), {thumb: true}),
+    onPress: () => runPicker(() => launchImageLibrary(pickerOptions), {thumb}),
   };
-  const ordered = options.preferCamera ? [camera, library] : [library, camera];
+  const ordered = preferCamera ? [camera, library] : [library, camera];
 
   // Alert.alert gir ingen returverdi, så valget pakkes i et løfte som
   // resolves fra knappen — inkludert avbryt, som gir null.
   return new Promise<PickedImage | null>(resolve => {
     Alert.alert(
-      'Legg ved bilde',
+      title,
       undefined,
       [
         ...ordered.map(o => ({
