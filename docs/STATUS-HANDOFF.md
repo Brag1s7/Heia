@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER BYGGET, DEPLOYET OG SERVERVERIFISERT; KUN TELEFONRUNDEN GJENSTÅR)
+## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER GODKJENT OG LUKKET. NESTE SAMTALE: PROFILBILDE-SKIVA, punkt 2b)
 
 **«FORLAT LAG»-SKIVA (dormant-modellen) ER BYGGET, PUSHET OG DEPLOYET
 2026-08-19.** Modellen står FROSSET i `docs/FORLAT-LAG-DORMANT-2026-08.md`
@@ -61,43 +61,37 @@
   §3b-ordningen, tiebreak, legacy-null='removed', gjenåpningsmyndighet).
   Lint ren (kun de gamle kjente advarslene).
 
-- 🔲 **GJENSTÅR FOR BRAGE:**
-  1. ✅ **GJORT 2026-08-19: `scripts/verify-00067.sql` KJØRT AV BRAGE —
-     34/34 GRØNT.** Serverbeviset er i havn: begge backfillene,
-     onboarding-triggeren, §5-innløserflaten (rolleavvisning,
-     trener→supporter+forespørsel, godkjenn/avslå), §3c-sporet,
-     §2-utmeldingen med RSVP-rydding og siste-admin-vakten, §3b
-     «siste episode avgjør» begge veier, §3a-låsen med beboer-unntaket,
-     §3f gjenåpning (både avvist og innvilget), §3e dormant fra både
-     leave og kontosletting, `get_team_authors`, og alle tre
-     A3-riderne. FØRSTE kjøring stoppet på test 6 — feil i SKRIPTET,
-     ikke i 00067: `set_config(...,true)` er transaksjonsbundet, så en
-     fanget exception rullet JWT-claimet tilbake til forrige bruker.
-     Claimet settes nå utenfor alle fire avvisningsblokkene (felle-
-     notatet står i skriptet — ikke gjeninnfør det).
-  2. **Telefonrunden.** ✅ **DELVIS GJORT 2026-08-19 — §3d-porten er
-     BEVIST PÅ ENHET, BEGGE GRENER:** onboardet bruker som forlot sitt
-     siste lag → Profil-rotet stack («fungerte bra»); helt ny bruker
-     (`+test1@gmail.com`, plus-adressering) → den LÅSTE onboardingen
-     (WelcomeIntent). Det var den ene skjelningen som ikke kan leses ut
-     av databasen — begge tilstander har null aktive lag.
-     🔲 **GJENSTÅR PÅ TELEFON:** forlat lag MED BARN (navngivingen),
-     siste-trener-blokkeringen + rollemeny/overdragelse,
-     trenerforespørsel (join som trener → chip → godkjenn/avslå),
-     «Gjenåpne laget», kommentar fra utmeldt forfatter, og hele
-     B6-runden. Serversiden for alle disse er bevist av verify (34/34),
-     så det som står igjen er om knappene vises og tekstene stemmer.
-     (Original liste:) forlat
-     lag (med/uten barn, med levende avtale-tekst), siste-admin-
-     blokkeringen + rollemeny/overdragelse, trenerforespørsel
-     (join som trener → chip → godkjenn/avslå), lagløs Profil-rot
-     (forlat siste lag → «Bli med i et lag»/«Opprett»), gjenåpning
-     (forlat som siste trener i tomt lag → inn igjen med koden →
-     «Gjenåpne laget»), kommentar fra utmeldt forfatter beholder navn.
-     + B6-telefonrunden som fortsatt står (profilrydding runde 1+2).
-  3. Valgfritt: kjør `verify-membership-hardening.mjs` PÅ NYTT når en
-     removed-rad finnes (leave-skiva lager dem nå) — dekker de to
-     ⚠️-ene fra første kjøring.
+- ✅ **SKIVA ER GODKJENT OG LUKKET AV BRAGE 2026-08-19.**
+  * **Serverbeviset:** `scripts/verify-00067.sql` kjørt — **34/34
+    GRØNT**. Dekker begge backfillene, onboarding-triggeren,
+    §5-innløserflaten (rolleavvisning, trener→supporter+forespørsel,
+    godkjenn/avslå), §3c-sporet, §2-utmeldingen med RSVP-rydding og
+    siste-admin-vakten, §3b «siste episode avgjør» begge veier,
+    §3a-låsen med beboer-unntaket, §3f gjenåpning (avvist OG
+    innvilget), §3e dormant fra både leave og kontosletting,
+    `get_team_authors`, og alle tre A3-riderne.
+    FØRSTE kjøring stoppet på test 6 — feil i SKRIPTET, ikke i 00067:
+    `set_config(...,true)` er transaksjonsbundet, så en fanget
+    exception rullet JWT-claimet tilbake til forrige bruker. Claimet
+    settes nå utenfor alle fire avvisningsblokkene (felle-notatet står
+    i skriptet — IKKE gjeninnfør det).
+  * **Telefonbeviset:** §3d-porten er verifisert på enhet i BEGGE
+    grener — onboardet bruker som forlot sitt siste lag → Profil-rotet
+    stack; helt ny bruker (plus-adressering `+test1@gmail.com`) → den
+    LÅSTE onboardingen (WelcomeIntent). Det var den ene skjelningen som
+    IKKE kan leses ut av databasen: begge tilstander har null aktive lag.
+
+**RIR MED I PRE-TESTFLIGHT-QA (ikke blokkerende — skiva er lukket).**
+Alle er bevist på RPC-nivå av verify; det som gjenstår er om knappene
+vises og tekstene stemmer:
+· forlat lag MED BARN (navngivingen i bekreftelsen) · levende
+støtteavtale-teksten + «Administrer støtte»-knappen ·
+siste-trener-blokkeringen + rollemeny/overdragelse ·
+trenerforespørsel (join som trener → chip → godkjenn/avslå) ·
+«Gjenåpne laget» · kommentar fra utmeldt forfatter beholder navn ·
+HELE B6-runden (profilrydding 1+2 — husk Metro-RESTART, nytt asset) ·
+push-trykk på rollevarsel (kun testbart i TestFlight) · valgfritt:
+`verify-membership-hardening.mjs` på nytt nå som removed-rader finnes.
 
 **BEVISST UTENFOR SKIVA (ikke glemt):** «Legg ned laget» (§4) er EGEN
 skive · ops-RPC-ene for gjenåpne/overdra/legge ned dormant lag (§3f-5)

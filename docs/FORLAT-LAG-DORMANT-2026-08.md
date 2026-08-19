@@ -1,9 +1,14 @@
 # «Forlat lag» — dormant-modellen (FROSSET 2026-08-19)
 
-**Status: GODKJENT AV BRAGE 2026-08-19, med presiseringene i §3.
-BYGGET OG DEPLOYET 2026-08-19 (migrasjon `00067_forlat_lag.sql` +
-`payments-notify`; hele §7-omfanget — se STATUS-HANDOFF for leveransen
-og restpunktene: verify-00067.sql i SQL-editoren + telefonrunden).**
+**Status: BYGGET, DEPLOYET, VERIFISERT OG GODKJENT AV BRAGE 2026-08-19.
+SKIVA ER LUKKET.** Migrasjon `00067_forlat_lag.sql` + `payments-notify`
+er i prod (hele §7-omfanget). `scripts/verify-00067.sql` kjørt av Brage:
+**34/34 grønt** — portene, vaktene, dormant-registreringen og de tre
+A3-riderne. §3d-porten er telefonverifisert i BEGGE grener (lagløs
+onboardet → Profil-rot; ny bruker → låst onboarding). Restende
+appflater (barn-navngiving, siste-trener-blokkering, trenerforespørsel,
+gjenåpning, utmeldt forfatter) er bevist på RPC-nivå og rir med i
+pre-TestFlight-QA — de er BEVISST ikke blokkerende for skiva.
 Dette dokumentet er beslutningsgrunnlaget og skal ikke relitigeres —
 endringer krever Brages uttrykkelige beslutning. Ops-RPC-ene i §3f-5
 (gjenåpne/overdra/legge ned via ops-flate) sto ikke i §7 og er BEVISST
