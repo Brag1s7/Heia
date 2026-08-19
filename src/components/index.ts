@@ -34,6 +34,7 @@ export {ReporterSheet} from './ReporterSheet';
 export {SimulatedPush} from './SimulatedPush';
 export {CreateSheet} from './CreateSheet';
 export {TeamHeader} from './TeamHeader';
+export {ProfileHeader} from './ProfileHeader';
 export {TeamColorPicker} from './TeamColorPicker';
 export {InviteCodeCard} from './InviteCodeCard';
 export {NotificationRow} from './NotificationRow';

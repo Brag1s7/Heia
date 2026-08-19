@@ -115,12 +115,17 @@ Deno.serve(async (req) => {
   );
 
   // Alle aktive medlemmer kan støtte laget sitt — ingen rollegate.
+  // limit(1): en forelder med to barn har TO aktive rader i laget, og
+  // maybeSingle() uten limit feiler da (PGRST116) — feilen ble svelget
+  // av destruktureringen og gaten falt til falsk 403 for flerbarns-
+  // foreldre. Gaten er «finnes minst én», aldri «finnes nøyaktig én».
   const {data: membership} = await admin
     .from('memberships')
     .select('id')
     .eq('user_id', user.id)
     .eq('team_space_id', teamSpaceId)
     .eq('status', 'active')
+    .limit(1)
     .maybeSingle();
   if (!membership) {
     return json({error: 'Du må være medlem av laget for å støtte det.'}, 403);

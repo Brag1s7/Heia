@@ -305,10 +305,18 @@ export type InboxStackParamList = {
   // fører til varsellista — som for kamp- og kommentarvarsler.
   SupportSetup: undefined;
   ClubPayments: undefined;
+  // Rollevarslene (00067: trenerforespørsel, rollebytte) åpner lagoversikten
+  // her av samme grunn. Varslene er lag-scopet, så aktivt lag stemmer.
+  // `Invite` følger med fordi lagoversikten navigerer dit.
+  TeamMembers: undefined;
+  Invite: {firstTime?: boolean} | undefined;
 };
 
 export type ProfilStackParamList = {
   Profil: undefined;
+  /** «Passord og sikkerhet» — passordbytte med server-håndhevet
+   *  current_password, og recovery-utveien for den som har glemt det. */
+  ChangePassword: undefined;
   TeamMembers: undefined;
   TeamSettings: undefined;
   /** Aktivering av «Støtt laget» (betalingsspor fase 3) — kun lagadmin. */

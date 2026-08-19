@@ -290,12 +290,12 @@ export function SupportSetupScreen() {
   })();
 
   // Brukes der KYC-CTA-en er borte fordi du ikke er betalingsansvarlig.
-  // NB: payloaden bærer navnet kun i `awaiting_manager` (manager_pending) —
-  // i de øvrige tilstandene finnes en aktiv ansvarlig, men navnet hens er
-  // ikke med i get_support_activation_status. Teksten er derfor presis uten
-  // å påstå et navn vi ikke har.
-  const waitingForManagerLine = pendingName
-    ? `Vi venter på at ${pendingName} fullfører registreringen hos Stripe.`
+  // Navnet kommer fra payloaden: `manager` (00067 — en AKTIV ansvarlig)
+  // når rollen finnes, ellers `manager_pending` i `awaiting_manager`.
+  // Uten navn (eldre DB): presis tekst som ikke påstår et navn vi ikke har.
+  const managerName = status?.manager?.name ?? pendingName;
+  const waitingForManagerLine = managerName
+    ? `Vi venter på at ${managerName} fullfører registreringen hos Stripe.`
     : 'Vi venter på at klubbens betalingsansvarlige fullfører registreringen hos Stripe.';
 
   // Klubbdøren (port 3) — samme kort i `active` og `awaiting_manager`.

@@ -33,7 +33,13 @@ interface OnboardingContextValue {
   clearPendingAction: () => void;
   lastError: string | null;
   setLastError: (msg: string | null) => void;
-  executeJoin: (inviteCode: string, role: MemberRole) => Promise<void>;
+  /** `reopen` = «Gjenåpne laget» (§3f-2 i FORLAT-LAG-DORMANT).
+   *  Returnerer utfallet så skjermen kan si fra om ventende trenerrolle. */
+  executeJoin: (
+    inviteCode: string,
+    role: MemberRole,
+    opts?: {reopen?: boolean},
+  ) => Promise<import('../lib/types').JoinResult>;
   executeCreate: (payload: CreateTeamPayload) => Promise<void>;
   /**
    * Settes til team_space-id rett etter at et lag er opprettet fra bunnen.
@@ -48,7 +54,7 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(
 );
 
 export function OnboardingProvider({children}: PropsWithChildren) {
-  const {session, profile} = useAuth();
+  const {session, profile, refreshProfile} = useAuth();
   const {refreshMemberships, setActiveTeamSpace} = useActiveTeam();
   const [pendingAction, setPendingActionState] = useState<PendingAction | null>(
     null,
@@ -73,13 +79,20 @@ export function OnboardingProvider({children}: PropsWithChildren) {
   }, []);
 
   // Fullfør join: refreshMemberships FØR setActive, så TeamContext er klar.
+  // refreshProfile til slutt: 00067-triggeren stempler
+  // onboarding_completed_at ved FØRSTE join/create, og navigator-porten
+  // (§3d) leser stempelet fra profilen — uten refresh sto en helt fersk
+  // bruker med utdatert null til neste app-start. Best-effort: selve
+  // join-en er alt fullført, og hasTeam-grenen tar uansett over.
   const executeJoin = useCallback(
-    async (inviteCode: string, role: MemberRole) => {
-      const result = await joinTeamSpace(inviteCode, role);
+    async (inviteCode: string, role: MemberRole, opts?: {reopen?: boolean}) => {
+      const result = await joinTeamSpace(inviteCode, role, opts);
       await refreshMemberships();
       setActiveTeamSpace(result.teamSpaceId);
+      refreshProfile().catch(() => {});
+      return result;
     },
-    [refreshMemberships, setActiveTeamSpace],
+    [refreshMemberships, setActiveTeamSpace, refreshProfile],
   );
 
   const executeCreate = useCallback(
@@ -88,6 +101,7 @@ export function OnboardingProvider({children}: PropsWithChildren) {
       await refreshMemberships();
       setActiveTeamSpace(result.teamSpaceId);
       setJustCreatedTeamSpaceId(result.teamSpaceId);
+      refreshProfile().catch(() => {});
       // NY klubb (clubName satt = opprettet nå) → tilby klubblogo (P4).
       // Her og ikke i skjermen, så auth-before-commit-resumet også dekkes.
       if (payload.clubName) {
@@ -98,7 +112,7 @@ export function OnboardingProvider({children}: PropsWithChildren) {
         );
       }
     },
-    [refreshMemberships, setActiveTeamSpace],
+    [refreshMemberships, setActiveTeamSpace, refreshProfile],
   );
 
   // Resume-effekt: kjør pending action når brukeren er autentisert.

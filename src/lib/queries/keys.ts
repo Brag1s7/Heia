@@ -17,6 +17,10 @@ export const queryKeys = {
   event: (eventId: string) => ['event', eventId] as const,
   matchPhotos: (eventId: string) => ['matchPhotos', eventId] as const,
   members: (teamSpaceId: string) => ['members', teamSpaceId] as const,
+  /** Forfatter-oppslaget (00067) — som members, men inkluderer utmeldte
+   *  og bærer aldri telefon/barn. Egen nøkkel: rosteret og forfatterskapet
+   *  har ulikt innhold og ulik livssyklus. */
+  authors: (teamSpaceId: string) => ['authors', teamSpaceId] as const,
   notifications: (teamSpaceId: string) =>
     ['notifications', teamSpaceId] as const,
   /** Uleste-telleren er notifications-domenet, men egen nøkkel: den

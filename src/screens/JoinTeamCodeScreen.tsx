@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   ScrollView,
+  Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
@@ -14,7 +15,12 @@ import {colors, typography, spacing, radius, shadows} from '../theme';
 import {BackBar, Button, Skeleton, TeamBadge} from '../components';
 import {Check} from '../components/icons';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
-import {lookupInviteCode} from '../lib/api/teams';
+import {lookupInviteCode, getMyTeamHistory} from '../lib/api/teams';
+import {
+  assessReentry,
+  type ReentryAssessment,
+} from '../shared/teamReentry';
+import {ROLE_LABELS} from '../shared/roles';
 import type {InviteCodeResult, MemberRole} from '../lib/types';
 import type {OnboardingStackParamList} from '../shared/types';
 
@@ -49,6 +55,36 @@ export function JoinTeamCodeScreen() {
   const [role, setRole] = useState<JoinRole>('forelder');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // §3a/b-portene (FORLAT-LAG-DORMANT, 00067): egne medlemsrader i laget
+  // (alle statuser er lesbare — 00066) avgjør hva flaten skal tilby FØR
+  // knappen trykkes. Serveren håndhever uansett — dette er UX-siden.
+  // null = ukjent (gjest, eller henting pågår/feilet mot eldre DB).
+  const [reentry, setReentry] = useState<ReentryAssessment | null>(null);
+  const userId = session?.user?.id;
+  useEffect(() => {
+    let cancelled = false;
+    setReentry(null);
+    if (!result || !userId) {
+      return;
+    }
+    getMyTeamHistory(userId, result.id)
+      .then(rows => {
+        if (!cancelled) {
+          setReentry(assessReentry(rows));
+        }
+      })
+      .catch(() => {
+        // Uten historikk-svar: behandle som ukjent bruker — serveren er
+        // porten, flaten skal bare ikke love noe den ikke vet.
+        if (!cancelled) {
+          setReentry(assessReentry([]));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [result, userId]);
 
   const runLookup = useCallback(async (raw: string) => {
     const c = raw.trim().toUpperCase();
@@ -90,6 +126,23 @@ export function JoinTeamCodeScreen() {
     }
   };
 
+  // Portenes UX-avledning. `hasActiveAdmin === false` = laget er låst
+  // (§3a — ingen aktiv lagadmin); undefined (eldre DB) = behandle som åpent.
+  const locked = result?.hasActiveAdmin === false;
+  // §3b: siste episode var en fjerning → koden virker aldri, i noe lag.
+  const blockedRemoved = !!reentry?.blockedRemoved;
+  // Låst lag + kjent historikk uten adgang: ærlig stopp med kontaktvei.
+  const lockedOut =
+    locked &&
+    !!session &&
+    reentry !== null &&
+    !reentry.resident &&
+    !reentry.leftVoluntarily &&
+    reentry.reopenRole === null;
+  // §3f-2: «Gjenåpne laget» vises kun i låst lag, for kvalifisert historikk.
+  const reopenRole = locked ? (reentry?.reopenRole ?? null) : null;
+  const canJoin = !blockedRemoved && !lockedOut;
+
   const handleContinue = async () => {
     if (!result) {
       return;
@@ -107,12 +160,40 @@ export function JoinTeamCodeScreen() {
     setError(null);
     try {
       // executeJoin oppdaterer memberships → AppNavigator bytter til MainTabs.
-      await executeJoin(normalizedCode, role);
+      const joined = await executeJoin(normalizedCode, role);
+      // §5: «Jeg er trener» ga aktivt medlemskap som supporter + stående
+      // forespørsel — det skal sies med en gang, ikke oppdages i rosteret.
+      if (joined.pendingRole === 'trener') {
+        Alert.alert(
+          'Du er med i laget',
+          'En trener eller lagleder godkjenner trenerrollen din — til da er du med som supporter.',
+        );
+      }
       if (hadTeam) {
         navigation.goBack();
       }
     } catch (e: any) {
       setError(e?.message ?? 'Kunne ikke bli med i laget.');
+      setSubmitting(false);
+    }
+  };
+
+  // «Gjenåpne laget» (§3f-2) — uttrykkelig valg som gjeninnsetter den gamle
+  // trener-/laglederrollen i samme bevisste handling. Vaktes server-side av
+  // §3b-historikken; flaten viser valget kun når den SER myndigheten.
+  const handleReopen = async () => {
+    if (!result || !session) {
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      await executeJoin(code.trim().toUpperCase(), 'forelder', {reopen: true});
+      if (hadTeam) {
+        navigation.goBack();
+      }
+    } catch (e: any) {
+      setError(e?.message ?? 'Kunne ikke gjenåpne laget.');
       setSubmitting(false);
     }
   };
@@ -202,45 +283,119 @@ export function JoinTeamCodeScreen() {
               </View>
             </View>
 
-            <Text style={styles.sectionLabel}>Din rolle</Text>
-            {/* Rollene sto som tre kort side om side, og «Supporter» brøt
-                over to linjer på en tredjedels skjermbredde. Fullbredde-rader
-                løser det permanent: ordene kan ikke klemmes, beskrivelsen får
-                plass ved siden av, og valget tåler forstørret skrift (der
-                3-kolonners kort uansett ville sprukket). */}
-            <View style={styles.roleList} accessibilityRole="radiogroup">
-              {ROLES.map(r => {
-                const selected = role === r.key;
-                return (
-                  <Pressable
-                    key={r.key}
-                    style={[styles.roleRow, selected && styles.roleRowSelected]}
-                    accessibilityRole="radio"
-                    accessibilityState={{selected, checked: selected}}
-                    accessibilityLabel={`${r.label} — ${r.description}`}
-                    onPress={() => setRole(r.key)}>
-                    <View style={styles.roleText}>
-                      <Text style={styles.roleLabel}>{r.label}</Text>
-                      <Text style={styles.roleDesc}>{r.description}</Text>
-                    </View>
-                    <View
-                      style={[styles.roleMark, selected && styles.roleMarkOn]}>
-                      {selected && (
-                        <Check size={14} color={colors.heiaDeep} strokeWidth={3} />
-                      )}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
+            {/* §3b: fjernet sist → ærlig stopp, aldri en død knapp. */}
+            {blockedRemoved && (
+              <Text style={styles.stopText} accessibilityRole="alert">
+                Du ble fjernet fra dette laget. En trener eller lagleder må
+                slippe deg inn igjen.
+              </Text>
+            )}
 
-            <Button
-              title="Bli med"
-              onPress={handleContinue}
-              loading={submitting}
-              size="lg"
-              style={{marginTop: spacing.xl}}
-            />
+            {/* §3a: låst lag uten adgangsgivende historikk. */}
+            {!blockedRemoved && lockedOut && (
+              <Text style={styles.stopText} accessibilityRole="alert">
+                Dette laget tar ikke imot nye medlemmer akkurat nå. Ta kontakt
+                på hello@heiaapp.no hvis du mener dette er feil.
+              </Text>
+            )}
+
+            {/* Gjest mot låst lag: serveren er porten — men si det ærlig,
+                så ingen registrerer seg forgjeves uten grunn. */}
+            {canJoin && locked && !session && (
+              <Text style={styles.noteText}>
+                Dette laget har ingen aktiv trener akkurat nå. Har du vært
+                medlem før, kan du logge inn og fortsette — ellers kan du ta
+                kontakt på hello@heiaapp.no.
+              </Text>
+            )}
+
+            {/* §3f-2: «Gjenåpne laget» — et UTTRYKKELIG valg over rollelista,
+                aldri en bivirkning av vanlig innmelding. */}
+            {canJoin && reopenRole && (
+              <View style={styles.reopenCard}>
+                <Text style={styles.reopenTitle}>Gjenåpne laget</Text>
+                <Text style={styles.reopenBody}>
+                  Du var{' '}
+                  {(
+                    ROLE_LABELS[reopenRole as keyof typeof ROLE_LABELS] ??
+                    reopenRole
+                  ).toLowerCase()}{' '}
+                  her og meldte deg ut selv. Du kan gjenåpne laget og få
+                  rollen tilbake — eller bli med som vanlig under.
+                </Text>
+                <Button
+                  title="Gjenåpne laget"
+                  onPress={handleReopen}
+                  loading={submitting}
+                  size="lg"
+                  style={{marginTop: spacing.md}}
+                />
+              </View>
+            )}
+
+            {canJoin && (
+              <>
+                <Text style={styles.sectionLabel}>Din rolle</Text>
+                {/* Rollene sto som tre kort side om side, og «Supporter» brøt
+                    over to linjer på en tredjedels skjermbredde. Fullbredde-
+                    rader løser det permanent: ordene kan ikke klemmes,
+                    beskrivelsen får plass ved siden av, og valget tåler
+                    forstørret skrift (der 3-kolonners kort uansett ville
+                    sprukket). */}
+                <View style={styles.roleList} accessibilityRole="radiogroup">
+                  {ROLES.map(r => {
+                    const selected = role === r.key;
+                    return (
+                      <Pressable
+                        key={r.key}
+                        style={[
+                          styles.roleRow,
+                          selected && styles.roleRowSelected,
+                        ]}
+                        accessibilityRole="radio"
+                        accessibilityState={{selected, checked: selected}}
+                        accessibilityLabel={`${r.label} — ${r.description}`}
+                        onPress={() => setRole(r.key)}>
+                        <View style={styles.roleText}>
+                          <Text style={styles.roleLabel}>{r.label}</Text>
+                          <Text style={styles.roleDesc}>{r.description}</Text>
+                        </View>
+                        <View
+                          style={[
+                            styles.roleMark,
+                            selected && styles.roleMarkOn,
+                          ]}>
+                          {selected && (
+                            <Check
+                              size={14}
+                              color={colors.heiaDeep}
+                              strokeWidth={3}
+                            />
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {/* §5: koden gir aldri trenerrollen direkte — si det FØR
+                    valget bekreftes, ikke som en overraskelse etterpå. */}
+                {role === 'trener' && (
+                  <Text style={styles.noteText}>
+                    En trener eller lagleder i laget godkjenner deg — til da
+                    er du med som supporter.
+                  </Text>
+                )}
+
+                <Button
+                  title="Bli med"
+                  onPress={handleContinue}
+                  loading={submitting}
+                  size="lg"
+                  style={{marginTop: spacing.xl}}
+                />
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -329,6 +484,39 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing['2xl'],
     marginBottom: spacing.md,
+  },
+  // Portenes stopptekst — informasjon med kontaktvei, ikke en feilfarge:
+  // brukeren har ikke gjort noe galt.
+  stopText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    marginTop: spacing.xl,
+    lineHeight: 22,
+  },
+  noteText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.lg,
+    lineHeight: 20,
+  },
+  // «Gjenåpne laget» (§3f-2) — eget kort så det uttrykkelige valget aldri
+  // blandes med rollelista under.
+  reopenCard: {
+    marginTop: spacing.xl,
+    backgroundColor: colors.heiaSoft,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.heia,
+    padding: spacing.lg,
+  },
+  reopenTitle: {
+    ...typography.heading3,
+  },
+  reopenBody: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    lineHeight: 20,
   },
   roleList: {
     gap: spacing.md,

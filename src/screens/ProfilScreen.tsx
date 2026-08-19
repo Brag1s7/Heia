@@ -24,7 +24,16 @@ import {
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar, ListRow, ListRowSkeleton, TeamBadge} from '../components';
+import {
+  pickPrimaryMembership,
+  uniqueTeamMemberships,
+} from '../shared/activeMembership';
+import {
+  ListRow,
+  ListRowSkeleton,
+  ProfileHeader,
+  TeamBadge,
+} from '../components';
 import {
   Bell,
   Building2,
@@ -33,6 +42,7 @@ import {
   FileText,
   HandHeart,
   Info,
+  Lock,
   LogOut,
   Phone,
   Plus,
@@ -40,6 +50,7 @@ import {
   Share2,
   ShieldCheck,
   Trash2,
+  UserMinus,
   UserPlus,
   Users,
   Wallet,
@@ -59,9 +70,12 @@ import {
   openSupportPortal,
   isOpsAdmin,
   isPaymentManager,
+  leaveTeam,
   type MySupportItem,
 } from '../lib/api';
+import {errorMessage} from '../shared/errorMessage';
 import {confirmDeleteAccount, registerLocalCache} from '../lib/account';
+import {useAppVersion} from '../lib/appVersion';
 import {formatKr} from '../lib/money';
 import type {ProfilStackParamList, RootTabParamList} from '../shared/types';
 
@@ -122,10 +136,18 @@ function supportStatusLine(item: MySupportItem): string {
 
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
-  const {profile, signOut, refreshProfile} = useAuth();
-  const {activeTeamSpaceId, userMemberships, setActiveTeamSpace} =
-    useActiveTeam();
+  const {session, profile, signOut, refreshProfile} = useAuth();
+  const {
+    activeTeamSpaceId,
+    userMemberships,
+    setActiveTeamSpace,
+    refreshMemberships,
+  } = useActiveTeam();
   const navigation = useNavigation<Nav>();
+
+  // Versjonen LESES fra bundelen (se lib/appVersion) — den skal aldri igjen
+  // kunne stå og lyve i TestFlight. `null` = ukjent, og da vises ingen rad.
+  const appVersion = useAppVersion();
 
   // Varsel-status. Oppdateres når skjermen mountes og hver gang appen kommer i
   // forgrunn igjen (bytter du i iOS-Innstillinger og kommer tilbake, stemmer den).
@@ -285,15 +307,113 @@ export function ProfilScreen() {
     );
   }, [profile?.phone, refreshProfile]);
 
+  // «Forlat laget» — dormant-modellen (00067, FROSSET i
+  // docs/FORLAT-LAG-DORMANT-2026-08.md): rører KUN medlemskapet.
+  // Bekreftelsen navngir alle berørte (barna følger forelderen), sier at
+  // innholdet består, og — når du har en levende støtteavtale på laget —
+  // at støtten fortsetter uavhengig, med «Administrer støtte» som egen vei.
+  const [leavingTeam, setLeavingTeam] = useState(false);
+  const handleLeaveTeam = useCallback(() => {
+    if (!activeTeamSpaceId || leavingTeam) return;
+    const membership = pickPrimaryMembership(
+      userMemberships,
+      activeTeamSpaceId,
+    );
+    const teamName = membership?.teamSpace.displayName ?? 'laget';
+
+    const childNames = userMemberships
+      .filter(m => m.teamSpaceId === activeTeamSpaceId && m.managedChildId)
+      .map(m => m.managedChildName)
+      .filter((n): n is string => !!n);
+    const who =
+      childNames.length === 0
+        ? 'Utmeldingen gjelder deg.'
+        : childNames.length === 1
+          ? `Utmeldingen gjelder deg og ${childNames[0]}.`
+          : `Utmeldingen gjelder deg og barna dine (${childNames
+              .slice(0, -1)
+              .join(', ')} og ${childNames[childNames.length - 1]}).`;
+
+    // Levende avtale på DETTE laget: utmeldingen rører den aldri
+    // (medlemskap og støtte er separate relasjoner — modell B), men det
+    // skal sies i klartekst, ikke oppdages på kontoutskriften.
+    const liveSupport = (mySupport ?? []).some(
+      s =>
+        s.teamSpaceId === activeTeamSpaceId &&
+        (s.status === 'active' || s.status === 'past_due') &&
+        !s.cancelAt,
+    );
+
+    const message =
+      `${who} Innlegg, bilder og kommentarer dere har delt blir stående.` +
+      (liveSupport
+        ? '\n\nStøtten din til laget fortsetter som før — den er uavhengig av medlemskapet, og du administrerer den under «Min støtte».'
+        : '');
+
+    const doLeave = async () => {
+      setLeavingTeam(true);
+      try {
+        const result = await leaveTeam(activeTeamSpaceId);
+        if (result.outcome === 'last_admin') {
+          // Siste-admin-vakten (§2): rollen må overdras først.
+          // Blokkeringsdialogen deep-linker til rollemenyen.
+          Alert.alert(
+            'Laget trenger en trener',
+            'Du er den siste treneren eller laglederen, og laget har fortsatt aktive medlemmer. Gi en annen voksen rollen i lagoversikten først — så kan du melde deg ut.',
+            [
+              {text: 'Ikke nå', style: 'cancel'},
+              {
+                text: 'Åpne lagoversikten',
+                onPress: () => navigation.navigate('TeamMembers'),
+              },
+            ],
+          );
+          return;
+        }
+        // 'left' (og 'not_member' etter et dobbelttrykk): fersk liste. Var
+        // dette siste laget, bytter AppNavigator til den lagløse Profil-
+        // roten; ellers velger TeamContext neste lag og purger mediecachen.
+        await refreshMemberships();
+      } catch (e) {
+        Alert.alert('Kunne ikke melde deg ut', errorMessage(e));
+      } finally {
+        setLeavingTeam(false);
+      }
+    };
+
+    Alert.alert(`Forlate ${teamName}?`, message, [
+      {text: 'Avbryt', style: 'cancel'},
+      ...(liveSupport
+        ? [{text: 'Administrer støtte', onPress: handleManageSupport}]
+        : []),
+      {text: 'Forlat laget', style: 'destructive', onPress: doLeave},
+    ]);
+  }, [
+    activeTeamSpaceId,
+    leavingTeam,
+    userMemberships,
+    mySupport,
+    refreshMemberships,
+    handleManageSupport,
+    navigation,
+  ]);
+
   if (!profile) return null;
 
-  const activeMembership = userMemberships.find(
-    m => m.teamSpaceId === activeTeamSpaceId,
+  // Primærraden, ikke «første rad»: en trener som også er forelder har
+  // flere rader i laget, og rollebadgen skal aldri avhenge av radrekkefølge.
+  const activeMembership = pickPrimaryMembership(
+    userMemberships,
+    activeTeamSpaceId,
   );
+  // Lagløs (§3d) = ingen rolle å vise — badgen utelates, aldri gjettes.
   const roleName = activeMembership
     ? ROLE_LABELS[activeMembership.role]
-    : 'Forelder';
+    : undefined;
   const isTrener = isTeamAdmin(activeMembership?.role);
+  // «Konto»-radene — utledet her fordi blokka rundt dem må kjenne dem også.
+  const showPhoneRow = Platform.OS === 'ios';
+  const showPushRow = isPushAvailable();
 
   function handleTeamSwitch(teamSpaceId: string) {
     if (teamSpaceId === activeTeamSpaceId) return;
@@ -307,41 +427,38 @@ export function ProfilScreen() {
   }
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
-      {/* Profil-toppen — på den varme bakgrunnstonen, ikke eget hvitt kort (P7) */}
-      <View
-        style={[
-          styles.profileSection,
-          {paddingTop: insets.top + spacing.lg},
-        ]}>
-        <Avatar name={profile.displayName} size="lg" />
-        <Text style={styles.userName}>{profile.displayName}</Text>
-        <View style={styles.roleRow}>
-          <View
-            style={[
-              styles.roleBadge,
-              isTrener ? styles.roleBadgeTrener : styles.roleBadgeForelder,
-            ]}>
-            <Text
-              style={[
-                styles.roleBadgeText,
-                isTrener
-                  ? styles.roleBadgeTrenerText
-                  : styles.roleBadgeForelderText,
-              ]}>
-              {roleName}
-            </Text>
-          </View>
-        </View>
-      </View>
+    <View style={styles.screen}>
+      {/* Profilheaderen er SØSKEN over scrollen, ikke inni den — samme
+          plassering som TeamHeader på Hjem/Kalender/Varsler, så fanebytte
+          ikke flytter toppflaten. Den eier safe area; scrollen under starter
+          rett på innholdet. */}
+      <ProfileHeader
+        name={profile.displayName}
+        email={session?.user?.email}
+        avatarUrl={profile.avatarUrl}
+        role={roleName}
+      />
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={{
+          paddingTop: spacing.lg,
+          paddingBottom: insets.bottom + spacing['3xl'],
+        }}>
 
-      {/* Dine lag */}
-      {userMemberships.length > 0 && (
+        {/* Dine lag — lagkortene OG de to lag-handlingene. Handlingene lå
+            begravd i «Innstillinger», mellom telefonnummeret og «Logg ut»
+            (B6): de handler om lag, så de hører hjemme her.
+
+            Seksjonen står ALLTID, guarden gjelder kun kortene. I dag er Profil
+            uansett bare nåbar med minst ett lag (`hasTeam`-porten i
+            AppNavigator), men handlingene er nettopp veien INN i et lag — de
+            skal ikke kunne forsvinne den dagen porten endres. */}
         <View style={styles.teamsSection}>
           <SectionLabel title="Dine lag" />
-          {userMemberships.map(m => {
+          {/* Ett kort per LAG: en forelder med to barn har to medlems-
+              rader i samme lag og så det samme kortet to ganger. Primær-
+              raden representerer laget, så rollebadgen på kortet stemmer. */}
+          {uniqueTeamMemberships(userMemberships).map(m => {
             const isActive = m.teamSpaceId === activeTeamSpaceId;
             return (
               <Pressable
@@ -377,294 +494,363 @@ export function ProfilScreen() {
               </Pressable>
             );
           })}
-        </View>
-      )}
-
-      {/* Laget — radene som gjelder det aktive laget */}
-      {activeMembership && (
-        <View style={styles.menuBlock}>
-          <SectionLabel title={activeMembership.teamSpace.displayName} />
           <View style={styles.menuCard}>
             <ListRow
               icon={
                 <MenuIcon>
-                  <Users size={20} color={colors.textSecondary} />
+                  <UserPlus size={20} color={colors.textSecondary} />
                 </MenuIcon>
               }
-              title="Lagoversikt"
-              subtitle="Se hvem som er med i laget"
+              title="Bli med i et lag"
+              subtitle="Har du fått en invitasjonskode?"
               right={<RowChevron />}
-              onPress={() => navigation.navigate('TeamMembers')}
+              onPress={() => navigation.navigate('JoinTeamCode')}
             />
-            {isTrener && (
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Plus size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Opprett et nytt lag"
+              subtitle="Du blir trener for laget"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('CreateTeam')}
+              showBorder={false}
+            />
+          </View>
+        </View>
+
+        {/* Laget — radene som gjelder det aktive laget */}
+        {activeMembership && (
+          <View style={styles.menuBlock}>
+            <SectionLabel title={activeMembership.teamSpace.displayName} />
+            <View style={styles.menuCard}>
               <ListRow
                 icon={
                   <MenuIcon>
-                    <Settings size={20} color={colors.textSecondary} />
+                    <Users size={20} color={colors.textSecondary} />
                   </MenuIcon>
                 }
-                title="Laginnstillinger"
-                subtitle="Lagnavn, lagfarge og logo"
+                title="Lagoversikt"
+                subtitle="Se hvem som er med i laget"
                 right={<RowChevron />}
-                onPress={() => navigation.navigate('TeamSettings')}
+                onPress={() => navigation.navigate('TeamMembers')}
               />
-            )}
-            <ListRow
-              icon={
-                <MenuIcon>
-                  <Share2 size={20} color={colors.textSecondary} />
-                </MenuIcon>
-              }
-              title="Inviter til laget"
-              subtitle="Del invitasjonskoden"
-              right={<RowChevron />}
-              onPress={() => navigation.navigate('Invite')}
-              showBorder={false}
-            />
-          </View>
-        </View>
-      )}
-
-      {/* Min støtte — egne støtteavtaler (fase 5). Klubbens onboarding og
-          økonomi bor i Laginnstillinger, ALDRI her (låst 2026-08-02).
-          Seksjonen står ALLTID her (Brages review-funn 2026-08-02) — flaten
-          er stabil, og en fersk betaling har et hjem fra første blikk. */}
-      <View style={styles.menuBlock}>
-        <SectionLabel title="Min støtte" />
-        <View style={styles.menuCard}>
-          {mySupport === null ? (
-            <ListRowSkeleton showBorder={false} />
-          ) : mySupport.length === 0 ? (
-            // Tom-raden peker inn i LAGKASSA, ikke rett på betalingssiden —
-            // «hvorfor» før «betal» (fordelingen og hva støtten betyr bor
-            // der). Uten aktivt lag er raden ren informasjon.
-            <ListRow
-              icon={
-                <MenuIcon>
-                  <HandHeart size={20} color={colors.textSecondary} />
-                </MenuIcon>
-              }
-              title="Du støtter ingen lag ennå"
-              subtitle={
-                activeMembership
-                  ? 'Se lagkassa og hva støtten betyr for laget'
-                  : 'Avtalene dine samles her når du støtter et lag'
-              }
-              right={activeMembership ? <RowChevron /> : undefined}
-              onPress={
-                activeMembership
-                  ? () =>
-                      navigation
-                        .getParent<NavigationProp<RootTabParamList>>()
-                        ?.navigate('HjemStack', {
-                          screen: 'Lagkassa',
-                          initial: false,
-                        })
-                  : undefined
-              }
-              showBorder={false}
-            />
-          ) : (
-            <>
-              {mySupport.map((item, index) => (
+              {isTrener && (
                 <ListRow
-                  key={item.subscriptionId}
                   icon={
                     <MenuIcon>
-                      <HandHeart size={20} color={colors.textSecondary} />
+                      <Settings size={20} color={colors.textSecondary} />
                     </MenuIcon>
                   }
-                  title={item.teamName}
-                  subtitle={`${formatKr(item.amountMinor)}/mnd · ${formatKr(
-                    item.clubAmountMinor,
-                  )} går til laget\n${supportStatusLine(item)}`}
+                  title="Laginnstillinger"
+                  subtitle="Lagnavn, lagfarge og logo"
                   right={<RowChevron />}
-                  onPress={handleManageSupport}
-                  showBorder={index < mySupport.length - 1}
+                  onPress={() => navigation.navigate('TeamSettings')}
                 />
-              ))}
-              <Text style={styles.supportHint}>
-                Betalingsmåte, kvitteringer og oppsigelse håndteres trygt hos
-                Stripe — lenken åpnes i Safari.
-              </Text>
-            </>
-          )}
-        </View>
-      </View>
+              )}
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Share2 size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Inviter til laget"
+                subtitle="Del invitasjonskoden"
+                right={<RowChevron />}
+                onPress={() => navigation.navigate('Invite')}
+              />
+              {/* «Forlat laget» (00067) — nederst i lagblokka: en handling
+                  som tar deg UT skal ikke stå mellom veiene inn. */}
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <UserMinus size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Forlat laget"
+                subtitle={
+                  leavingTeam
+                    ? 'Melder deg ut …'
+                    : 'Innholdet ditt blir stående'
+                }
+                onPress={handleLeaveTeam}
+                showBorder={false}
+              />
+            </View>
+          </View>
+        )}
 
-      {/* Klubbetalinger (klubbdøren, 00047) — hovedinngangen for
-          betalingsansvarlig (låst: bor på Profil). Raden er et speil av
-          DB-vakten club_payment_managers. */}
-      {isManager && (
+        {/* Min støtte — egne støtteavtaler (fase 5). Klubbens onboarding og
+            økonomi bor i Laginnstillinger, ALDRI her (låst 2026-08-02).
+            Seksjonen står ALLTID her (Brages review-funn 2026-08-02) — flaten
+            er stabil, og en fersk betaling har et hjem fra første blikk. */}
         <View style={styles.menuBlock}>
-          <SectionLabel title="Klubben" />
+          <SectionLabel title="Min støtte" />
+          <View style={styles.menuCard}>
+            {mySupport === null ? (
+              <ListRowSkeleton showBorder={false} />
+            ) : mySupport.length === 0 ? (
+              // Tom-raden peker inn i LAGKASSA, ikke rett på betalingssiden —
+              // «hvorfor» før «betal» (fordelingen og hva støtten betyr bor
+              // der). Uten aktivt lag er raden ren informasjon.
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <HandHeart size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Du støtter ingen lag ennå"
+                subtitle={
+                  activeMembership
+                    ? 'Se lagkassa og hva støtten betyr for laget'
+                    : 'Avtalene dine samles her når du støtter et lag'
+                }
+                right={activeMembership ? <RowChevron /> : undefined}
+                onPress={
+                  activeMembership
+                    ? () =>
+                        navigation
+                          .getParent<NavigationProp<RootTabParamList>>()
+                          ?.navigate('HjemStack', {
+                            screen: 'Lagkassa',
+                            initial: false,
+                          })
+                    : undefined
+                }
+                showBorder={false}
+              />
+            ) : (
+              <>
+                {mySupport.map((item, index) => (
+                  <ListRow
+                    key={item.subscriptionId}
+                    icon={
+                      <MenuIcon>
+                        <HandHeart size={20} color={colors.textSecondary} />
+                      </MenuIcon>
+                    }
+                    title={item.teamName}
+                    subtitle={`${formatKr(item.amountMinor)}/mnd · ${formatKr(
+                      item.clubAmountMinor,
+                    )} går til laget\n${supportStatusLine(item)}`}
+                    right={<RowChevron />}
+                    onPress={handleManageSupport}
+                    showBorder={index < mySupport.length - 1}
+                  />
+                ))}
+                <Text style={styles.supportHint}>
+                  Betalingsmåte, kvitteringer og oppsigelse håndteres trygt hos
+                  Stripe — lenken åpnes i Safari.
+                </Text>
+              </>
+            )}
+          </View>
+        </View>
+
+        {/* Klubbetalinger (klubbdøren, 00047) — hovedinngangen for
+            betalingsansvarlig (låst: bor på Profil). Raden er et speil av
+            DB-vakten club_payment_managers. */}
+        {isManager && (
+          <View style={styles.menuBlock}>
+            <SectionLabel title="Klubben" />
+            <View style={styles.menuCard}>
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Wallet size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Klubbetalinger"
+                subtitle="Godkjenn og administrer lagenes støtte"
+                right={<RowChevron />}
+                onPress={() => navigation.navigate('ClubPayments')}
+                showBorder={false}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Heia Ops — kun for ops_admins (Brage). Raden er et speil av
+            DB-vakten; alle handlinger er audit-loggede RPC-er. */}
+        {isOps && (
+          <View style={styles.menuBlock}>
+            <SectionLabel title="Heia internt" />
+            <View style={styles.menuCard}>
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <ShieldCheck size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Heia Ops"
+                subtitle="Klubbsøknader til behandling"
+                right={<RowChevron />}
+                onPress={() => navigation.navigate('OpsClaims')}
+              />
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Building2 size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Klubber og roller"
+                subtitle="Betalingsansvarlige, invitasjoner og avvikskontroll"
+                right={<RowChevron />}
+                onPress={() => navigation.navigate('OpsEntities')}
+                showBorder={false}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* Konto. «Innstillinger» var ÉN skuff med fire ulike ting:
+            kontodetaljer, lag-handlinger, farlige handlinger og juss. Nå tre
+            blokker med hver sin jobb, i den rekkefølgen Brage låste: det du
+            faktisk endrer først, det du sjelden leser i midten, og det du
+            ikke kan angre aller nederst.
+
+            Blokka trenger ikke lenger en vakt mot å bli tom: telefon- og
+            varselradene er iOS-betingede (Alert.prompt finnes ikke på
+            Android, isPushAvailable() krever iOS + pod), men «Passord og
+            sikkerhet» er det ikke. */}
+        <View style={styles.menuBlock}>
+          <SectionLabel title="Konto" />
+          <View style={styles.menuCard}>
+            {showPhoneRow && (
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Phone size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Telefonnummer"
+                subtitle={profile.phone ?? 'Legg til så trenerne når deg'}
+                onPress={handlePhone}
+              />
+            )}
+            {/* Server-håndhevet passordbytte: GoTrue krever og validerer
+                current_password i SAMME forespørsel («Require current
+                password when updating» er på). Skjermen er en flate, ikke
+                en vakt — se ChangePasswordScreen. */}
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Lock size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Passord og sikkerhet"
+              subtitle="Endre passord"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('ChangePassword')}
+              showBorder={showPushRow}
+            />
+            {showPushRow && (
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Bell size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Varslinger"
+                subtitle={PUSH_SUBTITLE[pushPerm]}
+                onPress={handleNotifications}
+                showBorder={false}
+              />
+            )}
+          </View>
+        </View>
+
+        {/* Om Heia — juss og versjon. Sjelden lest, men versjonsraden er den
+            ENE en testbruker leter etter når hun skal melde en feil. */}
+        <View style={styles.menuBlock}>
+          <SectionLabel title="Om Heia" />
           <View style={styles.menuCard}>
             <ListRow
               icon={
                 <MenuIcon>
-                  <Wallet size={20} color={colors.textSecondary} />
+                  <FileText size={20} color={colors.textSecondary} />
                 </MenuIcon>
               }
-              title="Klubbetalinger"
-              subtitle="Godkjenn og administrer lagenes støtte"
+              title="Vilkår for bruk"
+              onPress={() => Linking.openURL(TERMS_URL)}
               right={<RowChevron />}
-              onPress={() => navigation.navigate('ClubPayments')}
-              showBorder={false}
             />
-          </View>
-        </View>
-      )}
-
-      {/* Heia Ops — kun for ops_admins (Brage). Raden er et speil av
-          DB-vakten; alle handlinger er audit-loggede RPC-er. */}
-      {isOps && (
-        <View style={styles.menuBlock}>
-          <SectionLabel title="Heia internt" />
-          <View style={styles.menuCard}>
             <ListRow
               icon={
                 <MenuIcon>
                   <ShieldCheck size={20} color={colors.textSecondary} />
                 </MenuIcon>
               }
-              title="Heia Ops"
-              subtitle="Klubbsøknader til behandling"
+              title="Personvern"
+              onPress={() => Linking.openURL(PRIVACY_URL)}
               right={<RowChevron />}
-              onPress={() => navigation.navigate('OpsClaims')}
+              showBorder={appVersion !== null}
+            />
+            {/* Ingen rad uten et tall vi faktisk har lest fra bundelen —
+                hardkodet «v0.1.0» er nettopp feilen denne raden retter. */}
+            {appVersion !== null && (
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <Info size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title={appVersion}
+                showBorder={false}
+              />
+            )}
+          </View>
+        </View>
+
+        {/* Avslutningsblokken — uten overskrift med vilje. De to handlingene
+            som tar deg UT av appen står for seg selv, og «Slett konto» er
+            siste rad på hele siden: den ene handlingen som ikke kan angres
+            skal ikke ha noe under seg å bomme på. */}
+        <View style={styles.menuBlock}>
+          <View style={styles.menuCard}>
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <LogOut size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Logg ut"
+              subtitle="Logg ut av Heia"
+              onPress={handleSignOut}
             />
             <ListRow
               icon={
                 <MenuIcon>
-                  <Building2 size={20} color={colors.textSecondary} />
+                  <Trash2 size={20} color={colors.textSecondary} />
                 </MenuIcon>
               }
-              title="Klubber og roller"
-              subtitle="Betalingsansvarlige, invitasjoner og avvikskontroll"
-              right={<RowChevron />}
-              onPress={() => navigation.navigate('OpsEntities')}
+              title="Slett konto"
+              subtitle={
+                deletingAccount
+                  ? 'Sletter kontoen din …'
+                  : 'Fjern kontoen og dataene dine for godt'
+              }
+              onPress={handleDeleteAccount}
               showBorder={false}
             />
           </View>
         </View>
-      )}
 
-      {/* Innstillinger */}
-      <View style={styles.menuBlock}>
-        <SectionLabel title="Innstillinger" />
-        <View style={styles.menuCard}>
-          {Platform.OS === 'ios' && (
-            <ListRow
-              icon={
-                <MenuIcon>
-                  <Phone size={20} color={colors.textSecondary} />
-                </MenuIcon>
-              }
-              title="Telefonnummer"
-              subtitle={profile.phone ?? 'Legg til så trenerne når deg'}
-              onPress={handlePhone}
-            />
-          )}
-          <ListRow
-            icon={
-              <MenuIcon>
-                <UserPlus size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Bli med i et lag"
-            subtitle="Har du fått en invitasjonskode?"
-            right={<RowChevron />}
-            onPress={() => navigation.navigate('JoinTeamCode')}
+        {/* Footer — avbindingen beholdes, men kompakt. Den sto med 40 px luft
+            over OG under en 100×100 logo, altså ~250 px nesten tomt under
+            «Slett konto». */}
+        <View style={styles.footer}>
+          <Image
+            source={require('../assets/images/logo-green-wordmark.png')}
+            style={styles.footerLogo}
+            resizeMode="contain"
           />
-          <ListRow
-            icon={
-              <MenuIcon>
-                <Plus size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Opprett et nytt lag"
-            subtitle="Du blir trener for laget"
-            right={<RowChevron />}
-            onPress={() => navigation.navigate('CreateTeam')}
-          />
-          {isPushAvailable() && (
-            <ListRow
-              icon={
-                <MenuIcon>
-                  <Bell size={20} color={colors.textSecondary} />
-                </MenuIcon>
-              }
-              title="Varslinger"
-              subtitle={PUSH_SUBTITLE[pushPerm]}
-              onPress={handleNotifications}
-            />
-          )}
-          <ListRow
-            icon={
-              <MenuIcon>
-                <LogOut size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Logg ut"
-            subtitle="Logg ut av Heia"
-            onPress={handleSignOut}
-          />
-          <ListRow
-            icon={
-              <MenuIcon>
-                <Trash2 size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Slett konto"
-            subtitle={
-              deletingAccount
-                ? 'Sletter kontoen din …'
-                : 'Fjern kontoen og dataene dine for godt'
-            }
-            onPress={handleDeleteAccount}
-          />
-          <ListRow
-            icon={
-              <MenuIcon>
-                <FileText size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Vilkår for bruk"
-            onPress={() => Linking.openURL(TERMS_URL)}
-            right={<RowChevron />}
-          />
-          <ListRow
-            icon={
-              <MenuIcon>
-                <ShieldCheck size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Personvern"
-            onPress={() => Linking.openURL(PRIVACY_URL)}
-            right={<RowChevron />}
-          />
-          <ListRow
-            icon={
-              <MenuIcon>
-                <Info size={20} color={colors.textSecondary} />
-              </MenuIcon>
-            }
-            title="Om Heia"
-            subtitle="v0.1.0"
-            showBorder={false}
-          />
+          <Text style={styles.footerTagline}>Idrettsglede for alle</Text>
         </View>
-      </View>
-
-      {/* Footer */}
-      <View style={styles.footer}>
-        <Image
-          source={require('../assets/images/logo-green.png')}
-          style={styles.footerLogo}
-          resizeMode="contain"
-        />
-        <Text style={styles.footerTagline}>Idrettsglede for alle</Text>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -672,44 +858,6 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
-  },
-  profileSection: {
-    alignItems: 'center',
-    paddingBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.xs,
-  },
-  userName: {
-    ...typography.heading2,
-    marginTop: spacing.xs,
-  },
-  roleRow: {
-    flexDirection: 'row',
-  },
-  roleBadge: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.sm,
-  },
-  roleBadgeTrener: {
-    backgroundColor: 'rgba(2, 255, 171, 0.15)',
-  },
-  // Hvit pill med subtil kant — background-tonen forsvant mot den nye
-  // background-flaten bak.
-  roleBadgeForelder: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-  },
-  roleBadgeText: {
-    ...typography.caption,
-    fontWeight: '600',
-  },
-  roleBadgeTrenerText: {
-    color: colors.heiaInk,
-  },
-  roleBadgeForelderText: {
-    color: colors.textSecondary,
   },
   teamsSection: {
     marginTop: spacing.md,
@@ -788,17 +936,33 @@ const styles = StyleSheet.create({
     width: 28,
     alignItems: 'center',
   },
+  // Avbindingen beholdes, men kompakt: sto med 40 px luft over OG under en
+  // 100×100 logo — ~250 px nesten tomt under «Slett konto».
   footer: {
     alignItems: 'center',
-    paddingVertical: spacing['4xl'],
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
     gap: spacing.xs,
   },
+  // `logo-green-wordmark.png` — BESKÅRET, og det er hele poenget.
+  //
+  // ⚠️ `logo-green.png` er 1080×1080 med ordmerket på 715×370 i midten:
+  // 34 % av høyden er merke, resten er tom luft bakt inn i rasteret. Siden
+  // `contain` skalerer HELE kvadratet, tvinger den en stor boks rundt et
+  // lite merke — på en 80-boks ble ordmerket rendret 27 pt høyt, på 44 var
+  // det uleselig. «Større OG mer kompakt» er umulig med det assetet.
+  // Samme felle er dokumentert i WelcomeIntentScreen.
+  //
+  // Den beskårne varianten (@1x/@2x/@3x, samme konvensjon som
+  // `logo-wordmark.png`) er ren merkeflate: 66 pt boks = 66 pt ordmerke,
+  // altså 2,4× større enn før i en LAVERE footer. `logo-wordmark.png` kunne
+  // ikke brukes — den er hvit/mint for stadionflaten og forsvinner her.
   footerLogo: {
-    width: 100,
-    height: 100,
+    width: 128,
+    height: 66,
   },
   footerTagline: {
-    ...typography.bodySmall,
+    ...typography.caption,
     color: colors.textTertiary,
   },
 });

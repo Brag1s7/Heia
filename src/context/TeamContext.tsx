@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from './UserContext';
 import {registerTeamSwitcher} from '../navigation/deepLink';
 import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
+import {pickPrimaryMembership} from '../shared/activeMembership';
 import {purgeMediaCacheByPrefix} from '../lib/media/resolver';
 import type {
   EnrichedMembership,
@@ -185,26 +186,18 @@ export function TeamProvider({children}: PropsWithChildren) {
     }
   }, [userId, activeTeamSpaceId]);
 
-  const activeTeamSpace = useMemo(
-    () =>
-      userMemberships.find(m => m.teamSpaceId === activeTeamSpaceId)
-        ?.teamSpace ?? null,
+  // ÉN primærrad avgjør lagrom, lag OG rolle — deterministisk. `find` tok
+  // «første rad», og en trener som også er forelder i laget har flere:
+  // rollen (og dermed all isTeamAdmin-gating) var prisgitt radrekkefølgen.
+  // Den personlige raden bærer alltid den faktiske rollen (se modulen).
+  const activeMembership = useMemo(
+    () => pickPrimaryMembership(userMemberships, activeTeamSpaceId),
     [userMemberships, activeTeamSpaceId],
   );
 
-  const activeTeam = useMemo(
-    () =>
-      userMemberships.find(m => m.teamSpaceId === activeTeamSpaceId)
-        ?.team ?? null,
-    [userMemberships, activeTeamSpaceId],
-  );
-
-  const activeRole = useMemo(
-    () =>
-      userMemberships.find(m => m.teamSpaceId === activeTeamSpaceId)?.role ??
-      null,
-    [userMemberships, activeTeamSpaceId],
-  );
+  const activeTeamSpace = activeMembership?.teamSpace ?? null;
+  const activeTeam = activeMembership?.team ?? null;
+  const activeRole = activeMembership?.role ?? null;
 
   // Medlemstallet til TeamHeader-underteksten. Cachet per lagrom, så et
   // lagbytte viser forrige tall med én gang mens ferskt hentes. Feiler

@@ -36,6 +36,7 @@ function mapEnrichedMembership(row: any): EnrichedMembership {
     status: row.status,
     joinedAt: row.joined_at,
     managedChildId: row.managed_child_id,
+    managedChildName: row.managed_child?.display_name ?? null,
     teamSpace: {
       id: ts.id,
       teamId: ts.team_id,
@@ -80,6 +81,7 @@ export async function getUserMemberships(
     .select(
       `
       *,
+      managed_child:managed_children(display_name),
       team_space:team_spaces!inner(
         *,
         team:teams!inner(
@@ -92,7 +94,13 @@ export async function getUserMemberships(
     )
     .eq('user_id', userId)
     .eq('status', 'active')
-    .is('team_space.deleted_at', null);
+    .is('team_space.deleted_at', null)
+    // Uten ORDER BY er radrekkefølgen planleggerens valg og kan skifte
+    // mellom app-starter — og alt som plukker «første rad» per lag
+    // (activeMembership-modulen) må ha en stabil kilde. id er tiebreak
+    // for familier som ble meldt inn i samme sekund.
+    .order('joined_at', {ascending: true})
+    .order('id', {ascending: true});
 
   if (error) {
     throw error;
@@ -122,16 +130,23 @@ export async function lookupInviteCode(
     clubName: data.club_name,
     sport: data.sport,
     memberCount: data.member_count,
+    // Kom i 00067 (§3a): undefined fra eldre DB = behandle som åpent.
+    hasActiveAdmin: data.has_active_admin ?? undefined,
   };
 }
 
 export async function joinTeamSpace(
   inviteCode: string,
   role: string,
+  opts?: {reopen?: boolean},
 ): Promise<JoinResult> {
+  // v4 (00067): portene (§3a/b i FORLAT-LAG-DORMANT) håndheves i RPC-en
+  // og kommer hit som PostgrestError med norsk melding — skjermene viser
+  // e.message som før. p_reopen = «Gjenåpne laget» (§3f-2, eksplisitt valg).
   const {data, error} = await supabase.rpc('join_team_space', {
     p_invite_code: inviteCode,
     p_role: role,
+    p_reopen: opts?.reopen ?? false,
   });
 
   if (error) {
@@ -141,6 +156,62 @@ export async function joinTeamSpace(
     membershipId: data.membership_id,
     teamSpaceId: data.team_space_id,
     displayName: data.display_name,
+    outcome: data.outcome ?? 'joined',
+    role: data.role ?? undefined,
+    pendingRole: data.pending_role ?? null,
+  };
+}
+
+/**
+ * Brukerens EGNE medlemsrader i et lag, alle statuser (00066-policyen
+ * «Users can view own memberships» dekker historikk). Grunnlaget for
+ * §3b-portene i join-flaten — se shared/teamReentry.
+ */
+export async function getMyTeamHistory(
+  userId: string,
+  teamSpaceId: string,
+): Promise<
+  import('../../shared/teamReentry').MembershipHistoryRow[]
+> {
+  const {data, error} = await supabase
+    .from('memberships')
+    .select('id, status, role, managed_child_id, joined_at, left_reason')
+    .eq('user_id', userId)
+    .eq('team_space_id', teamSpaceId);
+
+  if (error) {
+    throw error;
+  }
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    status: row.status,
+    role: row.role,
+    managedChildId: row.managed_child_id,
+    joinedAt: row.joined_at,
+    leftReason: row.left_reason ?? null,
+  }));
+}
+
+/**
+ * «Forlat laget» (00067) — dormant-modellen: rører KUN medlemskapet.
+ * Ingen Stripe-kall, ingen sletting; støtteavtaler lever sitt eget liv
+ * i «Min støtte». Utfall som data: 'last_admin' = siste aktive
+ * trener/lagleder kan ikke gå fra et lag med andre aktive medlemmer —
+ * rollen må overdras først (rollemenyen i lagoversikten).
+ */
+export async function leaveTeam(
+  teamSpaceId: string,
+): Promise<import('../types').LeaveTeamResult> {
+  const {data, error} = await supabase.rpc('leave_team', {
+    p_team_space_id: teamSpaceId,
+  });
+
+  if (error) {
+    throw error;
+  }
+  return {
+    outcome: data.outcome,
+    teamDormant: data.team_dormant ?? false,
   };
 }
 

@@ -235,9 +235,9 @@ KYC-utfører, betalingsansvarlig) til én.
    ved identitetsavvik, managerløs enhet og forespørsel uten mottakere
    (ingen forespørsel forsvinner til null mottakere).
 10. **App/web:** web skal før full lansering ha invitasjonslanding,
-    innlogging, aksept/avslag, Stripe-onboarding, Klubbbetalinger,
+    innlogging, aksept/avslag, Stripe-onboarding, Klubbetalinger,
     rolleadmin, Heia Ops, https-lenker og server-side brreg-validering;
-    appen har aktivering/nominasjon/status/Klubbbetalinger/port 3. Samme
+    appen har aktivering/nominasjon/status/Klubbetalinger/port 3. Samme
     RPC-er overalt. Ingen invitasjons-e-post før web-landingen finnes.
 
 **Eksplisitt erstattet fra 2026-08-03-beslutningen:** auto-rolle til
@@ -294,7 +294,7 @@ SUPPORTER-ROLLEN. Tre-porter-modellen:**
    Grensesnittet: **Stripe står for KYC; Heia står for
    autorisasjonskontrollen.** (API-formene røyktestet mot Ridabu
    2026-08-03: FLI, hele styret med navn, leder@ridabufotball.no.)
-2. **Én kanonisk flate: «Klubbbetalinger».** Hovedinngang på PROFIL
+2. **Én kanonisk flate: «Klubbetalinger».** Hovedinngang på PROFIL
    (rad kun synlig for betalingsansvarlige), kontekstuell snarvei fra
    Laginnstillinger til SAMME flate. Ingen ny innlogging, portal eller
    e-postflyt — betalingsansvarlig er en vanlig Heia-bruker i appen.

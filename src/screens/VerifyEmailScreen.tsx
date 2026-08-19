@@ -14,6 +14,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {BackBar, Button} from '../components';
 import {useAuth} from '../context';
+import {authErrorMessage} from '../shared/authErrors';
 import type {OnboardingStackParamList} from '../shared/types';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'VerifyEmail'>;
@@ -53,9 +54,15 @@ export function VerifyEmailScreen({route}: Props) {
         await confirmSignup(email, code.trim());
       }
       // Session er satt → RootNavigator tar over. La spinneren stå.
-    } catch {
-      // Supabase-feilene her er engelske og i praksis alltid samme sak.
-      setError('Feil eller utløpt kode — sjekk sifrene, eller be om en ny.');
+    } catch (e) {
+      // Fallbacken dekker den vanlige saken; authErrorMessage slipper en mer
+      // presis feil (svakt passord, rate limit) forbi når den finnes.
+      setError(
+        authErrorMessage(
+          e,
+          'Feil eller utløpt kode — sjekk sifrene, eller be om en ny.',
+        ),
+      );
       setSubmitting(false);
     }
   };
@@ -70,9 +77,9 @@ export function VerifyEmailScreen({route}: Props) {
         await resendSignupCode(email);
       }
       setResent(true);
-    } catch {
+    } catch (e) {
       // Typisk rate limit («For security purposes …») — si det rolig.
-      setError('Vent litt før du ber om en ny kode.');
+      setError(authErrorMessage(e, 'Vent litt før du ber om en ny kode.'));
     }
   };
 

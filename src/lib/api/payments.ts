@@ -74,6 +74,10 @@ export interface SupportActivationStatus {
     invitedName: string;
     status: ManagerPendingStatus;
   } | null;
+  /** En AKTIV betalingsansvarlig for enheten (00067, A3-avvik 2) — så
+   *  KYC-kortet kan navngi hvem det venter på når `canOnboard` er false.
+   *  null fra eldre DB eller når enheten mangler/venter på rollen. */
+  manager: {name: string} | null;
 }
 
 /** RPC-en returnerer NULL for alle som ikke er lagadmin i laget. */
@@ -131,6 +135,7 @@ export async function getSupportActivationStatus(
           status: data.manager_pending.status as ManagerPendingStatus,
         }
       : null,
+    manager: data.manager?.name ? {name: data.manager.name} : null,
   };
 }
 

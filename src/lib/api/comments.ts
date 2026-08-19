@@ -1,23 +1,26 @@
 import {supabase} from '../supabase';
-import {type TeamMember} from './members';
-import {fetchTeamMembersCached} from '../queries/members';
+import {type TeamAuthor} from './members';
+import {fetchTeamAuthorsCached} from '../queries/members';
 import {getUserId} from './authUser';
 import {HEIA_EMOJI} from './feed';
 import {primeMediaUrls} from '../media/resolver';
 import type {FeedComment, FeedItem} from '../../shared/types';
 
 // profiles-RLS lar deg kun lese egen profil, så en direkte comments→profiles
-// join gir ikke lagkameraters navn. Vi henter hele laget via get_team_members
-// og kobler forfatter klient-side.
+// join gir ikke lagkameraters navn. Forfatterne hentes via get_team_authors
+// (00067) og kobles klient-side. Authors, IKKE members: rosteret viser bare
+// levende medlemmer, og en utmeldt forfatters kommentarer mistet navn og
+// avatar (kjent hull, tettet i leave-skiva — frysdokumentets §2 sier at
+// forfatterskap består).
 //
 // Via query-cachen (B2): getFeedPost + getComments kjører i parallell ved
 // trådåpning og gjorde før to identiske RPC-kall — ensureQueryData deduper
-// dem til ett, og et nylig besøk på laget gjør begge gratis.
+// dem til ett, og et nylig besøk i tråden gjør begge gratis.
 async function getMemberMap(
   teamSpaceId: string,
-): Promise<Map<string, TeamMember>> {
-  const members = await fetchTeamMembersCached(teamSpaceId);
-  return new Map(members.map(m => [m.id, m]));
+): Promise<Map<string, TeamAuthor>> {
+  const authors = await fetchTeamAuthorsCached(teamSpaceId);
+  return new Map(authors.map(m => [m.id, m]));
 }
 
 /**

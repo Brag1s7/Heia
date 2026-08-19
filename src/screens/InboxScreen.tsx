@@ -310,13 +310,15 @@ export function InboxScreen() {
     (item: HeiaNotification) => {
       markLocalRead([item.id]);
 
-      // Klubbdør-varsler (00047) peker inn i Profil-stacken — godkjenningen
-      // bor i Klubbetalinger, lagets status i «Støtte fra supportere».
+      // Klubbdør-varsler (00047) og rollevarsler (00067) peker på en fast
+      // skjerm — de åpnes i varselstacken så «Tilbake» går til lista.
       if (item.targetScreen) {
         navigation.navigate(
           item.targetScreen === 'club_payments'
             ? 'ClubPayments'
-            : 'SupportSetup',
+            : item.targetScreen === 'team_members'
+              ? 'TeamMembers'
+              : 'SupportSetup',
         );
         return;
       }

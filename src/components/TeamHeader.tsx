@@ -9,27 +9,17 @@ import {StadiumSurface} from './StadiumSurface';
 import {TeamBadge} from './TeamBadge';
 import {Trophy} from './icons';
 import {teamHeaderSurface} from '../shared/teamColors';
+// Geometrien deles med ProfileHeader (og StadiumSurface) — se modulen.
+import {
+  ARC_INSET_RIGHT,
+  ARC_INSET_BOTTOM,
+  ARC_R_OUTER,
+  ARC_R_INNER,
+  ARC_STROKE,
+  ARC_OPACITY_OUTER,
+  ARC_OPACITY_INNER,
+} from '../shared/headerGeometry';
 
-/**
- * Banesirkelen — DELT GEOMETRI MED StadiumSurface.
- *
- * Kortenes buer sitter konsentrisk 30 px inn fra høyre kant og 10 px opp fra
- * bunnen, med radius 100 og 68 og strek 1.5 (se arcOuter/arcInner i
- * StadiumSurface). Headeren bruker de SAMME absolutte verdiene, ikke skalerte:
- * lik radius gir lik krumning, og da leser headeren og kampkortene som samme
- * form — ikke som to som ligner på hverandre.
- *
- * Endrer du disse, endre StadiumSurface tilsvarende.
- */
-const ARC_INSET_RIGHT = 30;
-const ARC_INSET_BOTTOM = 10;
-const ARC_R_OUTER = 100;
-const ARC_R_INNER = 68;
-const ARC_STROKE = 1.5;
-/** Litt tydeligere enn kortenes 0.13/0.09 — headeren er en større flate og
- *  tåler mer før det blir dekor. */
-const ARC_OPACITY_OUTER = 0.18;
-const ARC_OPACITY_INNER = 0.11;
 
 interface TeamHeaderProps {
   /**

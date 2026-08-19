@@ -1,5 +1,137 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER GODKJENT OG LUKKET. NESTE SAMTALE: PROFILBILDE-SKIVA, punkt 2b)
+
+**«FORLAT LAG»-SKIVA (dormant-modellen) ER BYGGET, PUSHET OG DEPLOYET
+2026-08-19.** Modellen står FROSSET i `docs/FORLAT-LAG-DORMANT-2026-08.md`
+(kanonisk — §-referansene under peker dit). Leveransen, hele §7-omfanget:
+
+- ✅ **Migrasjon `00067_forlat_lag.sql` PUSHET TIL PROD** (bekreftet i
+  migration list). Innhold: `memberships.left_reason` + `ended_by`
+  (backfill: alle removed-rader → 'removed', ended_by NULL=ukjent) ·
+  `memberships.requested_role` ('trener') · `team_spaces.dormant_at`
+  (backfillet for alt tomme lag) · `profiles.onboarding_completed_at`
+  (backfill = eldste medlemsrads created_at + INSERT-TRIGGER
+  `stamp_onboarding_completed` som dekker ALLE innmeldingsdører, også
+  fremtidige) · hjelperne `has_active_team_admin` (den KANONISKE
+  §3a-porten, utledet) og `register_team_dormant_if_empty` (delt av
+  leave/delete; ops-varsel kun når laget har innhold/avtaler).
+- ✅ **RPC-ene:** `leave_team` (settbasert flip m/ left_reason='left',
+  RSVP-rydding, siste-admin-vakt som UTFALL 'last_admin', advisory-lås
+  `team_admin_guard` mot samtidige utmeldinger, dormant-registrering) ·
+  `set_member_role` + `decline_role_request` (personlig rad, aldri
+  spillere, laget kan aldri stå uten aktiv lagadmin, varsler til den
+  det gjelder) · `join_team_space` **v4** (NY signatur m/ `p_reopen` —
+  gammel 3-args DROPPET; lagleder/admin avvises §5; «trener» → supporter
+  + requested_role + varsel til alle aktive lagadmins; §3b-porten
+  «siste episode avgjør» også i levende lag; §3a-låsen med
+  beboer-unntak — forelder i låst lag kan legge til barn nr. 2;
+  gjenåpning §3f-2 gjeninnsetter gammel adminrolle; nuller dormant_at)
+  · `remove_team_member` v2 (left_reason='removed' + ended_by) ·
+  `delete_account_data` v4 (dormant-registrering; GDPR ellers urørt).
+- ✅ **Leseflater:** `get_team_members` v2 (+requested_role — DROP+CREATE
+  m/ gjenskapte 00060-grants) · NY `get_team_authors` (forfatteroppslag
+  som overlever utmelding — kun navn/avatar/rolle, aldri telefon/
+  status; kommentarfeltet bruker den nå via egen query-nøkkel
+  `['authors', ts]`) · `lookup_invite_code` v4 (+has_active_admin for
+  §3f-UX-en) · `get_club_payments_overview` (+dormant_at på lagradene —
+  §3f-4-innsynet, markering i ClubPayments).
+- ✅ **A3-RIDERNE ER MED I 00067 OG UTE:** «Klubbetalinger»-teksten i
+  `request_team_support_approval` · nominee-feltene i `ops_claim_payload`
+  (OpsClaimDetail viser nå navn/e-post/telefon) · `manager`-navnet i
+  `get_support_activation_status` (trenerkortet navngir hvem KYC venter
+  på). **`payments-notify` ER DEPLOYET** med tekstrettelsene + ny
+  hendelsestype `team_dormant` (ops-e-post når lag m/ innhold tømmes).
+- ✅ **Appflatene:** «Forlat laget» på Profil (bekreftelse navngir barna
+  fra nye `managedChildName`; levende avtale på laget → «støtten
+  fortsetter» + «Administrer støtte»-knapp; 'last_admin' →
+  blokkeringsdialog som deep-linker til lagoversikten) · TREDJE
+  NAVIGATOR-GREN (§3d: innlogget + stempel + null lag → hele
+  Profil-stacken som rot; ProfileHeader uten rollebadge; lagløs er
+  førsteklasses) · rollemeny i lagoversikten (⋯ → Endre rolle/Fjern;
+  «Vil bli trener»-chip m/ Godkjenn/Avslå for lagadmin) ·
+  join-flaten viser portene FØR knappen (`shared/teamReentry.ts` — ren
+  §3b-logikk over egne rader + `hasActiveAdmin` fra lookup): låst-lag-
+  stopp m/ kontaktvei, fjernet-stopp, «Gjenåpne laget»-kort, trenernote
+  («godkjennes av en trener — til da supporter») · varsel-trykk
+  `team_members` åpner lagoversikten i varselstacken ·
+  `executeJoin`/`executeCreate` refresher profilen (stempelet) og
+  executeJoin returnerer utfallet (pendingRole-alerten).
+- ✅ Suiten grønn: **198 tester, 16 filer** (ny: `teamReentry.test.ts` —
+  §3b-ordningen, tiebreak, legacy-null='removed', gjenåpningsmyndighet).
+  Lint ren (kun de gamle kjente advarslene).
+
+- ✅ **SKIVA ER GODKJENT OG LUKKET AV BRAGE 2026-08-19.**
+  * **Serverbeviset:** `scripts/verify-00067.sql` kjørt — **34/34
+    GRØNT**. Dekker begge backfillene, onboarding-triggeren,
+    §5-innløserflaten (rolleavvisning, trener→supporter+forespørsel,
+    godkjenn/avslå), §3c-sporet, §2-utmeldingen med RSVP-rydding og
+    siste-admin-vakten, §3b «siste episode avgjør» begge veier,
+    §3a-låsen med beboer-unntaket, §3f gjenåpning (avvist OG
+    innvilget), §3e dormant fra både leave og kontosletting,
+    `get_team_authors`, og alle tre A3-riderne.
+    FØRSTE kjøring stoppet på test 6 — feil i SKRIPTET, ikke i 00067:
+    `set_config(...,true)` er transaksjonsbundet, så en fanget
+    exception rullet JWT-claimet tilbake til forrige bruker. Claimet
+    settes nå utenfor alle fire avvisningsblokkene (felle-notatet står
+    i skriptet — IKKE gjeninnfør det).
+  * **Telefonbeviset:** §3d-porten er verifisert på enhet i BEGGE
+    grener — onboardet bruker som forlot sitt siste lag → Profil-rotet
+    stack; helt ny bruker (plus-adressering `+test1@gmail.com`) → den
+    LÅSTE onboardingen (WelcomeIntent). Det var den ene skjelningen som
+    IKKE kan leses ut av databasen: begge tilstander har null aktive lag.
+
+**RIR MED I PRE-TESTFLIGHT-QA (ikke blokkerende — skiva er lukket).**
+Alle er bevist på RPC-nivå av verify; det som gjenstår er om knappene
+vises og tekstene stemmer:
+· forlat lag MED BARN (navngivingen i bekreftelsen) · levende
+støtteavtale-teksten + «Administrer støtte»-knappen ·
+siste-trener-blokkeringen + rollemeny/overdragelse ·
+trenerforespørsel (join som trener → chip → godkjenn/avslå) ·
+«Gjenåpne laget» · kommentar fra utmeldt forfatter beholder navn ·
+HELE B6-runden (profilrydding 1+2 — husk Metro-RESTART, nytt asset) ·
+push-trykk på rollevarsel (kun testbart i TestFlight) · valgfritt:
+`verify-membership-hardening.mjs` på nytt nå som removed-rader finnes.
+
+**BEVISST UTENFOR SKIVA (ikke glemt):** «Legg ned laget» (§4) er EGEN
+skive · ops-RPC-ene for gjenåpne/overdra/legge ned dormant lag (§3f-5)
+er IKKE bygget — står ikke i §7-omfanget; ops-fallbacken er i dag
+SQL/service-rolle, tas sammen med «Legg ned laget»-skiva ·
+medlemstall teller fortsatt rader, ikke personer (kjent restanse §6) ·
+`author_role` NULL på historiske feed-innlegg (kosmetisk, §6).
+
+**TRE BLINDVEIER SOM ALLE ENDER I §3f-5 (funnet i reviewen 2026-08-19,
+BEVISST ikke fikset — de krever ops-flaten, som er neste skive):**
+1. **Trener i et lag der alle andre er spillerkontoer kan ikke gå.**
+   Siste-admin-vakten blokkerer (det finnes andre aktive medlemmer),
+   og `set_member_role` nekter å promotere spillere (§2 sier «spillere
+   kan ikke promoteres i v1»). Begge halvdelene er låst i frysdokumentet
+   — konsekvensen er en ekte blindvei til ops kan overdra rollen.
+2. **Tidligere trener som er tilbake som forelder kan ikke gjenåpne.**
+   `join_team_space` sin reopen-gren krever at nyeste PERSONLIGE rad er
+   `removed`+`left` — en som alt bor i laget treffer aldri den grenen.
+   Oppstår når laget mistet sin siste admin via KONTOSLETTING (ikke via
+   utmelding, som vakten hindrer). Ops må tildele rollen.
+3. **Trenerforespørsel i et låst lag varsler ingen.** `requested_role`
+   blir stående som §3f-3 krever, men det finnes ingen aktive admins å
+   varsle, og ingen ops-e-post sendes. Ops ser den først ved oppslag.
+   Vurder en `notify_payments_event`-gren når ops-flaten bygges.
+
+**DERETTER (uendret rekkefølge):** Profilbilde (avatar-opplasting, punkt
+2b under) · cache-persistering · fase B (nettsiden).
+
+**ÉN produksjonsendring fra B6 står utenfor koden:** dashboard-bryteren
+«Require current password when updating» = PÅ. Se punkt 1b under og
+notatet i `supabase/config.toml`.
+
+**SIKKERHETSSKIVA 00066** (pushet 2026-08-19) er verifisert: Brage
+kjørte `verify-membership-hardening.mjs` — ALT GRØNT (test 2 og
+egen-historikk-delen av test 5 hadde ingen removed-rader å bite i;
+mekanismen er bevist av test 1/3, og leave-skiva lager nå slike rader —
+se punkt 3 over).
+
+---
+
 ## ▶️ NESTE SAMTALE: KUN MERGE + TESTFLIGHT GJENSTÅR AV FASE A — SÅ FASE B
 
 **Status 2026-08-17 kveld — alt av Fase A-arbeid er FERDIG unntatt selve
@@ -487,8 +619,10 @@ Fase C er terskelstyrt — bygg ingenting.
    8. **Lagoversikten hadde ingen cache** — egen lokal state + henting ved
       HVERT fokus, så skeletonene kom tilbake hver gang. Nå på B2-cachen
       (`useTeamMembers`, 5 min) + 60 s-regelen ved fokus.
-   9. **«Klubbbetalinger» → «Klubbetalinger»** (tre b-er er feil norsk;
-      13 steder). **DOKUMENTASJONEN STÅR FORTSATT MED TRE B — egen sveip.**
+   9. **Flatenavnet skrevet med tre b-er → «Klubbetalinger»** (tre b-er er
+      feil norsk; 13 steder i appen). Docs-sveipen er GJORT i B6
+      2026-08-19, og Edge Function-kilden er rettet — men IKKE deployet;
+      RPC-teksten venter på fremovermigrasjonen før A3.
    10. **«1 medlemmer»** → entall/flertall. **Invitasjonskoden brøt til to
       linjer** (8 tegn × 6 px sperring) → krymper nå; delingsteksten har
       fått koden på EGEN LINJE. **Begrunnelsesarket i ops-flaten** var
@@ -526,37 +660,302 @@ Fase C er terskelstyrt — bygg ingenting.
    **▶️ REKKEFØLGEN FREMOVER — AVTALT MED BRAGE 2026-08-19.** A1, A2 og A3
    er alle ferdige; app-sporet i autoritetsmodellen er lukket.
 
-   1. **B6 profilryddingen — INNHOLDET BEKREFTET AV BRAGE 2026-08-19**
-      (beslutningen fra 18. aug. sa bare «profilrydding», aldri hva):
-      a) **E-post under navnet** i profil-toppen. Skjermen viser avatar,
-         navn og rollebadge, men aldri hvilken KONTO du er inne som —
-         ubrukelig med flere kontoer, og en forelder som registrerte seg
-         med feil adresse kan ikke oppdage det.
-      b) **Flytt «Bli med i et lag» + «Opprett et nytt lag»** fra
-         «Innstillinger» opp til «Dine lag». De er lag-handlinger, men
-         ligger begravd mellom telefonnummeret og «Logg ut».
-      c) **Del opp «Innstillinger»**, som i dag er en skuff med fire
-         ulike ting: Konto (telefon, varslinger) · Logg ut / Slett konto
-         som egen avsluttende blokk · Om Heia (vilkår, personvern,
-         versjon) nederst og dempet.
-      d) **Versjonsnummeret er hardkodet «v0.1.0»** — leses ikke fra
-         bygget, så «Om Heia» lyver i TestFlight, akkurat i den raden en
-         testbruker leser når hun skal melde en feil.
-      + sveip dokumentasjonen for «Klubbbetalinger» med tre b-er (appen
-      er rettet, docs ikke).
-   2. **«Forlat lag» + foreldreløse lag** — ÉN skive, ikke to. Brage
-      vurderer dette som viktig, og det er nærmere et lanseringskrav enn en
-      forbedring: i dag er eneste vei ut av et lag å slette hele kontoen,
-      og gjør man det som siste medlem blir laget liggende igjen tomt,
-      usynlig (ingen offentlig lagsøking) og med bilder som koster
-      lagring for alltid. Invitasjonskoden er da eneste «nøkkel» tilbake,
-      og `join_team_space` lar innløseren velge sin egen rolle — så et
-      forlatt lag overtas i praksis av den som har en gammel kode i en
-      meldingstråd. Vakter: siste voksen kan ikke gå ut · aktivt
-      abonnement må håndteres eksplisitt · forelder med flere barn har
-      flere rader. Ved KONTOSLETTING (kan aldri nektes): er du siste
-      medlem og laget aldri har hatt støtte eller innhold → slett laget og
-      bildene; ellers varsle ops, som ved managerløse enheter.
+   1. **B6 profilryddingen — BYGGET 2026-08-19, VENTER PÅ TELEFONRUNDE.**
+      Ren JS: ingen nye pakker, ingen native-endringer, ingen migrasjon,
+      ingen deploy. Metro-reload holder. Alt i `ProfilScreen.tsx` +
+      `src/lib/appVersion.ts` + `src/shared/appVersion.ts`.
+      a) ✅ **E-post mellom navnet og rollebadgen** i profil-toppen —
+         `session.user.email` lå alt i `useAuth()`, så ingen nytt kall og
+         ingen ny query. Én linje, midt-ellipsis (det er DOMENET som
+         avslører feil konto; en vanlig ellipsis spiser nettopp halen).
+      b) ✅ **«Bli med i et lag» + «Opprett et nytt lag» flyttet** ned
+         under lagkortene i «Dine lag». Guarden `userMemberships.length
+         > 0` gjelder nå KUN kortene, ikke seksjonen: handlingene er veien
+         INN i et lag og skal ikke kunne forsvinne om `hasTeam`-porten i
+         AppNavigator endres. (I dag er Profil uansett bare nåbar med
+         minst ett lag.)
+      c) ✅ **«Innstillinger» delt i tre blokker**, rekkefølge låst av
+         Brage: **Konto** (telefon, varslinger) · **Om Heia** (vilkår,
+         personvern, versjon) · en blokk UTEN overskrift helt nederst
+         (Logg ut, så Slett konto). «Slett konto» er nå siste rad på hele
+         siden. Den umerkede avslutningsblokken er bevisst og prøves på
+         telefon — mulig designrunde 2 der.
+      d) ✅ **Versjonen leses fra bundelen** — «Om Heia» viser
+         «Versjon 1.0 (3)» (`MARKETING_VERSION` + `CURRENT_PROJECT_VERSION`
+         står urørt i Xcode; Brages beslutning: IKKE bytt til 0.1.x).
+         Byggnummeret er med fordi to TestFlight-bygg deler versjon og
+         skilles kun på det.
+         **HVORDAN:** `src/lib/appVersion.ts` er en ADAPTER mot
+         `RNSentry.fetchNativeRelease()` — en metode Sentry-podden alt har
+         kompilert inn, som leser `CFBundleShortVersionString` +
+         `CFBundleVersion` rett fra `[NSBundle mainBundle]`. Den rører
+         ingen Sentry-tilstand og krever verken `Sentry.init` eller
+         SENTRY_DSN, så den svarer også når feilrapporteringen er av.
+         Modulen hentes med Sentrys eget mønster (TurboModuleRegistry med
+         NativeModules-fallback) fordi bridgeless ikke fyller
+         `NativeModules` som før.
+         **VRAKET:** `expo-constants` — podden EXConstants er også
+         kompilert inn, men v55 gir KUN `platform.ios.buildNumber`, ikke
+         markedsføringsversjonen, og pakken ligger nøstet under
+         `expo/node_modules/` (ville krevd ny toppnivå-avhengighet for
+         halve svaret).
+         **KONTRAKTEN:** ukjent versjon → raden forsvinner, ALDRI et gjettet
+         tall. Hardkodet «v0.1.0» er nettopp feilen som ble rettet.
+         Testet i `__tests__/appVersion.test.ts` (ren formatterer).
+      e) ✅ **«Klubbetalinger» konsekvent** (tre b-er er feil norsk):
+         docs rettet (PAYMENTS.md, AUTORITET-…, denne fila) og de to
+         tekstlinjene i `payments-notify/index.ts`. Appen var alt ren.
+         Filnavnet `AUTORITET-KLUBBBETALINGER-2026-08.md` står URØRT —
+         etablert teknisk sti, referert fra docs, deployet SQL-kommentar,
+         Edge Function og to src-kommentarer.
+         ⚠️ **UTESTÅENDE, IKKE ET EGET SPOR:** varselteksten inne i den
+         deployede RPC-en (`00062_autoritetsmodell.sql:1947`, arvet fra
+         `00047:251`) sier fortsatt tre b-er. Migrasjonen skal IKKE
+         redigeres. Rettelsen tas i den lille fremovermigrasjonen som
+         uansett må lages før A3, sammen med nominee-feltene i
+         Ops-payloaden og manager-navnet i statuspayloaden — og
+         `payments-notify` deployes i SAMME skive. Deploy + verifisering
+         skjer altså samlet der, ikke her.
+
+   1b. **B6 RUNDE 2 — BYGGET 2026-08-19, VENTER PÅ TELEFONRUNDE.**
+      Profilheader, passordbytte, avatar og footer. Fortsatt ren JS: ingen
+      nye pakker, ingen native-endringer, ingen migrasjon, ingen deploy.
+      **ÉN produksjonsendring utenfor koden:** dashboard-bryteren under.
+
+      a) **Statisk profilheader** (`components/ProfileHeader.tsx`).
+         Heias faste `heiaDeep`, IKKE lagfargen — låst beslutning:
+         lagfargen i TeamHeader er et SCOPE-signal (alt under den er
+         lag-scopet), og Profil er den ene hovedflaten som ikke er det
+         («Min støtte» går på tvers av lag, «Klubbetalinger» er en juridisk
+         enhet, «Heia Ops» er alle klubber). Dessuten står lagbytteren PÅ
+         skjermen: en header som skifter farge når du trykker et lagkort
+         under den ville sagt feil ting.
+         KONSISTENSEN LIGGER I FORMEN: anatomien er TeamHeaders slot for
+         slot (avatar der lagmerket er · navn + e-post der lagnavn +
+         «Fotball · 18 medlemmer» er · rollebadge der «Sesongen» er), og
+         `ARC_*`-konstantene er flyttet til `shared/headerGeometry.ts` og
+         DELES nå av begge (TeamHeader er ellers urørt). Høydene matcher
+         ved KONSTRUKSJON: lagmerket er 38 + 2×2 = 42, avataren er `md`
+         (40) + 1 px ring = 42. Statisk — ingen kollaps, ingen krysstoning,
+         ingen scrollstyrt animasjon (appen har ikke reanimated, og RN-
+         kjernens Animated kan ikke animere høyde nativt). `light-content`
+         med `useIsFocused()`-vakt som TeamHeader. Den gamle lyse
+         profil-toppen og stilene dens er slettet.
+      b) **`avatarUrl` koblet på.** Din egen profil var det ENE stedet som
+         ignorerte ditt eget bilde (FeedCard, TeamMembers og
+         NotificationRow viste det). Opplasting er bevisst IKKE bygget —
+         det er en egen skive (bildevelger, komprimering, bucket, egress).
+         Frem til da vises initialer, som før.
+      c) **«Passord og sikkerhet»** under Konto, mellom Telefonnummer og
+         Varslinger (`screens/ChangePasswordScreen.tsx`).
+         **GRENSEN LIGGER PÅ SERVEREN.** `changePassword` i UserContext
+         sender `current_password` MED i `updateUser`, og GoTrue validerer
+         det i samme forespørsel. Vi verifiserer det IKKE selv først: en
+         `signInWithPassword`-sjekk i appflyten er en SJEKK, ikke en grense
+         (kan omgås av alt som ikke er skjermen), og den ville brent
+         `sign_in_sign_ups`-kvoten (30 per 5 min per IP) — et helt lag på
+         klubb-wifi kunne blitt sperret ute fordi én forelder gjettet feil.
+         **«Glemt nåværende passord?»** gjenbruker recovery (6-sifret
+         e-postkode) inline. Uten den var skjermen en blindvei:
+         `VerifyEmailScreen` bor KUN i OnboardingStack, så en innlogget
+         bruker måtte logget UT for å komme videre.
+      d) **Norske auth-feil** (`shared/authErrors.ts`, kode først, så
+         tekst). AuthScreen gjorde `setError(e.message)` og sendte engelsk
+         Supabase-tekst rett ut i en norsk flyt. Nå ruter AuthScreen,
+         VerifyEmailScreen og passordskjermen gjennom mapperen. Dette var
+         FORUTSETNINGEN for at «Prevent use of leaked passwords» kan skrus
+         på — den avviser med engelsk tekst.
+      e) **Footeren komprimert** — tok TO runder på telefon.
+         `logo-green.png` er 1080×1080 med ordmerket på 715×370 i midten:
+         bare 34 % av høyden er merke, resten er tom luft i rasteret. Siden
+         `contain` skalerer HELE kvadratet, tvinger det en stor boks rundt
+         et lite merke — 100 → 44 gjorde ordmerket uleselig (15 pt høyt),
+         80 var fortsatt bare 27 pt. «Større OG mer kompakt» er UMULIG med
+         det assetet. Samme felle står dokumentert i WelcomeIntentScreen.
+         LØSNING: ny beskåret **`logo-green-wordmark.png` (@1x/@2x/@3x,
+         samme konvensjon som `logo-wordmark.png`)**, generert fra
+         alfakanalens bbox. Nå 128×66 = 66 pt ordmerke (2,4× større enn
+         opprinnelig) i en LAVERE footer. `logo-wordmark.png` kunne ikke
+         brukes: hvit/mint for stadionflaten, usynlig på lys footer.
+         ⚠️ Nytt asset = Metro må RESTARTES, ikke bare reloades.
+
+      **⚠️ PRODUKSJONSENDRINGEN (Brage, 2026-08-19): «Require current
+      password when updating» = PÅ** (Auth → Sign In / Providers → Email).
+      Dashboard-only — CLI-en har INGEN config.toml-nøkkel for den (kun
+      `minimum_password_length`, `password_requirements`,
+      `password_verification_attempt`, `secure_password_change`). Full
+      begrunnelse og felle-notatet står i `supabase/config.toml` ved
+      `secure_password_change`. Kort:
+      · `secure_password_change` ble stående AV med vilje — den er
+        REAUTENTISERING, og GoTrue krever bare nonce når sessionen er eldre
+        enn 24 t; ulåst-telefon-scenarioet treffer aldri koden.
+      · Glemt-passord er UBERØRT — GoTrue unntar recovery eksplisitt
+        (`if !session.IsRecovery()`).
+      · Ingen eksisterende kode måtte endres: `supabase.auth.updateUser`
+        kalles ETT sted i hele appen, i `confirmPasswordReset`.
+      · MOTSATT VEI: endrer du `minimum_password_length` eller
+        `secure_password_change` i dashboardet, rulles de stille tilbake av
+        neste `supabase config push`. Endre dem i fila.
+
+      **VERIFISERT MOT PROD 2026-08-19 — HELE SJEKKLISTA GRØNN.**
+      `scripts/verify-password-change.mjs` kjørt av Brage mot ekte GoTrue:
+      uten current_password → `400 current_password_required` · feil
+      current_password → `400 current_password_invalid` OG gammelt passord
+      virker fortsatt · riktig → byttet · nytt passord logger inn · gammelt
+      gjør ikke · recovery sender kode (200) · passordet satt tilbake.
+      **Grensen håndheves altså av SERVEREN, ikke av appflyten.**
+      I tillegg telefonverifisert: profilheaderen · norsk feil ved feil
+      passord · bytte · innlogging med nytt passord.
+      GJENSTÅR: kodeinntastingen i recovery (telefon), og punkt 7 —
+      kjør skriptet PÅ NYTT etter neste `supabase config push` for å
+      bekrefte at dashboard-bryteren står.
+      FUNN FRA KJØRINGEN: koden for feil passord er
+      `current_password_invalid`. Den lå kun dekket av tekst-fallbacken i
+      `shared/authErrors.ts` — nå eksplisitt i kodetabellen (koder er
+      stabile, engelske meldingstekster er det ikke).
+
+      **VERIFISERING:** `scripts/verify-password-change.mjs` (rent `node`,
+      ingen avhengigheter, leser .env) kjører Brages sjekkliste mot ekte
+      GoTrue: uten current_password → avvist · feil current_password →
+      avvist OG gammelt passord virker fortsatt · riktig → byttet · nytt
+      passord logger inn · gammelt gjør ikke · recovery sender kode. Setter
+      passordet tilbake til slutt. **KJØR MED TESTKONTO.** Punkt 7 (config
+      push lar bryteren stå) = kjør skriptet PÅ NYTT etter neste push.
+      Kodeinntasting i recovery + all flate verifiseres på telefon.
+
+   2. **«FORLAT LAG» + FORELDRELØSE LAG — NESTE SAMTALE (Fable).**
+      ÉN skive, ikke to. Nærmere et lanseringskrav enn en forbedring.
+      ⚠️ **DETTE ER EN BESLUTNINGSSKIVE, IKKE EN BYGGEOPPGAVE.** Migrasjonen
+      er den enkle delen; arbeidet er reglene. Skiva rører PENGER (Stripe),
+      RLS og UOPPRETTELIG datatap samtidig, og en feil her er STILLE — den
+      viser seg først når en forelder ikke får stoppet trekket sitt, eller
+      når et lag er borte. Kartlegg og frys beslutningene FØR bygging, slik
+      autoritetsmodellen og passordløsningen ble gjort.
+      ⚠️ Bryter «ren JS»-serien fra B6: dette KREVER migrasjon. Den nye
+      RPC-en kan med fordel legges i SAMME fremovermigrasjon som allerede
+      skal lages før A3 (se «Klubbetalinger»-teksten, nominee-feltene og
+      manager-navnet over).
+
+      **PROBLEMET, KONKRET.** I dag er eneste vei ut av et lag å slette hele
+      kontoen din. Gjør du det som siste medlem, blir laget liggende igjen
+      tomt og usynlig (ingen offentlig lagsøking) med bilder som koster
+      lagring for alltid — og invitasjonskoden er eneste nøkkel tilbake.
+
+      **KARTLAGTE FAKTA (verifisert i koden 2026-08-19 — ikke gjett om
+      disse på nytt):**
+      * `remove_team_member` (00041:274) sier eksplisitt
+        `Cannot remove yourself`, og `Team admins cannot be removed`.
+        Selvfjerning ble ALDRI bygget. Den setter `status='removed'` +
+        `left_at`, og sletter RSVP-er på FREMTIDIGE hendelser (historikken
+        består). Fjerner ALLE radene til personen i laget.
+      * `memberships` (00007:45): status ∈
+        `invited|active|inactive|removed`, rolle ∈
+        `trener|lagleder|admin|forelder|spiller`, har `left_at`. Én rad per
+        barn — `managed_child_id` NOT NULL ⇒ rolle må være `forelder`.
+        En forelder med to barn har derfor TO rader i samme lag.
+      * `join_team_space` (00015:143) tar `p_role DEFAULT 'forelder'` og
+        godtar `trener`/`admin` — **innløseren velger sin egen rolle**. Et
+        forlatt lag overtas i praksis av den som har en gammel kode i en
+        meldingstråd. Krever `is_activated = true` og
+        `deleted_at IS NULL` på team_spaces (soft-delete finnes altså
+        allerede).
+      * **KONTOSLETTING HARD-SLETTER medlemskapene**:
+        `delete_account_data` (00042:112) gjør
+        `DELETE FROM public.memberships WHERE user_id = ...` — ikke
+        `status='removed'`, fordi «kontosletting er GDPR, ikke moderasjon».
+        Innlegg, kommentarer og kampdata BESTÅR og peker på et anonymt
+        «Slettet bruker»-spøkelse. Ingenting rydder team_space-en.
+        Det er nøyaktig slik foreldreløse lag oppstår i dag.
+      * Kontosletting kansellerer Stripe FØRST (Edge Function
+        `delete-account`), så DB-en, så auth-brukeren. Rekkefølgen er
+        bevisst: klienten skal aldri kunne tømme databasen mens avtalen
+        løper.
+      * `support_subscriptions` (00037:307) er bundet til
+        **`team_space_id`** (NOT NULL) + `user_id`. Status ∈
+        `checkout_pending|incomplete|active|past_due|canceled|abandoned`,
+        med `cancel_at`/`current_period_end`. NB (fra B6-runden): en
+        OPPSAGT avtale har status `active` ut perioden — statusen alene
+        forteller ikke sannheten, `cancel_at` må leses.
+
+      **SPØRSMÅLENE SOM MÅ BESVARES (dette er selve jobben):**
+      1. Hva skjer med et AKTIVT abonnement når støttespilleren forlater
+         laget? Kanselleres det straks, ved periodeslutt, eller nektes
+         utmeldingen til brukeren har sagt opp selv? Vi kan ikke fortsette
+         å trekke noen for et lag de har forlatt — og vi kan ikke stoppe
+         et trekk uten at det er en bevisst, kommunisert handling.
+      2. Hvem er «siste voksen», presist? Rollene `trener|lagleder|admin`
+         er lagadmin (`is_team_admin`), men en `forelder` er også en
+         voksen. Skal vakten være «siste admin» eller «siste voksen»?
+      3. Forelder med flere barn: skal utmelding gjelde ett barn eller
+         hele forelderen? (Flere rader, jf. over.)
+      4. Skal `status='removed'` brukes, som `remove_team_member`, eller
+         hard delete? Konsekvens for historikk, «N kommer»-tellere og
+         gjeninntreden med samme kode.
+      5. Foreldreløse lag: soft-delete team_space (kolonnen finnes),
+         invalidere invitasjonskoden, eller varsle ops? Og hva med
+         bildene i `feed-media` — slettes de, og av hva?
+      6. Ved KONTOSLETTING (kan ALDRI nektes): er du siste medlem og laget
+         aldri har hatt støtte eller innhold → slett laget og bildene;
+         ellers varsle ops, som ved managerløse enheter. Trenger presis
+         definisjon av «innhold» og hvem som utfører oppryddingen.
+      7. Bør `join_team_space` slutte å la innløseren velge `trener`/
+         `admin`? Det er overtakelsesvektoren, og den er uavhengig av
+         resten av skiva — men den rører onboarding, som er LÅST
+         (se onboarding-memoryen), så den må avklares eksplisitt.
+
+   2b. **PROFILBILDE (avatar-opplasting) — SAMTALEN ETTER (Fable).**
+      Brages beslutning 2026-08-19: egen jobb, ETTER «forlat lag». Ikke et
+      lanseringskrav. Krav fra Brage: **«samme cache-løsning osv. som
+      resten av appen»** — og det er nettopp der jobben er større enn den
+      ser ut.
+
+      **HVA SOM ALLEREDE FINNES:** `profiles.avatar_url` er i basen,
+      `updateProfile({avatarUrl})` skriver den (api/profile.ts:72), og SJU
+      flater rendrer den — FeedCard, CommentsScreen, NotificationRow,
+      TeamMembersScreen, EventDetail-deltakere, ReporterBar, ReporterSheet.
+      Alle viser initialer, fordi ingenting kan SETTE feltet.
+      `media.ts:147` har alt en 512×512-plukkesti.
+
+      **⚠️ FUNN 1 — `Avatar` ER UTENFOR MEDIEPIPELINEN.**
+      `components/Avatar.tsx:66` bruker RNs vanlige
+      `<Image source={{uri}}>` — IKKE `MediaImage`. Den har altså verken
+      den 150 MB disk-cachen (`Image.configureCache`, MediaImage.tsx:27)
+      eller `cacheKey`-trikset som var HELE løsningen i egress-auditen:
+      `source={{uri, cacheKey: path}}` gjør at et ferskt signert token
+      fortsatt gir cache-TREFF (roterende `?token=` var rotårsak nr. 1).
+      Avataren er dessuten det bildet som gjentas OFTEST i appen — én per
+      feed-rad, én per kommentar, én per varsel. Å koble på opplasting uten
+      å løse dette er en egress-REGRESJON på appens mest repeterte bilde.
+
+      **⚠️ FUNN 2 — DET FINNES TO PROVDE MØNSTRE, OG VALGET ER EN
+      PERSONVERNBESLUTNING, ikke en teknisk:**
+      * **Klubblogo-mønsteret** (`club-logos`): bucketen er **PUBLIC**,
+        filnavnet immutabelt (`logo-{timestamp}.ext`, så bytte gir ny URL),
+        `Cache-Control: 31536000` (1 år) — CDN-en gjør jobben, og vanlig
+        `<Image>` holder. Begrunnelsen står i teams.ts:230: «uten den
+        revalideres hver logo hver time (F3, hovedkilde til cached
+        egress)». ENKELT — men en PUBLIC bucket betyr at bildet er synlig
+        for alle med URL-en, for alltid. **Det er et klubbmerke. Et
+        avatar av en trettenåring er noe annet.**
+      * **Feed-media-mønsteret** (`feed-media`): PRIVAT bucket, signerte
+        URL-er, `MediaImage` med `cacheKey: path` + 150 MB disk-cache +
+        signerte URL-er i AsyncStorage i 24 t (resolver.ts). Personvern-
+        riktig og gjenbruker cachen — MEN `resolver.ts:33` er hardkodet til
+        `FEED_MEDIA_BUCKET`, så den må gjøres bucket-bevisst, og `Avatar`
+        må rutes gjennom `MediaImage`.
+
+      **ANBEFALING (til diskusjon, ikke låst):** feed-media-mønsteret.
+      Bildet er et barn eller en forelder, ikke et klubbmerke, og
+      «samme cache som resten av appen» er bokstavelig talt dét mønsteret.
+      Prisen er resolver-endringen + at `Avatar` må ta `MediaRef` i stedet
+      for `uri` på sju kallsteder.
+
+      **⚠️ ÅPEN PRODUKTBESLUTNING FØR BYGGING:** hvem får laste opp? Dette
+      er en app for ungdomslag. Bilder av mindreårige, lastet opp av
+      mindreårige, uten moderering, er en annen sak enn foreldre-avatarer.
+      Teknisk hindring finnes ikke — valget om hvem funksjonen gjelder for
+      må tas først, og det avgjør også bucket-spørsmålet over.
+
    3. **Cache-persistering** — Brages beslutning 2026-08-19: tas FØR
       nettsiden, og settes ut til Fable. NB: det finnes INGEN egress-jobb
       (se under) — oppdraget er cache alene.
@@ -587,7 +986,7 @@ Fase C er terskelstyrt — bygg ingenting.
    er noen kB, ett bilde er hundrevis.
 
    Deretter:
-   så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbbetalinger
+   så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbetalinger
    /ops på web → full nominasjon-av-annen-dogfood). Stange/Nes-testdata
    ryddes FØRST etter fase B-dogfooden (de er motpart i testene).
    NB: `WEB_INVITE_BASE_URL`-secreten er BEVISST ikke satt —
@@ -607,7 +1006,7 @@ Fase C er terskelstyrt — bygg ingenting.
    chatloggen 2026-08-18.
 2. **Nettsiden** (heiaapp.no, eget prosjekt) — fase B av autoritetsskiva
    ER nettsidens første betalingsleveranse (invitasjonslanding →
-   Klubbbetalinger/rolleadmin → Heia Ops på web); starter når A-fasene
+   Klubbetalinger/rolleadmin → Heia Ops på web); starter når A-fasene
    er ferdige, venter IKKE på live-byttet.
 3. **Stripe live-bytte som ALLER SISTE steg** når AS-et er klart
    (sjekkliste i payments-memoryen: live-KYC m/ ledetid, live-nøkler +
@@ -2057,7 +2456,7 @@ uten ny full review). **PUSH:** ✅ APNS_HOST-byttet til produksjon
 ble GJORT og digest-verifisert 2026-08-04 (se 🚨-blokken øverst). Fra før: **🚪 KLUBBDØREN ER
 BYGGET OG DEPLOYET 2026-08-03 (sen kveld) — migrasjon `00047` +
 `00048` + Edge Function `club-support-deactivate` + hele app-flaten
-(«Klubbbetalinger» på Profil m/snarvei fra Laginnstillinger, «Be om
+(«Klubbetalinger» på Profil m/snarvei fra Laginnstillinger, «Be om
 godkjenning» i SupportSetup, pause/deaktiver med antall + logg,
 klubbdør-varsler med inbox-navigasjon). Dermed er ALLE TRE skivene
 fra beslutningsrunden 2026-08-03 i prod samme dag: supporter-skiva
@@ -2147,7 +2546,7 @@ oppdatering så den aldri overstyrer et lagvalg pushen alt har køet i
 samme commit. Alt ren JS — Metro-reload holder; testløpet er:
 (a) app helt lukket → trykk målvarsel → riktig kamp MED riktig lag;
 (b) app i bakgrunn → samme; (c) stå i Stange, trykk Ridabu-varsel →
-lagbytte + riktig kamp; (d) klubbdør-varsel → Klubbbetalinger. (2) KLUBBDØR-PUSHEN VAR ALDRI FEIL
+lagbytte + riktig kamp; (d) klubbdør-varsel → Klubbetalinger. (2) KLUBBDØR-PUSHEN VAR ALDRI FEIL
 — verifisert i prod via net._http_response (Management-API,
 CLI-token fra nøkkelringen): 20:36:36 «Lag ber om godkjenning» =
 sent:2 (begge managere, APNs aksepterte); 20:37:05 «godkjent» =
@@ -2156,7 +2555,7 @@ push-token — simulatoren kan ikke APNs. Request-banneret kom mens
 Brage sto inne i appen (forgrunn = flyktig banner øverst).
 RE-TEST etter rebuild: telefonen LÅST → be om godkjenning fra
 simulatoren → push på låst skjerm → TRYKK skal lande i
-Klubbbetalinger; kamp-/kommentar-push skal lande i
+Klubbetalinger; kamp-/kommentar-push skal lande i
 EventDetail/tråden.** Flyten for NYE klubber er komplett
 og forklart for Brage: ingen styrer klubben automatisk — claim-
 review i Heia Ops = autorisasjonen, claimanten blir første
@@ -2332,7 +2731,7 @@ delfeil; webhookene bokfører. Godkjenning kaller
 create_support_offering INTERNT (forblir ops-only utenfra);
 betalingsansvarlig ser ALDRI pris — forespørselskortet viser kun
 lagnavn/årskull/medlemstall/hvem som spør. App: ny
-ClubPaymentsScreen («Klubbbetalinger» — Profil-seksjon «Klubben»,
+ClubPaymentsScreen («Klubbetalinger» — Profil-seksjon «Klubben»,
 kun for managere; kontekstuell snarvei i Laginnstillinger),
 SupportSetupScreen har dørkortene (Be om godkjenning / TIL
 GODKJENNING / avslag m/begrunnelse + på nytt / pauset/deaktivert /
@@ -2349,12 +2748,12 @@ create_support_offering/deactivate_team_support_data fortsatt lukket
 for klienter, get_club_payments_overview røyktestet som Brage
 (Ridabu: J2019 'none' → klar for dogfood, G10 'collecting' med 4
 sandbox-abonnementer). 📱 TELEFONDOGFOOD (dev-bygg fra Xcode,
-Metro-reload): (a) Profil → ny seksjon «Klubben» → «Klubbbetalinger»
+Metro-reload): (a) Profil → ny seksjon «Klubben» → «Klubbetalinger»
 (begge kontoer er betalingsansvarlige); (b) bytt til J2019-laget →
 Laginnstillinger → «Støtte fra supportere» → AKTIV-kortet + «Siste
 steg: klubbens godkjenning» → **Be om godkjenning** → kortet flipper
 til TIL GODKJENNING + varsel i Varsler-fanen; (c) trykk varselet →
-Klubbbetalinger → J2019 under TIL GODKJENNING (medlemstall + hvem
+Klubbetalinger → J2019 under TIL GODKJENNING (medlemstall + hvem
 som spør, ALDRI pris) → **Godkjenn** → SAMLER INN + logg-rad +
 varsel tilbake («Laget er godkjent for støtte 💚»); (d) «Støtt
 laget» på J2019 viser nå 79/60-priskortet (ARVET fra defaults —
