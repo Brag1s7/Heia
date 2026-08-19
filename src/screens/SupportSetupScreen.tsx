@@ -570,10 +570,10 @@ export function SupportSetupScreen() {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Du er betalingsansvarlig</Text>
                 <Text style={styles.body}>
-                  Godkjenn og administrer lagenes støtte i Klubbbetalinger.
+                  Godkjenn og administrer lagenes støtte i Klubbetalinger.
                 </Text>
                 <Button
-                  title="Åpne Klubbbetalinger"
+                  title="Åpne Klubbetalinger"
                   variant="secondary"
                   onPress={() => navigation.navigate('ClubPayments')}
                   style={styles.cardButton}

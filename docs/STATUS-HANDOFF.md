@@ -398,11 +398,135 @@ Fase C er terskelstyrt — bygg ingenting.
       ikke si «venter på at [navn] fullfører hos Stripe» — teksten sier
       «klubbens betalingsansvarlige» i stedet (presist, uten å påstå et
       navn vi ikke har). Fiks = legg `manager: {name}` på payloaden.
-   **▶️ NESTE SAMTALE: FASE A3 — DOGFOOD AV SELVNOMINASJON** (telefon +
-   Stripe sandbox, seks scenarier a–f, se Del V i AUTORITET-dokumentet).
-   Ingenting nytt skal bygges først; A3 er å KJØRE flyten og fikse det
-   som faller ut. Deretter:
-   **profilryddingen** (B6 — etter A2, før lanserings-QA),
+   **✅ FASE A3 ER FERDIG 2026-08-19 — ALLE SEKS SCENARIENE (a–f) GRØNNE
+   PÅ TELEFON mot Stripe sandbox.** Exit-kriteriet er innfridd.
+
+   *Testrigg:* Ridabu G15 (nytt lag — farens J2019 ble bevisst unngått) ·
+   engangskonto `brage.lothe.weium+dogfood@gmail.com` («brage Bowling»,
+   SLETTET i (d)) · ny testklubb BRISKEBYEN BOWLINGKLUBB (orgnr
+   **983550134**, ekte FLI i Hamar, valgt fordi en bowlingklubb aldri
+   forveksles med en ekte Heia-kunde) med Lag 1–4 · «Testklubb duplikat»
+   fra (f). ALT dette er testdata som ryddes sammen med Stange/Nes etter
+   fase B.
+
+   *Bevist:* (a) lagforespørsel → varsel i app + E-POST til ALLE aktive
+   ansvarlige (første gang II.9-e-posten er sett med to managere) →
+   godkjenning → arv 79/60 og offering v1 UTEN SQL → sandbox-checkout m/
+   Apple Pay → pause → re-godkjenning som IKKE rørte eksisterende
+   abonnement (fornyelsesdato uendret — invarianten holder) → deaktivering.
+   (b) claim via Edge-funksjonen m/ server-side brreg → claim-notify traff
+   den ALDRI TESTEDE grenen «søkeren står IKKE i registerets roller —
+   beviser ingenting», med klubbens registrerte kanal som neste steg →
+   ops-godkjenning ga myndighet EKSPLISITT + defaults automatisk →
+   KYC-GATEN verifisert BEGGE VEIER (ops-admin uten managerrolle fikk
+   IKKE Stripe-knappen; managerkontoen fikk den) → sandbox-KYC → konto
+   aktiv → Lag 3 godkjent. (c) suspender siste aktive (LOV, ga
+   ops-e-post «siste aktive ansvarlige suspendert») → myndigheten
+   faktisk borte i managerens egen flate → reaktiver → fjern SISTE
+   aktive AVVIST → utsted invitasjon merket «IKKE SENDT (venter på
+   web-landingen)» → trekk tilbake. (d) GDPR-sletting av siste manager
+   kan aldri nektes → ops-e-post «betalingsansvarlig slettet kontoen
+   sin» + gult managerløs-kort. (e) lagforespørsel (Lag 4) mot managerløs
+   enhet → trenerkortet sa «Heia er varslet» + ops-fallback-e-post
+   «Forespørselen ligger og venter». (f) duplikatsperren ga HELE, lesbare
+   stoppteksten i appen.
+
+   **RETTELSE AV FASEPLANEN:** (a)-punktet «verifiser sperren mot en
+   klubb uten aktiv konto» er IKKE NÅBAR fra appen — klubbdør-kortet
+   («Be om godkjenning») vises først når klubbens Stripe-konto er aktiv
+   (SupportSetupScreen, `case 'active'`). Vakten i `approve_team_support`
+   er dermed forsvar i dybden, dekket av verify-00062. Ikke et åpent punkt.
+
+   *FIKSET UNDERVEIS — alt rent JS unntatt 00065:*
+   1. **Varsel-trykk låste Profil-fanen** (meldt av Brage): nested navigate
+      uten `initial: false` gjorde målskjermen til ENESTE rad i fanen →
+      ingen vei tilbake, fanetrykk = no-op, kun appdrap hjalp. LØST ved at
+      klubbdør-varsler nå åpnes I VARSELSTACKEN som kamp-/kommentarvarsler
+      (`InboxStackParamList` fikk SupportSetup + ClubPayments), så «Tilbake»
+      går til varsellista. Push-/e-postveien bruker `profilEntry`
+      (`src/navigation/profilEntry.ts`), som setter hele fanens state i ÉN
+      operasjon. To forkastede forsøk først: `initial: false` alene ga et
+      synlig hopp, og global kryssfade på fanene ble avvist av Brage.
+      **Push-veien er UVERIFISERT — dev-bygg har ikke push. Test i TestFlight.**
+      (E-post-deep-linken til ops ER verifisert på telefon.)
+   2. **`errorMessage`-fella — den viktigste av dem.** `supabase.rpc()`
+      kaster en PostgrestError, som IKKE er en `Error`-instans, og fem
+      steder i betalings-/ops-flatene testet `e instanceof Error` før de
+      leste meldingen. HVER håndskreven vaktmelding fra databasen ble
+      derfor byttet ut med «Prøv igjen om litt» — et råd som umulig kan
+      virke, siden vernene er permanente. Rammet bl.a. siste-aktive-vernet,
+      «Klubbens Stripe-konto er ikke aktiv ennå» og duplikat-forsvaret ved
+      ops-godkjenning. Ett felles `src/shared/errorMessage.ts` nå.
+      (SupportSetup slapp unna fordi den brukte `e?.message` — derfor så
+      appen riktig ut noen steder og feil andre.)
+   3. **«Støtt laget»-mellomskjermen SLETTET.** Den lå mellom Lagkassa og
+      Stripe og gjentok pris, fordeling, mottaker og knappetekst ordrett —
+      to like sider, to like knappetrykk. Lagkassa går nå rett på checkout;
+      fornyelsesdato, tillitslinje, lagadmin-snarveien, AppState-refetch og
+      «Fullfør betalingen» flyttet dit. Den stygge logoen og «Støtt [lag]»-
+      overskriften som ble stående ETTER betaling forsvant med skjermen.
+   4. **Lagkassa sa «Fornyes 19. sept» om en OPPSAGT avtale** — oppslaget
+      hentet aldri `cancel_at`. «Min støtte» på Profil var alltid riktig, så
+      appen sa to ting om samme abonnement og PENGESIDEN sa feil. Nå
+      «Avsluttes». NB: en oppsagt avtale har status `active` ut perioden —
+      statusen alene forteller ikke sannheten.
+   5. **Delfeil-varselet ropte ulv.** «Deaktiveringen ble ikke fullført, 1
+      støtteavtale trekkes videre» sto der etter en HELT VELLYKKET
+      deaktivering, fordi `cancel_at` skrives av webhooken sekunder senere;
+      boksen ble stående til pull-to-refresh. **MIGRASJON 00065
+      `deaktivering_karenstid` — PUSHET TIL PROD 2026-08-19**: telles først
+      når deaktiveringen er eldre enn 5 min.
+   6. **Lagkassa sa «ikke satt opp ennå» om et PAUSET lag** — payloaden
+      skiller ikke pauset fra aldri-priset (`no_offering` dekker begge). Ny
+      tekst «tar ikke imot nye støttespillere akkurat nå» er sann i alle
+      tilfeller. ORDENTLIG fiks = ny `reason` fra 00039, ikke gjort.
+   7. **Rødt varsel på ferdigbehandlet søknad.** «Klubben har allerede en
+      aktiv kobling» er BESLUTNINGSSTØTTE («godkjenning gjenbruker den») og
+      sto igjen etter godkjenning, der den beskrev koblingen godkjenningen
+      selv nettopp lagde. Vises nå kun mens søknaden er åpen.
+   8. **Lagoversikten hadde ingen cache** — egen lokal state + henting ved
+      HVERT fokus, så skeletonene kom tilbake hver gang. Nå på B2-cachen
+      (`useTeamMembers`, 5 min) + 60 s-regelen ved fokus.
+   9. **«Klubbbetalinger» → «Klubbetalinger»** (tre b-er er feil norsk;
+      13 steder). **DOKUMENTASJONEN STÅR FORTSATT MED TRE B — egen sveip.**
+   10. **«1 medlemmer»** → entall/flertall. **Invitasjonskoden brøt til to
+      linjer** (8 tegn × 6 px sperring) → krymper nå; delingsteksten har
+      fått koden på EGEN LINJE. **Begrunnelsesarket i ops-flaten** var
+      formet som et bunnark, men fadet inn på stedet — glir nå opp.
+
+   *KØ — avgjort at de IKKE bygges nå (Brage informert):*
+   * **Varselet som ikke finnes.** SupportSetup lover «Du får varsel her
+     når klubben er klar for støtte» — men `stripe-webhook` oppretter
+     INGEN notification når kontoen blir aktiv, og ingen trigger gjør det
+     heller. Treneren venter på noe som aldri kommer. Backend-oppgave til
+     lanserings-QA, sammen med resten av II.9.
+   * **Query-cache på disk** (skeletons ved kaldstart). Krever to pakker
+     OG en sikkerhetsbeslutning: query-nøklene er ikke merket med bruker
+     (feed.ts sier det rett ut — de er avhengige av `queryClient.clear()`
+     ved utlogging). På disk holder ikke det; nøkkelen må scopes per bruker.
+
+   *TIL B6 (profilryddingen) — Brages funn under dogfooden:*
+   * **Profil viser ingen steder hvilken e-post du er logget inn med.**
+     Smertefullt med flere kontoer, og en forelder som har registrert seg
+     med feil adresse kan ikke oppdage det.
+   * **Man må kunne forlate et lag selv** (VIKTIG, Brages ord). Kjent hull:
+     `remove_team_member` (00041) sier eksplisitt at selvfjerning er «en
+     annen flyt, med andre konsekvenser» — aldri bygget. Betalingskoblingen
+     er den harde: forlater du et lag du STØTTER, kan vi ikke fortsette å
+     trekke deg. Vakter: siste voksen kan ikke gå ut, forelder med flere
+     barn har flere rader. AVGJORT samtidig: klubb slettes ALDRI av
+     brukere; lag slettes ikke, bortsett fra en snever «opprettet ved en
+     feil»-luke (ingen andre medlemmer, aldri godkjent, ingen innlegg).
+
+   *TIL NETTSIDE-PROSJEKTET:* del invitasjonen som **https-LENKE**, ikke
+   kode. Et delingsark sender ren tekst — en lenke er det eneste som blir
+   blå og trykkbar, og den kan sende folk til App Store hvis de mangler
+   appen og fylle koden inn selv hvis de har den (`prefillCode` finnes alt).
+
+   **▶️ NESTE SAMTALE: PROFILRYDDINGEN (B6), SÅ FASE B.** A1, A2 og A3 er
+   alle ferdige — app-sporet i autoritetsmodellen er dermed lukket. B6 har
+   nå to konkrete krav fra dogfooden (innlogget e-post synlig, forlate lag
+   selv). Deretter:
    så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbbetalinger
    /ops på web → full nominasjon-av-annen-dogfood). Stange/Nes-testdata
    ryddes FØRST etter fase B-dogfooden (de er motpart i testene).

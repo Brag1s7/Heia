@@ -1,9 +1,10 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
   TextInput,
   Alert,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -15,6 +16,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {errorMessage} from '../shared/errorMessage';
 import {BackBar, Button, Skeleton} from '../components';
 import {
   AlertTriangle,
@@ -127,6 +129,9 @@ export function OpsEntitiesScreen() {
 
   // Invitasjonsskjemaet per enhet.
   const [inviteFor, setInviteFor] = useState<string | null>(null);
+  // Arket glir opp når prompten åpnes. `useNativeDriver` — transformen
+  // kjører på UI-tråden, så bevegelsen står selv om JS jobber.
+  const sheetRise = useRef(new Animated.Value(0)).current;
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteNote, setInviteNote] = useState('');
@@ -167,6 +172,21 @@ export function OpsEntitiesScreen() {
     setPrompt(state);
   }, []);
 
+  // Åpning animeres; lukking gjør det IKKE — Modal-en river innholdet i det
+  // `visible` blir false, så en utgangsanimasjon ville aldri rukket å vises.
+  // Verdien nullstilles derfor med én gang, klar til neste åpning.
+  useEffect(() => {
+    if (prompt === null) {
+      sheetRise.setValue(0);
+      return;
+    }
+    Animated.timing(sheetRise, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [prompt, sheetRise]);
+
   const confirmPrompt = useCallback(async () => {
     if (!prompt) return;
     const text = note.trim();
@@ -185,7 +205,7 @@ export function OpsEntitiesScreen() {
     } catch (e) {
       Alert.alert(
         'Handlingen feilet',
-        e instanceof Error ? e.message : 'Prøv igjen om litt.',
+        errorMessage(e),
       );
     } finally {
       setActing(false);
@@ -302,7 +322,7 @@ export function OpsEntitiesScreen() {
       } catch (e) {
         Alert.alert(
           'Invitasjonen ble ikke opprettet',
-          e instanceof Error ? e.message : 'Prøv igjen om litt.',
+          errorMessage(e),
         );
       } finally {
         setActing(false);
@@ -319,7 +339,7 @@ export function OpsEntitiesScreen() {
       } catch (e) {
         Alert.alert(
           'Fikk ikke hentet lagene',
-          e instanceof Error ? e.message : 'Prøv igjen om litt.',
+          errorMessage(e),
         );
       }
     },
@@ -783,7 +803,24 @@ export function OpsEntitiesScreen() {
           style={styles.backdrop}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closePrompt} />
-          <View style={styles.sheet}>
+          {/* Arket er formet som et ark — avrundet topp, klistret til bunnen
+              — men Modal-ens `fade` stemplet det midt på skjermen uten at det
+              kom noen steder fra. Formen sa «ark», bevegelsen sa «varsel».
+              Nå fader bakteppet mens selve arket GLIR opp. */}
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                transform: [
+                  {
+                    translateY: sheetRise.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [260, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}>
             <Text style={styles.sheetTitle}>{prompt?.title}</Text>
             <Text style={styles.meta}>{prompt?.message}</Text>
             <TextInput
@@ -805,7 +842,7 @@ export function OpsEntitiesScreen() {
               loading={acting}
             />
             <Button title="Avbryt" variant="ghost" onPress={closePrompt} />
-          </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
     </View>

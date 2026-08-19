@@ -1,4 +1,5 @@
 import {createNavigationContainerRef} from '@react-navigation/native';
+import {profilEntry} from './profilEntry';
 import type {RootTabParamList} from '../shared/types';
 
 /**
@@ -36,6 +37,7 @@ export function openEvent(eventId: string): void {
     navigationRef.navigate('HjemStack', {
       screen: 'EventDetail',
       params: {eventId},
+      initial: false,
     });
   } catch {
     // Skjer når onboarding-stacken står fremme: HjemStack finnes ikke ennå.
@@ -59,10 +61,10 @@ export function openOpsClaim(claimId: string): void {
   }
 
   try {
-    navigationRef.navigate('ProfilStack', {
-      screen: 'OpsClaimDetail',
-      params: {claimId},
-    });
+    navigationRef.navigate(
+      'ProfilStack',
+      profilEntry('OpsClaimDetail', {claimId}),
+    );
   } catch {
     pendingOpsClaimId = claimId;
   }
@@ -81,7 +83,7 @@ export function openLagkassa(): void {
   }
 
   try {
-    navigationRef.navigate('HjemStack', {screen: 'Lagkassa'});
+    navigationRef.navigate('HjemStack', {screen: 'Lagkassa', initial: false});
   } catch {
     pendingLagkassa = true;
   }
@@ -153,9 +155,12 @@ export function openNotificationTarget(data: Record<string, unknown>): void {
       return;
     }
     try {
-      navigationRef.navigate('ProfilStack', {
-        screen: screen === 'club_payments' ? 'ClubPayments' : 'SupportSetup',
-      });
+      navigationRef.navigate(
+        'ProfilStack',
+        profilEntry(
+          screen === 'club_payments' ? 'ClubPayments' : 'SupportSetup',
+        ),
+      );
     } catch {
       pendingNotificationData = data;
     }
@@ -193,6 +198,7 @@ export function openNotificationTarget(data: Record<string, unknown>): void {
       navigationRef.navigate('HjemStack', {
         screen: 'Comments',
         params: {postId: postId as string, teamSpaceId},
+        initial: false,
       });
     } catch {
       pendingNotificationData = data;

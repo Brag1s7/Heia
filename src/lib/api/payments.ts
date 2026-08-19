@@ -369,6 +369,11 @@ export type MySupportStatus = 'checkout_pending' | 'incomplete' | 'active' | 'pa
 export interface MySupportSubscription {
   status: MySupportStatus;
   currentPeriodEnd: string | null;
+  /** Satt når avtalen er sagt opp og løper ut perioden (deaktivert lag
+   *  eller egen oppsigelse). Da FORNYES den ikke — den avsluttes, og
+   *  flatene må si det. «Min støtte» har alltid gjort det; Lagkassa
+   *  manglet feltet og sa «Fornyes» om en avsluttet avtale (A3, 2026-08-19). */
+  cancelAt: string | null;
 }
 
 /**
@@ -380,7 +385,7 @@ export async function getMySupportSubscription(
 ): Promise<MySupportSubscription | null> {
   const {data, error} = await supabase
     .from('support_subscriptions')
-    .select('status, current_period_end')
+    .select('status, current_period_end, cancel_at')
     .eq('team_space_id', teamSpaceId)
     .in('status', ['checkout_pending', 'incomplete', 'active', 'past_due'])
     .maybeSingle();
@@ -394,6 +399,7 @@ export async function getMySupportSubscription(
   return {
     status: data.status as MySupportStatus,
     currentPeriodEnd: data.current_period_end ?? null,
+    cancelAt: data.cancel_at ?? null,
   };
 }
 

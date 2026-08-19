@@ -156,7 +156,7 @@ export function ProfilScreen() {
     };
   }, []);
 
-  // «Klubbbetalinger» (klubbdøren, 00047) — hovedinngangen for
+  // «Klubbetalinger» (klubbdøren, 00047) — hovedinngangen for
   // betalingsansvarlig bor på PROFIL (låst). Samme speil-mønster som ops.
   const [isManager, setIsManager] = useState(false);
   useEffect(() => {
@@ -456,7 +456,10 @@ export function ProfilScreen() {
                   ? () =>
                       navigation
                         .getParent<NavigationProp<RootTabParamList>>()
-                        ?.navigate('HjemStack', {screen: 'Lagkassa'})
+                        ?.navigate('HjemStack', {
+                          screen: 'Lagkassa',
+                          initial: false,
+                        })
                   : undefined
               }
               showBorder={false}
@@ -489,7 +492,7 @@ export function ProfilScreen() {
         </View>
       </View>
 
-      {/* Klubbbetalinger (klubbdøren, 00047) — hovedinngangen for
+      {/* Klubbetalinger (klubbdøren, 00047) — hovedinngangen for
           betalingsansvarlig (låst: bor på Profil). Raden er et speil av
           DB-vakten club_payment_managers. */}
       {isManager && (
@@ -502,7 +505,7 @@ export function ProfilScreen() {
                   <Wallet size={20} color={colors.textSecondary} />
                 </MenuIcon>
               }
-              title="Klubbbetalinger"
+              title="Klubbetalinger"
               subtitle="Godkjenn og administrer lagenes støtte"
               right={<RowChevron />}
               onPress={() => navigation.navigate('ClubPayments')}

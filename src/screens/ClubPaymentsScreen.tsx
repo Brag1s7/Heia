@@ -11,6 +11,7 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {errorMessage} from '../shared/errorMessage';
 import {BackBar, Button, Skeleton} from '../components';
 import {
   AlertTriangle,
@@ -37,7 +38,7 @@ import {
 import {WEB_INVITE_LANDING_LIVE} from '../shared/flags';
 
 /**
- * «Klubbbetalinger» (klubbdøren, 00047) — ÉN kanonisk flate for
+ * «Klubbetalinger» (klubbdøren, 00047) — ÉN kanonisk flate for
  * betalingsansvarlig: hovedinngang på Profil, snarvei fra
  * Laginnstillinger. DB-gatet på club_payment_managers; RPC-ene er
  * vaktene, skjermen speiler. Betalingsansvarlig ser ALDRI pris —
@@ -169,7 +170,7 @@ export function ClubPaymentsScreen() {
       } catch (e) {
         Alert.alert(
           'Handlingen feilet',
-          e instanceof Error ? e.message : 'Prøv igjen om litt.',
+          errorMessage(e),
         );
       } finally {
         setActing(false);
@@ -399,7 +400,8 @@ export function ClubPaymentsScreen() {
                     .filter(Boolean)
                     .join(' · ') || 'Lag i klubben'}
                   {' · '}
-                  {req.memberCount} medlemmer
+                  {req.memberCount}{' '}
+                  {req.memberCount === 1 ? 'medlem' : 'medlemmer'}
                 </Text>
                 <Text style={styles.meta}>
                   {req.requestedBy} spurte {formatDate(req.requestedAt)}
@@ -645,7 +647,7 @@ export function ClubPaymentsScreen() {
           />
         }
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Klubbbetalinger</Text>
+        <Text style={styles.title}>Klubbetalinger</Text>
         <Text style={styles.subtitle}>
           Du bestemmer hvilke lag i klubben som samler inn støtte
         </Text>

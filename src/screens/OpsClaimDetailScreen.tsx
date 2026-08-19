@@ -16,6 +16,7 @@ import {
   type RouteProp,
 } from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {errorMessage} from '../shared/errorMessage';
 import {BackBar, Button, Skeleton} from '../components';
 import {
   getOpsClaim,
@@ -146,7 +147,7 @@ export function OpsClaimDetailScreen() {
             } catch (e) {
               Alert.alert(
                 'Handlingen feilet',
-                e instanceof Error ? e.message : 'Prøv igjen om litt.',
+                errorMessage(e),
               );
             } finally {
               setActing(false);
@@ -224,12 +225,18 @@ export function OpsClaimDetailScreen() {
                   invitasjon til hen, ikke en rolle til søkeren.
                 </Text>
               )}
-              {claim.clubAlreadyLinked && (
+              {/* BESLUTNINGSSTØTTE, ikke statusvisning — begge sier noe om hva
+                  en godkjenning VIL gjøre («gjenbruker den»), og hører derfor
+                  bare hjemme mens søknaden er åpen. Etter godkjenning
+                  beskriver de koblingen godkjenningen nettopp lagde, og et
+                  rødt varsel på en ferdigbehandlet søknad leses som at noe
+                  gikk galt (A3-dogfood 2026-08-19). Utfallet står i loggen. */}
+              {isOpen && claim.clubAlreadyLinked && (
                 <Text style={styles.warn}>
                   ⚠️ Klubben har allerede en aktiv kobling
                 </Text>
               )}
-              {claim.existingEntity && (
+              {isOpen && claim.existingEntity && (
                 <Text style={styles.hint}>
                   Enheten finnes fra før ({claim.existingEntity.legalName}) —
                   godkjenning gjenbruker den.

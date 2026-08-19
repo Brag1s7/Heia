@@ -3,7 +3,7 @@ import {edgeMessage} from './payments';
 
 // ---------------------------------------------------------------------------
 // KLUBBDØREN (00047, PAYMENTS.md §«KLUBBDØREN») — betalingsansvarlig-flaten
-// «Klubbbetalinger» + lagets «Be om godkjenning». Alle vakter bor i
+// «Klubbetalinger» + lagets «Be om godkjenning». Alle vakter bor i
 // databasen (RPC-ene returnerer NULL/kaster for andre); UI-et speiler bare.
 // Betalingsansvarlig ser ALDRI pris — laget arver klubbens standardtilbud
 // server-side ved godkjenning.
