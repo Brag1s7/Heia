@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -14,6 +15,7 @@ import {
   Linking,
   Alert,
   AppState,
+  Modal,
   Platform,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
@@ -29,6 +31,8 @@ import {
   uniqueTeamMemberships,
 } from '../shared/activeMembership';
 import {
+  Avatar,
+  AvatarColorPicker,
   ListRow,
   ListRowSkeleton,
   ProfileHeader,
@@ -74,6 +78,8 @@ import {
   type MySupportItem,
 } from '../lib/api';
 import {errorMessage} from '../shared/errorMessage';
+import {pickAvatarImage} from '../lib/media';
+import {deleteAvatarFile, uploadAvatar} from '../lib/media/avatar';
 import {confirmDeleteAccount, registerLocalCache} from '../lib/account';
 import {useAppVersion} from '../lib/appVersion';
 import {formatKr} from '../lib/money';
@@ -279,6 +285,111 @@ export function ProfilScreen() {
     }
   }, [pushPerm]);
 
+  // Profilbilde (00068). Inngangen er avataren i headeren.
+  //
+  // REKKEFØLGEN ER BEVISST: last opp FØRST, skriv profilen ETTERPÅ, slett
+  // den gamle fila TIL SLUTT. Feiler opplastingen, står den gamle avataren
+  // urørt; feiler DB-skrivingen, ligger det igjen en ubrukt fil (samme
+  // aksepterte hull som feed-bilder og logoer) — men brukeren mister aldri
+  // bildet sitt til en halvveis operasjon.
+  //
+  // GUARDEN ER EN REF, ikke state: `handleAvatar` er memoisert, så en
+  // state-verdi ville vært lest fra en gammel closure og aldri stoppet noe.
+  // State-en ved siden av finnes kun for å DEMPE avataren mens det står på —
+  // uten den er et tregt opplastingskall en knapp som ikke gjør noe.
+  const savingAvatar = useRef(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+
+  const setSaving = useCallback((value: boolean) => {
+    savingAvatar.current = value;
+    setAvatarBusy(value);
+  }, []);
+
+  const applyAvatar = useCallback(
+    async (next: string | null, previous: string | null) => {
+      setSaving(true);
+      try {
+        await updateProfile({avatarPath: next});
+        await refreshProfile();
+        // Først her er den gamle fila garantert uten referanse.
+        if (previous && previous !== next) {
+          await deleteAvatarFile(previous);
+        }
+      } catch (e) {
+        Alert.alert('Kunne ikke lagre profilbildet', errorMessage(e));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [refreshProfile, setSaving],
+  );
+
+  // Fargevelgeren (00070). Egen sheet fordi swatchene ikke får plass i en
+  // Alert — men den ÅPNES fra samme ark som bildevalget, så «gjør avataren
+  // min» blir én inngang og ikke to konkurrerende.
+  const [colorSheetOpen, setColorSheetOpen] = useState(false);
+
+  const handlePickColor = useCallback(
+    async (color: string | null) => {
+      setColorSheetOpen(false);
+      try {
+        await updateProfile({avatarColor: color});
+        await refreshProfile();
+      } catch (e) {
+        Alert.alert('Kunne ikke lagre fargen', errorMessage(e));
+      }
+    },
+    [refreshProfile],
+  );
+
+  const handleAvatar = useCallback(() => {
+    if (savingAvatar.current) return;
+    const current = profile?.avatarPath ?? null;
+    const userId = session?.user?.id;
+    if (!userId) return;
+
+    const choose = async () => {
+      const image = await pickAvatarImage();
+      if (!image) return;
+      setSaving(true);
+      let path: string;
+      try {
+        path = await uploadAvatar(userId, image);
+      } catch (e) {
+        setSaving(false);
+        Alert.alert('Kunne ikke laste opp bildet', errorMessage(e));
+        return;
+      }
+      // applyAvatar setter den selv med én gang — ingen mellomtilstand der
+      // avataren lyser opp igjen midt i operasjonen.
+      await applyAvatar(path, current);
+    };
+
+    Alert.alert(
+      'Profilbilde',
+      'Bildet vises i feeden, i kommentarer og i lagoversikten. ' +
+        'Bare de du deler lag med kan se det.',
+      [
+        {text: current ? 'Bytt bilde' : 'Velg bilde', onPress: choose},
+        // Står ALLTID, også med bilde: fargen er fallbacken som gjelder
+        // den dagen bildet fjernes — og for dem som bevisst aldri legger
+        // inn et bilde, er den hele personaliseringen.
+        {text: 'Velg farge', onPress: () => setColorSheetOpen(true)},
+        ...(current
+          ? [
+              {
+                text: 'Fjern bildet',
+                style: 'destructive' as const,
+                onPress: () => applyAvatar(null, current),
+              },
+            ]
+          : []),
+        {text: 'Avbryt', style: 'cancel' as const},
+      ],
+      {cancelable: true},
+    );
+  }, [applyAvatar, profile?.avatarPath, session?.user?.id, setSaving]);
+
   // Nummeret er hele grunnen til at lagoversikten kan brukes til å nå noen —
   // uten et sted å skrive det inn står telefonkolonnen tom for alle.
   // Alert.prompt finnes bare på iOS; Android får en egen flate den dagen.
@@ -435,7 +546,10 @@ export function ProfilScreen() {
       <ProfileHeader
         name={profile.displayName}
         email={session?.user?.email}
-        avatarUrl={profile.avatarUrl}
+        avatarPath={profile.avatarPath}
+        avatarColor={profile.avatarColor}
+        onPressAvatar={handleAvatar}
+        avatarBusy={avatarBusy}
         role={roleName}
       />
       <ScrollView
@@ -850,11 +964,114 @@ export function ProfilScreen() {
           <Text style={styles.footerTagline}>Idrettsglede for alle</Text>
         </View>
       </ScrollView>
+
+      {/* Fargevelgeren. Forhåndsvisningen er selve forklaringen: uten den
+          måtte arket brukt en setning på å si hva fargen er til, og med
+          bilde ville valget virket meningsløst. Her SER du at det er
+          initialene som farges. */}
+      <Modal
+        visible={colorSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setColorSheetOpen(false)}>
+        <Pressable
+          style={styles.sheetBackdrop}
+          onPress={() => setColorSheetOpen(false)}
+        />
+        <View
+          style={[
+            styles.sheet,
+            {paddingBottom: insets.bottom + spacing.lg},
+          ]}>
+          <View style={styles.sheetHandle} />
+          <Text style={styles.sheetTitle}>Farge på avataren</Text>
+
+          <View style={styles.colorPreview}>
+            <Avatar
+              name={profile.displayName}
+              color={profile.avatarColor}
+              size="lg"
+            />
+            <Text style={styles.sheetHint}>
+              {profile.avatarPath
+                ? 'Vises når du ikke har profilbilde.'
+                : 'Vises bak initialene dine i feeden, i kommentarer og i lagoversikten.'}
+            </Text>
+          </View>
+
+          <AvatarColorPicker
+            value={profile.avatarColor}
+            onChange={handlePickColor}
+          />
+
+          {!!profile.avatarColor && (
+            <Pressable
+              onPress={() => handlePickColor(null)}
+              style={({pressed}) => [
+                styles.sheetReset,
+                pressed && styles.sheetResetPressed,
+              ]}>
+              <Text style={styles.sheetResetText}>Tilbakestill farge</Text>
+            </Pressable>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  // Fargevelger-arket — samme form som ReporterSheet, så de to leses som
+  // samme mekanisme.
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    alignSelf: 'center',
+    marginBottom: spacing.lg,
+  },
+  sheetTitle: {
+    ...typography.heading3,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  colorPreview: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+  },
+  sheetHint: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  sheetReset: {
+    alignSelf: 'center',
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+  },
+  sheetResetPressed: {
+    opacity: 0.6,
+  },
+  sheetResetText: {
+    ...typography.body,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.background,

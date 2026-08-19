@@ -73,7 +73,12 @@ export interface NotificationMatch {
 export interface NotificationActor {
   id: string;
   name: string;
-  avatarUrl?: string;
+  /**
+   * Path i `avatars`-bucketen (00068), FROSSET ved varseltidspunktet
+   * (00051: «et varsel er et historisk faktum»). Fjernes bildet, dør
+   * path-en og raden faller til initialer — det er riktig utfall.
+   */
+  avatarPath?: string;
 }
 
 /**
@@ -157,7 +162,7 @@ export function mapActor(
   return {
     id: data.actor_id,
     name: data.actor_name,
-    avatarUrl:
+    avatarPath:
       typeof data.actor_avatar === 'string' ? data.actor_avatar : undefined,
   };
 }

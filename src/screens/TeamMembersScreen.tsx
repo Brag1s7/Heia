@@ -18,12 +18,15 @@ import {MoreHorizontal} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
 import {
+  removeMemberAvatar,
   removeTeamMember,
   setMemberRole,
   declineRoleRequest,
   type TeamMember,
 } from '../lib/api/members';
 import {errorMessage} from '../shared/errorMessage';
+import {avatarRef} from '../lib/media/avatar';
+import {promptReport} from '../lib/moderation';
 import {useTeamMembers, invalidateTeamMembers} from '../lib/queries/members';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {queryKeys} from '../lib/queries/keys';
@@ -196,13 +199,50 @@ export function TeamMembersScreen() {
     [activeTeamSpaceId],
   );
 
+  // Profilbilde-moderasjon (00068). To knapper, to helt ulike myndigheter:
+  //
+  //  · «Fjern profilbildet» er lagadmins EGEN makt — samme forhold som at
+  //    trener/lagleder kan slette andres innlegg (soft_delete_post, 00041).
+  //    Alternativet frem til nå var å kaste personen ut av laget for å bli
+  //    kvitt et bilde, og det er ikke forholdsmessig.
+  //  · «Rapporter profilbildet» er veien til HEIA, og den må stå åpen for
+  //    ALLE medlemmer — også når det er treneren selv bildet gjelder.
+  //    Uten den er et upassende profilbilde det eneste UGC-et i appen som
+  //    ikke kan flagges (Apple 1.2).
+  const handleRemoveAvatar = useCallback(
+    (member: TeamMember) => {
+      if (!activeTeamSpaceId) return;
+      Alert.alert(
+        `Fjerne profilbildet til ${member.name}?`,
+        `${member.name} beholder plassen sin i laget og kan legge inn et nytt bilde selv. Frem til da vises initialer.`,
+        [
+          {text: 'Avbryt', style: 'cancel'},
+          {
+            text: 'Fjern bildet',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await removeMemberAvatar(activeTeamSpaceId, member.id);
+              } catch (e) {
+                Alert.alert('Kunne ikke fjerne bildet', errorMessage(e));
+              }
+              invalidateTeamMembers(activeTeamSpaceId);
+            },
+          },
+        ],
+      );
+    },
+    [activeTeamSpaceId],
+  );
+
   // ⋯-menyen samler medlemshandlingene: forespørsel, rollebytte, fjerning.
   const handleMemberActions = useCallback(
     (member: TeamMember) => {
       const canChangeRole = member.role !== 'spiller';
       const canRemove = !isTeamAdmin(member.role);
+      const hasAvatar = !!member.avatarPath;
       Alert.alert(member.name, subtitleFor(member), [
-        ...(member.requestedRole
+        ...(amAdmin && member.requestedRole
           ? [
               {
                 text: 'Behandle trenerforespørsel',
@@ -210,10 +250,29 @@ export function TeamMembersScreen() {
               },
             ]
           : []),
-        ...(canChangeRole
+        ...(amAdmin && canChangeRole
           ? [{text: 'Endre rolle', onPress: () => handleChangeRole(member)}]
           : []),
-        ...(canRemove
+        // Rapportering står FØRST av bildehandlingene for et vanlig medlem,
+        // fordi det er den eneste de har.
+        ...(hasAvatar
+          ? [
+              {
+                text: 'Rapporter profilbildet',
+                onPress: () => promptReport('avatar', member.id),
+              },
+            ]
+          : []),
+        ...(amAdmin && hasAvatar
+          ? [
+              {
+                text: 'Fjern profilbildet',
+                style: 'destructive' as const,
+                onPress: () => handleRemoveAvatar(member),
+              },
+            ]
+          : []),
+        ...(amAdmin && canRemove
           ? [
               {
                 text: 'Fjern fra laget',
@@ -225,7 +284,13 @@ export function TeamMembersScreen() {
         {text: 'Avbryt', style: 'cancel' as const},
       ]);
     },
-    [handleChangeRole, handleRemove, handleRoleRequest],
+    [
+      amAdmin,
+      handleChangeRole,
+      handleRemove,
+      handleRemoveAvatar,
+      handleRoleRequest,
+    ],
   );
 
   const handleContact = useCallback((member: TeamMember) => {
@@ -304,9 +369,12 @@ export function TeamMembersScreen() {
             {section.data.map((member, i) => {
               const isMe = member.id === myId;
               const canContact = !!member.phone && !isMe;
-              // ⋯ samler handlingene (rolle/forespørsel/fjerning) — hva som
-              // faktisk tilbys avgjøres i menyen, vaktene bor i RPC-ene.
-              const showActions = amAdmin && !isMe;
+              // ⋯ samler handlingene (rolle/forespørsel/fjerning/bilde) —
+              // hva som faktisk tilbys avgjøres i menyen, vaktene bor i
+              // RPC-ene. Et vanlig medlem ser knappen KUN når det finnes et
+              // profilbilde å rapportere; ellers ville menyen vært tom.
+              const showActions =
+                !isMe && (amAdmin || !!member.avatarPath);
               return (
                 <Pressable
                   key={member.id}
@@ -317,7 +385,12 @@ export function TeamMembersScreen() {
                     i < section.data.length - 1 && styles.rowBorder,
                     pressed && canContact && styles.rowPressed,
                   ]}>
-                  <Avatar uri={member.avatarUrl} name={member.name} size="md" />
+                  <Avatar
+                    media={avatarRef(member.avatarPath)}
+                    name={member.name}
+                    color={member.avatarColor}
+                    size="md"
+                  />
                   <View style={styles.rowText}>
                     <View style={styles.nameLine}>
                       <Text style={styles.name} numberOfLines={1}>

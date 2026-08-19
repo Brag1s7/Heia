@@ -43,6 +43,23 @@ export function fetchTeamMembersCached(
 }
 
 /**
+ * Lagets forfattere via query-cachen — for skjermene. Varsellista bruker
+ * den til å slå opp avatarfargen til den som utløste varselet (00070):
+ * `notifications.data` fryser avsenderen, og det er RIKTIG for navn og
+ * bilde (de VAR sånn da det skjedde), men en farge er ikke et historisk
+ * faktum — den er en stående preferanse. Fryses den, viser et gammelt
+ * varsel en farge personen forlot for lenge siden.
+ */
+export function useTeamAuthors(teamSpaceId: string | null | undefined) {
+  return useQuery({
+    queryKey: queryKeys.authors(teamSpaceId ?? ''),
+    queryFn: () => getTeamAuthors(teamSpaceId as string),
+    staleTime: MEMBERS_STALE_MS,
+    enabled: !!teamSpaceId,
+  });
+}
+
+/**
  * Forfatter-oppslaget (00067) — kommentartrådens navnekilde. Skilt fra
  * members-cachen fordi utmeldte forfattere skal bestå der (frysdokumentets
  * §2: innhold og forfatterskap overlever utmelding), mens rosteret kun

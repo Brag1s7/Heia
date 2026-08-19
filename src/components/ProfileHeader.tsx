@@ -1,10 +1,11 @@
 import React, {useState} from 'react';
-import {View, Text, StatusBar, StyleSheet} from 'react-native';
+import {View, Text, StatusBar, StyleSheet, Pressable} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import Svg, {Circle, Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar} from './Avatar';
+import {avatarRef} from '../lib/media/avatar';
 import {
   ARC_INSET_RIGHT,
   ARC_INSET_BOTTOM,
@@ -20,10 +21,20 @@ interface ProfileHeaderProps {
   name: string;
   /** Kontoen du er logget inn med. Utelates aldri når den finnes. */
   email?: string | null;
-  /** Profilbilde. Faller til initialer i Avatar når den mangler. */
-  avatarUrl?: string | null;
+  /** Profilbilde som path i `avatars`-bucketen (00068), ikke URL.
+   *  Faller til initialer i Avatar når den mangler. */
+  avatarPath?: string | null;
+  /** Selvvalgt avatarfarge (00070) — bak initialene. */
+  avatarColor?: string | null;
   /** Rollen din i det AKTIVE laget (lagkortene rett under viser hvilket). */
   role?: string | null;
+  /**
+   * Trykk på avataren. Utelatt = ikke trykkbar (headeren brukes bare på
+   * Profil i dag, men komponenten skal ikke ANTA at den gjør det).
+   */
+  onPressAvatar?: () => void;
+  /** Opplasting/lagring pågår — avataren dempes så knappen ikke føles død. */
+  avatarBusy?: boolean;
 }
 
 /**
@@ -50,8 +61,11 @@ interface ProfileHeaderProps {
 export function ProfileHeader({
   name,
   email,
-  avatarUrl,
+  avatarPath,
+  avatarColor,
   role,
+  onPressAvatar,
+  avatarBusy = false,
 }: ProfileHeaderProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
@@ -123,10 +137,29 @@ export function ProfileHeader({
 
       {/* Avatar 40 + 1 px ring = 42 = lagmerkets 38 + 2×2. Høydene matcher ved
           konstruksjon, ikke ved justering. Ringen holder kanten på et
-          profilbilde skarp mot den mørke flaten; initialer klarer seg selv. */}
-      <View style={styles.avatarRing}>
-        <Avatar name={name} uri={avatarUrl ?? undefined} size="md" />
-      </View>
+          profilbilde skarp mot den mørke flaten; initialer klarer seg selv.
+
+          AVATAREN ER INNGANGEN til å sette profilbilde (00068): ingen egen
+          rad i Innstillinger, ingen blyant-ikon. Å trykke på bildet sitt er
+          den vante bevegelsen, og «Innstillinger» ble nettopp ryddet i B6 —
+          en ny rad der ville jobbet mot den ryddingen. */}
+      <Pressable
+        onPress={onPressAvatar}
+        disabled={!onPressAvatar || avatarBusy}
+        hitSlop={8}
+        accessibilityRole={onPressAvatar ? 'button' : undefined}
+        accessibilityLabel={onPressAvatar ? 'Endre profilbilde' : undefined}
+        style={({pressed}) => [
+          styles.avatarRing,
+          (avatarBusy || (pressed && onPressAvatar)) && styles.avatarPressed,
+        ]}>
+        <Avatar
+          name={name}
+          media={avatarRef(avatarPath)}
+          color={avatarColor}
+          size="md"
+        />
+      </Pressable>
 
       <View style={styles.textWrap}>
         <Text style={styles.name} numberOfLines={1}>
@@ -161,6 +194,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.heiaDeep,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  avatarPressed: {
+    opacity: 0.7,
   },
   avatarRing: {
     borderRadius: radius.full,

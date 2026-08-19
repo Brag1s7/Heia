@@ -2,6 +2,7 @@ import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
 import {getUserId, getUserIdOrNull} from './authUser';
 import {acquireChannel, isChannelResync} from '../realtimeChannels';
+import {primeAvatars} from '../media/avatar';
 import {
   FEED_MEDIA_BUCKET,
   invalidateMediaCache,
@@ -39,7 +40,9 @@ export interface MatchPhoto {
   media: MediaRef;
   caption?: string;
   authorName: string;
-  authorAvatarUrl?: string;
+  /** Path i `avatars`-bucketen (00068), ikke URL. Ikke tegnet i dag —
+   *  galleriet og railen viser bare bildet, ikke fotografen. */
+  authorAvatarPath?: string;
   createdAt: Date;
   /** Satt når bildet hører til ett bestemt øyeblikk, f.eks. 1–0-målet. */
   matchEventId?: string;
@@ -137,7 +140,8 @@ function mapFeedRow(row: any): FeedItem {
     author: {
       id: row.author_id ?? '',
       name: row.author_name ?? 'Ukjent',
-      avatarUrl: row.author_avatar ?? undefined,
+      avatarPath: row.author_avatar ?? undefined,
+      avatarColor: row.author_avatar_color ?? undefined,
       role: (row.author_role as UserRole) ?? undefined,
     },
     createdAt: new Date(row.created_at),
@@ -210,6 +214,11 @@ export async function getTeamFeed(
   if (paths.length > 0) {
     await primeMediaUrls(paths);
   }
+
+  // Forfatteravatarene bor i en ANNEN bucket (00068) og trenger derfor sin
+  // egen batch. Ett kall per skjermlast for hele siden — avataren er appens
+  // mest gjentatte bilde, og uten dette ville hver rad signert sin egen.
+  await primeAvatars(items.map(i => i.author.avatarPath));
 
   // get_team_feed sier hvor mange som har reagert, men ikke om JEG har det.
   // Én ekstra spørring (RLS lar meg se lagets reaksjoner) markerer mine.
@@ -580,7 +589,7 @@ export async function getMatchPhotos(eventId: string): Promise<MatchPhoto[]> {
     },
     caption: (r.content as string) || undefined,
     authorName: (r.author_name as string) ?? 'Ukjent',
-    authorAvatarUrl: (r.author_avatar as string) ?? undefined,
+    authorAvatarPath: (r.author_avatar as string) ?? undefined,
     createdAt: new Date(r.created_at),
     matchEventId: (r.match_event_id as string) ?? undefined,
   }));

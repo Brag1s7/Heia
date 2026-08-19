@@ -1,5 +1,6 @@
 import {supabase} from '../supabase';
 import {mapNotificationRow} from '../../shared/inbox';
+import {primeAvatars} from '../media/avatar';
 // ⚠️ Egen import, i tillegg til re-eksporten under. `export type {…} from`
 // er en REN videresending: den binder ingen navn lokalt, så typen kunne ikke
 // brukes som returtype her uten denne linja.
@@ -73,7 +74,11 @@ export async function getNotifications(
   if (error) {
     throw error;
   }
-  return (data || []).map(mapNotificationRow);
+  const items = (data || []).map(mapNotificationRow);
+  // Varsel-lista tegner ett ansikt per rad (00051). Én signeringsbatch for
+  // hele siden — samme regel som feeden og lagoversikten (P1).
+  await primeAvatars(items.map(n => n.actor?.avatarPath));
+  return items;
 }
 
 /** Antall uleste — driver badgen på Varsler-fanen. */

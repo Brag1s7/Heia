@@ -93,7 +93,10 @@ export interface User {
   id: string;
   name: string;
   role?: UserRole; // deprecated — bruk Membership.role per lag
-  avatarUrl?: string;
+  /** Path i `avatars`-bucketen (00068), ikke URL. Se avatarRef(). */
+  avatarPath?: string;
+  /** Selvvalgt avatarfarge (00070). Utelatt = navne-hashen. */
+  avatarColor?: string;
 }
 
 export interface HeiaEvent {
@@ -142,7 +145,9 @@ export interface RSVPSummary {
 export interface EventAttendee {
   id: string;
   name: string;
-  avatarUrl?: string;
+  /** Path i `avatars`-bucketen (00068), ikke URL. Ikke tegnet i dag —
+   *  oppmøtelisten viser initialer, og barn har uansett ingen konto. */
+  avatarPath?: string;
   childName?: string;
 }
 

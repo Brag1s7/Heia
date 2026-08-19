@@ -4,6 +4,7 @@ import {colors, typography, spacing, radius, shadows} from '../theme';
 import {MediaImage} from '../lib/media/MediaImage';
 import {Maximize2, MessageCircle, MoreHorizontal} from './icons';
 import {Avatar} from './Avatar';
+import {avatarRef} from '../lib/media/avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
 import type {FeedItem} from '../shared/types';
@@ -138,7 +139,12 @@ export function FeedCard({
     <>
       {/* Header */}
       <View style={styles.header}>
-        <Avatar name={item.author.name} size="md" uri={item.author.avatarUrl} />
+        <Avatar
+          name={item.author.name}
+          size="md"
+          media={avatarRef(item.author.avatarPath)}
+          color={item.author.avatarColor}
+        />
         <View style={styles.headerText}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>
