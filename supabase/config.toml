@@ -211,7 +211,35 @@ double_confirm_changes = true
 # Flyten i appen: AuthScreen → VerifyEmailScreen (OTP, ingen deep links).
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
+# AV MED VILJE (2026-08-19). Dette er REAUTENTISERING, og den har et hull:
+# GoTrue krever bare nonce når sessionen er ELDRE enn 24 timer
+# (internal/api/user.go: `now.After(session.CreatedAt.Add(24*time.Hour))`).
+# Scenarioet vi bryr oss om — ulåst telefon, nylig innlogget — treffer aldri
+# koden. Vi bruker current_password-kravet i stedet; se notatet under.
 secure_password_change = false
+#
+# ⚠️ TO PASSORDINNSTILLINGER STYRES **KUN FRA DASHBOARDET** (Auth → Sign In /
+# Providers → Email). Supabase-CLI-en har ingen config.toml-nøkkel for dem —
+# den kjenner bare minimum_password_length, password_requirements,
+# password_verification_attempt og secure_password_change. Denne fila er
+# derfor IKKE hele sannheten om auth-oppsettet:
+#
+#   1. «Require current password when updating» = PÅ (satt 2026-08-19).
+#      GoTrue krever og validerer current_password i SAMME forespørsel som
+#      passordbyttet. Dette er sikkerhetsgrensen bak Profil → «Passord og
+#      sikkerhet» (src/screens/ChangePasswordScreen.tsx). Glemt-passord-flyten
+#      er uberørt: GoTrue unntar recovery-sessions eksplisitt
+#      (`if !session.IsRecovery()`).
+#   2. «Prevent use of leaked passwords» = AV. Ønsket på, men den avviser
+#      passord med en ENGELSK melding, så src/shared/authErrors.ts må dekke
+#      teksten først (den gjør det nå — bryteren kan skrus på).
+#
+# `supabase config push` sender ikke disse feltene og skal derfor la dem stå.
+# VERIFISER det etter neste push (scripts/verify-password-change.md).
+#
+# ⚠️ Motsatt vei: minimum_password_length og secure_password_change ER
+# CLI-styrte. Endrer du dem i dashboardet, blir de stille rullet tilbake ved
+# neste `supabase config push` — endre dem HER, ikke i nettleseren.
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 # 1 minutt (remote-verdien beholdt): «Send koden på nytt»-lenken skal
 # ikke kunne spamme; appen viser «Vent litt …» ved avslag.

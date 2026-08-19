@@ -92,7 +92,13 @@ export async function getUserMemberships(
     )
     .eq('user_id', userId)
     .eq('status', 'active')
-    .is('team_space.deleted_at', null);
+    .is('team_space.deleted_at', null)
+    // Uten ORDER BY er radrekkefølgen planleggerens valg og kan skifte
+    // mellom app-starter — og alt som plukker «første rad» per lag
+    // (activeMembership-modulen) må ha en stabil kilde. id er tiebreak
+    // for familier som ble meldt inn i samme sekund.
+    .order('joined_at', {ascending: true})
+    .order('id', {ascending: true});
 
   if (error) {
     throw error;

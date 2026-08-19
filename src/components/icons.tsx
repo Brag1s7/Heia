@@ -26,6 +26,7 @@ export {
   House,
   Image as ImageIcon,
   Info,
+  Lock,
   LogOut,
   Mail,
   MapPin,

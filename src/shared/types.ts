@@ -309,6 +309,9 @@ export type InboxStackParamList = {
 
 export type ProfilStackParamList = {
   Profil: undefined;
+  /** «Passord og sikkerhet» — passordbytte med server-håndhevet
+   *  current_password, og recovery-utveien for den som har glemt det. */
+  ChangePassword: undefined;
   TeamMembers: undefined;
   TeamSettings: undefined;
   /** Aktivering av «Støtt laget» (betalingsspor fase 3) — kun lagadmin. */

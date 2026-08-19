@@ -15,6 +15,7 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {BackBar, Button} from '../components';
 import {useAuth} from '../context';
+import {authErrorMessage} from '../shared/authErrors';
 import {TERMS_URL, PRIVACY_URL} from '../shared/links';
 import type {OnboardingStackParamList} from '../shared/types';
 
@@ -56,8 +57,13 @@ export function AuthScreen({route, navigation}: Props) {
       } else {
         await signIn(email.trim(), password);
       }
-    } catch (e: any) {
-      setError(e.message || 'Noe gikk galt');
+    } catch (e) {
+      // Supabase-feilene er ENGELSKE. Rå `e.message` sto her og sendte dem
+      // rett ut i en norsk flyt — ufarlig så lenge de i praksis var «feil
+      // e-post eller passord», men passordreglene (minstelengde, og
+      // HaveIBeenPwned-sjekken når den skrus på) treffer helt vanlige
+      // foreldre midt i registreringen.
+      setError(authErrorMessage(e));
     } finally {
       setSubmitting(false);
     }
@@ -78,9 +84,11 @@ export function AuthScreen({route, navigation}: Props) {
         flow: 'recovery',
         email: email.trim(),
       });
-    } catch {
+    } catch (e) {
       // Typisk rate limit — Supabase-teksten er engelsk og kryptisk.
-      setError('Fikk ikke sendt kode akkurat nå — prøv igjen om litt');
+      setError(
+        authErrorMessage(e, 'Fikk ikke sendt kode akkurat nå — prøv igjen om litt'),
+      );
     } finally {
       setSubmitting(false);
     }

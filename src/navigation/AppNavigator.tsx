@@ -42,6 +42,7 @@ import {JoinTeamCodeScreen} from '../screens/JoinTeamCodeScreen';
 import {CreateTeamScreen} from '../screens/CreateTeamScreen';
 import {KalenderScreen} from '../screens/KalenderScreen';
 import {ProfilScreen} from '../screens/ProfilScreen';
+import {ChangePasswordScreen} from '../screens/ChangePasswordScreen';
 import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {TeamSettingsScreen} from '../screens/TeamSettingsScreen';
 import {SupportSetupScreen} from '../screens/SupportSetupScreen';
@@ -208,6 +209,10 @@ function ProfilStackNavigator() {
   return (
     <ProfilNav.Navigator screenOptions={stackScreenOptions}>
       <ProfilNav.Screen name="Profil" component={ProfilScreen} />
+      <ProfilNav.Screen
+        name="ChangePassword"
+        component={ChangePasswordScreen}
+      />
       <ProfilNav.Screen name="TeamMembers" component={TeamMembersScreen} />
       <ProfilNav.Screen name="TeamSettings" component={TeamSettingsScreen} />
       <ProfilNav.Screen name="SupportSetup" component={SupportSetupScreen} />

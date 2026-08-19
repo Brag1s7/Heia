@@ -40,6 +40,17 @@ interface AuthContextValue {
     code: string,
     newPassword: string,
   ) => Promise<void>;
+  /**
+   * Bytter passord for den innloggede brukeren.
+   *
+   * ⚠️ `current_password` sendes MED, og valideres av GoTrue i SAMME
+   * forespørsel — ikke av oss. Se `changePassword` under for hvorfor det
+   * skillet er hele poenget.
+   */
+  changePassword: (
+    currentPassword: string,
+    newPassword: string,
+  ) => Promise<void>;
   /** Leser profilen på nytt — etter at du har endret navn eller telefon. */
   refreshProfile: () => Promise<void>;
 }
@@ -154,6 +165,46 @@ export function AuthProvider({children}: PropsWithChildren) {
     [],
   );
 
+  /**
+   * Passordbytte fra Profil → «Passord og sikkerhet».
+   *
+   * SIKKERHETSGRENSEN LIGGER PÅ SERVEREN, ikke her. Dashboard-bryteren
+   * «Require current password when updating» (Auth → Email) er PÅ, og da
+   * kjører GoTrue denne grenen i internal/api/user.go:
+   *
+   *     if config.Security.UpdatePasswordRequireCurrentPassword {
+   *       if !session.IsRecovery() {
+   *         ... krev current_password, og user.Authenticate(...) mot den
+   *
+   * Derfor sendes `current_password` med i selve oppdateringen. Vi verifiserer
+   * det IKKE selv først: en `signInWithPassword`-sjekk i appflyten ville vært
+   * en sjekk, ikke en grense — den kan hoppes over av alt som ikke er denne
+   * skjermen, og den ville i tillegg brent innloggings-rate-limiten
+   * (`sign_in_sign_ups`, 30 per 5 min per IP), slik at et helt lag på samme
+   * klubb-wifi kunne blitt sperret ute fordi én forelder gjettet feil.
+   * Server-veien bruker `password_verification_attempt` i stedet.
+   *
+   * ⚠️ Bryteren er DASHBOARD-ONLY: supabase-CLI-en har ingen config.toml-nøkkel
+   * for den (kun `secure_password_change`, som er reautentisering — en annen,
+   * svakere mekanisme med et 24-timers hull). `supabase config push` sender
+   * derfor ikke feltet og lar den stå. Se kommentaren i supabase/config.toml.
+   *
+   * Glemt-passord-flyten er UBERØRT: den går via en recovery-session, og
+   * GoTrue unntar den eksplisitt (`!session.IsRecovery()`).
+   */
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      const {error} = await supabase.auth.updateUser({
+        password: newPassword,
+        current_password: currentPassword,
+      });
+      if (error) {
+        throw error;
+      }
+    },
+    [],
+  );
+
   const signIn = useCallback(async (email: string, password: string) => {
     const {error} = await supabase.auth.signInWithPassword({
       email,
@@ -198,6 +249,7 @@ export function AuthProvider({children}: PropsWithChildren) {
         resendSignupCode,
         requestPasswordReset,
         confirmPasswordReset,
+        changePassword,
         refreshProfile,
       }}>
       {children}

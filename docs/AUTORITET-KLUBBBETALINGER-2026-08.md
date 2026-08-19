@@ -252,10 +252,10 @@ App/web viser kun status + neste handling.
 ### II.10 App/web-arbeidsdeling
 
 **Web (før full lansering):** invitasjonslanding, innlogging/opprettelse,
-aksept/avslag, Stripe-onboarding, Klubbbetalinger, rolleadministrasjon,
+aksept/avslag, Stripe-onboarding, Klubbetalinger, rolleadministrasjon,
 Heia Ops, https-retur/deep-links, server-side Brønnøysund-validering.
 **Appen:** starte aktivering, selv-/annen-nominasjon, følge hele statusen,
-Klubbbetalinger for eksisterende ansvarlige, lagforespørsel/port 3.
+Klubbetalinger for eksisterende ansvarlige, lagforespørsel/port 3.
 Samme RPC-er overalt. Ingen invitasjons-e-post før web-landingen finnes.
 
 ### II.11 Eksplisitt erstattede beslutninger (omkamp tatt 2026-08-18)
@@ -517,7 +517,7 @@ klubbrad + claim med aktivert orgnr → brukerrettet stopp ved submit.
 B4-stackbeslutningen tas ved fasestart. Rekkefølge: **B-1**
 invitasjonslanding (auth, redeem/decline, avviksskjermen «bekreftes av
 Heia») → `WEB_INVITE_BASE_URL` settes → «En annen»-flagget PÅ i appen.
-**B-2** Klubbbetalinger + rolleadmin på web (samme RPC-er). **B-3** Heia
+**B-2** Klubbetalinger + rolleadmin på web (samme RPC-er). **B-3** Heia
 Ops på web (claims, review-kø, entities, flytt-lag); e-postene bytter
 `heia://` → https. **B-4** full dogfood: nominasjon av annen person
 (Benjamin-kontoen som «kasserer»): invitasjon → aksept med e-postmatch →

@@ -217,7 +217,7 @@ Hilsen Heia`,
       await sendMail(
         to,
         `Ny betalingsansvarlig for ${legal}`,
-        `${inv.invited_name} har takket ja og er nå betalingsansvarlig for ${legal} i Heia.\n\nDu ser rollene under Klubbbetalinger.`,
+        `${inv.invited_name} har takket ja og er nå betalingsansvarlig for ${legal} i Heia.\n\nDu ser rollene under Klubbetalinger.`,
       );
       return new Response('ok', {status: 200});
     }
@@ -314,7 +314,7 @@ Inviter en ny fra Heia Ops (Klubber og roller) når klubben har pekt ut en perso
         await sendMail(
           to,
           `${teamName} ber om godkjenning for støtte`,
-          `«${teamName}» vil samle inn supporterstøtte for ${legal}.\n\nGodkjenn eller avslå under Klubbbetalinger på Profil i Heia-appen.`,
+          `«${teamName}» vil samle inn supporterstøtte for ${legal}.\n\nGodkjenn eller avslå under Klubbetalinger på Profil i Heia-appen.`,
         );
       }
       return new Response('ok', {status: 200});
