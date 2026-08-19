@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo} from 'react';
 import {
   View,
   Text,
@@ -10,18 +10,17 @@ import {
   Alert,
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar, BackBar, ListRowSkeleton, Skeleton} from '../components';
 import {MoreHorizontal} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
-import {
-  getTeamMembers,
-  removeTeamMember,
-  type TeamMember,
-} from '../lib/api/members';
+import {removeTeamMember, type TeamMember} from '../lib/api/members';
+import {useTeamMembers, invalidateTeamMembers} from '../lib/queries/members';
+import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
+import {queryKeys} from '../lib/queries/keys';
 import type {ProfilStackParamList, UserRole} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<ProfilStackParamList, 'TeamMembers'>;
@@ -58,37 +57,23 @@ export function TeamMembersScreen() {
   const {session} = useAuth();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
 
-  const [members, setMembers] = useState<TeamMember[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Skjermen hadde egen lokal state og hentet PÅ NYTT ved hvert fokus, med
+  // `loading` fra true — så skeletonene kom tilbake hver eneste gang man gikk
+  // inn, også rett etter at man var her (A3-dogfood 2026-08-19). Den delte
+  // heller ikke data med resten av appen, enda medlemslisten allerede lå i
+  // query-cachen fra B2 (kommentartråden bruker den). Nå: samme cache, samme
+  // 5-minutters staleTime, og 60 s-regelen ved fokus.
+  const {
+    data: members = [],
+    isPending,
+    isError,
+    refetch,
+    isRefetching,
+  } = useTeamMembers(activeTeamSpaceId);
+  useScreenFocusRefetch(queryKeys.members(activeTeamSpaceId ?? ''));
 
   const myId = session?.user?.id;
   const amAdmin = isTeamAdmin(activeRole);
-
-  const load = useCallback(async () => {
-    if (!activeTeamSpaceId) return;
-    setError(null);
-    try {
-      setMembers(await getTeamMembers(activeTeamSpaceId));
-    } catch {
-      setError('Kunne ikke laste laget. Dra ned for å prøve igjen.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [activeTeamSpaceId]);
-
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    load();
-  }, [load]);
 
   // RPC-en sorterer allerede etter rollehierarki og navn, så seksjonene kan
   // bare plukke ut sine egne rader og beholde rekkefølgen.
@@ -124,13 +109,13 @@ export function TeamMembersScreen() {
               } catch {
                 Alert.alert('Kunne ikke fjerne', 'Prøv igjen om litt.');
               }
-              load();
+              invalidateTeamMembers(activeTeamSpaceId);
             },
           },
         ],
       );
     },
-    [activeTeamSpaceId, activeTeamSpace, load],
+    [activeTeamSpaceId, activeTeamSpace],
   );
 
   const handleContact = useCallback((member: TeamMember) => {
@@ -147,7 +132,8 @@ export function TeamMembersScreen() {
 
   if (!activeTeamSpaceId) return null;
 
-  if (loading) {
+  // Skeletonene er nå FØRSTE besøk — har cachen data, tegnes lista med én gang.
+  if (isPending) {
     return (
       <View style={styles.screen}>
         <BackBar title="Lagoversikt" />
@@ -178,8 +164,8 @@ export function TeamMembersScreen() {
       contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
       refreshControl={
         <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
+          refreshing={isRefetching}
+          onRefresh={refetch}
           tintColor={colors.heia}
         />
       }>
@@ -192,7 +178,11 @@ export function TeamMembersScreen() {
         </Text>
       </View>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {isError && (
+        <Text style={styles.error}>
+          Kunne ikke laste laget. Dra ned for å prøve igjen.
+        </Text>
+      )}
 
       {sections.map(section => (
         <View key={section.title} style={styles.section}>

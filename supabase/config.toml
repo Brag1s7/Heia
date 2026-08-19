@@ -464,6 +464,20 @@ verify_jwt = true
 enabled = true
 verify_jwt = true
 
+# Varslingsnavet for autoritetsmodellen v2 (00062/00063) — kalles av
+# pg_net med service-nøkkelen som Bearer (claim-notify-mønsteret);
+# eier token-generering for invitasjoner (B3).
+[functions.payments-notify]
+enabled = true
+verify_jwt = false
+
+# «Aktiver støtte» med server-side Brønnøysund-håndhevelse
+# (autoritetsmodellen v2, II.10) — innlogget bruker; RPC-vaktene
+# gjelder i tillegg.
+[functions.submit-club-claim]
+enabled = true
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

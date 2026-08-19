@@ -33,7 +33,6 @@ import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
 import {NewEventScreen} from '../screens/NewEventScreen';
 import {InviteScreen} from '../screens/InviteScreen';
-import {SupportScreen} from '../screens/SupportScreen';
 import {LagkassaScreen} from '../screens/LagkassaScreen';
 import {CommentsScreen} from '../screens/CommentsScreen';
 import {WelcomeIntentScreen} from '../screens/WelcomeIntentScreen';
@@ -47,6 +46,7 @@ import {TeamMembersScreen} from '../screens/TeamMembersScreen';
 import {TeamSettingsScreen} from '../screens/TeamSettingsScreen';
 import {SupportSetupScreen} from '../screens/SupportSetupScreen';
 import {OpsClaimsScreen} from '../screens/OpsClaimsScreen';
+import {OpsEntitiesScreen} from '../screens/OpsEntitiesScreen';
 import {OpsClaimDetailScreen} from '../screens/OpsClaimDetailScreen';
 import {ClubPaymentsScreen} from '../screens/ClubPaymentsScreen';
 import {InboxScreen} from '../screens/InboxScreen';
@@ -151,7 +151,6 @@ function HomeStackNavigator() {
         component={NewEventScreen}
         options={newEventOptions}
       />
-      <HomeStack.Screen name="Support" component={SupportScreen} />
       <HomeStack.Screen name="Lagkassa" component={LagkassaScreen} />
       <HomeStack.Screen name="Invite" component={InviteScreen} />
       <HomeStack.Screen name="Comments" component={CommentsScreen} />
@@ -187,6 +186,12 @@ function InboxStackNavigator() {
       <InboxNav.Screen name="InboxList" component={InboxScreen} />
       <InboxNav.Screen name="EventDetail" component={EventDetailScreen} />
       <InboxNav.Screen name="Comments" component={CommentsScreen} />
+      {/* Klubbdør-varslene åpnes HER, ikke i Profil-fanen: et varsel skal
+          oppføre seg likt uansett hva det peker på — samme innskyving, og
+          «Tilbake» tilbake til varsellista. Skjermene er også registrert i
+          Profil-stacken, der de er de faste flatene sine. */}
+      <InboxNav.Screen name="SupportSetup" component={SupportSetupScreen} />
+      <InboxNav.Screen name="ClubPayments" component={ClubPaymentsScreen} />
       <InboxNav.Screen
         name="NewEvent"
         component={NewEventScreen}
@@ -211,6 +216,7 @@ function ProfilStackNavigator() {
         name="OpsClaimDetail"
         component={OpsClaimDetailScreen}
       />
+      <ProfilNav.Screen name="OpsEntities" component={OpsEntitiesScreen} />
       <ProfilNav.Screen name="ClubPayments" component={ClubPaymentsScreen} />
       <ProfilNav.Screen name="Invite" component={InviteScreen} />
       <ProfilNav.Screen name="JoinTeamCode" component={JoinTeamCodeScreen} />
@@ -313,10 +319,11 @@ function MainTabs() {
       navigation.navigate('KalenderStack', {
         screen: 'NewEvent',
         params: {presetDate: day},
+        initial: false,
       });
       return;
     }
-    navigation.navigate('HjemStack', {screen: 'NewEvent'});
+    navigation.navigate('HjemStack', {screen: 'NewEvent', initial: false});
   };
 
   return (

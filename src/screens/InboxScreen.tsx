@@ -14,7 +14,6 @@ import {
   useFocusEffect,
   useIsFocused,
   useNavigation,
-  type NavigationProp,
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
@@ -32,7 +31,7 @@ import {buildEntries, groupByAge, mergeNotifications} from '../shared/inbox';
 import type {Entry, HeiaNotification} from '../shared/inbox';
 import {getLiveMatch} from '../lib/api/events';
 import type {HeiaEvent} from '../shared/types';
-import type {InboxStackParamList, RootTabParamList} from '../shared/types';
+import type {InboxStackParamList} from '../shared/types';
 
 type Nav = NativeStackNavigationProp<InboxStackParamList, 'InboxList'>;
 
@@ -312,16 +311,13 @@ export function InboxScreen() {
       markLocalRead([item.id]);
 
       // Klubbdør-varsler (00047) peker inn i Profil-stacken — godkjenningen
-      // bor i Klubbbetalinger, lagets status i «Støtte fra supportere».
+      // bor i Klubbetalinger, lagets status i «Støtte fra supportere».
       if (item.targetScreen) {
-        navigation
-          .getParent<NavigationProp<RootTabParamList>>()
-          ?.navigate('ProfilStack', {
-            screen:
-              item.targetScreen === 'club_payments'
-                ? 'ClubPayments'
-                : 'SupportSetup',
-          });
+        navigation.navigate(
+          item.targetScreen === 'club_payments'
+            ? 'ClubPayments'
+            : 'SupportSetup',
+        );
         return;
       }
 

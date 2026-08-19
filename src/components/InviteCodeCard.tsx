@@ -15,7 +15,17 @@ interface InviteCodeCardProps {
  * native tredjeparts-moduler — så den kan ikke krasje på manglende binær.
  */
 export function InviteCodeCard({teamName, inviteCode}: InviteCodeCardProps) {
-  const shareMessage = `Bli med i ${teamName} på Heia! Bruk invitasjonskoden ${inviteCode} når du laster ned appen.`;
+  // Koden står ALENE på sin egen linje. Et delingsark sender ren tekst —
+  // ingen farger, ingen lenker, ingen formatering — så det eneste vi styrer
+  // er hvor lett koden er å treffe. Ligger den midt i en setning, må
+  // mottakeren dra markører rundt åtte tegn; står den alene, tar ett langt
+  // trykk hele linja. (Det som FAKTISK gjør koden blå og trykkbar er en
+  // https-lenke, og den krever heiaapp.no — se nettside-prosjektet.)
+  const shareMessage =
+    `Bli med i ${teamName} på Heia 💚\n\n` +
+    'Invitasjonskoden din:\n' +
+    `${inviteCode}\n\n` +
+    'Last ned Heia og skriv inn koden når du oppretter kontoen.';
 
   const handleShare = useCallback(() => {
     Share.share({message: shareMessage}).catch(() => {
@@ -28,7 +38,15 @@ export function InviteCodeCard({teamName, inviteCode}: InviteCodeCardProps) {
       <Text style={styles.label}>Invitasjonskode</Text>
 
       <View style={styles.codeWrap}>
-        <Text style={styles.code} selectable>
+        {/* Åtte tegn med 6 px sperring er bredere enn en smal skjerm, og
+            brøt til to linjer med ett tegn nederst. Koden skal ALLTID stå
+            som én blokk — heller litt mindre skrift enn en avkuttet kode. */}
+        <Text
+          style={styles.code}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.6}
+          selectable>
           {inviteCode}
         </Text>
       </View>
@@ -70,7 +88,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.heia,
     paddingVertical: spacing.lg,
-    paddingHorizontal: spacing['2xl'],
+    paddingHorizontal: spacing.md,
     alignSelf: 'stretch',
     alignItems: 'center',
   },

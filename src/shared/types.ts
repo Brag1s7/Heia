@@ -212,8 +212,9 @@ export type RootTabParamList = {
   KalenderStack: NavigatorScreenParams<KalenderStackParamList> | undefined;
   Opprett: undefined;
   InboxStack: NavigatorScreenParams<InboxStackParamList> | undefined;
-  // Klubbdør-varsler (00047) navigerer på tvers av faner inn i
-  // Klubbbetalinger/SupportSetup — derfor NavigatorScreenParams her også.
+  // Push og e-postlenker (deepLink.ts) åpner Klubbetalinger/SupportSetup/
+  // ops-flatene i Profil-fanen — derfor NavigatorScreenParams her også.
+  // Varsel-TRYKK i appen går derimot i varselstacken, se InboxStackParamList.
   ProfilStack: NavigatorScreenParams<ProfilStackParamList> | undefined;
 };
 
@@ -263,8 +264,9 @@ export type HomeStackParamList = {
   EventDetail: {eventId: string};
   /** parentEventId settes av «Ny kamp» på en turneringsside. */
   NewEvent: NewEventParams;
-  Support: undefined;
-  /** Lagkassa (betalingsspor fase 5) — lagets støtteside for alle medlemmer. */
+  /** Lagkassa (betalingsspor fase 5) — lagets støtteside for alle medlemmer,
+   *  og eneste side før Stripe. «Støtt laget»-mellomskjermen er fjernet
+   *  2026-08-19: den gjentok pris, fordeling og knappetekst ordrett. */
   Lagkassa: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};
@@ -299,6 +301,10 @@ export type InboxStackParamList = {
   EventDetail: {eventId: string};
   Comments: {postId: string; teamSpaceId: string};
   NewEvent: NewEventParams;
+  // Klubbdør-varslene (00047) åpner disse I varselstacken, slik at «Tilbake»
+  // fører til varsellista — som for kamp- og kommentarvarsler.
+  SupportSetup: undefined;
+  ClubPayments: undefined;
 };
 
 export type ProfilStackParamList = {
@@ -315,7 +321,10 @@ export type ProfilStackParamList = {
    *  raden på Profil vises kun for ops, og RPC-ene er vaktene. */
   OpsClaims: undefined;
   OpsClaimDetail: {claimId: string};
-  /** «Klubbbetalinger» (klubbdøren, 00047) — kun betalingsansvarlige.
+  /** «Klubber og roller» — ops-flaten for autoritetsmodellen v2 (00062):
+   *  enheter, betalingsansvarlige, invitasjoner og avvikskontrollen. */
+  OpsEntities: undefined;
+  /** «Klubbetalinger» (klubbdøren, 00047) — kun betalingsansvarlige.
    *  DB-gatet på club_payment_managers; raden på Profil er speilet. */
   ClubPayments: undefined;
 };

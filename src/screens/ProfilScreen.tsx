@@ -27,6 +27,7 @@ import {colors, typography, spacing, radius, shadows} from '../theme';
 import {Avatar, ListRow, ListRowSkeleton, TeamBadge} from '../components';
 import {
   Bell,
+  Building2,
   Check,
   ChevronRight,
   FileText,
@@ -155,7 +156,7 @@ export function ProfilScreen() {
     };
   }, []);
 
-  // «Klubbbetalinger» (klubbdøren, 00047) — hovedinngangen for
+  // «Klubbetalinger» (klubbdøren, 00047) — hovedinngangen for
   // betalingsansvarlig bor på PROFIL (låst). Samme speil-mønster som ops.
   const [isManager, setIsManager] = useState(false);
   useEffect(() => {
@@ -455,7 +456,10 @@ export function ProfilScreen() {
                   ? () =>
                       navigation
                         .getParent<NavigationProp<RootTabParamList>>()
-                        ?.navigate('HjemStack', {screen: 'Lagkassa'})
+                        ?.navigate('HjemStack', {
+                          screen: 'Lagkassa',
+                          initial: false,
+                        })
                   : undefined
               }
               showBorder={false}
@@ -488,7 +492,7 @@ export function ProfilScreen() {
         </View>
       </View>
 
-      {/* Klubbbetalinger (klubbdøren, 00047) — hovedinngangen for
+      {/* Klubbetalinger (klubbdøren, 00047) — hovedinngangen for
           betalingsansvarlig (låst: bor på Profil). Raden er et speil av
           DB-vakten club_payment_managers. */}
       {isManager && (
@@ -501,7 +505,7 @@ export function ProfilScreen() {
                   <Wallet size={20} color={colors.textSecondary} />
                 </MenuIcon>
               }
-              title="Klubbbetalinger"
+              title="Klubbetalinger"
               subtitle="Godkjenn og administrer lagenes støtte"
               right={<RowChevron />}
               onPress={() => navigation.navigate('ClubPayments')}
@@ -527,6 +531,17 @@ export function ProfilScreen() {
               subtitle="Klubbsøknader til behandling"
               right={<RowChevron />}
               onPress={() => navigation.navigate('OpsClaims')}
+            />
+            <ListRow
+              icon={
+                <MenuIcon>
+                  <Building2 size={20} color={colors.textSecondary} />
+                </MenuIcon>
+              }
+              title="Klubber og roller"
+              subtitle="Betalingsansvarlige, invitasjoner og avvikskontroll"
+              right={<RowChevron />}
+              onPress={() => navigation.navigate('OpsEntities')}
               showBorder={false}
             />
           </View>

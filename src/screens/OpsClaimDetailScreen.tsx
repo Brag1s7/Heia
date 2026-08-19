@@ -16,6 +16,7 @@ import {
   type RouteProp,
 } from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {errorMessage} from '../shared/errorMessage';
 import {BackBar, Button, Skeleton} from '../components';
 import {
   getOpsClaim,
@@ -24,6 +25,7 @@ import {
   opsRequestClaimInfo,
   type OpsClaim,
 } from '../lib/api';
+import {WEB_INVITE_LANDING_LIVE} from '../shared/flags';
 import type {ProfilStackParamList} from '../shared/types';
 
 type Route = RouteProp<ProfilStackParamList, 'OpsClaimDetail'>;
@@ -34,7 +36,46 @@ type Route = RouteProp<ProfilStackParamList, 'OpsClaimDetail'>;
  * audit-loggede RPC-er gatet på ops_admins, og godkjenning KREVER tekst
  * om hvordan autorisasjonen ble verifisert. Stripe tar KYC — dette er
  * Heias autorisasjonskontroll.
+ *
+ * Autoritetsmodellen v2 (00062): det er den NOMINERTE som skal verifiseres,
+ * ikke nødvendigvis søkeren — og godkjenningen TILDELER myndighet (rolle
+ * ved selvnominasjon, invitasjon ved nominasjon av en annen). Begge deler
+ * står nå i flaten: nominasjonen i beslutningsgrunnlaget, og utfallet i
+ * bekreftelsen etter godkjenning.
  */
+
+/** Hva godkjenningen faktisk gjorde med myndigheten (00062 §7). */
+function describeApproval(result: unknown): string {
+  const r = result as {
+    grantedManager?: boolean;
+    invitationId?: string | null;
+    entityReused?: boolean;
+    accountStatus?: string | null;
+  } | null;
+
+  const lines: string[] = [];
+  if (r?.grantedManager) {
+    lines.push(
+      'Søkeren er nå AKTIV betalingsansvarlig for den juridiske enheten, og kan starte registreringen hos Stripe.',
+    );
+  } else if (r?.invitationId) {
+    lines.push(
+      'Det er opprettet en invitasjon til den nominerte. Ingen har myndighet før invitasjonen er akseptert.',
+    );
+    if (!WEB_INVITE_LANDING_LIVE) {
+      lines.push(
+        'E-posten går IKKE ut ennå (web-landingen mangler) — invitasjonen står som «ikke sendt» under Klubber og roller.',
+      );
+    }
+  } else {
+    lines.push('Ingen fikk betalingsmyndighet av denne godkjenningen.');
+  }
+  if (r?.entityReused) {
+    lines.push('Den juridiske enheten fantes fra før og ble gjenbrukt.');
+  }
+  lines.push('Klubben arvet Heias standardvilkår (79/60).');
+  return lines.join('\n\n');
+}
 
 function FactRow({label, value}: {label: string; value: string}) {
   return (
@@ -74,7 +115,7 @@ export function OpsClaimDetailScreen() {
   const runAction = useCallback(
     async (
       label: string,
-      action: (id: string, text: string) => Promise<void>,
+      action: (id: string, text: string) => Promise<unknown>,
     ) => {
       const text = note.trim();
       if (!text) {
@@ -94,13 +135,19 @@ export function OpsClaimDetailScreen() {
           onPress: async () => {
             setActing(true);
             try {
-              await action(claimId, text);
+              const result = await action(claimId, text);
               setNote('');
               await load();
+              // TILDELINGSUTFALLET (00062 §7): ops skal se hva
+              // godkjenningen faktisk gjorde med myndigheten — rollen er
+              // aldri en bieffekt man må gjette seg til.
+              if (label === 'Godkjenn') {
+                Alert.alert('Godkjent', describeApproval(result));
+              }
             } catch (e) {
               Alert.alert(
                 'Handlingen feilet',
-                e instanceof Error ? e.message : 'Prøv igjen om litt.',
+                errorMessage(e),
               );
             } finally {
               setActing(false);
@@ -115,6 +162,10 @@ export function OpsClaimDetailScreen() {
   const isOpen =
     claim?.status === 'submitted' || claim?.status === 'in_review';
   const brreg = claim?.brreg;
+  // Nominasjonen ligger i brreg-snapshotet (claim-notify skriver den ved
+  // innsending). Eldre søknader mangler feltet — da ER det selvnominasjon,
+  // for modellen fantes ikke da.
+  const nomineeIsSelf = brreg?.checks?.nomineeIsSelf !== false;
 
   return (
     <KeyboardAvoidingView
@@ -158,12 +209,34 @@ export function OpsClaimDetailScreen() {
               {claim.contactPhone && (
                 <FactRow label="Telefon" value={claim.contactPhone} />
               )}
-              {claim.clubAlreadyLinked && (
+              <FactRow
+                label="Betalingsansvarlig"
+                value={
+                  nomineeIsSelf
+                    ? `Søkeren selv (${claim.claimant?.displayName ?? 'ukjent'})`
+                    : 'En annen i klubben — se e-posten'
+                }
+              />
+              {!nomineeIsSelf && (
+                <Text style={styles.hint}>
+                  Søkeren har nominert en ANNEN person. Navn og e-post står i
+                  klubbsøknad-e-posten fra Heia (claim-notify) — det er den
+                  personen som skal verifiseres, og godkjenning oppretter en
+                  invitasjon til hen, ikke en rolle til søkeren.
+                </Text>
+              )}
+              {/* BESLUTNINGSSTØTTE, ikke statusvisning — begge sier noe om hva
+                  en godkjenning VIL gjøre («gjenbruker den»), og hører derfor
+                  bare hjemme mens søknaden er åpen. Etter godkjenning
+                  beskriver de koblingen godkjenningen nettopp lagde, og et
+                  rødt varsel på en ferdigbehandlet søknad leses som at noe
+                  gikk galt (A3-dogfood 2026-08-19). Utfallet står i loggen. */}
+              {isOpen && claim.clubAlreadyLinked && (
                 <Text style={styles.warn}>
                   ⚠️ Klubben har allerede en aktiv kobling
                 </Text>
               )}
-              {claim.existingEntity && (
+              {isOpen && claim.existingEntity && (
                 <Text style={styles.hint}>
                   Enheten finnes fra før ({claim.existingEntity.legalName}) —
                   godkjenning gjenbruker den.
@@ -203,6 +276,18 @@ export function OpsClaimDetailScreen() {
                       {brreg.enhet.underAvvikling ? 'UNDER AVVIKLING' : ''}
                     </Text>
                   )}
+                  {brreg.checks && !brreg.checks.nomineeIsSelf && (
+                    <Text
+                      style={
+                        brreg.checks.nominertIRegisteret
+                          ? styles.good
+                          : styles.hint
+                      }>
+                      {brreg.checks.nominertIRegisteret
+                        ? '◆ Den NOMINERTE står i registerets roller — sterkt bevis på fullmakt'
+                        : '◆ Den nominerte står ikke i registerets roller (beviser ingenting — kasserer kan ha reell fullmakt; verifiser via klubbens registrerte kanal)'}
+                    </Text>
+                  )}
                   {brreg.checks && (
                     <Text
                       style={
@@ -211,8 +296,8 @@ export function OpsClaimDetailScreen() {
                           : styles.hint
                       }>
                       {brreg.checks.sokerIRegisteret
-                        ? '✓ Søkeren står i registerets roller — sterkt bevis på fullmakt'
-                        : '· Søkeren står ikke i registerets roller (beviser ingenting — verifiser via klubbens registrerte kanal)'}
+                        ? '★ Søkeren står i registerets roller — sterkt bevis på fullmakt'
+                        : '★ Søkeren står ikke i registerets roller (beviser ingenting — verifiser via klubbens registrerte kanal)'}
                     </Text>
                   )}
                   {brreg.roller.length > 0 && (
@@ -220,10 +305,22 @@ export function OpsClaimDetailScreen() {
                       {brreg.roller.map((r, i) => (
                         <Text
                           key={i}
-                          style={r.matchSoker ? styles.good : styles.rolle}>
-                          {r.matchSoker ? '★' : '·'} {r.rolle}: {r.navn}
+                          style={
+                            r.matchSoker || r.matchNominert
+                              ? styles.good
+                              : styles.rolle
+                          }>
+                          {r.matchSoker && r.matchNominert
+                            ? '★◆'
+                            : r.matchSoker
+                              ? '★'
+                              : r.matchNominert
+                                ? '◆'
+                                : '·'}{' '}
+                          {r.rolle}: {r.navn}
                         </Text>
                       ))}
+                      <Text style={styles.hint}>★ = søker · ◆ = nominert</Text>
                     </View>
                   )}
                   {(brreg.enhet.epostadresse || brreg.enhet.telefon) && (

@@ -85,7 +85,7 @@ export function TeamSettingsScreen() {
   const [savingTeamLogo, setSavingTeamLogo] = useState(false);
   const [savingClubLogo, setSavingClubLogo] = useState(false);
 
-  // Snarveien til Klubbbetalinger (00047) — kun for betalingsansvarlige.
+  // Snarveien til Klubbetalinger (00047) — kun for betalingsansvarlige.
   const [isManager, setIsManager] = useState(false);
   useEffect(() => {
     let mounted = true;
@@ -345,13 +345,13 @@ export function TeamSettingsScreen() {
           </Pressable>
         )}
 
-        {/* Kontekstuell snarvei til «Klubbbetalinger» (klubbdøren, 00047)
+        {/* Kontekstuell snarvei til «Klubbetalinger» (klubbdøren, 00047)
             — SAMME flate som på Profil, kun for betalingsansvarlige. */}
         {club && isManager && (
           <Pressable
             style={styles.card}
             onPress={() => navigation.navigate('ClubPayments')}>
-            <Text style={styles.label}>Klubbbetalinger</Text>
+            <Text style={styles.label}>Klubbetalinger</Text>
             <View style={styles.supportRow}>
               <Wallet size={22} color={colors.heiaDeep} strokeWidth={2} />
               <Text style={styles.hintFlex}>

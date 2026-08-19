@@ -15,6 +15,7 @@ krever eksplisitt omkamp med Brage — aldri stille drift._
 | 4 | Checkout-flyten i appen | ✅ FERDIG + **GODKJENT 2026-08-02** — E2E med **Apple Pay** (privat kort i sandbox), pengeveien DB-verifisert (7900/1975/5925), webhooks 4/4. Se «Fase 4» nederst |
 | 5 | Selvbetjening (Customer Portal) + lagaggregater | ✅ FERDIG + **GODKJENT 2026-08-02** — telefontest bestått («Alt funker fra fase 5»), DB-verifisert 8/8; to review-justeringer samme dag: «Min støtte» ALLTID synlig på Profil + trykkbar tom-rad → Lagkassa. Universal Links-bunken (heiaapp.no) forberedt: `docs/HEIAAPP-NO.md`. Se «Fase 5» nederst |
 | 6 | Produksjon: juridisk enhet, live-nøkler, MVA, policyer, pilotklubb | ⏳ |
+| A | **Autoritetsmodell v2**: nominasjon, enhetsscope, invitasjoner, web-aksept | 🔒 **GODKJENT AV BRAGE 2026-08-18** (B1–B6 avgjort; B4 web-stack åpen til fase B) — fase A1 (backend) under bygging. Full frys + faseplan: `docs/AUTORITET-KLUBBBETALINGER-2026-08.md`; kanonisk beslutningstekst i §«Autoritetsmodellen v2» under |
 
 **Gate-regel: hver fase stopper for Brages review før neste starter.**
 
@@ -149,11 +150,113 @@ Wallet · intern ledger · payout-tabell · automatisk
 Brønnøysund · årsplan · navngitte supporterlister · Vipps (via Stripe i dag =
 kun engangs, private preview — verifisert) · automatisert klubbmerge · egen
 selvbetjeningsflate · web-checkout for ikke-medlemmer · prisendringsflyt for
-løpende abonnementer · staging-miljø (vurderes før prod) · invitasjonsflyt
-for flere betalingsansvarlige (ops seeder inntil videre — rollen selv er
-BYGGET, se «KLUBBDØREN»).
+løpende abonnementer · staging-miljø (vurderes før prod).
+~~Invitasjonsflyt for flere betalingsansvarlige~~ — TATT UT AV LISTEN
+2026-08-18: bygges nå som del av Autoritetsmodellen v2 (se egen seksjon
+under); «ops seeder»-regimet utgår som normalflyt.
+
+## Autoritetsmodellen v2 (LÅST — GODKJENT AV BRAGE 2026-08-18)
+
+_Resultatet av kartleggingen + beslutningsrunden 2026-08-18. Dette er en
+eksplisitt OMKAMP av deler av KLUBBDØREN-beslutningen fra 2026-08-03
+(gate-regelen fulgt — aldri stille drift). Full tekst, B1–B6-avgjørelsene,
+faseplan, verifikasjon og rollback:
+`docs/AUTORITET-KLUBBBETALINGER-2026-08.md`. **Produksjonsklar v1 for
+full lansering** («MVP»/«pilot» er ikke avgrensninger); rå SQL er aldri
+normal flyt for renominasjon, managerreparasjon, duplikathåndtering
+eller lagflytting — auditerte RPC-er + ops-flater kreves før
+lanseringsporten._
+
+**Problemet som løses:** den som starter aktiveringen av en klubb er ikke
+nødvendigvis personen som skal ha myndighet over klubbens betalinger.
+Dagens kode blander fire identiteter (claimant, fullmaktshaver,
+KYC-utfører, betalingsansvarlig) til én.
+
+**Modellen (låst ved GO):**
+1. «Claim» er kun teknisk. Brukeren møter «Aktiver støtte for [klubb]»,
+   «Hvem skal være betalingsansvarlig?» («Jeg» / «En annen i klubben»),
+   invitasjonen «Bli betalingsansvarlig».
+2. Flyt: aktivering startes av lagadmin → betalingsansvarlig NOMINERES →
+   Heia Ops verifiserer organisasjonen OG den nominerte → selvnominasjon
+   gir rollen eksplisitt ved godkjenning; annen person får SIKKER
+   INVITASJON opprettet ETTER godkjenning (behandlingen venter aldri på
+   tredjepart) → aksept skjer PÅ NETTSIDEN (ingen midlertidig appaksept;
+   «En annen»-valget i appen er featureflagget til web-landingen er live)
+   → kun AKTIV betalingsansvarlig kan starte/fortsette Stripe-onboarding
+   → aktiv konto åpner port 3 som før. **Ingen får betalingsmyndighet
+   automatisk** — hver tildeling er en eksplisitt, logget beslutning.
+3. **Scope:** rollen flyttes fra `clubs.id` til `legal_club_entities`
+   (orgnr). Én myndighetskrets per organisasjon. Duplikatrad kan aldri
+   skape ny krets, arve aktiv konto eller bli betalingsaktiv uten
+   uttrykkelig behandling. Avdelingsdelegering = senere utvidelse.
+4. **Tilstander (eierskap, ingen duplisering):** claims
+   `submitted→in_review→approved|rejected` (info-behov = `in_review` +
+   note; `needs_information` innføres ikke; død `expired` fjernes) ·
+   invitasjoner `pending→accepted|awaiting_review|declined|revoked|
+   expired` · manager `active↔suspended` + append-only hendelseslogg ·
+   Stripe-konto uendret webhook-eid. Brukertilstanden avledes i
+   `get_support_activation_status`; ny avledet verdi `awaiting_manager`.
+   **Kanonisk «aktiv klubb»** = dagens kontopredikat (status `active` +
+   `charges_enabled`), trukket ut i ÉN intern hjelper som
+   `get_payment_account_for_team_space`, `approve_team_support` og
+   (speilet) checkout-gaten deler. Kjeden: godkjent av Heia →
+   akseptert rolle → Stripe aktiv → laget godkjent → innsamling.
+   `approve_team_support` krever kanonisk aktiv konto; avslag alltid lov.
+5. **Invitasjoner:** 256-bit engangstoken, kun hash lagres, token i
+   URL-fragment; 14 dagers levetid, påminnelse dag 7 (pg_cron), utløp
+   håndheves lat ved innløsning; atomisk engangsbruk; revoke/reissue;
+   alle hendelser og forsøk logges; krever innlogget, e-postverifisert
+   konto. **Avvikskontroll:** eksakt e-postmatch → aktiv rolle; ALT annet
+   → `awaiting_review` der rollen først aktiveres ved eksplisitt
+   ops-bekreftelse (varsel i etterkant er ikke godt nok).
+6. **Rolleadministrasjon = produksjonsflyter, aldri SQL-runbook:** aktiv
+   ansvarlig kan invitere ny (auditert append-only; varsler øvrige
+   aktive ansvarlige; INGEN rutinemessig ops-e-post — ops ser hendelsen
+   i flaten og varsles kun ved unntak: avvik/managerløs/sikkerhet/
+   suspendert utsteder — B5); ops-flater for utsted/revoke/reissue,
+   review-beslutning, suspender/reaktiver/fjern (vern mot å fjerne
+   siste aktive; ops-suspensjon av siste er lov; GDPR-sletting kan
+   aldri nektes → umiddelbart ops-varsel), og auditert lagflytting
+   (`ops_move_team_to_club`). **Defaults (B2, ren kopi-semantikk):**
+   global `heia_support_defaults`-rad (79/60) → kopieres ÉN gang til
+   enhetens konfig ved godkjenning (`club_support_defaults` RE-SCOPES
+   til legal_club_entity_id) → fryses i versjonerte offerings; global
+   endring når kun NYE aktiveringer, aldri retroaktivt. Runbook-SQL-en
+   under i KLUBBDØREN-bolken er historisk.
+7. **Claims/duplikater:** maks én åpen prosess per normalisert orgnr,
+   håndhevet ved submit (brukerrettet stopp) + forsvar i dybden i approve
+   (hard stopp; stille gjenbruk av aktiv link/kontostatus fjernes).
+8. **Stripe:** Account Link fersk ved klikk, aldri lagret, aldri
+   distribuert via e-post/melding; Share-arket FJERNES; kun aktiv
+   betalingsansvarlig (eller ops) genererer; Heia lagrer fortsatt ingen
+   KYC-/bankdata.
+9. **Varsling ved lansering:** e-post til ansvarlige ved lagforespørsel;
+   invitasjons-/påminnelses-/utløps-/avslags-/akseptvarsler; ops-varsel
+   ved identitetsavvik, managerløs enhet og forespørsel uten mottakere
+   (ingen forespørsel forsvinner til null mottakere).
+10. **App/web:** web skal før full lansering ha invitasjonslanding,
+    innlogging, aksept/avslag, Stripe-onboarding, Klubbbetalinger,
+    rolleadmin, Heia Ops, https-lenker og server-side brreg-validering;
+    appen har aktivering/nominasjon/status/Klubbbetalinger/port 3. Samme
+    RPC-er overalt. Ingen invitasjons-e-post før web-landingen finnes.
+
+**Eksplisitt erstattet fra 2026-08-03-beslutningen:** auto-rolle til
+claimant (00048) · rolle-scope på `clubs.id` · Share-arket · KYC-lenke
+gated på lagadminskap · «invitasjonsflyt bygges ikke / ops seeder» ·
+runbook-SQL som normalflyt · stille enhet-/kontogjenbruk ved duplikat.
+Tre-porter-modellen, port 3-mekanikken, pause/deaktiver-språket,
+supporter-rollen og prisinvarianten STÅR uendret.
+
+**B1–B6 er AVGJORT 2026-08-18** (B4 web-stack holdes åpen til fase B) —
+avgjørelsene og senere-listen: Del III–IV i
+`docs/AUTORITET-KLUBBBETALINGER-2026-08.md`.
 
 ## Åpne beslutninger
+
+> ⚠️ **2026-08-18: Deler av KLUBBDØREN-blokken under er ERSTATTET av
+> «Autoritetsmodellen v2» over** (eksplisitt omkamp, se erstatningslisten
+> der). Blokken står som beslutningshistorikk; bygget-status-avsnittene
+> beskriver koden slik den er I DAG, før v2-fasene er bygget.
 
 **Avgjort 2026-08-03 (Brage) — KLUBBDØREN (klubbgodkjenning av lag) +
 SUPPORTER-ROLLEN. Tre-porter-modellen:**

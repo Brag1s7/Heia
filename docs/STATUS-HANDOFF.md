@@ -248,15 +248,370 @@ og han vil ikke skipe TestFlight før B er med — A+B går som ÉN slipp):
   feilmelding, prod er fortsatt rolig. Valgfritt, ikke gjort: eksplisitt
   flymodus-test av disk-cachen og thumbnail_path-sjekk i DB.
 
-**GJENSTÅR AV EGRESS-PLANEN (Fase A+B er kode-KOMPLETT og verifisert):**
-1. PR + merge til main når GitHub virker (Brage merger selv, PR opprettes
-   eksplisitt på forespørsel; branchen er MANGE commits foran origin —
-   husk push først).
-2. TestFlight (A+B som ÉN slipp). EKSTERNT valgfritt før den:
-   Sentry-prosjekt + DSN i .env (nativedelen er i bygget).
-3. Exit-avlesning: −80 % egress i Usage→Bandwidth over ~2 uker (P13).
-4. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
+**SLIPPEN ER UTE (2026-08-18 kveld):** PR merget til main (Brage),
+Sentry satt opp (EU-region; DSN i gitignorert .env, VERIFISERT bakt inn
+i binæren), TestFlight-bygg **1.0 (4)** lastet opp og i Testing hos
+interne + Friends and family (main.jsbundle verifisert i arkivet FØR
+upload — regelen fra bygg 1.0 (2) holdt). Sentry-lesetilgang for Claude
+er BEVISST utsatt til første ekte feil (DSN er skrivevei; lesing krever
+User Auth Token som Brage lager da).
+
+**GJENSTÅR AV EGRESS-PLANEN (kun avlesning — intet arbeid):**
+1. Exit-avlesning: −80 % egress i Usage→Bandwidth over ~2 uker fra nå
+   (P13-lista er feilsøkingskartet hvis grafen skuffer).
+2. Pre-launch-beslutningen om gamle kameraoriginaler (manifestet ligger).
 Fase C er terskelstyrt — bygg ingenting.
+
+**NESTE BYGGESPOR (revidert 2026-08-18 — ERSTATTER den gamle
+«klubbdør-skiva»-definisjonen):**
+1. **AUTORITETSSKIVA for klubbbetalinger** — produksjonsklar v1 av
+   hvem-får-myndighet-modellen: nominasjon i «Aktiver støtte»-skjemaet,
+   eksplisitt rolletildeling ved ops-godkjenning, sikre invitasjoner m/
+   avvikskontroll (aksept på WEB), enhets-scope for betalingsansvarlig,
+   KYC-gate (Share-arket fjernes), varslingsmatrise, ops-flater i stedet
+   for SQL-runbooks. ALT i Stripe testmodus.
+   **Status: GODKJENT AV BRAGE 2026-08-18 (B1–B6 avgjort; B4 web-stack
+   åpen til fase B) — ✅ FASE A1 (backend) BYGGET OG DEPLOYET TIL PROD
+   2026-08-18 (kveld):** migrasjon `00062_autoritetsmodell` +
+   `00063_autoritet_varsling` + `00064_redeem_outcomes` pushet (backfill ren: 0 foreldreløse,
+   alle 5 manager-rader enhets-scopet — Ridabu/Stange/Nes);
+   Edge Functions deployet: NY `payments-notify` (varslingsnav +
+   token-eierskap B3), NY `submit-club-claim` (server-side brreg),
+   `stripe-onboarding` (gate = aktiv betalingsansvarlig, Share-flyt
+   død server-side), `claim-notify` (nominee-bevis). Røyktestet:
+   anon → 42501 på alle nye RPC-er, payments-notify/submit uten
+   auth → 401, `heia_support_defaults` = 7900/2405/6000.
+   **✅ A1 ER FERDIG OG VERIFISERT 2026-08-18: verify-00062.sql kjørt
+   av Brage i SQL-editoren — 38/38 GRØNT** (selvforsynt, rullet
+   tilbake). Første kjøring ga 36/37 og avdekket et EKTE FUNN, ikke en
+   testfeil: PL/pgSQL ruller tilbake alt arbeid i en funksjon som
+   avslutter med RAISE EXCEPTION, så forsøkslogging
+   (`invite_attempt_invalid`), utløps-statusflippen og
+   sikkerhetsvarselet ved suspendert utsteder forsvant sammen med
+   feilmeldingen — tre låste krav var ikke oppfylt i praksis (ingen
+   rolle ble gitt, så sikkerheten var intakt; det var SPORET som
+   manglet). Fikset i **00064**, som gir den BINDENDE KONTRAKTEN for
+   A2 og web: `redeem_manager_invitation` →
+   `accepted|awaiting_review|invalid|expired|suspended`,
+   `decline_manager_invitation` → `declined|invalid`,
+   `issue_manager_invitation` → `issued (+invitation_id)|suspended`.
+   Exceptions kun der ingen sideeffekt skal bevares. Verify dekker nå
+   38 tester (17/21/24 beviser at loggingen OVERLEVER, 38 = decline).
+
+   **✅ FASE A2 ER FERDIG 2026-08-18 (ren JS — ingen migrasjoner, ingen
+   native). Suiten grønn (164), lint identisk med baseline (13 kjente),
+   og TELEFONTESTET OK av Brage samme kveld: «Alt funker på
+   telefonen.»** Alt under er implementert; to kjente avvik er
+   DOKUMENTERT nederst i bolken (ingen av dem blokkerer A3).
+   Innholdet, fra faseplanens Del V:
+   * `SupportSetupScreen`: nominasjonsvalget «Jeg» / «En annen i
+     klubben» (sistnevnte BAK FEATUREFLAGG til web-landingen er live —
+     ingen død brukerreise); nye `awaiting_manager`-kort
+     (invitert/avslått/utløpt → kontaktvei hello@heiaapp.no);
+     KYC-kortet viser CTA kun ved `can_onboard` (aktiv
+     betalingsansvarlig), ellers «venter på at [navn] fullfører hos
+     Stripe»; **Share-arket FJERNES** (gaten er alt død server-side);
+     `submitClubClaim` går over til Edge-funksjonen `submit-club-claim`
+     (dev-bygg beholder direkte-RPC som «Send likevel (testdata)»).
+   * `ClubPaymentsScreen`: enhets-gruppering (payload har nå `entity`,
+     `clubs[]`, `managers[]`, `invitations[]`); rolleadmin-seksjon med
+     «Inviter ny betalingsansvarlig»; **«Fullfør deaktiveringen»** når
+     `unresolved_cancellations > 0` (delfeil-fiksen fra gamle K2);
+     designavstemming (ikoner i stedet for emoji-loggen, tokens i
+     stedet for hardkodet gult #FFF4D6).
+   * Ops: `OpsClaimDetailScreen` viser nominee + tildelingsutfall; NY
+     `OpsEntitiesScreen` («Klubber og roller» i Profil-stacken) på
+     `ops_list_payment_entities` — enheter, managere, invitasjoner,
+     REVIEW-KØEN (bekreft/avvis avvik), suspender/reaktiver/fjern,
+     utsted/trekk invitasjon, flytt lag (`ops_move_team_to_club`).
+   * API-laget (`payments.ts`, `clubPayments.ts`, `ops.ts`): nye typer
+     + outcome-håndtering etter 00064-kontrakten.
+   * Exit A2: suite grønn + lint ren, alle nye flater navigerbare i
+     dev-bygg, «En annen»-flagget AV, ingen døde CTA-er.
+
+   **SLIK BLE A2 BYGGET (filer + avgjørelser):**
+   * NY `src/shared/flags.ts` → `WEB_INVITE_LANDING_LIVE = false`.
+     UTVIDET SCOPE mot faseplanen, bevisst: flagget skjuler BEGGE
+     inngangene som ender i en invitasjon — «En annen i klubben» i
+     SupportSetup OG «Inviter ny betalingsansvarlig» i
+     ClubPayments-rolleadmin. Grunn: aksept skjer kun på web, e-posten
+     er gated på `WEB_INVITE_BASE_URL`, og rå-tokenet finnes ALDRI i
+     basen (B3) — en manager-utstedt invitasjon i dag kan derfor ikke
+     innløses av noen, heller ikke med ops-hjelp. Det er en død CTA, og
+     exit-kriteriet forbyr dem. Ops-flatens «Utsted invitasjon» er
+     BEVISST ikke flagget (behandlet beslutning m/ begrunnelse, og
+     flaten viser selv «IKKE SENDT»). ÉN flipp i fase B-1 slår på alt.
+   * `payments.ts`: `awaiting_manager` + `canOnboard` + `managerPending`
+     i statustypen; `submitClubClaim` går nå via Edge-funksjonen
+     (`submitClubClaimDirect` er dev-veien for «Send likevel
+     (testdata)»); `edgeMessage` trukket ut og delt med clubPayments.
+   * `clubPayments.ts`: enhets-payloaden (`entity.id`, `clubs[]`,
+     `managers[]`, `invitations[]`, `unresolvedCancellations`) +
+     `issueManagerInvitation` med 00064-utfallet som DATA
+     (`issued|suspended` — aldri exception, ellers ryker
+     sikkerhetsvarselet).
+   * `ops.ts`: `opsListPaymentEntities` + hele ops-settet (utsted/trekk,
+     bekreft/avvis review, suspender/reaktiver/fjern, flytt lag),
+     `opsApproveClaim` returnerer nå tildelingsutfallet, og brreg-
+     snapshotet mapper nominee-feltene (`nomineeIsSelf`,
+     `nominertIRegisteret`, `matchNominert`). `opsListTeamsForClubs`
+     leser `teams` direkte (RLS: alle innloggede, 00005) — grunnlaget
+     for «Flytt lag» uten ny RPC.
+   * `SupportSetupScreen`: nominasjonsvalget (to ChoiceCards, bak
+     flagg), `awaiting_manager`-kortene med kontaktvei per
+     invitasjonsutfall, KYC-CTA kun ved `canOnboard`, Share-arket +
+     `Share`-importen BORTE, klubbdør-kortet trukket ut i
+     `renderDoorCard(managerless)` (gjenbrukt i `active` og
+     `awaiting_manager`; managerløs variant sier at Heia er varslet —
+     II.9-fallbacken).
+   * `ClubPaymentsScreen`: enhets-gruppering (juridisk navn som
+     overskrift, klubbrader listet når det er flere),
+     BETALINGSANSVARLIGE-seksjon (managere + åpne invitasjoner),
+     «Fullfør deaktiveringen» i eget solskinnskort per lag med
+     `unresolvedCancellations > 0`, emoji-loggen → Lucide-ikoner,
+     `#FFF4D6`/`#8A6D1A` → `colors.sun`/`sunBorder`/`goldInk`.
+   * NY `OpsEntitiesScreen` + rute `OpsEntities` i Profil-stacken (rad
+     «Klubber og roller» under Heia internt). AVVIKSKØEN ligger øverst
+     på tvers av enheter. Begrunnelse er påkrevd i alle skrivende
+     RPC-er, så skjermen har ÉN felles `Modal`-prompt i stedet for
+     `Alert.prompt` (den finnes kun på iOS).
+   * `OpsClaimDetailScreen`: nominasjonsraden + ★/◆-markering i
+     registerrollene, og en bekreftelse etter godkjenning som sier hva
+     som skjedde med myndigheten (rolle vs. invitasjon vs. ingen).
+
+   **TO KJENTE AVVIK (begge krever backend — derfor IKKE gjort i A2).
+   INGEN av dem blokkerer A3, som kun kjører SELV-nominasjon; de biter
+   først i fase B-4 (nominasjon av en annen person). Begge løses av ÉN
+   liten, rent additiv migrasjon (foreslått `00065_ops_payload_nominee`)
+   — ta den som oppvarming til fase B:**
+   1. `ops_claim_payload` (00046) bærer ikke `nominee_is_self`/
+      `nominee_name`/`nominee_email`/`nominee_phone`. Ops-detaljskjermen
+      kan derfor si AT en annen er nominert (lest fra
+      `brreg_snapshot.checks.nominee_is_self`, som claim-notify skriver)
+      og markere registertreff med ◆, men ikke vise navn/e-post — de
+      står kun i claim-notify-e-posten. Fiks = `CREATE OR REPLACE
+      ops_claim_payload` med de fire feltene; appen mapper dem allerede
+      strukturelt likt resten.
+   2. `get_support_activation_status` bærer manager-navnet KUN i
+      `awaiting_manager` (`manager_pending`). Når `canOnboard` er false
+      fordi en ANNEN er aktiv betalingsansvarlig, kan kortet derfor
+      ikke si «venter på at [navn] fullfører hos Stripe» — teksten sier
+      «klubbens betalingsansvarlige» i stedet (presist, uten å påstå et
+      navn vi ikke har). Fiks = legg `manager: {name}` på payloaden.
+   **✅ FASE A3 ER FERDIG 2026-08-19 — ALLE SEKS SCENARIENE (a–f) GRØNNE
+   PÅ TELEFON mot Stripe sandbox.** Exit-kriteriet er innfridd.
+
+   *Testrigg:* Ridabu G15 (nytt lag — farens J2019 ble bevisst unngått) ·
+   engangskonto `brage.lothe.weium+dogfood@gmail.com` («brage Bowling»,
+   SLETTET i (d)) · ny testklubb BRISKEBYEN BOWLINGKLUBB (orgnr
+   **983550134**, ekte FLI i Hamar, valgt fordi en bowlingklubb aldri
+   forveksles med en ekte Heia-kunde) med Lag 1–4 · «Testklubb duplikat»
+   fra (f). ALT dette er testdata som ryddes sammen med Stange/Nes etter
+   fase B.
+
+   *Bevist:* (a) lagforespørsel → varsel i app + E-POST til ALLE aktive
+   ansvarlige (første gang II.9-e-posten er sett med to managere) →
+   godkjenning → arv 79/60 og offering v1 UTEN SQL → sandbox-checkout m/
+   Apple Pay → pause → re-godkjenning som IKKE rørte eksisterende
+   abonnement (fornyelsesdato uendret — invarianten holder) → deaktivering.
+   (b) claim via Edge-funksjonen m/ server-side brreg → claim-notify traff
+   den ALDRI TESTEDE grenen «søkeren står IKKE i registerets roller —
+   beviser ingenting», med klubbens registrerte kanal som neste steg →
+   ops-godkjenning ga myndighet EKSPLISITT + defaults automatisk →
+   KYC-GATEN verifisert BEGGE VEIER (ops-admin uten managerrolle fikk
+   IKKE Stripe-knappen; managerkontoen fikk den) → sandbox-KYC → konto
+   aktiv → Lag 3 godkjent. (c) suspender siste aktive (LOV, ga
+   ops-e-post «siste aktive ansvarlige suspendert») → myndigheten
+   faktisk borte i managerens egen flate → reaktiver → fjern SISTE
+   aktive AVVIST → utsted invitasjon merket «IKKE SENDT (venter på
+   web-landingen)» → trekk tilbake. (d) GDPR-sletting av siste manager
+   kan aldri nektes → ops-e-post «betalingsansvarlig slettet kontoen
+   sin» + gult managerløs-kort. (e) lagforespørsel (Lag 4) mot managerløs
+   enhet → trenerkortet sa «Heia er varslet» + ops-fallback-e-post
+   «Forespørselen ligger og venter». (f) duplikatsperren ga HELE, lesbare
+   stoppteksten i appen.
+
+   **RETTELSE AV FASEPLANEN:** (a)-punktet «verifiser sperren mot en
+   klubb uten aktiv konto» er IKKE NÅBAR fra appen — klubbdør-kortet
+   («Be om godkjenning») vises først når klubbens Stripe-konto er aktiv
+   (SupportSetupScreen, `case 'active'`). Vakten i `approve_team_support`
+   er dermed forsvar i dybden, dekket av verify-00062. Ikke et åpent punkt.
+
+   *FIKSET UNDERVEIS — alt rent JS unntatt 00065:*
+   1. **Varsel-trykk låste Profil-fanen** (meldt av Brage): nested navigate
+      uten `initial: false` gjorde målskjermen til ENESTE rad i fanen →
+      ingen vei tilbake, fanetrykk = no-op, kun appdrap hjalp. LØST ved at
+      klubbdør-varsler nå åpnes I VARSELSTACKEN som kamp-/kommentarvarsler
+      (`InboxStackParamList` fikk SupportSetup + ClubPayments), så «Tilbake»
+      går til varsellista. Push-/e-postveien bruker `profilEntry`
+      (`src/navigation/profilEntry.ts`), som setter hele fanens state i ÉN
+      operasjon. To forkastede forsøk først: `initial: false` alene ga et
+      synlig hopp, og global kryssfade på fanene ble avvist av Brage.
+      **Push-veien er UVERIFISERT — dev-bygg har ikke push. Test i TestFlight.**
+      (E-post-deep-linken til ops ER verifisert på telefon.)
+   2. **`errorMessage`-fella — den viktigste av dem.** `supabase.rpc()`
+      kaster en PostgrestError, som IKKE er en `Error`-instans, og fem
+      steder i betalings-/ops-flatene testet `e instanceof Error` før de
+      leste meldingen. HVER håndskreven vaktmelding fra databasen ble
+      derfor byttet ut med «Prøv igjen om litt» — et råd som umulig kan
+      virke, siden vernene er permanente. Rammet bl.a. siste-aktive-vernet,
+      «Klubbens Stripe-konto er ikke aktiv ennå» og duplikat-forsvaret ved
+      ops-godkjenning. Ett felles `src/shared/errorMessage.ts` nå.
+      (SupportSetup slapp unna fordi den brukte `e?.message` — derfor så
+      appen riktig ut noen steder og feil andre.)
+   3. **«Støtt laget»-mellomskjermen SLETTET.** Den lå mellom Lagkassa og
+      Stripe og gjentok pris, fordeling, mottaker og knappetekst ordrett —
+      to like sider, to like knappetrykk. Lagkassa går nå rett på checkout;
+      fornyelsesdato, tillitslinje, lagadmin-snarveien, AppState-refetch og
+      «Fullfør betalingen» flyttet dit. Den stygge logoen og «Støtt [lag]»-
+      overskriften som ble stående ETTER betaling forsvant med skjermen.
+   4. **Lagkassa sa «Fornyes 19. sept» om en OPPSAGT avtale** — oppslaget
+      hentet aldri `cancel_at`. «Min støtte» på Profil var alltid riktig, så
+      appen sa to ting om samme abonnement og PENGESIDEN sa feil. Nå
+      «Avsluttes». NB: en oppsagt avtale har status `active` ut perioden —
+      statusen alene forteller ikke sannheten.
+   5. **Delfeil-varselet ropte ulv.** «Deaktiveringen ble ikke fullført, 1
+      støtteavtale trekkes videre» sto der etter en HELT VELLYKKET
+      deaktivering, fordi `cancel_at` skrives av webhooken sekunder senere;
+      boksen ble stående til pull-to-refresh. **MIGRASJON 00065
+      `deaktivering_karenstid` — PUSHET TIL PROD 2026-08-19**: telles først
+      når deaktiveringen er eldre enn 5 min.
+   6. **Lagkassa sa «ikke satt opp ennå» om et PAUSET lag** — payloaden
+      skiller ikke pauset fra aldri-priset (`no_offering` dekker begge). Ny
+      tekst «tar ikke imot nye støttespillere akkurat nå» er sann i alle
+      tilfeller. ORDENTLIG fiks = ny `reason` fra 00039, ikke gjort.
+   7. **Rødt varsel på ferdigbehandlet søknad.** «Klubben har allerede en
+      aktiv kobling» er BESLUTNINGSSTØTTE («godkjenning gjenbruker den») og
+      sto igjen etter godkjenning, der den beskrev koblingen godkjenningen
+      selv nettopp lagde. Vises nå kun mens søknaden er åpen.
+   8. **Lagoversikten hadde ingen cache** — egen lokal state + henting ved
+      HVERT fokus, så skeletonene kom tilbake hver gang. Nå på B2-cachen
+      (`useTeamMembers`, 5 min) + 60 s-regelen ved fokus.
+   9. **«Klubbbetalinger» → «Klubbetalinger»** (tre b-er er feil norsk;
+      13 steder). **DOKUMENTASJONEN STÅR FORTSATT MED TRE B — egen sveip.**
+   10. **«1 medlemmer»** → entall/flertall. **Invitasjonskoden brøt til to
+      linjer** (8 tegn × 6 px sperring) → krymper nå; delingsteksten har
+      fått koden på EGEN LINJE. **Begrunnelsesarket i ops-flaten** var
+      formet som et bunnark, men fadet inn på stedet — glir nå opp.
+
+   *KØ — avgjort at de IKKE bygges nå (Brage informert):*
+   * **Varselet som ikke finnes.** SupportSetup lover «Du får varsel her
+     når klubben er klar for støtte» — men `stripe-webhook` oppretter
+     INGEN notification når kontoen blir aktiv, og ingen trigger gjør det
+     heller. Treneren venter på noe som aldri kommer. Backend-oppgave til
+     lanserings-QA, sammen med resten av II.9.
+   * **Query-cache på disk** (skeletons ved kaldstart). Krever to pakker
+     OG en sikkerhetsbeslutning: query-nøklene er ikke merket med bruker
+     (feed.ts sier det rett ut — de er avhengige av `queryClient.clear()`
+     ved utlogging). På disk holder ikke det; nøkkelen må scopes per bruker.
+
+   *TIL B6 (profilryddingen) — Brages funn under dogfooden:*
+   * **Profil viser ingen steder hvilken e-post du er logget inn med.**
+     Smertefullt med flere kontoer, og en forelder som har registrert seg
+     med feil adresse kan ikke oppdage det.
+   * **Man må kunne forlate et lag selv** (VIKTIG, Brages ord). Kjent hull:
+     `remove_team_member` (00041) sier eksplisitt at selvfjerning er «en
+     annen flyt, med andre konsekvenser» — aldri bygget. Betalingskoblingen
+     er den harde: forlater du et lag du STØTTER, kan vi ikke fortsette å
+     trekke deg. Vakter: siste voksen kan ikke gå ut, forelder med flere
+     barn har flere rader. AVGJORT samtidig: klubb slettes ALDRI av
+     brukere; lag slettes ikke, bortsett fra en snever «opprettet ved en
+     feil»-luke (ingen andre medlemmer, aldri godkjent, ingen innlegg).
+
+   *TIL NETTSIDE-PROSJEKTET:* del invitasjonen som **https-LENKE**, ikke
+   kode. Et delingsark sender ren tekst — en lenke er det eneste som blir
+   blå og trykkbar, og den kan sende folk til App Store hvis de mangler
+   appen og fylle koden inn selv hvis de har den (`prefillCode` finnes alt).
+
+   **▶️ REKKEFØLGEN FREMOVER — AVTALT MED BRAGE 2026-08-19.** A1, A2 og A3
+   er alle ferdige; app-sporet i autoritetsmodellen er lukket.
+
+   1. **B6 profilryddingen — INNHOLDET BEKREFTET AV BRAGE 2026-08-19**
+      (beslutningen fra 18. aug. sa bare «profilrydding», aldri hva):
+      a) **E-post under navnet** i profil-toppen. Skjermen viser avatar,
+         navn og rollebadge, men aldri hvilken KONTO du er inne som —
+         ubrukelig med flere kontoer, og en forelder som registrerte seg
+         med feil adresse kan ikke oppdage det.
+      b) **Flytt «Bli med i et lag» + «Opprett et nytt lag»** fra
+         «Innstillinger» opp til «Dine lag». De er lag-handlinger, men
+         ligger begravd mellom telefonnummeret og «Logg ut».
+      c) **Del opp «Innstillinger»**, som i dag er en skuff med fire
+         ulike ting: Konto (telefon, varslinger) · Logg ut / Slett konto
+         som egen avsluttende blokk · Om Heia (vilkår, personvern,
+         versjon) nederst og dempet.
+      d) **Versjonsnummeret er hardkodet «v0.1.0»** — leses ikke fra
+         bygget, så «Om Heia» lyver i TestFlight, akkurat i den raden en
+         testbruker leser når hun skal melde en feil.
+      + sveip dokumentasjonen for «Klubbbetalinger» med tre b-er (appen
+      er rettet, docs ikke).
+   2. **«Forlat lag» + foreldreløse lag** — ÉN skive, ikke to. Brage
+      vurderer dette som viktig, og det er nærmere et lanseringskrav enn en
+      forbedring: i dag er eneste vei ut av et lag å slette hele kontoen,
+      og gjør man det som siste medlem blir laget liggende igjen tomt,
+      usynlig (ingen offentlig lagsøking) og med bilder som koster
+      lagring for alltid. Invitasjonskoden er da eneste «nøkkel» tilbake,
+      og `join_team_space` lar innløseren velge sin egen rolle — så et
+      forlatt lag overtas i praksis av den som har en gammel kode i en
+      meldingstråd. Vakter: siste voksen kan ikke gå ut · aktivt
+      abonnement må håndteres eksplisitt · forelder med flere barn har
+      flere rader. Ved KONTOSLETTING (kan aldri nektes): er du siste
+      medlem og laget aldri har hatt støtte eller innhold → slett laget og
+      bildene; ellers varsle ops, som ved managerløse enheter.
+   3. **Cache-persistering** — Brages beslutning 2026-08-19: tas FØR
+      nettsiden, og settes ut til Fable. NB: det finnes INGEN egress-jobb
+      (se under) — oppdraget er cache alene.
+   4. **Fase B (nettsiden)**, som starter med B4-stackbeslutningen.
+
+   **CACHE-PERSISTERING — OPPDRAGSBESKRIVELSE.** Gevinsten er KUN opplevd
+   fart ved kaldstart på de varme skjermene; egress er upåvirket (bildene
+   ligger allerede på disk, se under). Omfang: `@tanstack/
+   react-query-persist-client` + `@tanstack/query-async-storage-persister`
+   (begge ren JS — ingen native, ingen pod install, kun Metro-omstart) ·
+   `PersistQueryClientProvider` i App.tsx · lagringsnøkkel som inkluderer
+   bruker-id + sletting i `clearLocalCaches` (delt telefon: bruker B skal
+   aldri kunne lese bruker A sine lagdata fra disk) · `maxAge` ~24 t.
+   **FELLA:** feeden er en `useInfiniteQuery` — uten en grense skrives
+   ALLE lastede sider til disk og leses inn igjen ved oppstart. Begrens
+   til første side. Betalinger/ops er IKKE i query-cachen (P7-avgrensningen
+   i keys.ts), så ingen betalingsdata kan havne på disk — det var den
+   farligste delen, og den er allerede eliminert.
+
+   **HVA SOM ALLEREDE PERSISTERES (svar på Brages spørsmål 2026-08-19 —
+   «lagres ingenting lokalt?»):** jo, den dyre delen. `expo-image` har en
+   **150 MB disk-cache nøklet på storage_path, ikke URL**
+   (MediaImage.tsx) — den overlever appdrap, og et ferskt signert token
+   gir fortsatt cache-TREFF (roterende `?token=` var rotårsak nr. 1 i
+   egress-auditen). De signerte URL-ene lagres i tillegg i AsyncStorage i
+   24 t (resolver.ts), og opplastingene setter Cache-Control. Det som IKKE
+   persisteres er JSON-radene — og det er riktig prioritering: en feed-side
+   er noen kB, ett bilde er hundrevis.
+
+   Deretter:
+   så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbbetalinger
+   /ops på web → full nominasjon-av-annen-dogfood). Stange/Nes-testdata
+   ryddes FØRST etter fase B-dogfooden (de er motpart i testene).
+   NB: `WEB_INVITE_BASE_URL`-secreten er BEVISST ikke satt —
+   invitasjons-e-post er strukturelt av til web-landingen finnes.
+
+   Beslutningsfrys
+   + komplett faseplan (A1 backend / A2 app / A3 selvnominasjon-dogfood
+   / B web + full dogfood, med verify-scripts, exit-kriterier og
+   rollback): `docs/AUTORITET-KLUBBBETALINGER-2026-08.md` + PAYMENTS.md
+   §«Autoritetsmodellen v2». Nøkkelavgjørelser: avvik ved aksept →
+   `awaiting_review` FØR aktiv rolle (B1); global defaults-rad med ren
+   kopi-semantikk + `club_support_defaults` re-scopes til enheten (B2);
+   token kun i URL-fragment, generert i payments-notify, reminder
+   roterer (B3); ingen rutinemessig ops-e-post på managerinvitasjoner
+   (B5); profilrydding ETTER A2, før lanserings-QA (B6). Produksjonsklar
+   v1 — rå SQL er aldri normal flyt. Kartleggingen bak ligger i
+   chatloggen 2026-08-18.
+2. **Nettsiden** (heiaapp.no, eget prosjekt) — fase B av autoritetsskiva
+   ER nettsidens første betalingsleveranse (invitasjonslanding →
+   Klubbbetalinger/rolleadmin → Heia Ops på web); starter når A-fasene
+   er ferdige, venter IKKE på live-byttet.
+3. **Stripe live-bytte som ALLER SISTE steg** når AS-et er klart
+   (sjekkliste i payments-memoryen: live-KYC m/ ledetid, live-nøkler +
+   nye webhooks, Apple-konto→AS, vilkår m/ orgnr, én ekte E2E-betaling).
 
 **Hele Fase A (alle 7 punkter) er BYGGET og grønn 2026-08-17** på
 Brage-branchen, som 8 commits (A0 + A1–A7, hver skipbar uavhengig — se

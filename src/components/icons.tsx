@@ -8,8 +8,11 @@ import {colors} from '../theme';
  * til her, ikke i skjermen.
  */
 export {
+  AlertTriangle,
   ArrowLeftRight,
+  Ban,
   Bell,
+  Building2,
   Calendar,
   Camera,
   Check,
@@ -24,6 +27,7 @@ export {
   Image as ImageIcon,
   Info,
   LogOut,
+  Mail,
   MapPin,
   Maximize2,
   Megaphone,
@@ -39,6 +43,7 @@ export {
   Trash2,
   Trophy,
   User,
+  UserCheck,
   UserPlus,
   Users,
   Wallet,

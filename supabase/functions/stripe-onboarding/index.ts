@@ -1,16 +1,18 @@
 // ============================================================
 // stripe-onboarding — fase 3 i betalingssporet (se docs/PAYMENTS.md).
 //
-// Kalles av LAGADMIN i appen etter at Heia har godkjent claimen
-// (approve_club_claim). Gjør to ting, i klikkøyeblikket:
+// AUTORITETSMODELLEN v2 (00062, II.8): kalles av en AKTIV
+// BETALINGSANSVARLIG for klubbens juridiske enhet (eller ops-admin)
+// — aldri lenger av vilkårlig lagadmin, og lenken deles ALDRI
+// (Share-arket er fjernet; Stripes føring: Account Links åpnes av
+// autentisert plattformbruker og distribueres ikke via e-post/
+// melding). Gjør to ting, i klikkøyeblikket:
 //   1. Oppretter Stripe-kontoen LAT ved første kall (kontoraden
 //      finnes fra godkjenningen, provider_account_id er NULL til nå).
 //      Idempotency-Key = kontorad-id: et dobbeltklikk/kappløp kan
 //      aldri gi to Stripe-kontoer for samme enhet.
 //   2. Genererer en Account Link (fase 0-funn #6: kortlevd — ALDRI
 //      lagret, alltid generert på klikk) og returnerer URL-en.
-//      Lenken åpnes i Safari og KAN videresendes (kasserer/
-//      styreleder med reell fullmakt fullfører KYC-en).
 //
 // Kontoparametrene er nøyaktig fase 0-spikens (RUNBOOK steg 3,
 // P1 bevist): controller-konfig = Express-tilsvarende, Stripe eier
@@ -75,19 +77,6 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // Kun lagadmin i laget får generere onboarding-lenker.
-  const {data: membership} = await admin
-    .from('memberships')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('team_space_id', teamSpaceId)
-    .eq('status', 'active')
-    .in('role', ['trener', 'lagleder', 'admin'])
-    .maybeSingle();
-  if (!membership) {
-    return json({error: 'Bare trenere og lagledere kan gjøre dette.'}, 403);
-  }
-
   // Kjeden team_space → team → club → aktiv link → enhet → konto.
   // Kontoraden finnes KUN etter godkjent claim — det er selve gaten.
   const {data: ts} = await admin
@@ -112,6 +101,34 @@ Deno.serve(async (req) => {
   }
   if (entity.verification_status !== 'verified') {
     return json({error: 'Klubbens godkjenning er ikke gyldig lenger.'}, 409);
+  }
+
+  // v2-GATEN: kun en AKTIV betalingsansvarlig for enheten (eller
+  // ops-admin) kan generere Account Link — rollen er selve
+  // KYC-tilgangen, aldri lagadminskap (II.8).
+  const {data: manager} = await admin
+    .from('club_payment_managers')
+    .select('id')
+    .eq('legal_club_entity_id', link.legal_club_entity_id)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (!manager) {
+    const {data: ops} = await admin
+      .from('ops_admins')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (!ops) {
+      return json(
+        {
+          error:
+            'Bare klubbens betalingsansvarlige kan fullføre registreringen ' +
+            'hos Stripe.',
+        },
+        403,
+      );
+    }
   }
 
   const {data: account} = await admin
