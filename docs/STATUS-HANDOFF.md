@@ -66,6 +66,15 @@
      ett — selvforsynt, ruller alt tilbake, grid-en til slutt skal si
      «SUM … GRØNT»; ⚠️-rader er dokumenterte hopp, ❌ er funn). Dette
      er skivas serverbevis — portene, vaktene, dormant og A3-riderne.
+     ⚠️ **SKRIPTET ER IKKE KJØRT ÉN ENESTE GANG** — denne maskinen har
+     hverken `psql` eller Docker, og Management-API-tokenet lå bak
+     keychain-sperren, så det fantes ingen vei til en Postgres å teste
+     mot. SQL-en i skriptet er altså lest, ikke bevist. Feiler den på
+     syntaks eller en fixtur (mistenkt nr. 1: `auth.users`-inserten —
+     kolonnekrav varierer mellom GoTrue-versjoner), er det SKRIPTET som
+     er feil, ikke 00067: send feilmeldingen, så rettes den. Selve
+     migrasjonen er derimot bevist kjørbar — `supabase db push` gikk
+     gjennom mot prod, og `supabase migration list` viser 00067.
   2. **Telefonrunden** (Metro-reload holder — ren JS i appen): forlat
      lag (med/uten barn, med levende avtale-tekst), siste-admin-
      blokkeringen + rollemeny/overdragelse, trenerforespørsel

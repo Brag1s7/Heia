@@ -174,8 +174,19 @@ BEGIN
     PERFORM set_config('request.jwt.claims',
       jsonb_build_object('sub', u_f, 'role', 'authenticated')::text, true);
     v := join_team_space('XVRF67AA', 'trener');
+
+    -- get_team_members v2 må BÆRE den stående forespørselen — det er slik
+    -- lagoversikten i det hele tatt får vist «Vil bli trener»-chipen.
+    -- Testes HER, mens forespørselen faktisk står (etter godkjenning er
+    -- feltet nullet, og en tom liste ville bevist ingenting).
     PERFORM set_config('request.jwt.claims',
       jsonb_build_object('sub', u_a, 'role', 'authenticated')::text, true);
+    SELECT count(*) INTO v_cnt FROM get_team_members(ts1) m
+    WHERE m.user_id = u_f AND m.requested_role = 'trener';
+    r := r || jsonb_build_array(jsonb_build_array(
+      'get_team_members v2: stående trenerforespørsel er synlig for lagadmin',
+      CASE WHEN v_cnt = 1 THEN '✅' ELSE '❌ traff ' || v_cnt || ' rader' END));
+
     v := set_member_role(ts1, u_f, 'trener');
     SELECT role = 'trener' AND requested_role IS NULL INTO v_bool
     FROM public.memberships
@@ -429,13 +440,6 @@ BEGIN
     r := r || jsonb_build_array(jsonb_build_array(
       'get_team_authors: fjernet/utmeldt forfatter er med (navn består)',
       CASE WHEN v_cnt = 1 THEN '✅' ELSE '❌' END));
-
-    -- ── get_team_members v2: requested_role-kolonnen finnes ──
-    SELECT count(*) INTO v_cnt
-    FROM get_team_members(ts1) m WHERE m.requested_role IS NOT NULL;
-    r := r || jsonb_build_array(jsonb_build_array(
-      'get_team_members v2: requested_role-kolonnen svarer',
-      '✅'));
 
     -- ── delete_account_data v4: dormant-registrering ─────────
     INSERT INTO public.memberships (user_id, team_space_id, role, status, joined_at)

@@ -307,7 +307,9 @@ export type InboxStackParamList = {
   ClubPayments: undefined;
   // Rollevarslene (00067: trenerforespørsel, rollebytte) åpner lagoversikten
   // her av samme grunn. Varslene er lag-scopet, så aktivt lag stemmer.
+  // `Invite` følger med fordi lagoversikten navigerer dit.
   TeamMembers: undefined;
+  Invite: {firstTime?: boolean} | undefined;
 };
 
 export type ProfilStackParamList = {

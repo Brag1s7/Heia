@@ -193,8 +193,12 @@ function InboxStackNavigator() {
           Profil-stacken, der de er de faste flatene sine. */}
       <InboxNav.Screen name="SupportSetup" component={SupportSetupScreen} />
       <InboxNav.Screen name="ClubPayments" component={ClubPaymentsScreen} />
-      {/* Rollevarslene (00067) åpner lagoversikten her av samme grunn. */}
+      {/* Rollevarslene (00067) åpner lagoversikten her av samme grunn.
+          `Invite` MÅ følge med: lagoversikten har en «Inviter til laget»-rad,
+          og uten ruten i DENNE stacken er den raden en død knapp når skjermen
+          nås fra et varsel. */}
       <InboxNav.Screen name="TeamMembers" component={TeamMembersScreen} />
+      <InboxNav.Screen name="Invite" component={InviteScreen} />
       <InboxNav.Screen
         name="NewEvent"
         component={NewEventScreen}
