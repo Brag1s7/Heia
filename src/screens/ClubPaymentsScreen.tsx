@@ -457,6 +457,14 @@ export function ClubPaymentsScreen() {
                   Laget kan be om godkjenning på nytt fra Laginnstillinger.
                 </Text>
               )}
+              {/* Dormant-markeringen (§3e/§3f-4): innsyn, aldri myndighet.
+                  Rolig informasjon — ingenting slettes, avtaler består. */}
+              {team.dormantAt != null && (
+                <Text style={styles.hint}>
+                  Laget står uten aktive medlemmer. Innhold og avtaler består —
+                  Heia er varslet, og spørsmål tas på hello@heiaapp.no.
+                </Text>
+              )}
               {unresolved && (
                 <View style={styles.warnBox}>
                   <View style={styles.warnRow}>

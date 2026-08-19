@@ -193,6 +193,8 @@ function InboxStackNavigator() {
           Profil-stacken, der de er de faste flatene sine. */}
       <InboxNav.Screen name="SupportSetup" component={SupportSetupScreen} />
       <InboxNav.Screen name="ClubPayments" component={ClubPaymentsScreen} />
+      {/* Rollevarslene (00067) åpner lagoversikten her av samme grunn. */}
+      <InboxNav.Screen name="TeamMembers" component={TeamMembersScreen} />
       <InboxNav.Screen
         name="NewEvent"
         component={NewEventScreen}
@@ -438,6 +440,12 @@ export function AppNavigator() {
   const {pendingAction, lastError, setLastError} = useOnboarding();
 
   const hasTeam = userMemberships.length > 0;
+  // §3d (FORLAT-LAG-DORMANT): brukere uten aktive lag er en varig,
+  // førsteklasses tilstand — IKKE et onboarding-tilbakefall. Stempelet
+  // settes server-side ved første join/create (00067-triggeren) og er
+  // backfillet for alle med en medlemsrad. hasTeam vinner alltid
+  // (defensivt: et manglende stempel skal aldri kaste et lagmedlem ut).
+  const onboarded = profile?.onboardingCompletedAt != null;
 
   // heia://-lenker (JS-Linking-restansen fra native-runden): kaldstart-URL-en
   // hentes én gang, og lytteren dekker trykk mens appen kjører. Målet
@@ -450,14 +458,15 @@ export function AppNavigator() {
     return () => sub.remove();
   }, []);
 
-  // WelcomeIntent viser lastError for en gjest. Har brukeren alt et lag rendres
-  // MainTabs, og feilen ville forsvunnet i stillhet — så vi sier fra her.
+  // WelcomeIntent viser lastError for en gjest. Rendres MainTabs eller den
+  // lagløse Profil-roten i stedet, ville feilen forsvunnet i stillhet — så
+  // vi sier fra her.
   useEffect(() => {
-    if (lastError && hasTeam) {
+    if (lastError && (hasTeam || onboarded)) {
       Alert.alert('Noe gikk galt', lastError);
       setLastError(null);
     }
-  }, [lastError, hasTeam, setLastError]);
+  }, [lastError, hasTeam, onboarded, setLastError]);
 
   // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
   if (loading || (session && !profile) || (session && teamLoading)) {
@@ -484,6 +493,12 @@ export function AppNavigator() {
       onStateChange={() => noteScreen(navigationRef.getCurrentRoute()?.name)}>
       {session && profile && hasTeam ? (
         <MainTabs />
+      ) : session && profile && onboarded ? (
+        // Den lagløse grenen (§3d): Profil-rotet stack — «Bli med i et
+        // lag» og «Opprett et nytt lag» bor der, sammen med Min støtte,
+        // Klubbetalinger og ops-flatene. Gjenbruker hele Profil-stacken:
+        // lag-skjermene i den er bare nåbare med et aktivt lag.
+        <ProfilStackNavigator />
       ) : (
         <OnboardingStackNavigator key={session ? 'authed' : 'guest'} />
       )}

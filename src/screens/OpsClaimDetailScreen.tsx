@@ -214,15 +214,19 @@ export function OpsClaimDetailScreen() {
                 value={
                   nomineeIsSelf
                     ? `Søkeren selv (${claim.claimant?.displayName ?? 'ukjent'})`
-                    : 'En annen i klubben — se e-posten'
+                    : claim.nomineeName
+                      ? `${claim.nomineeName}${claim.nomineeEmail ? ` <${claim.nomineeEmail}>` : ''}`
+                      : 'En annen i klubben — se e-posten'
                 }
               />
+              {!nomineeIsSelf && claim.nomineePhone && (
+                <FactRow label="Nominertes telefon" value={claim.nomineePhone} />
+              )}
               {!nomineeIsSelf && (
                 <Text style={styles.hint}>
-                  Søkeren har nominert en ANNEN person. Navn og e-post står i
-                  klubbsøknad-e-posten fra Heia (claim-notify) — det er den
-                  personen som skal verifiseres, og godkjenning oppretter en
-                  invitasjon til hen, ikke en rolle til søkeren.
+                  Søkeren har nominert en ANNEN person — det er den personen
+                  som skal verifiseres, og godkjenning oppretter en invitasjon
+                  til hen, ikke en rolle til søkeren.
                 </Text>
               )}
               {/* BESLUTNINGSSTØTTE, ikke statusvisning — begge sier noe om hva

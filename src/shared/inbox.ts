@@ -107,8 +107,9 @@ export interface HeiaNotification {
   feedPostId?: string;
   eventId?: string;
   teamSpaceId?: string;
-  /** Klubbdør-varsler (00047) peker på en skjerm i Profil-stacken. */
-  targetScreen?: 'club_payments' | 'support_setup';
+  /** Klubbdør-varsler (00047) og rollevarsler (00067) peker på en fast
+   *  skjerm — de åpnes i varselstacken så «Tilbake» går til lista. */
+  targetScreen?: 'club_payments' | 'support_setup' | 'team_members';
   /** Satt fra 00051 på kampvarsler. Mangler på eldre rader. */
   match?: NotificationMatch;
   /** Satt fra 00051 der handlingen kom fra en person. Mangler på eldre rader. */
@@ -204,7 +205,9 @@ export function mapNotificationRow(row: any): HeiaNotification {
     eventId: data.event_id ?? undefined,
     teamSpaceId: row.team_space_id ?? undefined,
     targetScreen:
-      data.screen === 'club_payments' || data.screen === 'support_setup'
+      data.screen === 'club_payments' ||
+      data.screen === 'support_setup' ||
+      data.screen === 'team_members'
         ? data.screen
         : undefined,
     match: mapMatch(data),

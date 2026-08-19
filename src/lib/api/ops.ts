@@ -68,6 +68,13 @@ export interface OpsClaim {
   contactEmail: string | null;
   contactPhone: string | null;
   claimant: {id: string; displayName: string} | null;
+  /** Nominasjonen (00067 — A2-avviket tettet): hvem søkeren peker på som
+   *  betalingsansvarlig. `nomineeIsSelf` true = søkeren selv; false = navn,
+   *  e-post og ev. telefon står her (før 00067 fantes de kun i e-posten). */
+  nomineeIsSelf: boolean;
+  nomineeName: string | null;
+  nomineeEmail: string | null;
+  nomineePhone: string | null;
   brreg: BrregSnapshot | null;
   reviewNote: string | null;
   reviewedAt: string | null;
@@ -131,6 +138,11 @@ function mapClaim(raw: any): OpsClaim {
     claimant: raw.claimant
       ? {id: raw.claimant.id, displayName: raw.claimant.display_name}
       : null,
+    // Eldre payloads (før 00067) mangler feltet → selv-nominasjon.
+    nomineeIsSelf: raw.nominee_is_self !== false,
+    nomineeName: raw.nominee_name ?? null,
+    nomineeEmail: raw.nominee_email ?? null,
+    nomineePhone: raw.nominee_phone ?? null,
     brreg: mapSnapshot(raw.brreg_snapshot),
     reviewNote: raw.review_note ?? null,
     reviewedAt: raw.reviewed_at ?? null,

@@ -305,6 +305,9 @@ export type InboxStackParamList = {
   // fører til varsellista — som for kamp- og kommentarvarsler.
   SupportSetup: undefined;
   ClubPayments: undefined;
+  // Rollevarslene (00067: trenerforespørsel, rollebytte) åpner lagoversikten
+  // her av samme grunn. Varslene er lag-scopet, så aktivt lag stemmer.
+  TeamMembers: undefined;
 };
 
 export type ProfilStackParamList = {

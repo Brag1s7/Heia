@@ -1,56 +1,102 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-19 sent — etter «forlat lag»-beslutningssamtalen)
+## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER BYGGET OG DEPLOYET)
 
-**NY SAMTALE STARTER MED: BYGG LEAVE-SKIVA.** Modellen er FROSSET av
-Brage 2026-08-19: **dormant-modellen** — laget består med null medlemmer,
-utmelding rører KUN medlemskapet (ingen Stripe i leave-flyten), støtte og
-medlemskap er separate relasjoner, `deleted_at` kun ved uttrykkelig
-«Legg ned laget». **Les `docs/FORLAT-LAG-DORMANT-2026-08.md` FØRST** —
-hele modellen med Brages seks presiseringer (kanonisk port = fravær av
-aktiv admin; siste-episode-regelen; left_reason + ended_by;
-onboarding_completed_at; dormant_at + aldri autosletting;
-gjenåpningsmatrisen), forkastede alternativer (ikke relitiger) og
-byggeomfanget i §7 (migrasjon 00067+ som også skal bære de utestående
-A3-payload-fiksene, RPC-ene, payments-notify-deployen, appflatene).
-«Legg ned laget» er EGEN skive etterpå.
+**«FORLAT LAG»-SKIVA (dormant-modellen) ER BYGGET, PUSHET OG DEPLOYET
+2026-08-19.** Modellen står FROSSET i `docs/FORLAT-LAG-DORMANT-2026-08.md`
+(kanonisk — §-referansene under peker dit). Leveransen, hele §7-omfanget:
 
-**SIKKERHETSSKIVA 00066 ER PUSHET OG DEPLOYET 2026-08-19** (isolert
-leveranse fra memberships-auditen — auditen fant bl.a. at ethvert medlem
-kunne sette `role='admin'` på egen rad via rå PostgREST):
-- ✅ `00066_memberships_hardening.sql` PUSHET (bekreftet i migration
-  list): memberships har nå NØYAKTIG to policyer (begge SELECT — egne
-  rader alle statuser, andres kun `active`). All skriving går via RPC;
-  alle fire skrivepolicyene fra 00014 er droppet (inkl. den ubrukte
-  invite-INSERT-en).
-- ✅ `stripe-checkout` DEPLOYET med `limit(1)`-fiksen: forelder med to
-  barn (to aktive rader) fikk PGRST116→falsk 403 og kunne ikke tegne
-  støtte.
-- ✅ Determinisme: `src/shared/activeMembership.ts` (primærrad = den
-  personlige raden; CHECK-constrainten gjør det til datamodellens eget
-  svar) — TeamContext utleder lagrom/lag/rolle fra ÉN rad,
-  getUserMemberships har ORDER BY, «Dine lag» dedupes per lag.
-  Suiten grønn: 182 tester, 15 filer. Ren JS — Metro-reload holder.
-- 🔲 **GJENSTÅR FOR BRAGE (før leave-bygging):**
-  `TEST_EMAIL=… TEST_PASSWORD=… node scripts/verify-membership-hardening.mjs`
-  (forelder-/supporter-testkonto, IKKE lagadmin — står hvorfor i
-  headeren; fem tester, alle skal være grønne) · telefonkontroll på
-  Profil (ett kort per lag, riktig rollebadge for trener-som-også-er-
-  forelder).
+- ✅ **Migrasjon `00067_forlat_lag.sql` PUSHET TIL PROD** (bekreftet i
+  migration list). Innhold: `memberships.left_reason` + `ended_by`
+  (backfill: alle removed-rader → 'removed', ended_by NULL=ukjent) ·
+  `memberships.requested_role` ('trener') · `team_spaces.dormant_at`
+  (backfillet for alt tomme lag) · `profiles.onboarding_completed_at`
+  (backfill = eldste medlemsrads created_at + INSERT-TRIGGER
+  `stamp_onboarding_completed` som dekker ALLE innmeldingsdører, også
+  fremtidige) · hjelperne `has_active_team_admin` (den KANONISKE
+  §3a-porten, utledet) og `register_team_dormant_if_empty` (delt av
+  leave/delete; ops-varsel kun når laget har innhold/avtaler).
+- ✅ **RPC-ene:** `leave_team` (settbasert flip m/ left_reason='left',
+  RSVP-rydding, siste-admin-vakt som UTFALL 'last_admin', advisory-lås
+  `team_admin_guard` mot samtidige utmeldinger, dormant-registrering) ·
+  `set_member_role` + `decline_role_request` (personlig rad, aldri
+  spillere, laget kan aldri stå uten aktiv lagadmin, varsler til den
+  det gjelder) · `join_team_space` **v4** (NY signatur m/ `p_reopen` —
+  gammel 3-args DROPPET; lagleder/admin avvises §5; «trener» → supporter
+  + requested_role + varsel til alle aktive lagadmins; §3b-porten
+  «siste episode avgjør» også i levende lag; §3a-låsen med
+  beboer-unntak — forelder i låst lag kan legge til barn nr. 2;
+  gjenåpning §3f-2 gjeninnsetter gammel adminrolle; nuller dormant_at)
+  · `remove_team_member` v2 (left_reason='removed' + ended_by) ·
+  `delete_account_data` v4 (dormant-registrering; GDPR ellers urørt).
+- ✅ **Leseflater:** `get_team_members` v2 (+requested_role — DROP+CREATE
+  m/ gjenskapte 00060-grants) · NY `get_team_authors` (forfatteroppslag
+  som overlever utmelding — kun navn/avatar/rolle, aldri telefon/
+  status; kommentarfeltet bruker den nå via egen query-nøkkel
+  `['authors', ts]`) · `lookup_invite_code` v4 (+has_active_admin for
+  §3f-UX-en) · `get_club_payments_overview` (+dormant_at på lagradene —
+  §3f-4-innsynet, markering i ClubPayments).
+- ✅ **A3-RIDERNE ER MED I 00067 OG UTE:** «Klubbetalinger»-teksten i
+  `request_team_support_approval` · nominee-feltene i `ops_claim_payload`
+  (OpsClaimDetail viser nå navn/e-post/telefon) · `manager`-navnet i
+  `get_support_activation_status` (trenerkortet navngir hvem KYC venter
+  på). **`payments-notify` ER DEPLOYET** med tekstrettelsene + ny
+  hendelsestype `team_dormant` (ops-e-post når lag m/ innhold tømmes).
+- ✅ **Appflatene:** «Forlat laget» på Profil (bekreftelse navngir barna
+  fra nye `managedChildName`; levende avtale på laget → «støtten
+  fortsetter» + «Administrer støtte»-knapp; 'last_admin' →
+  blokkeringsdialog som deep-linker til lagoversikten) · TREDJE
+  NAVIGATOR-GREN (§3d: innlogget + stempel + null lag → hele
+  Profil-stacken som rot; ProfileHeader uten rollebadge; lagløs er
+  førsteklasses) · rollemeny i lagoversikten (⋯ → Endre rolle/Fjern;
+  «Vil bli trener»-chip m/ Godkjenn/Avslå for lagadmin) ·
+  join-flaten viser portene FØR knappen (`shared/teamReentry.ts` — ren
+  §3b-logikk over egne rader + `hasActiveAdmin` fra lookup): låst-lag-
+  stopp m/ kontaktvei, fjernet-stopp, «Gjenåpne laget»-kort, trenernote
+  («godkjennes av en trener — til da supporter») · varsel-trykk
+  `team_members` åpner lagoversikten i varselstacken ·
+  `executeJoin`/`executeCreate` refresher profilen (stempelet) og
+  executeJoin returnerer utfallet (pendingRole-alerten).
+- ✅ Suiten grønn: **198 tester, 16 filer** (ny: `teamReentry.test.ts` —
+  §3b-ordningen, tiebreak, legacy-null='removed', gjenåpningsmyndighet).
+  Lint ren (kun de gamle kjente advarslene).
+
+- 🔲 **GJENSTÅR FOR BRAGE:**
+  1. **Kjør `scripts/verify-00067.sql` i SQL-editoren** (hele fila i
+     ett — selvforsynt, ruller alt tilbake, grid-en til slutt skal si
+     «SUM … GRØNT»; ⚠️-rader er dokumenterte hopp, ❌ er funn). Dette
+     er skivas serverbevis — portene, vaktene, dormant og A3-riderne.
+  2. **Telefonrunden** (Metro-reload holder — ren JS i appen): forlat
+     lag (med/uten barn, med levende avtale-tekst), siste-admin-
+     blokkeringen + rollemeny/overdragelse, trenerforespørsel
+     (join som trener → chip → godkjenn/avslå), lagløs Profil-rot
+     (forlat siste lag → «Bli med i et lag»/«Opprett»), gjenåpning
+     (forlat som siste trener i tomt lag → inn igjen med koden →
+     «Gjenåpne laget»), kommentar fra utmeldt forfatter beholder navn.
+     + B6-telefonrunden som fortsatt står (profilrydding runde 1+2).
+  3. Valgfritt: kjør `verify-membership-hardening.mjs` PÅ NYTT når en
+     removed-rad finnes (leave-skiva lager dem nå) — dekker de to
+     ⚠️-ene fra første kjøring.
+
+**BEVISST UTENFOR SKIVA (ikke glemt):** «Legg ned laget» (§4) er EGEN
+skive · ops-RPC-ene for gjenåpne/overdra/legge ned dormant lag (§3f-5)
+er IKKE bygget — står ikke i §7-omfanget; ops-fallbacken er i dag
+SQL/service-rolle, tas sammen med «Legg ned laget»-skiva ·
+medlemstall teller fortsatt rader, ikke personer (kjent restanse §6) ·
+`author_role` NULL på historiske feed-innlegg (kosmetisk, §6).
 
 **DERETTER (uendret rekkefølge):** Profilbilde (avatar-opplasting, punkt
-2b under) · cache-persistering · fase B (nettsiden). Merge + TestFlight av
-fase A står fortsatt.
-
-**UTESTÅENDE SOM RIR MED LEAVE-SKIVA:** den lille fremovermigrasjonen
-(RPC-teksten «Klubbetalinger» i 00062:1947, nominee-feltene i
-ops-payloaden, manager-navnet i statuspayloaden) legges i SAMME migrasjon
-som leave (§7 i frysdokumentet) · `payments-notify` er rettet i kilden men
-IKKE deployet — deployes i leave-skiva sammen med de nye hendelsestypene.
+2b under) · cache-persistering · fase B (nettsiden).
 
 **ÉN produksjonsendring fra B6 står utenfor koden:** dashboard-bryteren
 «Require current password when updating» = PÅ. Se punkt 1b under og
 notatet i `supabase/config.toml`.
+
+**SIKKERHETSSKIVA 00066** (pushet 2026-08-19) er verifisert: Brage
+kjørte `verify-membership-hardening.mjs` — ALT GRØNT (test 2 og
+egen-historikk-delen av test 5 hadde ingen removed-rader å bite i;
+mekanismen er bevist av test 1/3, og leave-skiva lager nå slike rader —
+se punkt 3 over).
 
 ---
 

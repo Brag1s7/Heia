@@ -15,6 +15,12 @@ export interface Profile {
   phone: string | null;
   locale: string;
   onboardingCompleted: boolean;
+  /**
+   * §3d (FORLAT-LAG-DORMANT): første fullførte join/create, stemplet
+   * server-side (00067-triggeren). Navigator-porten: satt → hovedappen
+   * (Profil-rotet ved null aktive lag); null → den låste onboardingen.
+   */
+  onboardingCompletedAt: string | null;
   householdId: string | null;
 }
 
@@ -91,6 +97,9 @@ export interface Membership {
 export interface EnrichedMembership extends Membership {
   teamSpace: TeamSpace;
   team: Team;
+  /** Barnets navn når raden er en barne-rad — «Forlat laget» navngir alle
+   *  berørte (frysdokumentets §7-krav), så navnet må følge raden. */
+  managedChildName: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,12 +115,34 @@ export interface InviteCodeResult {
   clubName: string;
   sport: string;
   memberCount: number;
+  /**
+   * §3a (FORLAT-LAG-DORMANT): false = laget har ingen aktiv lagadmin og
+   * er låst for ukjente kodebrukere. Eldre bygg mot ny DB tåler feltet;
+   * nye bygg mot gammel DB får undefined → behandles som åpent (porten
+   * håndheves uansett server-side).
+   */
+  hasActiveAdmin?: boolean;
 }
 
 export interface JoinResult {
   membershipId: string;
   teamSpaceId: string;
   displayName: string;
+  /** 'joined' (vanlig) eller 'reopened' (§3f-2 — gammel adminrolle
+   *  gjeninnsatt). Eldre DB uten 00067 gir undefined → 'joined'. */
+  outcome?: 'joined' | 'reopened';
+  /** Rollen raden faktisk fikk («trener» via koden blir 'supporter'). */
+  role?: MemberRole;
+  /** 'trener' når forespørselen står og venter på godkjenning (§5). */
+  pendingRole?: 'trener' | null;
+}
+
+/** Utfallet av leave_team (00067) — utfall som data, aldri exceptions
+ *  for de forventede stoppene (00064-kontrakten). */
+export interface LeaveTeamResult {
+  outcome: 'left' | 'last_admin' | 'not_member';
+  /** Ble laget stående uten aktive medlemmer? (informasjon, ikke alarm) */
+  teamDormant?: boolean;
 }
 
 export interface ActivateResult {

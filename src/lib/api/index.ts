@@ -3,6 +3,8 @@ export {
   getUserMemberships,
   lookupInviteCode,
   joinTeamSpace,
+  leaveTeam,
+  getMyTeamHistory,
   activateTeamSpace,
   updateTeamColor,
   updateTeamName,

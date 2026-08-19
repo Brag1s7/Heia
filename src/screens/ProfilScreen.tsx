@@ -50,6 +50,7 @@ import {
   Share2,
   ShieldCheck,
   Trash2,
+  UserMinus,
   UserPlus,
   Users,
   Wallet,
@@ -69,8 +70,10 @@ import {
   openSupportPortal,
   isOpsAdmin,
   isPaymentManager,
+  leaveTeam,
   type MySupportItem,
 } from '../lib/api';
+import {errorMessage} from '../shared/errorMessage';
 import {confirmDeleteAccount, registerLocalCache} from '../lib/account';
 import {useAppVersion} from '../lib/appVersion';
 import {formatKr} from '../lib/money';
@@ -134,8 +137,12 @@ function supportStatusLine(item: MySupportItem): string {
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const {session, profile, signOut, refreshProfile} = useAuth();
-  const {activeTeamSpaceId, userMemberships, setActiveTeamSpace} =
-    useActiveTeam();
+  const {
+    activeTeamSpaceId,
+    userMemberships,
+    setActiveTeamSpace,
+    refreshMemberships,
+  } = useActiveTeam();
   const navigation = useNavigation<Nav>();
 
   // Versjonen LESES fra bundelen (se lib/appVersion) — den skal aldri igjen
@@ -300,6 +307,97 @@ export function ProfilScreen() {
     );
   }, [profile?.phone, refreshProfile]);
 
+  // «Forlat laget» — dormant-modellen (00067, FROSSET i
+  // docs/FORLAT-LAG-DORMANT-2026-08.md): rører KUN medlemskapet.
+  // Bekreftelsen navngir alle berørte (barna følger forelderen), sier at
+  // innholdet består, og — når du har en levende støtteavtale på laget —
+  // at støtten fortsetter uavhengig, med «Administrer støtte» som egen vei.
+  const [leavingTeam, setLeavingTeam] = useState(false);
+  const handleLeaveTeam = useCallback(() => {
+    if (!activeTeamSpaceId || leavingTeam) return;
+    const membership = pickPrimaryMembership(
+      userMemberships,
+      activeTeamSpaceId,
+    );
+    const teamName = membership?.teamSpace.displayName ?? 'laget';
+
+    const childNames = userMemberships
+      .filter(m => m.teamSpaceId === activeTeamSpaceId && m.managedChildId)
+      .map(m => m.managedChildName)
+      .filter((n): n is string => !!n);
+    const who =
+      childNames.length === 0
+        ? 'Utmeldingen gjelder deg.'
+        : childNames.length === 1
+          ? `Utmeldingen gjelder deg og ${childNames[0]}.`
+          : `Utmeldingen gjelder deg og barna dine (${childNames
+              .slice(0, -1)
+              .join(', ')} og ${childNames[childNames.length - 1]}).`;
+
+    // Levende avtale på DETTE laget: utmeldingen rører den aldri
+    // (medlemskap og støtte er separate relasjoner — modell B), men det
+    // skal sies i klartekst, ikke oppdages på kontoutskriften.
+    const liveSupport = (mySupport ?? []).some(
+      s =>
+        s.teamSpaceId === activeTeamSpaceId &&
+        (s.status === 'active' || s.status === 'past_due') &&
+        !s.cancelAt,
+    );
+
+    const message =
+      `${who} Innlegg, bilder og kommentarer dere har delt blir stående.` +
+      (liveSupport
+        ? '\n\nStøtten din til laget fortsetter som før — den er uavhengig av medlemskapet, og du administrerer den under «Min støtte».'
+        : '');
+
+    const doLeave = async () => {
+      setLeavingTeam(true);
+      try {
+        const result = await leaveTeam(activeTeamSpaceId);
+        if (result.outcome === 'last_admin') {
+          // Siste-admin-vakten (§2): rollen må overdras først.
+          // Blokkeringsdialogen deep-linker til rollemenyen.
+          Alert.alert(
+            'Laget trenger en trener',
+            'Du er den siste treneren eller laglederen, og laget har fortsatt aktive medlemmer. Gi en annen voksen rollen i lagoversikten først — så kan du melde deg ut.',
+            [
+              {text: 'Ikke nå', style: 'cancel'},
+              {
+                text: 'Åpne lagoversikten',
+                onPress: () => navigation.navigate('TeamMembers'),
+              },
+            ],
+          );
+          return;
+        }
+        // 'left' (og 'not_member' etter et dobbelttrykk): fersk liste. Var
+        // dette siste laget, bytter AppNavigator til den lagløse Profil-
+        // roten; ellers velger TeamContext neste lag og purger mediecachen.
+        await refreshMemberships();
+      } catch (e) {
+        Alert.alert('Kunne ikke melde deg ut', errorMessage(e));
+      } finally {
+        setLeavingTeam(false);
+      }
+    };
+
+    Alert.alert(`Forlate ${teamName}?`, message, [
+      {text: 'Avbryt', style: 'cancel'},
+      ...(liveSupport
+        ? [{text: 'Administrer støtte', onPress: handleManageSupport}]
+        : []),
+      {text: 'Forlat laget', style: 'destructive', onPress: doLeave},
+    ]);
+  }, [
+    activeTeamSpaceId,
+    leavingTeam,
+    userMemberships,
+    mySupport,
+    refreshMemberships,
+    handleManageSupport,
+    navigation,
+  ]);
+
   if (!profile) return null;
 
   // Primærraden, ikke «første rad»: en trener som også er forelder har
@@ -308,9 +406,10 @@ export function ProfilScreen() {
     userMemberships,
     activeTeamSpaceId,
   );
+  // Lagløs (§3d) = ingen rolle å vise — badgen utelates, aldri gjettes.
   const roleName = activeMembership
     ? ROLE_LABELS[activeMembership.role]
-    : 'Forelder';
+    : undefined;
   const isTrener = isTeamAdmin(activeMembership?.role);
   // «Konto»-radene — utledet her fordi blokka rundt dem må kjenne dem også.
   const showPhoneRow = Platform.OS === 'ios';
@@ -461,6 +560,22 @@ export function ProfilScreen() {
                 subtitle="Del invitasjonskoden"
                 right={<RowChevron />}
                 onPress={() => navigation.navigate('Invite')}
+              />
+              {/* «Forlat laget» (00067) — nederst i lagblokka: en handling
+                  som tar deg UT skal ikke stå mellom veiene inn. */}
+              <ListRow
+                icon={
+                  <MenuIcon>
+                    <UserMinus size={20} color={colors.textSecondary} />
+                  </MenuIcon>
+                }
+                title="Forlat laget"
+                subtitle={
+                  leavingTeam
+                    ? 'Melder deg ut …'
+                    : 'Innholdet ditt blir stående'
+                }
+                onPress={handleLeaveTeam}
                 showBorder={false}
               />
             </View>

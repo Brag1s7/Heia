@@ -45,6 +45,7 @@ export {
   Trophy,
   User,
   UserCheck,
+  UserMinus,
   UserPlus,
   Users,
   Wallet,

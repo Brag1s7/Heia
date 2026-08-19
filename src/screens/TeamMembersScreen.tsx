@@ -17,7 +17,13 @@ import {Avatar, BackBar, ListRowSkeleton, Skeleton} from '../components';
 import {MoreHorizontal} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
-import {removeTeamMember, type TeamMember} from '../lib/api/members';
+import {
+  removeTeamMember,
+  setMemberRole,
+  declineRoleRequest,
+  type TeamMember,
+} from '../lib/api/members';
+import {errorMessage} from '../shared/errorMessage';
 import {useTeamMembers, invalidateTeamMembers} from '../lib/queries/members';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {queryKeys} from '../lib/queries/keys';
@@ -118,6 +124,110 @@ export function TeamMembersScreen() {
     [activeTeamSpaceId, activeTeamSpace],
   );
 
+  // Rollemenyen (00067): synlig rolleadministrasjon — set_member_role er
+  // vakten (kun personlige rader, aldri spillere, laget kan aldri stå uten
+  // aktiv trener/lagleder), UI-et speiler den. Dette er også veien siste-
+  // admin-vakten i «Forlat laget» deep-linker til: overdra rollen først.
+  const handleChangeRole = useCallback(
+    (member: TeamMember) => {
+      if (!activeTeamSpaceId) return;
+      const choices: UserRole[] = ['trener', 'lagleder', 'forelder', 'supporter'];
+      Alert.alert(
+        `Endre rollen til ${member.name}`,
+        `Rollen er ${ROLE_LABELS[member.role].toLowerCase()} i dag.`,
+        [
+          ...choices
+            .filter(r => r !== member.role)
+            .map(r => ({
+              text: ROLE_LABELS[r],
+              onPress: async () => {
+                try {
+                  await setMemberRole(activeTeamSpaceId, member.id, r);
+                } catch (e) {
+                  Alert.alert('Kunne ikke endre rollen', errorMessage(e));
+                }
+                invalidateTeamMembers(activeTeamSpaceId);
+              },
+            })),
+          {text: 'Avbryt', style: 'cancel' as const},
+        ],
+      );
+    },
+    [activeTeamSpaceId],
+  );
+
+  // Trenerforespørselen (§5): «Jeg er trener» i join-flyten ga supporter +
+  // stående forespørsel. Godkjenn = set_member_role('trener'); avslå nuller
+  // forespørselen — begge gir personen beskjed via varsel (RPC-ene).
+  const handleRoleRequest = useCallback(
+    (member: TeamMember) => {
+      if (!activeTeamSpaceId) return;
+      Alert.alert(
+        `${member.name} vil bli trener`,
+        'Godkjenner du, får personen trenerrollen med en gang. Avslår du, blir personen værende som supporter.',
+        [
+          {text: 'Avbryt', style: 'cancel'},
+          {
+            text: 'Avslå',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await declineRoleRequest(activeTeamSpaceId, member.id);
+              } catch (e) {
+                Alert.alert('Kunne ikke avslå', errorMessage(e));
+              }
+              invalidateTeamMembers(activeTeamSpaceId);
+            },
+          },
+          {
+            text: 'Godkjenn som trener',
+            onPress: async () => {
+              try {
+                await setMemberRole(activeTeamSpaceId, member.id, 'trener');
+              } catch (e) {
+                Alert.alert('Kunne ikke godkjenne', errorMessage(e));
+              }
+              invalidateTeamMembers(activeTeamSpaceId);
+            },
+          },
+        ],
+      );
+    },
+    [activeTeamSpaceId],
+  );
+
+  // ⋯-menyen samler medlemshandlingene: forespørsel, rollebytte, fjerning.
+  const handleMemberActions = useCallback(
+    (member: TeamMember) => {
+      const canChangeRole = member.role !== 'spiller';
+      const canRemove = !isTeamAdmin(member.role);
+      Alert.alert(member.name, subtitleFor(member), [
+        ...(member.requestedRole
+          ? [
+              {
+                text: 'Behandle trenerforespørsel',
+                onPress: () => handleRoleRequest(member),
+              },
+            ]
+          : []),
+        ...(canChangeRole
+          ? [{text: 'Endre rolle', onPress: () => handleChangeRole(member)}]
+          : []),
+        ...(canRemove
+          ? [
+              {
+                text: 'Fjern fra laget',
+                style: 'destructive' as const,
+                onPress: () => handleRemove(member),
+              },
+            ]
+          : []),
+        {text: 'Avbryt', style: 'cancel' as const},
+      ]);
+    },
+    [handleChangeRole, handleRemove, handleRoleRequest],
+  );
+
   const handleContact = useCallback((member: TeamMember) => {
     const phone = member.phone;
     if (!phone) return;
@@ -194,9 +304,9 @@ export function TeamMembersScreen() {
             {section.data.map((member, i) => {
               const isMe = member.id === myId;
               const canContact = !!member.phone && !isMe;
-              // Speiler RPC-vaktene: aldri deg selv, aldri trener/lagleder.
-              const canRemove =
-                amAdmin && !isMe && !isTeamAdmin(member.role);
+              // ⋯ samler handlingene (rolle/forespørsel/fjerning) — hva som
+              // faktisk tilbys avgjøres i menyen, vaktene bor i RPC-ene.
+              const showActions = amAdmin && !isMe;
               return (
                 <Pressable
                   key={member.id}
@@ -224,10 +334,25 @@ export function TeamMembersScreen() {
                       <Text style={styles.pendingText}>Invitert</Text>
                     </View>
                   )}
-                  {canContact && <Text style={styles.contactIcon}>📞</Text>}
-                  {canRemove && (
+                  {/* Trenerforespørselen (§5) — kun lagadmin ser og
+                      behandler den; chippen er selve inngangen. */}
+                  {amAdmin && member.requestedRole === 'trener' && (
                     <Pressable
-                      onPress={() => handleRemove(member)}
+                      onPress={() => handleRoleRequest(member)}
+                      hitSlop={6}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${member.name} vil bli trener — behandle forespørselen`}
+                      style={({pressed}) => [
+                        styles.requestChip,
+                        pressed && styles.morePressed,
+                      ]}>
+                      <Text style={styles.requestText}>Vil bli trener</Text>
+                    </Pressable>
+                  )}
+                  {canContact && <Text style={styles.contactIcon}>📞</Text>}
+                  {showActions && (
+                    <Pressable
+                      onPress={() => handleMemberActions(member)}
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel={`Flere valg for ${member.name}`}
@@ -376,6 +501,21 @@ const styles = StyleSheet.create({
   pendingText: {
     ...typography.caption,
     color: colors.textSecondary,
+  },
+  // Trenerforespørselen skal ses, ikke ropes: mint flate, mørk tekst
+  // (A v2-regelen — mint er fyll på lys flate, aldri tekstfarge).
+  requestChip: {
+    backgroundColor: colors.heiaSoft,
+    borderWidth: 1,
+    borderColor: colors.heia,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  requestText: {
+    ...typography.caption,
+    color: colors.heiaInk,
+    fontWeight: '700',
   },
   contactIcon: {
     fontSize: 18,

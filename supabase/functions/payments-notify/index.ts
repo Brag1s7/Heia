@@ -28,6 +28,8 @@
 //   team_request_no_manager → ops (fallback-mottakeren: ingen
 //     forespørsel forsvinner til null mottakere).
 //   security        → ops (f.eks. forsøk fra suspendert utsteder).
+//   team_dormant    → ops: lag uten aktive medlemmer (00067, §3e i
+//     FORLAT-LAG-DORMANT — kun når laget har innhold/avtaler).
 //
 // Mangler RESEND_API_KEY → skip (aldri feile en DB-transaksjon på
 // varsling). Norsk tekst; minimalt innhold — aldri KYC-/bankdata.
@@ -317,6 +319,31 @@ Inviter en ny fra Heia Ops (Klubber og roller) når klubben har pekt ut en perso
           `«${teamName}» vil samle inn supporterstøtte for ${legal}.\n\nGodkjenn eller avslå under Klubbetalinger på Profil i Heia-appen.`,
         );
       }
+      return new Response('ok', {status: 200});
+    }
+
+    // ── team_dormant: lag uten aktive medlemmer → ops (§3e i
+    //    FORLAT-LAG-DORMANT: kun informasjon — ingenting slettes,
+    //    og varselet sendes bare når laget har innhold/avtaler) ────
+    if (type === 'team_dormant') {
+      const {data: ts} = await admin
+        .from('team_spaces')
+        .select('display_name')
+        .eq('id', body.team_space_id)
+        .maybeSingle();
+      const teamName = (ts?.display_name as string) ?? '(ukjent lag)';
+      const live = Number(body.live_subscriptions ?? 0);
+      await sendMail(
+        [OPS_TO],
+        `Laget «${teamName}» står uten medlemmer`,
+        `«${teamName}» har ikke lenger noen aktive medlemmer (årsak: ${body.reason ?? 'ukjent'}).
+
+Laget består som beholder — innhold, historikk og støtteavtaler er urørt, og ingenting slettes automatisk.
+${body.has_content ? 'Laget HAR innhold (innlegg/hendelser).' : 'Laget har ikke innhold.'}
+Løpende støtteavtaler: ${live}.
+
+En tidligere trener kan gjenåpne laget med invitasjonskoden, eller Heia kan tildele rollen på nytt.`,
+      );
       return new Response('ok', {status: 200});
     }
 

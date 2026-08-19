@@ -45,6 +45,12 @@ export interface ClubPaymentTeam {
    * Edge-funksjon på nytt. 0 for alt annet enn deaktiverte lag.
    */
   unresolvedCancellations: number;
+  /**
+   * §3e i FORLAT-LAG-DORMANT (00067): satt når laget står uten aktive
+   * medlemmer. Ren dormant-markering — innsyn, aldri myndighet (§3f-4):
+   * betalingsansvarlig kan be ops, ikke overta laget.
+   */
+  dormantAt: string | null;
 }
 
 /** Aktiv eller suspendert betalingsansvarlig for enheten. */
@@ -145,6 +151,7 @@ function mapClub(raw: any): ClubPaymentsClub {
       state: t.state as TeamSupportState,
       liveSubscriptions: t.live_subscriptions ?? 0,
       unresolvedCancellations: t.unresolved_cancellations ?? 0,
+      dormantAt: t.dormant_at ?? null,
     })),
     managers: ((raw.managers ?? []) as any[]).map((m) => ({
       userId: m.user_id,

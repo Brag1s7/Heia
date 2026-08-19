@@ -3,7 +3,12 @@ import {queryClient} from './queryClient';
 import {queryKeys} from './keys';
 // Direkte fil-import, ikke api-barrelen: comments.ts (i barrelen) importerer
 // denne modulen tilbake, og barrel-veien ville gitt en importsirkel.
-import {getTeamMembers, type TeamMember} from '../api/members';
+import {
+  getTeamMembers,
+  getTeamAuthors,
+  type TeamMember,
+  type TeamAuthor,
+} from '../api/members';
 
 /**
  * Medlemslisten endrer seg sjelden (noen inn/ut per sesong) men leses
@@ -37,8 +42,26 @@ export function fetchTeamMembersCached(
   });
 }
 
-/** Etter medlemsmutasjoner (rollebytte, fjerning) — tving fersk henting. */
+/**
+ * Forfatter-oppslaget (00067) — kommentartrådens navnekilde. Skilt fra
+ * members-cachen fordi utmeldte forfattere skal bestå der (frysdokumentets
+ * §2: innhold og forfatterskap overlever utmelding), mens rosteret kun
+ * viser levende medlemmer. Samme staleTime; forfatterskap endres sjeldnere.
+ */
+export function fetchTeamAuthorsCached(
+  teamSpaceId: string,
+): Promise<TeamAuthor[]> {
+  return queryClient.ensureQueryData({
+    queryKey: queryKeys.authors(teamSpaceId),
+    queryFn: () => getTeamAuthors(teamSpaceId),
+    staleTime: MEMBERS_STALE_MS,
+  });
+}
+
+/** Etter medlemsmutasjoner (rollebytte, fjerning) — tving fersk henting.
+ *  Forfatter-cachen følger med: et navnebytte skal ikke leve videre der. */
 export function invalidateTeamMembers(teamSpaceId: string): Promise<void> {
+  queryClient.invalidateQueries({queryKey: queryKeys.authors(teamSpaceId)});
   return queryClient.invalidateQueries({
     queryKey: queryKeys.members(teamSpaceId),
   });

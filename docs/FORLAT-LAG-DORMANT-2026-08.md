@@ -1,9 +1,13 @@
 # «Forlat lag» — dormant-modellen (FROSSET 2026-08-19)
 
 **Status: GODKJENT AV BRAGE 2026-08-19, med presiseringene i §3.
-IKKE BYGGET.** Byggingen skjer i egen samtale (se STATUS-HANDOFF).
+BYGGET OG DEPLOYET 2026-08-19 (migrasjon `00067_forlat_lag.sql` +
+`payments-notify`; hele §7-omfanget — se STATUS-HANDOFF for leveransen
+og restpunktene: verify-00067.sql i SQL-editoren + telefonrunden).**
 Dette dokumentet er beslutningsgrunnlaget og skal ikke relitigeres —
-endringer krever Brages uttrykkelige beslutning.
+endringer krever Brages uttrykkelige beslutning. Ops-RPC-ene i §3f-5
+(gjenåpne/overdra/legge ned via ops-flate) sto ikke i §7 og er BEVISST
+ikke bygget ennå — de følger «Legg ned laget»-skiva (§4).
 
 Forhistorien (to forkastede modeller, GPT-runden, auditens funn og
 sikkerhetsskiva 00066) står i §6, så en ny samtale slipper å

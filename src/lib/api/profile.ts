@@ -10,6 +10,7 @@ function mapProfile(row: any): Profile {
     phone: row.phone,
     locale: row.locale,
     onboardingCompleted: row.onboarding_completed,
+    onboardingCompletedAt: row.onboarding_completed_at ?? null,
     householdId: row.household_id,
   };
 }
