@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER BYGGET OG DEPLOYET)
+## ▶️▶️ START HER (oppdatert 2026-08-19 natt — LEAVE-SKIVA ER BYGGET, DEPLOYET OG SERVERVERIFISERT; KUN TELEFONRUNDEN GJENSTÅR)
 
 **«FORLAT LAG»-SKIVA (dormant-modellen) ER BYGGET, PUSHET OG DEPLOYET
 2026-08-19.** Modellen står FROSSET i `docs/FORLAT-LAG-DORMANT-2026-08.md`
@@ -62,19 +62,19 @@
   Lint ren (kun de gamle kjente advarslene).
 
 - 🔲 **GJENSTÅR FOR BRAGE:**
-  1. **Kjør `scripts/verify-00067.sql` i SQL-editoren** (hele fila i
-     ett — selvforsynt, ruller alt tilbake, grid-en til slutt skal si
-     «SUM … GRØNT»; ⚠️-rader er dokumenterte hopp, ❌ er funn). Dette
-     er skivas serverbevis — portene, vaktene, dormant og A3-riderne.
-     ⚠️ **SKRIPTET ER IKKE KJØRT ÉN ENESTE GANG** — denne maskinen har
-     hverken `psql` eller Docker, og Management-API-tokenet lå bak
-     keychain-sperren, så det fantes ingen vei til en Postgres å teste
-     mot. SQL-en i skriptet er altså lest, ikke bevist. Feiler den på
-     syntaks eller en fixtur (mistenkt nr. 1: `auth.users`-inserten —
-     kolonnekrav varierer mellom GoTrue-versjoner), er det SKRIPTET som
-     er feil, ikke 00067: send feilmeldingen, så rettes den. Selve
-     migrasjonen er derimot bevist kjørbar — `supabase db push` gikk
-     gjennom mot prod, og `supabase migration list` viser 00067.
+  1. ✅ **GJORT 2026-08-19: `scripts/verify-00067.sql` KJØRT AV BRAGE —
+     34/34 GRØNT.** Serverbeviset er i havn: begge backfillene,
+     onboarding-triggeren, §5-innløserflaten (rolleavvisning,
+     trener→supporter+forespørsel, godkjenn/avslå), §3c-sporet,
+     §2-utmeldingen med RSVP-rydding og siste-admin-vakten, §3b
+     «siste episode avgjør» begge veier, §3a-låsen med beboer-unntaket,
+     §3f gjenåpning (både avvist og innvilget), §3e dormant fra både
+     leave og kontosletting, `get_team_authors`, og alle tre
+     A3-riderne. FØRSTE kjøring stoppet på test 6 — feil i SKRIPTET,
+     ikke i 00067: `set_config(...,true)` er transaksjonsbundet, så en
+     fanget exception rullet JWT-claimet tilbake til forrige bruker.
+     Claimet settes nå utenfor alle fire avvisningsblokkene (felle-
+     notatet står i skriptet — ikke gjeninnfør det).
   2. **Telefonrunden** (Metro-reload holder — ren JS i appen): forlat
      lag (med/uten barn, med levende avtale-tekst), siste-admin-
      blokkeringen + rollemeny/overdragelse, trenerforespørsel
