@@ -523,10 +523,70 @@ Fase C er terskelstyrt — bygg ingenting.
    blå og trykkbar, og den kan sende folk til App Store hvis de mangler
    appen og fylle koden inn selv hvis de har den (`prefillCode` finnes alt).
 
-   **▶️ NESTE SAMTALE: PROFILRYDDINGEN (B6), SÅ FASE B.** A1, A2 og A3 er
-   alle ferdige — app-sporet i autoritetsmodellen er dermed lukket. B6 har
-   nå to konkrete krav fra dogfooden (innlogget e-post synlig, forlate lag
-   selv). Deretter:
+   **▶️ REKKEFØLGEN FREMOVER — AVTALT MED BRAGE 2026-08-19.** A1, A2 og A3
+   er alle ferdige; app-sporet i autoritetsmodellen er lukket.
+
+   1. **B6 profilryddingen — INNHOLDET BEKREFTET AV BRAGE 2026-08-19**
+      (beslutningen fra 18. aug. sa bare «profilrydding», aldri hva):
+      a) **E-post under navnet** i profil-toppen. Skjermen viser avatar,
+         navn og rollebadge, men aldri hvilken KONTO du er inne som —
+         ubrukelig med flere kontoer, og en forelder som registrerte seg
+         med feil adresse kan ikke oppdage det.
+      b) **Flytt «Bli med i et lag» + «Opprett et nytt lag»** fra
+         «Innstillinger» opp til «Dine lag». De er lag-handlinger, men
+         ligger begravd mellom telefonnummeret og «Logg ut».
+      c) **Del opp «Innstillinger»**, som i dag er en skuff med fire
+         ulike ting: Konto (telefon, varslinger) · Logg ut / Slett konto
+         som egen avsluttende blokk · Om Heia (vilkår, personvern,
+         versjon) nederst og dempet.
+      d) **Versjonsnummeret er hardkodet «v0.1.0»** — leses ikke fra
+         bygget, så «Om Heia» lyver i TestFlight, akkurat i den raden en
+         testbruker leser når hun skal melde en feil.
+      + sveip dokumentasjonen for «Klubbbetalinger» med tre b-er (appen
+      er rettet, docs ikke).
+   2. **«Forlat lag» + foreldreløse lag** — ÉN skive, ikke to. Brage
+      vurderer dette som viktig, og det er nærmere et lanseringskrav enn en
+      forbedring: i dag er eneste vei ut av et lag å slette hele kontoen,
+      og gjør man det som siste medlem blir laget liggende igjen tomt,
+      usynlig (ingen offentlig lagsøking) og med bilder som koster
+      lagring for alltid. Invitasjonskoden er da eneste «nøkkel» tilbake,
+      og `join_team_space` lar innløseren velge sin egen rolle — så et
+      forlatt lag overtas i praksis av den som har en gammel kode i en
+      meldingstråd. Vakter: siste voksen kan ikke gå ut · aktivt
+      abonnement må håndteres eksplisitt · forelder med flere barn har
+      flere rader. Ved KONTOSLETTING (kan aldri nektes): er du siste
+      medlem og laget aldri har hatt støtte eller innhold → slett laget og
+      bildene; ellers varsle ops, som ved managerløse enheter.
+   3. **Cache-persistering** — Brages beslutning 2026-08-19: tas FØR
+      nettsiden, og settes ut til Fable. NB: det finnes INGEN egress-jobb
+      (se under) — oppdraget er cache alene.
+   4. **Fase B (nettsiden)**, som starter med B4-stackbeslutningen.
+
+   **CACHE-PERSISTERING — OPPDRAGSBESKRIVELSE.** Gevinsten er KUN opplevd
+   fart ved kaldstart på de varme skjermene; egress er upåvirket (bildene
+   ligger allerede på disk, se under). Omfang: `@tanstack/
+   react-query-persist-client` + `@tanstack/query-async-storage-persister`
+   (begge ren JS — ingen native, ingen pod install, kun Metro-omstart) ·
+   `PersistQueryClientProvider` i App.tsx · lagringsnøkkel som inkluderer
+   bruker-id + sletting i `clearLocalCaches` (delt telefon: bruker B skal
+   aldri kunne lese bruker A sine lagdata fra disk) · `maxAge` ~24 t.
+   **FELLA:** feeden er en `useInfiniteQuery` — uten en grense skrives
+   ALLE lastede sider til disk og leses inn igjen ved oppstart. Begrens
+   til første side. Betalinger/ops er IKKE i query-cachen (P7-avgrensningen
+   i keys.ts), så ingen betalingsdata kan havne på disk — det var den
+   farligste delen, og den er allerede eliminert.
+
+   **HVA SOM ALLEREDE PERSISTERES (svar på Brages spørsmål 2026-08-19 —
+   «lagres ingenting lokalt?»):** jo, den dyre delen. `expo-image` har en
+   **150 MB disk-cache nøklet på storage_path, ikke URL**
+   (MediaImage.tsx) — den overlever appdrap, og et ferskt signert token
+   gir fortsatt cache-TREFF (roterende `?token=` var rotårsak nr. 1 i
+   egress-auditen). De signerte URL-ene lagres i tillegg i AsyncStorage i
+   24 t (resolver.ts), og opplastingene setter Cache-Control. Det som IKKE
+   persisteres er JSON-radene — og det er riktig prioritering: en feed-side
+   er noen kB, ett bilde er hundrevis.
+
+   Deretter:
    så **fase B** (web: invitasjonslanding → flagget PÅ → Klubbbetalinger
    /ops på web → full nominasjon-av-annen-dogfood). Stange/Nes-testdata
    ryddes FØRST etter fase B-dogfooden (de er motpart i testene).
