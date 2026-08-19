@@ -75,7 +75,19 @@
      fanget exception rullet JWT-claimet tilbake til forrige bruker.
      Claimet settes nå utenfor alle fire avvisningsblokkene (felle-
      notatet står i skriptet — ikke gjeninnfør det).
-  2. **Telefonrunden** (Metro-reload holder — ren JS i appen): forlat
+  2. **Telefonrunden.** ✅ **DELVIS GJORT 2026-08-19 — §3d-porten er
+     BEVIST PÅ ENHET, BEGGE GRENER:** onboardet bruker som forlot sitt
+     siste lag → Profil-rotet stack («fungerte bra»); helt ny bruker
+     (`+test1@gmail.com`, plus-adressering) → den LÅSTE onboardingen
+     (WelcomeIntent). Det var den ene skjelningen som ikke kan leses ut
+     av databasen — begge tilstander har null aktive lag.
+     🔲 **GJENSTÅR PÅ TELEFON:** forlat lag MED BARN (navngivingen),
+     siste-trener-blokkeringen + rollemeny/overdragelse,
+     trenerforespørsel (join som trener → chip → godkjenn/avslå),
+     «Gjenåpne laget», kommentar fra utmeldt forfatter, og hele
+     B6-runden. Serversiden for alle disse er bevist av verify (34/34),
+     så det som står igjen er om knappene vises og tekstene stemmer.
+     (Original liste:) forlat
      lag (med/uten barn, med levende avtale-tekst), siste-admin-
      blokkeringen + rollemeny/overdragelse, trenerforespørsel
      (join som trener → chip → godkjenn/avslå), lagløs Profil-rot
