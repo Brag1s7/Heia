@@ -1,5 +1,11 @@
-import React from 'react';
-import {View, Text, Pressable, StyleSheet} from 'react-native';
+import React, {useState} from 'react';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  type LayoutChangeEvent,
+} from 'react-native';
 import Svg, {
   ClipPath,
   Defs,
@@ -97,6 +103,48 @@ function gateLabel(event: MatchEvent, score?: string): string {
 }
 
 /**
+ * RADENS FAKTISKE HØYDE, I PUNKTER.
+ *
+ * ---------------------------------------------------------------------------
+ * ⚠️ HVORFOR IKKE BARE `height="100%"` (telefontest 2026-08-20, skive 3)
+ *
+ * Flatene i en rad — målswellen og skiferstripa — er svg-er i en
+ * `absoluteFill`-beholder. Beholderen strekker seg korrekt over hele raden;
+ * det gjør RNs layout alltid. Men `<Rect height="100%">` inne i svg-en
+ * regnes mot svg-ens EGEN oppmålte lerretstørrelse, og den henger igjen på
+ * verdien fra første layout. En målrad UTEN bilde er ~83 pt; med bilde er
+ * den tre ganger så høy — og da ble swellen stående igjen på den første
+ * høyden.
+ *
+ * Resultatet var nøyaktig den feilen skive 2.2 trodde den hadde lukket:
+ * lagets lys rakk ikke ned til bildet, og bildet hang løsrevet under et mål
+ * som visuelt sluttet midtveis. Den gangen var årsaken gradientens
+ * rotasjon, og den rettelsen var riktig — men den var ikke HELE årsaken.
+ *
+ * BEVISET LÅ I SAMME SKJERMBILDE: måltenningen (`styles.ignition`) er en
+ * vanlig `View` med `top: 0, bottom: 0`, og den gikk hele veien ned forbi
+ * bildet. Samme rad, samme beholder — den ene brukte RNs layout, den andre
+ * en prosent inne i svg. Bare den ene var feil.
+ *
+ * Derfor måles høyden her og sendes inn som PUNKTER. Ingen prosent noe sted
+ * i flatene. Samme mønster som `ArenaSurface` alt bruker, og prisen er den
+ * samme: én frame uten flaten før målingen lander.
+ */
+function useRowHeight(): {
+  height: number;
+  onLayout: (e: LayoutChangeEvent) => void;
+} {
+  const [height, setHeight] = useState(0);
+  const onLayout = (e: LayoutChangeEvent) => {
+    const next = e.nativeEvent.layout.height;
+    // Terskel, ikke likhet: en ren `setState` per layout-hendelse ville
+    // gitt en render-løkke på subpiksel-drift.
+    setHeight(prev => (Math.abs(prev - next) > 0.5 ? next : prev));
+  };
+  return {height, onLayout};
+}
+
+/**
  * MÅLSWELLEN — grunnen løftes der et mål ligger. Ingen kort, ingen ramme.
  *
  * ⚠️ FEIRINGENS KJERNE ER ALLTID MINT/KREM MED MØRKT BLEKK. Lagfargen er en
@@ -119,64 +167,129 @@ function GoalSwell({grid, teamColor}: {grid: MatchGrid; teamColor: string}) {
   // Kuppelen: flat ved kantene, løftet på midten. Samme grunne bue som
   // prototypens elliptiske radius gir.
   const curve = `M0 ${dome} C ${w * 0.14} 0, ${w * 0.86} 0, ${w} ${dome}`;
+  const h = useRowHeight();
 
   return (
     <View
       style={StyleSheet.absoluteFill}
+      onLayout={h.onLayout}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants">
-      <Svg width="100%" height="100%">
-        <Defs>
-          {/* ⚠️ KLIPP, IKKE OVERMALING (telefontest 2026-08-20).
-              Kuppelen ble før laget ved å male grunnfargen (#123325) tilbake
-              over de firkantede hjørnene. Det virket så lenge raden lå på en
-              flat, mørk egen flate — men fra skive 2 ligger den på GRUNNEN,
-              og da var overmalingen en ugjennomsiktig plate i feil farge som
-              KUTTET KRITTLINJA i de øverste 34 punktene av hver målrad.
-              Nå klippes hele swellen til formen sin i stedet. Ingen opasitet
-              legges noe sted, og linja går uavbrutt gjennom.
-              Bunnen settes vilkårlig dypt: svg-en klipper uansett til
-              viewporten, og raden har ingen kjent høyde her. */}
-          <ClipPath id="swellClip">
-            <Path d={`${curve} L ${w} 4000 L 0 4000 Z`} />
-          </ClipPath>
-          {/* ⚠️ HELT HORISONTAL (`y2="0%"`). Med `y2="30%"` roterte
-              gradienten når raden ble høy — og en målrad MED BILDE er tre
-              ganger så høy som en uten. Da rakk lagets lys aldri ned til
-              bildet, og bildet ble hengende løsrevet under et mål som
-              sluttet midtveis. Feiringen skal dekke hele øyeblikket. */}
-          <LinearGradient id="swellTeam" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0" stopColor={teamColor} stopOpacity={cap.peak} />
-            <Stop offset="0.56" stopColor={teamColor} stopOpacity={0} />
-          </LinearGradient>
-          {/* Fasiten legger BEGGE gradientene i ett lag og multipliserer
-              hele laget med swell-peaken. Her er de to lag, så peaken må
-              ganges inn i mint-radialen også — ellers lyser den ~1.8x for
-              sterkt og feiringen blir grell i stedet for varm. */}
-          <RadialGradient id="swellMint" cx="4%" cy="46%" rx="126%" ry="118%">
-            <Stop
-              offset="0"
-              stopColor={colors.heia}
-              stopOpacity={0.34 * cap.peak}
+      {h.height > 0 && (
+        <Svg width={w} height={h.height}>
+          <Defs>
+            {/* ⚠️ KLIPP, IKKE OVERMALING (telefontest 2026-08-20).
+                Kuppelen ble før laget ved å male grunnfargen (#123325) tilbake
+                over de firkantede hjørnene. Det virket så lenge raden lå på en
+                flat, mørk egen flate — men fra skive 2 ligger den på GRUNNEN,
+                og da var overmalingen en ugjennomsiktig plate i feil farge som
+                KUTTET KRITTLINJA i de øverste 34 punktene av hver målrad.
+                Nå klippes hele swellen til formen sin i stedet. Ingen opasitet
+                legges noe sted, og linja går uavbrutt gjennom.
+                Bunnen er radens MÅLTE høyde — se `useRowHeight`. Den sto før
+                på et vilkårlig dypt tall fordi høyden ikke var kjent her. */}
+            <ClipPath id="swellClip">
+              <Path d={`${curve} L ${w} ${h.height} L 0 ${h.height} Z`} />
+            </ClipPath>
+            {/* ⚠️ HELT HORISONTAL (`y2="0%"`). Med `y2="30%"` roterte
+                gradienten når raden ble høy — og en målrad MED BILDE er tre
+                ganger så høy som en uten. Da rakk lagets lys aldri ned til
+                bildet, og bildet ble hengende løsrevet under et mål som
+                sluttet midtveis. Feiringen skal dekke hele øyeblikket.
+                ⚠️ Den rettelsen var riktig, men ikke hele årsaken — flaten
+                var også prosenthøy. Se `useRowHeight`. */}
+            <LinearGradient id="swellTeam" x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop offset="0" stopColor={teamColor} stopOpacity={cap.peak} />
+              <Stop offset="0.56" stopColor={teamColor} stopOpacity={0} />
+            </LinearGradient>
+            {/* Fasiten legger BEGGE gradientene i ett lag og multipliserer
+                hele laget med swell-peaken. Her er de to lag, så peaken må
+                ganges inn i mint-radialen også — ellers lyser den ~1.8x for
+                sterkt og feiringen blir grell i stedet for varm. */}
+            <RadialGradient id="swellMint" cx="4%" cy="46%" rx="126%" ry="118%">
+              <Stop
+                offset="0"
+                stopColor={colors.heia}
+                stopOpacity={0.34 * cap.peak}
+              />
+              <Stop offset="0.6" stopColor={colors.heia} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+
+          <G clipPath="url(#swellClip)">
+            <Rect
+              x="0"
+              y="0"
+              width={w}
+              height={h.height}
+              fill="url(#swellTeam)"
             />
-            <Stop offset="0.6" stopColor={colors.heia} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
+            <Rect
+              x="0"
+              y="0"
+              width={w}
+              height={h.height}
+              fill="url(#swellMint)"
+            />
+          </G>
 
-        <G clipPath="url(#swellClip)">
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#swellTeam)" />
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#swellMint)" />
-        </G>
+          {/* Lyskanten på kuppelen — kritt, ikke ramme. */}
+          <Path
+            d={curve}
+            stroke={matchColors.chalk}
+            strokeWidth={1}
+            fill="none"
+          />
+        </Svg>
+      )}
+    </View>
+  );
+}
 
-        {/* Lyskanten på kuppelen — kritt, ikke ramme. */}
-        <Path
-          d={curve}
-          stroke={matchColors.chalk}
-          strokeWidth={1}
-          fill="none"
-        />
-      </Svg>
+/**
+ * MÅL IMOT — dempet skiferstripe som toner ut mot høyre. Informasjon, ikke
+ * feiring, og aldri coral.
+ *
+ * ⚠️ Måler høyden av samme grunn som swellen: et mål imot MED bilde er like
+ * høyt som et mål for oss med bilde, og en prosenthøyde ville stoppet på
+ * samme sted.
+ */
+function AgainstStripe({grid}: {grid: MatchGrid}) {
+  const h = useRowHeight();
+
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      onLayout={h.onLayout}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      {h.height > 0 && (
+        <Svg width={grid.width} height={h.height}>
+          <Defs>
+            <LinearGradient id="againstFade" x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop
+                offset="0"
+                stopColor={matchColors.opponent}
+                stopOpacity={0.42}
+              />
+              <Stop
+                offset="0.72"
+                stopColor={matchColors.opponent}
+                stopOpacity={0}
+              />
+            </LinearGradient>
+          </Defs>
+          <Rect
+            x="0"
+            y="0"
+            width={grid.width}
+            height={h.height}
+            fill="url(#againstFade)"
+          />
+        </Svg>
+      )}
     </View>
   );
 }
@@ -253,38 +366,7 @@ export function MatchEventRow({
 
       {/* Mål imot: dempet skiferstripe som toner ut mot høyre. Informasjon,
           ikke feiring — og aldri coral. */}
-      {isGoalThem && (
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <Svg width="100%" height="100%">
-            <Defs>
-              <LinearGradient
-                id="againstFade"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="0%">
-                <Stop
-                  offset="0"
-                  stopColor={matchColors.opponent}
-                  stopOpacity={0.42}
-                />
-                <Stop
-                  offset="0.72"
-                  stopColor={matchColors.opponent}
-                  stopOpacity={0}
-                />
-              </LinearGradient>
-            </Defs>
-            <Rect
-              x="0"
-              y="0"
-              width="100%"
-              height="100%"
-              fill="url(#againstFade)"
-            />
-          </Svg>
-        </View>
-      )}
+      {isGoalThem && <AgainstStripe grid={grid} />}
 
       {/* ⚠️ REPORTERENS STEMME HAR INGEN FLATE I DET HELE TATT.
           Prototypen legger et «ekstremt svakt» grønt lys bak teksten. På

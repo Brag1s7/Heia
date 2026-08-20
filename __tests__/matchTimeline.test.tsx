@@ -388,3 +388,98 @@ describe('MatchTimeline — måltenningen maler aldri over krittlinja', () => {
     expect(ignition[0].left).toBe(g.threadLeft);
   });
 });
+
+describe('MatchTimeline — målswellen dekker HELE målet, også bildet', () => {
+  /**
+   * ⚠️ TELEFONTEST 2026-08-20 (skive 3): «en feil med hvordan bilder lastes
+   * inn». Lagets lys stoppet rett over bildet, så målet sluttet visuelt
+   * midtveis og bildet hang løsrevet under.
+   *
+   * Skive 2.2 rettet gradientens ROTASJON, og det var riktig — men det var
+   * ikke hele årsaken. Flatene var svg-er med `height="100%"`, og en prosent
+   * inne i svg regnes mot lerretets oppmålte størrelse, ikke mot RNs layout.
+   * En målrad uten bilde er ~83 pt; med bilde tre ganger så høy.
+   *
+   * BEVISET LÅ I SAMME SKJERMBILDE: måltenningen er en vanlig `View` med
+   * `top: 0, bottom: 0` og gikk hele veien ned. Samme rad, samme beholder —
+   * bare den ene brukte prosent, og bare den ene var feil.
+   *
+   * Regelen nå: flatene måles og tegnes i PUNKTER. Ingen prosenthøyde.
+   */
+
+  /** Alt som tegner en flate i en rad måler seg selv — fyr av målingen. */
+  function layout(tree: ReactTestRenderer.ReactTestRenderer, height: number) {
+    const RNView = require('react-native').View;
+    const measured = tree.root
+      .findAllByType(RNView)
+      .filter(n => typeof n.props.onLayout === 'function');
+    act(() => {
+      for (const n of measured) {
+        n.props.onLayout({nativeEvent: {layout: {width: 393, height}}});
+      }
+    });
+    return measured.length;
+  }
+
+  const goalWithPhoto = () =>
+    render({
+      matchEvents: [ev('g1', 'mål', 34, {teamSide: 'home'})],
+      newestFirst: true,
+      nowMinute: 40,
+    });
+
+  it('måler BEGGE radflatene — mål for oss og mål imot', () => {
+    // Skiferstripa på et mål imot hadde nøyaktig samme prosenthøyde, og en
+    // målrad imot MED bilde er like høy. Rettes bare den ene, er feilen
+    // fortsatt der — den er bare vanskeligere å få øye på.
+    const tree = render({
+      matchEvents: [
+        ev('g1', 'mål', 34, {teamSide: 'home'}),
+        ev('g2', 'mål', 41, {teamSide: 'away', description: 'Mål til Ridabu'}),
+      ],
+      newestFirst: true,
+      nowMinute: 45,
+    });
+    layout(tree, 420);
+
+    const RNSvg = require('react-native-svg').default;
+    const measured = tree.root
+      .findAllByType(RNSvg)
+      .filter(x => x.props.height === 420);
+
+    expect(measured).toHaveLength(2);
+  });
+
+  it('arver radens FAKTISKE høyde, ikke høyden uten bilde', () => {
+    const tree = goalWithPhoto();
+    const n = layout(tree, 431);
+    expect(n).toBeGreaterThan(0);
+
+    const RNSvg = require('react-native-svg').default;
+    const heights = tree.root
+      .findAllByType(RNSvg)
+      .map(x => x.props.height)
+      .filter(h => typeof h === 'number');
+
+    // Swellen skal ha nøyaktig den høyden raden meldte — vokser raden når
+    // bildet legger seg inn, følger flaten etter.
+    expect(heights).toContain(431);
+  });
+
+  it('holder seg til gradienter og kritt også når flaten faktisk tegnes', () => {
+    // Den gamle vakten («ingen dekkende fyllfarge») ble blind da swellen
+    // begynte å vente på en måling: uten onLayout tegnes den ikke i det hele
+    // tatt, og testen «bestod» på ingenting.
+    const tree = goalWithPhoto();
+    layout(tree, 431);
+
+    const fills = tree.root
+      .findAll(n => typeof n.props.fill === 'string')
+      .map(n => String(n.props.fill));
+
+    expect(fills.some(f => f.startsWith('url('))).toBe(true);
+    for (const fill of fills) {
+      expect(fill === 'none' || fill.startsWith('url(')).toBe(true);
+    }
+  });
+});

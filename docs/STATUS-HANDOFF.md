@@ -2,7 +2,10 @@
 
 ## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 3 BYGGET, VENTER PÅ TELEFONKONTROLL)
 
-**⏳ SKIVE 3 ER BYGGET OG VENTER PÅ BRAGES TELEFONTEST.** Skive 1 og 2 er
+**⏳ SKIVE 3 ER BYGGET, RUNDE 1 AV TELEFONTESTEN ER TATT.** Én reell feil
+kom ut av den (`SKIVE 3.1` — målswellen dekket ikke bildet, og årsaken var
+`height="100%"` inne i svg, ikke gradienten skive 2.2 rettet). Runde 2
+gjenstår.** Skive 1 og 2 er
 levert og telefongodkjent (`93e75ca`, `23df9ed`). Skive 3 — kamprapporten på
 samme grunn — er bygget i samme mønster og skal kontrolleres på enhet FØR
 noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
@@ -835,7 +838,51 @@ spretter bare ikke.
   `MatchGround`, men står fortsatt på den lyse flaten — «FØR KAMP ER UTE I
   DENNE RUNDEN» gjelder den også.
 
-#### 📱 TELEFONKONTROLL — IKKE GJENNOMFØRT ENNÅ
+#### ✅ SKIVE 3.1 — ÉN RETTELSE FRA TELEFONTESTEN 2026-08-20
+
+Brage: **«Alt det andre funker»** — men bildet i en målrad var tilbake som
+en feil. **Lagets lys stoppet rett over bildet**, så målet sluttet visuelt
+midtveis og bildet hang løsrevet under.
+
+**Skive 2.2 trodde den hadde lukket dette**, og rettelsen den gjorde
+(gradientens rotasjon, `y2="0%"`) var riktig — men den var ikke HELE årsaken.
+
+**Den andre halvparten: `height="100%"` inne i svg.** Radens flater
+(målswellen og skiferstripa) er svg-er i en `absoluteFill`-beholder.
+Beholderen strekker seg korrekt over hele raden — RNs layout gjør alltid det.
+Men `<Rect height="100%">` regnes mot svg-ens EGEN oppmålte lerretstørrelse,
+og den blir stående på verdien fra første layout. En målrad uten bilde er
+~83 pt; med bilde er den tre ganger så høy.
+
+⚠️ **BEVISET LÅ I SAMME SKJERMBILDE, OG ER VERDT Å HUSKE SOM METODE:**
+måltenningen (`styles.ignition`) er en vanlig `View` med `top: 0, bottom: 0`,
+og den gikk hele veien ned forbi bildet. Samme rad, samme beholder, samme
+høyde — den ene brukte RNs layout, den andre en prosent inne i svg. **Når to
+lag i samme boks er uenige om høyden, er det ikke layouten som tar feil.**
+
+**Nå måles radens høyde (`useRowHeight`) og sendes inn som PUNKTER.** Ingen
+prosent noen steder i radflatene, og klippet er eksakt i stedet for «vilkårlig
+dypt». Samme mønster som `ArenaSurface`; prisen er den samme — én frame uten
+flaten før målingen lander.
+
+**Begge flatene er rettet.** Mål imot fikk `AgainstStripe` som egen komponent
+med samme måling: skiferstripa hadde nøyaktig samme prosenthøyde, og en
+målrad imot med bilde er like høy. Rettes bare den ene, er feilen fortsatt
+der — bare vanskeligere å få øye på.
+
+**Voktet i `matchTimeline.test.tsx`:** begge radflatene må ha radens målte
+høyde i punkter, og swellen må arve den FAKTISKE høyden (ikke høyden uten
+bilde). Den gamle vakten («ingen dekkende fyllfarge») ble samtidig blind —
+uten `onLayout` tegnes swellen ikke i det hele tatt, så testen «bestod» på
+ingenting. Den kjøres nå med målingen fyrt av.
+
+345 tester / 26 suiter grønt. Lint 12 kjente, uendret.
+
+#### 📱 TELEFONKONTROLL — RUNDE 1 GJENNOMFØRT
+
+**Runde 1 (2026-08-20): «Alt det andre funker» — kun bildet i målraden var
+feil, se 3.1 over. Punkt 1–4 og 6–10 sto Brage til ved første gjennomgang.**
+Runde 2 gjenstår: kontroller punkt 5 på nytt, og at swellen nå dekker bildet.
 
 Åpne en FERDIGSPILT kamp (Hjem/Kalender/Sesongen → en kamp med resultat):
 
