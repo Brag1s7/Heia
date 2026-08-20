@@ -487,6 +487,8 @@ rader beholder sine verdier; de skal ikke backfilles.
 
 ### ✅ SKIVE 2 LEVERT OG TELEFONGODKJENT 2026-08-20 — GRUNNEN OG ARENAEN
 
+Commit `23df9ed` (skive 2 + 2.1 + 2.2 i én — rettelsene traff de samme
+filene og kunne ikke deles uten en mellomtilstand som ikke bygger).
 **Ren JS. Ingen nye pakker, ingen native endringer, ingen migrasjon.**
 316 tester / 25 suiter grønt (var 263/22). Lint 12 kjente — ett hakk UNDER
 baseline. Ruten, de tre stackene og B2-cachen er urørt.
@@ -711,7 +713,7 @@ en REELL begrensning.
 | # | Skive | Status |
 |---|---|---|
 | 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` + 1.1 |
-| 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT + 2.1 + 2.2 |
+| 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT `23df9ed` (+2.1 +2.2) |
 | 3 | **Kamprapporten på samme grunn** | ⏭️ NESTE |
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | godkjent, se P1 |
 | 5 | **Kampens puls** (`PulseCurve`) | se memoiseringsregelen |
@@ -720,6 +722,33 @@ en REELL begrensning.
 | 8 | **Angre mål** (10 s) | se P3 |
 | 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
+
+#### ▶️ SKIVE 3 — HVA SOM ALLEREDE ER KARTLAGT
+
+Rapportgrenen ble lest gjennom rett før skive 2 ble lukket. Dette er hva
+den består av i dag (`EventDetailScreen`, «VANLIG EVENT-MODUS + KAMPRAPPORT»),
+så neste samtale slipper å finne det på nytt:
+
+- `showReport` = ferdig kamp MED score og motstander. Grenen deles med
+  trening, sosialt, kommende kamp, turnering og AVLYST kamp — **det er
+  derfor rapporten ikke bare kan få `MatchGround` rundt hele returen.**
+  Mønsteret fra skive 2 gjelder: en egen `FinishedMatch`-komponent ved siden
+  av `LiveMatch`, og resten av grenen står urørt på krem.
+- Rapporten i dag: `ScoreBoard` (uten minutt) + tittel + «hvor og når» på én
+  linje + beskrivelse → `MatchPhotoRail` → `MatchTimeline` på den lokale
+  `styles.timeline`-flaten → påmeldtliste.
+- **Disse må enten flytte med eller bli igjen — det er en reell beslutning:**
+  «Rediger»-knappen (admin, hvit `Button`), påmeldtlisten
+  (`AttendanceSection`, hvite rader) og `MatchPhotoGallery`.
+  RSVP-baren er allerede gatet bort på ferdig kamp.
+- **Klart siden skive 2:** `MatchPhotoRail` har `variant="match"` ferdig
+  bygget og ubrukt · `MatchTimeline` tar `ground` · `MatchGround` har
+  `phase="finished"` · `MatchArena` må utvides med SLUTT/SEIER-pill i stedet
+  for LIVE (i dag typet `paused: boolean`, live/halfTime only).
+- **A11y-kravet gjelder rapportens flater** — `MatchPhotoRail` og
+  `AttendanceSection` har ingen labels i dag.
+- ⚠️ **Se etter mønsteret fra 2.1/2.2** i alt som flytter ned på grunnen:
+  kode som maler en flat farge «tilbake», eller som antar en fast høyde.
 
 **FØR KAMP ER UTE I DENNE RUNDEN.** Ingen nedtelling, ingen «13 av 18
 kommer». Kommende kamp beholder dagens flate. Live og ferdig kamp først.
