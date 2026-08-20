@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-19 — PROFILBILDE-SKIVA ER GODKJENT OG LUKKET, BEGGE DELER. NESTE: cache-persistering)
+## ▶️▶️ START HER (oppdatert 2026-08-20 — KAMPSKJERMENS DESIGNRETNING ER FROSSET. NESTE SAMTALE: IMPLEMENTERING, se bolken rett under)
 
 **✅ PROFILBILDE ER TELEFONTESTET OG GODKJENT AV BRAGE 2026-08-19: «Alt
 funker på telefon!»** Del to av skiva — SELVVALGT AVATARFARGE — er bygget
@@ -73,8 +73,194 @@ ser fortsatt bildet, ikke fargen.
 
 **HELE PROFILBILDE-SKIVA ER DERMED GODKJENT OG LUKKET.** Ikke rør den
 uten grunn — og ruller du den likevel, les de to delene her FØRST.
-**NESTE SKIVE: cache-persistering** (punkt 3 lenger nede), deretter
-fase B (nettsiden).
+
+---
+
+### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET 2026-08-20. NESTE SAMTALE = IMPLEMENTERING
+
+**Prototypen er fasit:** [`docs/prototypes/kampskjerm/index.html`](prototypes/kampskjerm/index.html)
+(kjør lokalt, eller https://claude.ai/code/artifact/d8592f04-c731-4994-9b24-f0296910412c).
+Mellomrundene (`kampskjerm-runde3.html.bak`, `kampskjerm-lab5.html.bak`) er
+BEVISST IKKE committet — kun fasiten ligger i repoet. De finnes lokalt i
+`docs/prototypes/` på Brages maskin og er forkastede runder, ikke referanse.
+**Ingen produksjonskode er rørt.** Retningen ble valgt etter sju runder; alt
+annet enn det som står her er forkastet — ikke gjenoppfinn kampvær, kampbånd,
+equalizer, hvit/cream topp, fem kandidater eller «Kampens nerve».
+
+#### 🔒 LÅST VISUELT
+
+- **Hele skjermen er grønn**, statuslinje til tab-bar. Ingen hvit eller
+  creamfarget flate. «Lysere» betyr lysere grønn.
+- **Tre grønne rom**, skilt av tone og lys — aldri av bokser eller rammer.
+  Trinnene er satt i opplevd lyshet (L*), ikke på øyemål:
+  | Rom | Farge | L* | tekst / dempet / mint |
+  |---|---|---|---|
+  | Arena topp | `#25563F` | 32.7 | 8.1 / 4.9 / 6.4 |
+  | Arena bunn | `#1D4633` | 26.4 | 10.2 / 6.1 / 8.0 |
+  | Puls | `#1A4433` | ~23 | 11.7 / 7.0 / 9.2 |
+  | Kampforløp | `#123325` | 18.5 | 13.2 / 7.9 / 10.4 |
+  Grunnen: `--g-top #0B1911` → `--g-mid #183F30` → `--g-low #0E291D`.
+  ⚠️ **`#3B8062` er LYS, ikke en tekstflate** (4.5:1 — kun stor tekst).
+  ⚠️ **På arenaflaten faller dempet tekst til 3.7:1** og må løftes til
+  `#C8E6D8`. Dette er den ene detaljen som ellers ser riktig ut og måler feil.
+- **Stadionkritt** er linjespråket: 1 px, 20–24 % opasitet, varm off-white
+  (`rgba(234,255,246,…)`). Buet lyskant under arenaen (inset-skygge så den
+  følger radiusen), kort venstrestilt strek som avslutter pulsen, lyskant på
+  målswellens overkant. Aldri rette linjer over hele bredden, aldri rammer.
+- **Fargesemantikk (LÅST):** mint `#02FFAB` = stilling, mål for oss, HEIA,
+  energi · varm off-white = banemarkeringer og viktig tekst · gull `#FFC53D`
+  = reporterens stemme, pausemarkør, enkelte pulspunkter (5–10 % av uttrykket)
+  · coral `#FF5A5F` = KUN LIVE · skifer = motstander og mål imot · lagfarge =
+  lokalt lys rundt logo og i måløyeblikket.
+- **Feiringens kjerne er alltid mint/krem med mørkt blekk.** Mållyset er
+  `#DDFFEF` med `heiaDeep` = 12:1; lagfargen er en STRÅLE i ytterkanten,
+  klemt til maks 56 %. **Dette er grunnen til at rødt lag aldri blir brunt** —
+  lagfargen ligger aldri under tekst.
+- **Tab-baren** er `rgba(237,250,243,.93)` med mint hårstrek. Ikke rent hvit.
+
+#### 🔒 LÅST FUNKSJONELT
+
+- **Hendelsesgrid: ikonnode → minutt → innhold.** Faste kolonner:
+  node sentrert på x=27, minuttkolonne x=44–74 (høyrestilt), innhold fra
+  x=82. **Minuttet står ALLTID i samme kolonne** — aldri over overskriften ett
+  sted og etter navnet et annet. Avstanden er kompakt, ikke proporsjonal med tid.
+- **Ikonene er appens egne**, videreført fra `MatchEventRow.tsx`/`icons.tsx`.
+  Ingen emoji, ingen ny familie. **Regelen «ballen betyr MÅL og ingenting
+  annet» står.**
+  | Hendelse | Ikon | Node |
+  |---|---|---|
+  | Mål for oss | `Ball` | `heiaTint` + gulldetalj + glød |
+  | Mål imot | `Ball` | skifer, dempet — ingen feiring, ingen HEIA |
+  | Reporteroppdatering | `MessageCircle` | gullfylt |
+  | Bilde | `Camera` | lys |
+  | Avspark / ny omgang | `Play` | nøytral |
+  | Pause | `Pause` | gulltonet |
+  | Slutt | `Flag` | lys med ring |
+  | Bytte / kort | `ArrowLeftRight` / `BookingCard` | kun historiske data |
+- **Tidslinja er én sammenhengende krittlinje** i varm off-white (22 %),
+  dempet mellom hendelsene. Et mål **tenner den samme linja** i mint (samme x,
+  samme bredde) — ingen hendelse får sin egen ekstra vertikale linje.
+- **Retningsmarkør øverst:** `NÅ · 40′` med «Nyeste øverst — bla nedover i
+  kampen». Ved ferdig kamp: `SLUTT` + «Kampen leses forfra».
+- **Reporteroppdateringen har ingen boks, ramme, skygge eller sidestrek.**
+  Gull `MessageCircle`-node på linja · avatar + «Jarle oppdaterer» · minuttet i
+  kolonnen · teksten fritt på stadiongrunnen · ekstremt svakt grønt lys bak som
+  toner ut mot høyre. **Noden sier HVA som skjedde, avataren sier HVEM.**
+  To på rad skilles av luft, node og minutt — aldri av bokser.
+- **Kampens puls** er en egen kompakt seksjon (~90 px) under stillingen,
+  sted/reporter og avatarene. Åpent på grunnen, ingen container. «KAMPENS PULS»
+  til venstre, **`NÅ 40′`** til høyre — aldri et nakent minutt.
+  Formen kommer av ØYEBLIKKENE, ikke av en energimodell: mål for oss = minttopp,
+  mål imot = søkk, bilde = lys mint, oppdatering = gull.
+  **HEIA endrer gløderadien, aldri kurvens høyde** — derfor kan den ikke bli en
+  påstand om hvem som presser. Ingen akser, tall, prosenter eller analyseestetikk.
+- **Reduce Motion fjerner bevegelsen, men beholder lysresponsen.**
+
+#### 🐛 ÉN EKTE BUG FUNNET I PROTOTYPEN — MÅ IKKE GJENSKAPES
+
+Kamphodet viste 40′ mens pulsen viste 37′. Årsaken var ikke design:
+minuttickeren oppdaterte `.a-clock`, men ikke pulsens etikett, som sto igjen
+fra forrige render. **Alt som viser kampminuttet må oppdateres fra samme kilde
+i samme tick** — hodet, pulsen, retningsmarkøren og sticky-baren.
+
+#### 🛠 IMPLEMENTERINGSOVERSIKT FOR NESTE SAMTALE
+
+**Beholdes uendret:** `StadiumSurface` · `HeroSurface` · `TeamBadge` ·
+`StatusPill` · `LiveBadge` · `ScoreChip` · `MatchPhotoRail`/`Gallery` ·
+`ReporterSheet` · `CommentsScreen` · `useGoalMoment` · alle ikonene i
+`icons.tsx` (ingen nye trengs).
+
+**Endres:**
+- `MatchEventRow.tsx` → hendelsesgriddet (node/minutt/innhold). `markerFor()`
+  overlever som ikonvalg; flatene byttes fra lyse kort til grunn + lys.
+- `MatchTimeline.tsx` → krittlinja, retningsmarkøren, gate-markørene.
+  Stillings- og bildeflettingen beholdes uendret — den er god.
+- `ScoreBoard.tsx` → arenaen med buet underkant og mintlyskant.
+- `EventDetailScreen.tsx` → kampen bør bli en egen komponent (fila er 1449
+  linjer); ruten, de tre stackene og B2-cachen røres ikke.
+- `theme/tokens.ts` → de fire grønntonene + `#C8E6D8` som dempet-på-arena.
+
+**Må bygges nytt:** `MatchPulse` (SVG-kurve, `react-native-svg` er allerede
+inne) · `EventNode` (delt node-komponent) · retningsmarkøren · krittlinja.
+
+**Ingen nye pakker.** All bevegelse er `transform` + `opacity` → native driver;
+`reanimated` er fortsatt bevisst ikke installert.
+
+#### ⚠️ REELLE PROBLEMER Å LØSE FØR/UNDER IMPLEMENTERING
+
+1. **82 px venstremarg** koster innholdsbredde på 430 pt. Grunnen til at det
+   likevel er riktig: uten fast minuttkolonne kan man ikke skanne. Må kjennes
+   på telefon med STOR TEKST — der er den strammest.
+2. **Krittlinja tegnes i dag med CSS.** I RN blir den en `View` med gradient
+   (trivielt), men mål-«tenningen» er et absolutt plassert lag som må ligge
+   bak noden — sjekk z-index mot `MatchTimeline`s eksisterende struktur.
+3. **Pulsen tegnes om ved hvert nytt øyeblikk.** Med realtime + scroll samtidig
+   må den memoiseres på `matchEvents.length` + heia-summen, ellers re-rendres
+   SVG-en ved hver tick.
+4. **Kontrastvakten bør bli en test**, ikke en kommentar: gullverdier for de
+   fire grønntonene × tre blekkfarger, samme mønster som `avatarColors.test.ts`.
+5. **`Reduce Motion` brukes i dag kun i Kalender.** `useReducedMotion` må
+   kobles på `useGoalMoment`, SEIER-pillen, `LiveBadge` og pulsen.
+6. **Reporterpanelets knapper bruker fortsatt tegnene `▶ ❚❚ ⚑`** (arv fra
+   runde 3). Utenfor tidslinja, så ikke en regresjon — men bytt til
+   `Play`/`Pause`/`Flag` når panelet uansett røres.
+7. **Dynamic Type XXL** på det store tallet: 62 px score i tre kolonner
+   sprenger på 430 pt. Trenger stablet fallback.
+
+---
+
+### ▶️▶️ NESTE SAMTALE: KAMPSKJERMEN — DISKUSJON FØRST, IKKE BYGGING
+
+**Brages beslutning 2026-08-20:** neste økt er en samtale om å FORBEDRE
+KAMPSKJERMEN. Ikke start med å foreslå en skive, og ikke bygg noe før
+retningen er valgt sammen med ham.
+
+**LES DISSE BOLKENE FØRST** (de er kampflatens historikk, og alt der er
+allerede godkjent på telefon — ikke gjenoppfinn dem):
+`## 🎨 P5 + P5B — KAMPFORLØPET + HENDELSESSIDEN` · `## ⚽ P2 —
+MÅL-ØYEBLIKKET` · `## Fase 3C` + `## Fase 3D` (live kamp, pause⇄andre
+omgang) · `### ✅ Skive 5 — KAMPRAPPORTEN` · `## ✅ Fase 7/8/9`
+(kampbilder, feed→kamp, push→kamp) · B2-bolken om event-detalj-skiva
+(query-cache, thumb-varianter, payload-først realtime).
+
+**LÅST — SKAL IKKE FORESLÅS PÅ NYTT:**
+· **Alle medlemmer kan legge bilder på kampen: AVVIST av Brage
+  2026-07-30** («nei, alle skal ikke legge bilder»). Kampbilder er
+  reporterens jobb. Backend-en tillater det, men det er en bevisst
+  avgrensning — ikke et hull.
+· **Ingen toppscorer eller spillerstatistikk** før en strukturert
+  spillerstall finnes (låst 2026-07-30).
+· Kampen bor alltid på MØRK flate (A v2). Mørk modus i appen ellers er
+  bevisst «nei i v1» nettopp fordi mørk flate BETYR kamp.
+· Trener tildeler reporter; +-knappen er et rollestyrt valgark.
+
+**KJENTE KANDIDATER PÅ KAMPFLATEN (ingen er lovet, ingen er prioritert):**
+1. **Kommentarer + heiing synlig i kamptidslinja** — «var der»-følelsen
+   ligger i de andres stemmer. De FINNES i dag, men bor på feed-poster og
+   er usynlige på kampsiden. Planens kandidat 2.
+2. **Før kamp-innhold** — nesten gratis når 1 finnes: samme knapp, bare
+   ikke låst til live-grenen.
+3. **«Kampen på 30 sekunder»** — SIST, og med en ÅPEN
+   PERSONVERNAVKLARING: en delbar oppsummering bryter med at bildene
+   ligger i privat bucket nettopp fordi de er av barn. Norske klubber har
+   samtykkeregler for billedbruk. Deling til foreldregruppa er noe helt
+   annet enn en offentlig lenke.
+4. **«Start kamp»-snarvei på +-knappen** — siste rest av låst beslutning 1.
+5. **Designgjeld PÅ kampflaten:** `MatchPhotoSheet.tsx` har appens siste
+   rå `ActivityIndicator` OG tegn-glyfene `⚽ ↔ 🟨` blant Lucide-ikonene.
+   Ta dem samlet hvis skiva uansett rører fila.
+6. **Ingen bevegelse i appen** (kun LiveBadge-puls). Størst effekt per
+   innsats er MÅL-øyeblikket — scoren som teller opp, en feiring.
+   Haptikk krever native modul → ved neste rebuild uansett.
+
+**RESTEN AV KØEN** (ikke kampflaten, men det som ellers står igjen):
+cache-persistering (velspesifisert, egnet for Fable) · fase B / web
+(invitasjonslanding KREVER innlogging på web — `redeem_manager_invitation`
+gater på `auth.uid()` + verifisert e-post; B4-stackvalget er ÅPENT og er
+Brages) · «Legg ned laget» (§4) + ops-RPC-ene (§3f-5) — IKKE bygget,
+verifisert i skjemaet 2026-08-20; lite hastende, se blindvei-notatet.
+⚠️ **Blindvei 1 i det notatet er uoppnåelig i dag** — den forutsetter
+spillerkontoer, og `spiller` kan ikke oppnås fra appen.
 
 **KJENT OG AKSEPTERT:** `delete_account_data` nuller `display_name` og
 `avatar_url`, men ikke `avatar_color` — funksjonen er 150 linjer og ble
