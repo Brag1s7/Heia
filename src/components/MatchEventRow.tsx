@@ -257,24 +257,14 @@ export function MatchEventRow({
         </View>
       )}
 
-      {/* Reporterens stemme: ekstremt svakt grønt lys bak teksten, som toner
-          helt ut mot høyre. Ingen boks, ingen ramme, ingen sidestrek. */}
-      {isVoice && (
-        <View
-          style={[styles.voiceGlow, {left: grid.minuteLeft + grid.minuteWidth}]}
-          pointerEvents="none">
-          <Svg width="100%" height="100%">
-            <Defs>
-              <LinearGradient id="voiceGlow" x1="0%" y1="0%" x2="100%" y2="20%">
-                <Stop offset="0" stopColor={colors.heia} stopOpacity={0.075} />
-                <Stop offset="0.38" stopColor={colors.heia} stopOpacity={0.025} />
-                <Stop offset="0.76" stopColor={colors.heia} stopOpacity={0} />
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#voiceGlow)" />
-          </Svg>
-        </View>
-      )}
+      {/* ⚠️ REPORTERENS STEMME HAR INGEN FLATE I DET HELE TATT.
+          Prototypen legger et «ekstremt svakt» grønt lys bak teksten. På
+          telefon med ekte data leste det som en synlig rektangulær grønn
+          boks — nøyaktig det den frosne retningen forbyr («ingen boks,
+          ramme, skygge eller sidestrek»). Gradienten toner ut mot HØYRE,
+          men aldri opp eller ned, så kantene står. Fjernet (Brage,
+          telefontest 2026-08-20): teksten står rett på grunnen. Noden og
+          minuttet bærer skillet, og to på rad skilles av luft. */}
 
       <EventNode kind={kind} grid={grid} top={padTop} />
 
@@ -310,16 +300,20 @@ export function MatchEventRow({
                 </Text>
               )}
             </View>
+            {/* ⚠️ KUN DET BRUKEREN FAKTISK SKREV.
+                `event.description` er SYNTETISK for mål — `describeMatchEvent`
+                (lib/api/events.ts) stemper alltid «Mål for oss» / «Mål for
+                <motstander>», og legger reporterens frie tekst i `player`
+                i stedet (`player: description || undefined`). Rendret vi
+                begge, sto det «Mål for oss» under hvert eneste MÅL! uten at
+                noen hadde skrevet det. MÅL! + stillingen sier det allerede.
+                Mål IMOT beholder sin `description` — der ER etiketten
+                innholdet, og raden har ingen annen tekst. */}
             {event.player && (
-              <Text style={styles.goalWho} maxFontSizeMultiplier={grid.fontCap}>
-                {event.player}
-              </Text>
-            )}
-            {!!event.description && (
               <Text
-                style={[styles.goalNote, {maxWidth: grid.measureMax}]}
+                style={[styles.goalWho, {maxWidth: grid.measureMax}]}
                 maxFontSizeMultiplier={grid.fontCap}>
-                {event.description}
+                {event.player}
               </Text>
             )}
           </>
@@ -455,12 +449,6 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     zIndex: 1,
   },
-  voiceGlow: {
-    position: 'absolute',
-    right: 0,
-    top: 2,
-    bottom: 0,
-  },
   minute: {
     position: 'absolute',
     textAlign: 'right',
@@ -499,12 +487,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: matchColors.text,
-  },
-  goalNote: {
-    marginTop: 3,
-    fontSize: 14.5,
-    lineHeight: 21,
-    color: matchColors.dim,
   },
   // --- Mål imot ---
   againstRow: {

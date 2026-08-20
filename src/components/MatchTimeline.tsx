@@ -126,15 +126,14 @@ function NowMarker({
           live ? styles.nowDotLive : styles.nowDotDone,
         ]}
       />
-      <Text
-        style={styles.nowText}
-        maxFontSizeMultiplier={grid.fontCap}>
+      {/* ⚠️ INGEN PERMANENT HJELPETEKST (Brage, telefontest 2026-08-20).
+          Prototypen har «Nyeste øverst — bla nedover i kampen» under
+          markøren. Med ekte data forklarer «NÅ · 81′» og minuttkolonnen
+          under den retningen helt av seg selv, og setningen ble stående
+          som varig instruksjon på en flate som skal være kampen — ikke en
+          bruksanvisning. Samme for «Kampen leses forfra» i rapporten. */}
+      <Text style={styles.nowText} maxFontSizeMultiplier={grid.fontCap}>
         {live ? `NÅ · ${nowMinute ?? 0}′` : 'SLUTT'}
-      </Text>
-      <Text style={styles.nowSub} maxFontSizeMultiplier={grid.fontCap}>
-        {live
-          ? 'Nyeste øverst — bla nedover i kampen'
-          : 'Kampen leses forfra'}
       </Text>
     </View>
   );
@@ -466,14 +465,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.75,
     textTransform: 'uppercase',
     color: colors.heia,
-  },
-  nowSub: {
-    marginTop: 3,
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    color: matchColors.dim,
-    opacity: 0.85,
   },
   // --- Bilderaden ---
   photoRow: {

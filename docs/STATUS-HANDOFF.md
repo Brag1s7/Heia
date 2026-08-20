@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 1 AV KAMPSKJERMEN ER LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 2)
+## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 1 + 1.1 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 2)
 
 **LES I DENNE REKKEFØLGEN:**
 1. `### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20` — P1 mål imot ·
@@ -8,8 +8,13 @@
    Ingen av dem skal relitigeres.
 2. `### ✅ SKIVE 1 LEVERT` — hva som er bygget, og **to rettelser til den
    frosne bolken som fortsatt står feil i den**.
-3. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen og hva skive 2 MÅ ta med.
-4. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
+3. `### ✅ SKIVE 1.1` — fem rettelser fra telefontesten, og PRINSIPPET de
+   satte: prototypen er fasit for identitet og hierarki, ikke noe som
+   kopieres piksel for piksel når det fungerer dårligere med ekte data.
+4. `### ♿ TILGJENGELIGHET` — OBLIGATORISK akseptansekriterium fra og med
+   skive 2. Kampsporet har null a11y-props i dag.
+5. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen og hva skive 2 MÅ ta med.
+6. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
    Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
    repoet.
 
@@ -415,6 +420,61 @@ Handoff-en sier «node sentrert på x=27», og den vant: `railLeft` er 13.5.
 
 ---
 
+### ✅ SKIVE 1.1 — FEM RETTELSER ETTER TELEFONTEST 2026-08-20
+
+**Prinsippet Brage satte, og som gjelder resten av implementeringen:**
+> Prototypen er fasit for IDENTITET og HIERARKI — ikke noe som skal kopieres
+> piksel for piksel når det fungerer dårligere med ekte data på telefon.
+
+Fem ting så riktige ut i nettleseren og feil på enhet:
+
+1. **Den permanente hjelpeteksten er borte.** «Nyeste øverst — bla nedover i
+   kampen» (og «Kampen leses forfra») sto som varig bruksanvisning på en
+   flate som skal være kampen. `NÅ · 81′` og minuttkolonnen under forklarer
+   retningen selv.
+2. **Reporteroppdateringen har ingen flate i det hele tatt.** Prototypens
+   «ekstremt svake» grønne lys bak teksten leste som en synlig rektangulær
+   grønn boks — nøyaktig det den frosne retningen forbyr. Gradienten toner ut
+   mot HØYRE, men aldri opp eller ned, så kantene sto. Teksten står nå rett
+   på grunnen; noden og minuttet bærer skillet.
+3. **Meldingsnoden er dempet.** Heldekkende gull konkurrerte med målet om
+   blikket. Nå transparent gullflate + gullkant + gullikon: samme semantikk,
+   uten volumet. Målet skal vinne.
+4. **Ingen permanent gullprikk på målnoden.** Den leste som et stående
+   BADGE, ikke som feiring. Gulldetaljen hører hjemme i MÅLTENNINGEN — et
+   kort blink som forsvinner. Fjernet helt til animasjonen finnes
+   (skive 5/6), ikke stående statisk.
+5. **Ingen automatisk «Mål for oss» under MÅL!.**
+   ⚠️ **Dette var en ekte datafeil, ikke bare pynt.** `describeMatchEvent`
+   (`lib/api/events.ts:762-766`) STEMPLER alltid en beskrivelse på et mål og
+   legger reporterens frie tekst i `player` i stedet
+   (`player: description || undefined`). Rendret man begge, sto det «Mål for
+   oss» under hvert eneste mål uten at noen hadde skrevet det. Nå vises kun
+   `player` — det er det ENESTE brukerskrevne feltet et mål har.
+   **Mål IMOT beholder sin `description`**: der ER etiketten innholdet.
+
+#### ✔️ 0′ PÅ HENDELSENE MENS KLOKKA STO PÅ 81′ — RIKTIG, IKKE EN FEIL
+
+Bekreftet i koden. To forskjellige tall med to forskjellige liv:
+
+- **`event.minute` er FROSSET ved innsetting.** Serveren regner
+  `FLOOR(EXTRACT(EPOCH FROM (now() - started_at))/60)` ÉN gang i
+  `report_match_event` (00021) og lagrer tallet. Appen leser det rått
+  (`mapMatchEventRow`: `minute: me.minute`) — det regnes ALDRI om klientside.
+- **`matchMinute` er LEVENDE.** `EventDetailScreen` regner den fra
+  `event.startedAt` mot en `nowMs` som tikker hvert 30. sekund.
+
+En hendelse opprettet rett etter avspark har altså minutt 0 for alltid, mens
+klokka fortsetter. **Testhendelsene ble laget ved kampstart — derfor 0′.**
+Ingenting skal endres. Kontrollen på ekte data: rapporter en hendelse NÅ og
+se at den får inneværende minutt, ikke 0.
+
+⚠️ **P2 (kampuret) endrer semantikken til nettopp dette tallet** — da skal
+`minute` regnes fra akkumulert spilletid, ikke `now() - started_at`. Gamle
+rader beholder sine verdier; de skal ikke backfilles.
+
+---
+
 ### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
 
 **Skiverekkefølgen er godkjent av Brage.** Skive 1 er levert. Neste er
@@ -423,7 +483,7 @@ en REELL begrensning.
 
 | # | Skive | Status |
 |---|---|---|
-| 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` |
+| 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` + 1.1 |
 | 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ⏭️ NESTE |
 | 3 | **Kamprapporten på samme grunn** | |
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | godkjent, se P1 |
@@ -450,6 +510,41 @@ BORT når grunnen tar over.
 kallesteder og `ScoreChip` arver alt fra den.
 
 ---
+
+---
+
+### ♿ TILGJENGELIGHET — OBLIGATORISK AKSEPTANSEKRITERIUM (Brage 2026-08-20)
+
+**Funnet:** appen har 66 `accessibilityLabel` og 62 `accessibilityRole` —
+men kampsporet hadde NULL. Ikke én prop i `MatchEventRow`, `MatchTimeline`,
+`EventNode`, `ScoreBoard`, `MatchPhotoRail` eller `ReporterActions`.
+
+**En kamptidslinje VoiceOver ikke kan lese, er en kamp en blind forelder
+ikke kan følge.** Dette er derfor ikke en «nice to have» — det er et
+AKSEPTANSEKRITERIUM. En skive er ikke ferdig før dens flater oppfyller:
+
+1. **SAMLET LABEL PER HENDELSE.** Én hendelse = ett stopp i VoiceOver, ikke
+   fire (node, minutt, overskrift, tekst). Raden setter `accessible={true}`
+   + `accessibilityLabel` som leser hele øyeblikket i rekkefølgen
+   MINUTT → HVA → HVEM → DETALJ: «34 minutter. Mål for oss, 2–1. Erlend
+   Hagen.» · «31 minutter. Jarle oppdaterer: Vi presser høyt nå.»
+2. **DEKORATIVE SVG-ER SKJULES.** Krittlinja, målswellen, skiferstripen,
+   skrimene og pulskurven er atmosfære, ikke innhold:
+   `accessibilityElementsHidden` (iOS) + `importantForAccessibility="no-hide-descendants"`
+   (Android). `EventNode` er allerede `pointerEvents="none"`, men det
+   skjuler den ikke for skjermleser.
+3. **HANDLINGER HAR LABEL OG STATE.** HEIA, kommentarer, bilde og
+   reporterknappene trenger `accessibilityRole="button"`,
+   en label som sier hva som skjer («Heia på målet på 34 minutter»), og
+   `accessibilityState={{selected}}` der noe er på/av. En teller alene
+   («34») er ikke en label.
+4. **44 pt TRYKKFLATER.** Alt som kan trykkes måler minst 44×44 pt, om
+   nødvendig via `hitSlop`. Kampsporet har i dag 0 `hitSlop`. Gjelder
+   særlig HEIA/kommentar-radene, som er ikon + tall og optisk små.
+
+**Hvor:** skive 2 og 3 tar flatene sine (arena, reporterbar, rapport),
+skive 4 tar HEIA/kommentarer, skive 5 skjuler pulskurven.
+**Griddet fra skive 1 tas i skive 2**, mens radene uansett røres.
 
 ---
 

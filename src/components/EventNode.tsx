@@ -78,27 +78,41 @@ export function nodeKindFor(
 interface NodeSkin {
   bg: string;
   ink: string;
-  /** Liten gulldetalj oppe til høyre — kun mål for oss. */
-  goldDot?: boolean;
   /** Mint-glød rundt sirkelen — feiringen, rasjonert. */
   glow?: string;
-  /** Ring i stedet for fylt flate — kampen lukkes, den feires ikke. */
-  ring?: boolean;
+  /** Kantfarge. Gjør en transparent flate til en definert node. */
+  border?: string;
 }
 
 const SKIN: Record<NodeKind, NodeSkin> = {
+  // ⚠️ INGEN PERMANENT GULLPRIKK PÅ MÅLNODEN (Brage, telefontest 2026-08-20).
+  // Prototypen har en gulldetalj oppe til høyre. På telefon med ekte data
+  // leste den som et stående BADGE — «noe er merket her» — i stedet for som
+  // feiring. Gulldetaljen hører hjemme i MÅLTENNINGEN: et kort blink når
+  // målet skjer, som forsvinner. Til den animasjonen finnes (skive 5/6) er
+  // den fjernet helt, ikke stående statisk.
   goalUs: {
     bg: colors.heiaTint,
     ink: colors.heiaInk,
-    goldDot: true,
     glow: 'rgba(2, 255, 171, 0.45)',
   },
   goalThem: {bg: matchColors.opponentNode, ink: matchColors.opponentInk},
-  update: {bg: colors.gold, ink: colors.goldInk, glow: 'rgba(255, 197, 61, 0.4)'},
+  // Reporterens stemme er GULL, men dempet: en heldekkende gullskive
+  // konkurrerte med målet om blikket, og det er målet som skal vinne.
+  // Transparent flate + gullkant + gullikon holder semantikken uten volumet.
+  update: {
+    bg: 'rgba(255, 197, 61, 0.16)',
+    ink: colors.gold,
+    border: 'rgba(255, 197, 61, 0.55)',
+  },
   photo: {bg: 'rgba(234, 255, 246, 0.92)', ink: colors.heiaDeep},
   kick: {bg: 'rgba(234, 255, 246, 0.15)', ink: matchColors.text},
   pause: {bg: 'rgba(255, 197, 61, 0.2)', ink: colors.gold},
-  end: {bg: 'rgba(234, 255, 246, 0.14)', ink: matchColors.text, ring: true},
+  end: {
+    bg: 'rgba(234, 255, 246, 0.14)',
+    ink: matchColors.text,
+    border: matchColors.chalkStrong,
+  },
   card: {bg: 'rgba(255, 197, 61, 0.16)', ink: colors.gold},
   swap: {bg: 'rgba(234, 255, 246, 0.15)', ink: matchColors.text},
 };
@@ -155,23 +169,14 @@ export function EventNode({kind, grid, top = 0}: EventNodeProps) {
           borderRadius: r,
           backgroundColor: skin.bg,
         },
-        skin.ring && styles.ring,
-        // Glød er rasjonert i Heia. Målet for oss og reporterens stemme er
-        // to av de reserverte stedene.
+        skin.border ? styles.bordered : null,
+        skin.border ? {borderColor: skin.border} : null,
+        // Glød er rasjonert i Heia. Målet for oss er ett av de reserverte
+        // stedene — og etter telefontesten er det det ENESTE i nodene.
         skin.glow ? styles.glow : null,
         skin.glow ? {shadowColor: skin.glow} : null,
       ]}>
       {glyphFor(kind, grid.iconSize, skin.ink)}
-      {skin.goldDot && (
-        <View
-          style={[
-            styles.goldDot,
-            // Kanten som løfter prikken av mint-sirkelen er GRUNNEN, ikke
-            // hvit. På den mørke flaten ville hvit lest som et hull.
-            {borderColor: matchColors.timeline},
-          ]}
-        />
-      )}
     </View>
   );
 }
@@ -192,18 +197,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  ring: {
+  bordered: {
     borderWidth: 1,
-    borderColor: matchColors.chalkStrong,
-  },
-  goldDot: {
-    position: 'absolute',
-    top: -1,
-    right: -1,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: colors.gold,
-    borderWidth: 2,
   },
 });

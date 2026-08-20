@@ -10,8 +10,9 @@
  *
  *   1. Minuttet står i SAMME kolonne for alle rader. Det er hele grunnen til
  *      at man kan sveipe nedover og bare lese 34′ · 31′ · 29′ · 25′.
- *   2. Retningsmarkørens tekst. «Nyeste øverst» i live, «leses forfra» i
- *      rapporten — uten den er en omvendt kronologisk liste bare forvirrende.
+ *   2. Retningsmarkøren sier NÅ i live og SLUTT i rapporten — og INGENTING
+ *      mer. Den permanente hjelpeteksten ble fjernet etter telefontesten;
+ *      minuttet og minuttkolonnen forklarer retningen selv.
  *   3. Retningsmarkøren leser minuttet fra PROPEN, aldri fra en egen klokke.
  *      Prototypen hadde nettopp den bugen: hodet viste 40′ mens pulsen sto
  *      igjen på 37′.
@@ -128,6 +129,44 @@ describe('MatchTimeline — alle radvariantene monterer', () => {
     expect(t.filter(x => x === 'MÅL!')).toHaveLength(1);
   });
 
+  it('skriver ALDRI den syntetiske «Mål for oss» under MÅL!', () => {
+    // describeMatchEvent (lib/api/events.ts) stempler alltid en beskrivelse
+    // på et mål og legger brukerens egen tekst i `player`. Rendres begge,
+    // står det «Mål for oss» under hvert mål uten at noen skrev det.
+    const t = texts(
+      render({
+        newestFirst: true,
+        nowMinute: 40,
+        matchEvents: [
+          ev('g1', 'mål', 12, {
+            teamSide: 'home',
+            player: 'Erlend Hagen',
+            description: 'Mål for oss',
+          }),
+        ],
+      }),
+    );
+    expect(t).toContain('MÅL!');
+    expect(t).toContain('Erlend Hagen'); // brukerens egen tekst
+    expect(t).not.toContain('Mål for oss'); // maskinens etikett
+  });
+
+  it('beholder etiketten på mål IMOT — der ER den innholdet', () => {
+    const t = texts(
+      render({
+        newestFirst: true,
+        nowMinute: 40,
+        matchEvents: [
+          ev('g2', 'mål', 23, {
+            teamSide: 'away',
+            description: 'Mål for Ridabu',
+          }),
+        ],
+      }),
+    );
+    expect(t).toContain('Mål for Ridabu');
+  });
+
   it('gir reporterens stemme et navn, ikke bare en node', () => {
     expect(texts(render({newestFirst: true, nowMinute: 40}))).toContain(
       'Jarle oppdaterer',
@@ -175,19 +214,20 @@ describe('MatchTimeline — minuttet står i samme kolonne', () => {
 });
 
 describe('MatchTimeline — retningsmarkøren', () => {
-  it('sier «NÅ» og hvilken vei man leser i live', () => {
+  it('sier «NÅ» i live — og ingen bruksanvisning', () => {
     const t = texts(render({newestFirst: true, nowMinute: 40}));
     expect(t).toContain('NÅ · 40′');
-    expect(t).toContain('Nyeste øverst — bla nedover i kampen');
     expect(t).toContain('Det som skjer');
+    // Kampflaten er kampen, ikke en bruksanvisning. Kommer denne tilbake,
+    // er det en regresjon — ikke en forbedring.
+    expect(t).not.toContain('Nyeste øverst — bla nedover i kampen');
   });
 
   it('snur i kamprapporten', () => {
     const t = texts(render({newestFirst: false}));
     expect(t).toContain('SLUTT');
-    expect(t).toContain('Kampen leses forfra');
     expect(t).toContain('Kampens historie');
-    expect(t).not.toContain('Nyeste øverst — bla nedover i kampen');
+    expect(t).not.toContain('Kampen leses forfra');
   });
 
   it('leser minuttet fra propen — aldri fra en egen klokke', () => {
