@@ -217,3 +217,58 @@ export function matchScoreA11yLabel(opts: {
 }): string {
   return `${opts.homeTeam} ${opts.homeScore}, ${opts.awayTeam} ${opts.awayScore}.`;
 }
+
+// ---------------------------------------------------------------------------
+// ENGASJEMENTET SOM TALE (skive 4)
+//
+// «En teller alene («34») er ikke en label» — tilgjengelighetskravet, ordrett.
+// HEIA og kommentarer er HANDLINGER, og de ligger derfor utenfor øyeblikkets
+// samlede label: de har egne setninger, egen state og egen trykkflate.
+//
+// Setningen sier HVA trykket gjør, HVILKET øyeblikk det gjelder, og HVOR
+// mange som har gjort det før deg. Om DU har heiet sier `accessibilityState`
+// — ikke teksten, ellers leses tilstanden opp to ganger.
+// ---------------------------------------------------------------------------
+
+/** «målet» / «målet til motstanderen» / «oppdateringen» / «bildet». */
+function momentPhrase(subject: MatchEventA11yInput | 'photo'): string {
+  if (subject === 'photo') {
+    return 'bildet';
+  }
+  switch (subject.type) {
+    case 'mål':
+      return subject.teamSide === 'home' ? 'målet' : 'målet til motstanderen';
+    case 'melding':
+      return 'oppdateringen';
+    default:
+      return 'øyeblikket';
+  }
+}
+
+function countPhrase(n: number, one: string, many: string): string {
+  return n === 1 ? `1 ${one}` : `${n} ${many}`;
+}
+
+/** «Heia på målet på 34 minutter. 12 heier.» */
+export function matchHeiaA11yLabel(opts: {
+  subject: MatchEventA11yInput | 'photo';
+  minute?: number;
+  count: number;
+}): string {
+  const where = `Heia på ${momentPhrase(opts.subject)}${
+    opts.minute !== undefined ? ` på ${minuteSpoken(opts.minute)}` : ''
+  }`;
+  return sentence([where, countPhrase(opts.count, 'heia', 'heier')]);
+}
+
+/** «Åpne samtalen om målet på 34 minutter. 2 kommentarer.» */
+export function matchCommentA11yLabel(opts: {
+  subject: MatchEventA11yInput | 'photo';
+  minute?: number;
+  count: number;
+}): string {
+  const where = `Åpne samtalen om ${momentPhrase(opts.subject)}${
+    opts.minute !== undefined ? ` på ${minuteSpoken(opts.minute)}` : ''
+  }`;
+  return sentence([where, countPhrase(opts.count, 'kommentar', 'kommentarer')]);
+}

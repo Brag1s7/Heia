@@ -363,11 +363,9 @@ const styles = StyleSheet.create({
   reactPillPressed: {
     opacity: 0.7,
   },
-  reactText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
+  // Stemmen bor i `typography.action` — delt med kommentartråden og
+  // kampens engasjementslinje, så de tre ikke kan drifte fra hverandre.
+  reactText: typography.action,
   reactTextOn: {
     color: colors.heiaInk,
   },

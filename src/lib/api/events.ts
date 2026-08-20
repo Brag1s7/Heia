@@ -650,6 +650,11 @@ export async function reportMatchEvent(
  * refetch, hendelser kan være tapt. Realtime respekterer RLS, så bare lagets
  * medlemmer får hendelsene.
  *
+ * SKIVE 4 la til engasjementet: `reaction` og `commentDelta` justerer tellerne
+ * lokalt (ingen refetch), og `engagementPost` sier at et ferskt øyeblikk
+ * nettopp fikk sin kanoniske post. Uten det siste ville det NYESTE målet vært
+ * det eneste man ikke kunne heie på — og det er nettopp det man vil heie på.
+ *
  * Returnerer en oppryddingsfunksjon — kall den når skjermen forlates, ellers
  * blir kanalen liggende åpen.
  */
@@ -657,6 +662,22 @@ export type MatchRealtimeEvent =
   | {kind: 'matchEvent'; row: any}
   | {kind: 'session'; row: any}
   | {kind: 'photo'}
+  /**
+   * HEIA fra en annen tilskuer (skive 4). `userId` følger med i stedet for å
+   * filtreres bort her: kanalen deles via `acquireChannel`, så en «hvem er
+   * jeg»-verdi fanget i oppsettet ville tilhørt den FØRSTE abonnenten for
+   * alltid. Kalleren kjenner alltid sin egen id, og filtrerer eget ekko der.
+   */
+  | {kind: 'reaction'; postId: string; userId?: string; delta: 1 | -1}
+  /** Ny eller soft-slettet kommentar på en post i kampen. */
+  | {kind: 'commentDelta'; postId: string; delta: 1 | -1}
+  /**
+   * En ny post med `match_event_id` — altså et ferskt øyeblikk som nettopp
+   * fikk sin kanoniske post. Uten denne ville det nyeste målet stått uten
+   * post-id å heie på til neste refetch, og det er nøyaktig det målet folk
+   * vil heie på.
+   */
+  | {kind: 'engagementPost'}
   | {kind: 'fallback'}
   | {kind: 'resync'};
 
@@ -720,9 +741,68 @@ export function subscribeToMatch(
             filter: `event_id=eq.${eventId}`,
           },
           payload => {
-            if ((payload.new as any)?.type === 'bilde') {
+            const row = (payload.new ?? {}) as any;
+            if (row.type === 'bilde') {
               emit({kind: 'photo'});
             }
+            // Posten som bærer øyeblikket. Et bilde festet til et mål har
+            // BEGGE deler, og skal derfor treffe begge stiene.
+            if (row.match_event_id) {
+              emit({kind: 'engagementPost'});
+            }
+          },
+        )
+        // ⚠️ UFILTRERT, OG DET ER TRYGT. `reactions` og `comments` har ingen
+        // event_id å filtrere på — samme situasjon som feeden (`subscribeToFeed`)
+        // løste på samme måte. RLS slipper kun gjennom rader du uansett kunne
+        // lest, og en patch for en post som ikke er i kampens oppslag er en
+        // no-op.
+        //
+        // DELETE på reactions krever REPLICA IDENTITY FULL (00059) for at
+        // old-raden skal bære feed_post_id — uten den faller vi tilbake.
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'reactions'},
+          payload => {
+            const p = payload as any;
+            const row =
+              p.eventType === 'INSERT'
+                ? p.new
+                : p.eventType === 'DELETE'
+                ? p.old
+                : null;
+            if (!row) return;
+            if (!row.feed_post_id) {
+              emit({kind: 'fallback'});
+              return;
+            }
+            emit({
+              kind: 'reaction',
+              postId: row.feed_post_id,
+              userId: row.user_id,
+              delta: p.eventType === 'INSERT' ? 1 : -1,
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'comments'},
+          payload => {
+            const p = payload as any;
+            // Soft-delete (00041) er en UPDATE med deleted_at satt; en
+            // REDIGERING har deleted_at null og skal ikke røre telleren.
+            const delta: 1 | -1 | null =
+              p.eventType === 'INSERT'
+                ? 1
+                : p.eventType === 'UPDATE' && p.new?.deleted_at
+                ? -1
+                : null;
+            if (delta === null) return;
+            emit(
+              p.new?.feed_post_id
+                ? {kind: 'commentDelta', postId: p.new.feed_post_id, delta}
+                : {kind: 'fallback'},
+            );
           },
         );
     },

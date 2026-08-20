@@ -69,12 +69,13 @@ interface MatchEventRowProps {
   /** Reporteren bak en oppdatering. Noden sier HVA, avataren sier HVEM. */
   author?: User;
   /**
-   * HEIA + kommentarer for dette øyeblikket.
+   * HEIA + kommentarer for dette øyeblikket (skive 4).
    *
-   * Slot, ikke innhold: engasjementet henger på den KANONISKE feed-posten
-   * (`feed_posts.match_event_id`), og den koblingen bygges i sin egen skive.
-   * Griddet reserverer plassen nå så raden ikke må omskrives da — og så
-   * luften mellom hendelsene stemmer allerede på telefontesten.
+   * Fortsatt en SLOT, ikke innhold: hvilken post øyeblikket henger på, og om
+   * det i det hele tatt SKAL ha en linje, avgjøres av kalleren
+   * (`shared/matchEngagement` + `EventDetailScreen`). Raden vet bare hvor den
+   * skal stå. Rytmemarkørene får aldri noen — de er kampens gater, ikke
+   * øyeblikk man reagerer på.
    */
   engagement?: React.ReactNode;
   onPressPhoto?: (photo: MatchPhoto) => void;
@@ -514,16 +515,6 @@ export function MatchEventRow({
         </View>
       </View>
 
-      {/* HEIA + kommentarer. Ligger UTENFOR den samlede labelen med vilje —
-          de er handlinger med egne labels og egen state, ikke en del av
-          setningen om hva som skjedde. */}
-      {engagement && (
-        <View
-          style={{paddingLeft: grid.contentLeft, paddingRight: grid.gutter}}>
-          {engagement}
-        </View>
-      )}
-
       {/* ⚠️ BILDET LIGGER I INNHOLDSKOLONNEN, IKKE KANT TIL KANT.
           Den frosne retningen sa «bildet ER flaten». På telefon med ekte
           data ble det feil (Brage, telefontest 2026-08-20): et fullbredt,
@@ -569,6 +560,24 @@ export function MatchEventRow({
           )}
         </Pressable>
       ))}
+
+      {/* HEIA + kommentarer AVSLUTTER ØYEBLIKKET.
+          ⚠️ Sloten sto før mellom teksten og bildet, fordi den var tom da
+          plassen ble reservert i skive 1. Med innhold i den ble det feil: et
+          mål med bilde ville fått «MÅL! → HEIA → bildet», altså en handling
+          midt inne i det den handler om. Fasiten legger `engRow()` sist i
+          hvert øyeblikk, og et bilde festet til et mål er en del av målet.
+
+          Ligger UTENFOR den samlede a11y-labelen med vilje — HEIA og
+          kommentarer er handlinger med egne labels og egen state, ikke en
+          del av setningen om hva som skjedde. Ikke «rydd» den inn i
+          `accessible`-gruppa: da slutter de å være egne stopp i VoiceOver. */}
+      {engagement && (
+        <View
+          style={{paddingLeft: grid.contentLeft, paddingRight: grid.gutter}}>
+          {engagement}
+        </View>
+      )}
     </View>
   );
 }

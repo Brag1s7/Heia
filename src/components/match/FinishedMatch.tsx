@@ -76,6 +76,12 @@ interface FinishedMatchProps {
   reporter?: User;
   isAdmin: boolean;
   authorFor: (userId: string) => User | undefined;
+  /** HEIA + kommentarer per øyeblikk (skive 4). Rapporten har den av samme
+   *  grunn som bildestripa: etterpå er det HER samtalen om kampen bor. */
+  renderEngagement?: (entry: {
+    event?: MatchEvent;
+    photo?: MatchPhoto;
+  }) => React.ReactNode;
   onPressPhoto: (photo: MatchPhoto) => void;
   onEdit: () => void;
 }
@@ -89,6 +95,7 @@ export function FinishedMatch({
   reporter,
   isAdmin,
   authorFor,
+  renderEngagement,
   onPressPhoto,
   onEdit,
 }: FinishedMatchProps) {
@@ -165,6 +172,7 @@ export function FinishedMatch({
             photos={photos}
             startedAt={event.startedAt}
             authorFor={authorFor}
+            renderEngagement={renderEngagement}
             onPressPhoto={onPressPhoto}
           />
         )}

@@ -1,21 +1,35 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 3 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 4)
+## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 4 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 5)
 
-**✅ SKIVE 3 ER TELEFONGODKJENT AV BRAGE 2026-08-20: «Nå funker det».**
-Godkjenningen kom etter TO runder. Runde 1 ga én reell feil — `SKIVE 3.1`,
-målswellen dekket ikke bildet — og årsaken var IKKE gradienten skive 2.2
+**✅ SKIVE 4 ER TELEFONGODKJENT AV BRAGE 2026-08-21: «Godkjent nå!»**
+Kanonisk kobling + HEIA/kommentarer, `00071_kampfeed.sql` **ER I PROD**
+(`supabase db push`, bekreftet i `supabase migration list --linked`;
+anon-døren bevist mot ekte prod: 42501, med kontrollrader).
+
+⚠️ **GODKJENNINGEN KOM ETTER FIRE RUNDER, OG BARE DEN FØRSTE HANDLET OM
+FUNKSJONALITET.** 4.1 var en ren PRODUKSJONSOVERSETTELSE (prototypen var
+fulgt for bokstavelig: egen hånd-SVG, displayfont på brødtekst, «2 HEIA» som
+måleenhet, navigasjon der det skulle vært et ark), 4.2 bevegelsen og den
+svarte faden, 4.3 at draget ikke virket, 4.4 at utglidningen rykket.
+**Det er derfor `## ⚖️⚖️ AUTORITETSREGELEN` finnes — les den før du bygger.**
+
+Skive 1–3 er levert og telefongodkjent (`93e75ca`, `23df9ed`, `1b0390d` +
+`95c092f`).
+
+⚠️ **`SKIVE 3.1` er fortsatt den viktigste feilhistorien i sporet:**
+målswellen dekket ikke bildet, og årsaken var IKKE gradienten skive 2.2
 rettet, men `height="100%"` inne i svg. **Les 3.1 før du rører en flate i
 kampverdenen; diagnosemetoden der gjelder alt som ligger over innhold av
-variabel høyde.** Neste er skive 4: kanonisk kobling + HEIA/kommentarer. Skive 1 og 2 er
-levert og telefongodkjent (`93e75ca`, `23df9ed`). Skive 3 — kamprapporten på
-samme grunn — er bygget i samme mønster og skal kontrolleres på enhet FØR
-noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
+variabel høyde.**
 
 **LES I DENNE REKKEFØLGEN:**
+0. `## ⚖️⚖️ AUTORITETSREGELEN` — **permanent, gjelder alle skiver.** Prototypen
+   bestemmer intensjon og hierarki; Heias designsystem bestemmer komponenter,
+   ikoner, typografi og språk. Les den FØR du skriver en ny komponent.
 1. `### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20` — P1 mål imot ·
    P2 kampuret · P3 angre · P4 kampknappen · PulseCurve-memoiseringen.
-   Ingen av dem skal relitigeres. **P1 er selve oppgaven i skive 4.**
+   Ingen av dem skal relitigeres. **P1 er bygget i skive 4.**
 2. `### ✅ SKIVE 1 LEVERT` — hva som er bygget, og **to rettelser til den
    frosne bolken som fortsatt står feil i den**.
 3. `### ✅ SKIVE 1.1` — fem rettelser fra telefontesten, og PRINSIPPET de
@@ -27,10 +41,15 @@ noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
 5. `### ✅ SKIVE 3 LEVERT` — kamprapporten, de tre beslutningene den tvang
    fram (påmeldte, «Rediger», SLUTT/SEIER), og **3.1: prosenthøyde i svg,
    den feilen som overlevde skive 2.2 fordi bare halve årsaken var rettet.**
-6. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1–3s
-   flater; skive 4–5 tar sine.
-7. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 4 er neste).
-8. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
+6. `### ⏳ SKIVE 4 BYGGET` — kanonisk kobling, HEIA/kommentarer,
+   `00071_kampfeed.sql`, det ene stedet der P1 og fasiten var uenige, og
+   **4.1–4.4: prototype-lånene som ble rettet, og kommentararket.**
+7. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1–4s
+   flater; skive 5 skjuler pulskurven.
+8. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 5 er neste).
+9. `### 🕯 STADIUM LIGHT` — Brage vurderer en LYSERE palett, **etter alle
+   skivene**. Påvirker hvordan tester skrives NÅ: vokt struktur, ikke farge.
+10. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
    Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
    repoet.
 
@@ -38,6 +57,38 @@ noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
 **✅ PROFILBILDE ER TELEFONTESTET OG GODKJENT AV BRAGE 2026-08-19: «Alt
 funker på telefon!»** Del to av skiva — SELVVALGT AVATARFARGE — er bygget
 rett etterpå, på Brages bestilling.
+
+---
+
+## ⚖️⚖️ AUTORITETSREGELEN — PERMANENT, GJELDER ALLE KOMMENDE SKIVER (Brage 2026-08-21)
+
+**Prototypen bestemmer INTENSJON, HIERARKI, RYTME og ØNSKET OPPLEVELSE.
+Heias eksisterende designsystem bestemmer KOMPONENTER, IKONER, TYPOGRAFI og
+PRODUKTSPRÅK. Native bruk og tilgjengelighet bestemmer INTERAKSJONEN.
+Telefonen avgjør SLUTTRESULTATET.**
+
+> **Før du lager et nytt ikon, komponentmønster, ordvalg eller fontuttrykk,
+> skal du FØRST søke etter hva Heia allerede bruker.** Prototypen er aldri
+> automatisk fasit for SVG-path, CSS, tekst, font, mål eller midlertidige
+> demonstrasjonsvalg.
+
+**Hvorfor regelen finnes:** skive 4 brøt den fire ganger i én liten
+komponent — egen hånd-SVG kopiert fra prototypens CSS, displayfonten på et
+brødteksttall, «2 HEIA» som om HEIA var en måleenhet, og navigasjon bort fra
+kampen der prototypen faktisk hadde riktig interaksjon (ark). Ingen av dem
+var vanskelige å oppdage; de var vanskelige å oppdage FOR MEG, fordi
+prototypen lå åpen og appen ikke gjorde det. Se `### ✅ SKIVE 4.1`.
+
+**Sjekklista før du skriver en ny komponent:**
+1. `grep` etter handlingen i `src/components` — finnes den som pill, rad
+   eller ark et annet sted i appen?
+2. Er teksten allerede formulert? (`FeedCard`, `CommentThread`, `matchCopy`)
+3. Finnes stemmen som token i `typography`? Hvis du skriver `fontSize:` med
+   et tall, må du kunne forsvare hvorfor det ikke er et token.
+4. Er ikonet i `icons.tsx`? Et nytt ikon krever en grunn som ikke er
+   «prototypen tegnet det sånn».
+5. Er interaksjonen native-riktig — ark vs. skjerm, tilbake-gest, tastatur,
+   VoiceOver-fokus?
 
 ---
 
@@ -239,6 +290,42 @@ inne) · `EventNode` (delt node-komponent) · retningsmarkøren · krittlinja.
    `Play`/`Pause`/`Flag` når panelet uansett røres.
 7. **Dynamic Type XXL** på det store tallet: 62 px score i tre kolonner
    sprenger på 430 pt. Trenger stablet fallback.
+
+---
+
+### 🕯 STADIUM LIGHT — MULIG LYSERE PALETT, ETTER ALLE SKIVENE (Brage 2026-08-21)
+
+**Brage vurderer å gjøre kampverdenen LYSERE.** Ikke en ny retning:
+**alt er likt — kun fargene justeres.** Struktur, geometri, hierarki,
+hendelsesgriddet, de tre rommene, krittspråket og fargeSEMANTIKKEN står.
+
+**⛔ DETTE GJØRES IKKE NÅ.** Det tas som ÉN samlet runde når alle ti skivene
+er ferdige. Grunnen er den samme som gjorde skive 2.1/2.2/3.1 dyre: endrer
+man flaten under mens nye flater bygges oppå, oppdages feilene én og én på
+telefonen i stedet for samlet.
+
+**Konsekvenser for hvordan det bygges i mellomtiden:**
+
+- ⚠️ **Ingen test skal frysse paletten.** `liveMatch.test.tsx` sin
+  «ingen kremfamilie»-vakt er en KLASSE-vakt (ikke lyse flater i kampen), og
+  den kan bli feil når retningen blir lysere — den skal revurderes i samme
+  runde, ikke omgås underveis. Nye vakter skal derfor teste STRUKTUR, ikke
+  farge: skive 4s engasjementstest sjekker «ingen pill/boks/fyllflate», og
+  ikke én eneste hex-verdi. **Bygg videre på det mønsteret.**
+- **Kontrastvaktene (`matchContrast.test.ts`, `swellCap`, `arenaLightCap`,
+  `floodCap`) er nettopp det som gjør en palettflytt trygg.** De regner ut fra
+  fargene i stedet for å hardkode dommen, så en lysere grunn gir nye
+  gullverdier — ikke ny logikk. Ikke fjern dem for å «rydde».
+- **Dominanten er `#02FFAB` mot lyse flater.** Mint er fortsatt stillingen,
+  målet for oss, HEIA og energien.
+
+#### `CommentsScreen` — KREM ER IKKE EN FEIL (Brage 2026-08-21)
+
+Kommentartråden er lys, og du trykker deg dit fra den grønne kampverdenen.
+**Det er BESLUTTET at den står uendret i skive 4.** Krem kan godt være Heias
+lyse LESEFLATE — overgangen fra kampen vurderes på telefon, og en eventuell
+`#02FFAB`-innramming tas i den samlede Stadium Light-runden, ikke som en
+egen liten skive nå.
 
 ---
 
@@ -917,6 +1004,467 @@ skiferstripa hadde aldri vært testet med bilde i det hele tatt.
 
 ---
 
+### ✅ SKIVE 4 LEVERT OG TELEFONGODKJENT 2026-08-21 — KANONISK KOBLING + HEIA/KOMMENTARER
+
+**✅ TELEFONGODKJENT 2026-08-21 etter fire runder (4.1–4.4 under).**
+Ren JS + ÉN MIGRASJON.
+Ingen nye pakker, ingen native endringer. 377 tester / 28 suiter grønt (var
+345/26). Lint 12 kjente i `src`+`__tests__` — uendret.
+
+⚠️ **`00071_kampfeed.sql` MÅ PUSHES TIL PROD FØR APPEN VIRKER.** Kampsiden
+kaller `get_match_feed`; uten funksjonen feiler kallet, og engasjementslinja
+står med nuller og disablede knapper på hver rad. Resten av kampen lever
+videre (query-en er isolert), men skiva kan ikke telefontestes før den er ute.
+
+#### ✅ MIGRASJONEN ER I PROD 2026-08-21 — OG DELVIS VERIFISERT
+
+`supabase db push` la ut **kun** 00071 (dry-run bekreftet at ingenting annet
+sto i kø), og `supabase migration list --linked` viser den som anvendt.
+Ingen andre produksjonsendringer er gjort.
+
+**✅ DØREN ER BEVIST MOT EKTE PROD**, med anon-nøkkelen fra `.env`:
+
+| Kall | Svar |
+|---|---|
+| `get_match_feed` som anon | **401 `42501 permission denied for function`** |
+| `get_match_photos` som anon (kontroll, samme REVOKE/GRANT) | 401 `42501` — identisk |
+| `get_invite_preview` som anon (kontroll, finnes ikke) | 404 `PGRST202` |
+| `get_match_feed` helt uten nøkkel | 401 `No API key found` |
+
+Kontrollradene er hele poenget: en funksjon som ikke finnes gir **PGRST202**,
+mens vår gir **42501**. Altså er funksjonen DEPLOYET og døren LUKKET for anon
+— de to tingene kan ikke forveksles.
+
+#### ⛔ RESTEN AV PRODVERIFIKASJONEN ER BLOKKERT — MANGLER EN VEI TIL Å KJØRE SQL
+
+De sju andre punktene krever en INNLOGGET bruker eller vilkårlig SQL mot prod.
+Ingen av delene finnes i dette oppsettet, og det er ikke noe som kan «prøves
+en gang til»:
+
+- **`.env` har kun `SUPABASE_URL` + `SUPABASE_ANON_KEY`.** Ingen
+  service-role-nøkkel, ingen testkonto. De tidligere `verify-*.mjs`-skriptene
+  tar `TEST_EMAIL`/`TEST_PASSWORD` fra MILJØET ved kjøring — Brage har dem,
+  repoet har dem aldri hatt.
+- **`psql` er ikke installert, og Docker finnes ikke** på maskinen, så
+  verken direkte tilkobling eller `supabase db start` (lokal Postgres) er
+  mulig. Skriptet kan derfor heller ikke tørrkjøres.
+- **`supabase`-CLI 2.75 har ingen kommando for vilkårlig SQL** — kun
+  `diff/dump/lint/pull/push/reset/start`.
+- **`supabase/.temp/pooler-url` inneholder ingen passord** (CLI-en henter det
+  fra nøkkelringen), så en connection string kan ikke settes sammen.
+
+⚠️ **EN NY BRUKER KAN IKKE LAGES SOM RIGG HELLER**, og det er verdt å vite
+hvorfor: prod krever e-postbekreftelse (6-sifret kode), og
+`delete_account_data` (00042) er **service-role-only** og ANONYMISERER i
+stedet for å slette — en signup-basert rigg ville altså både vært umulig å
+logge inn på og etterlatt varige rader. «Riv den helt ned» er ikke oppnåelig
+den veien.
+
+#### ▶️ DEN FERDIGE BEVISFILA: `scripts/verify-00071.sql`
+
+Skrevet i repoets egen bevisform (samme som `verify-00067.sql` /
+`verify-00068.sql`): **alt skjer i en subtransaksjon som rulles tilbake med
+en marker-exception**, så riggen er revet ned VED KONSTRUKSJON — det finnes
+ingen opprydding å glemme. Kjøres ved å lime hele fila inn i
+Supabase SQL-editoren; siste `SELECT` gir en grid med ✅/❌ per punkt, og en
+etterkontroll som skal vise 0/0/0.
+
+⚠️ **INGEN PUSH SENDES.** Trigger-kjeden bak `start_match`/`report_match_event`
+skriver `notifications` og fyrer `net.http_post` (pg_net). pg_net KØER kallet
+i en tabell inne i transaksjonen og sender først ETTER COMMIT (00049) — en
+rollback fjerner køraden. Dette er grunnen til at rollback-formen er den
+eneste trygge måten å teste kampskriving mot prod på i det hele tatt.
+
+Den dekker: **A** døren (grants + gate for anon/ikke-medlem/medlem/ukjent
+hendelse) · **B** HEIA av/på, både antall og «valgt», inkludert at en ANNENS
+heia flytter telleren men ikke min tilstand · **C** ny og slettet kommentar ·
+**D** at en fersk kamphendelse har sin kanoniske post i SAMME transaksjon ·
+**E** at rytmemarkørene HAR poster (linja skjules av vår regel, ikke av
+manglende data) · **F** at mål imot har en kommenterbar post · **G** bilde på
+samme øyeblikk, eldst-først-rekkefølgen og FALLBACKEN når den kanoniske
+posten er slettet · **H** regresjon på `get_match_photos` og `get_team_feed`.
+
+⚠️ **FILA ER IKKE TØRRKJØRT** (ingen lokal Postgres). Feiler noe uventet,
+kommer alt likevel ut som «⛔ UVENTET FEIL» med meldingen, og resten av
+rapporten står — den er skrevet med det som sikkerhetsnett.
+
+**To ting SQL ikke kan bevise, og som derfor MÅ tas på telefonen:**
+«uten refetch» (realtime-kanalen) og «Kalender → Comments» (navigasjon).
+
+#### MIGRASJONEN — NØYAKTIG SLIK P1 SPESIFISERTE DEN
+
+`get_match_feed(evt_id)`, `SECURITY DEFINER STABLE`, `is_team_member`-gate,
+`REVOKE … FROM PUBLIC, anon` + `GRANT … TO authenticated` (00060/00061-malen).
+**Ingen skjemaendring, ingen indeks på `match_event_id`, ingen UNIQUE.**
+Én rad per ikke-slettet post på kampen: `post_id`, `match_event_id`,
+`post_type`, `created_at`, `comment_count`, `reaction_counts`, `my_reactions`.
+
+- **`reaction_counts` (jsonb) + `my_reactions` (text[]), ikke
+  `heia_count`/`i_reacted`.** 👏 bor ETT sted — `HEIA_EMOJI` i `feed.ts`.
+  Et ferdig `heia_count` ville gitt emojien et andre hjem som kan drifte.
+  Formen er ordrett den `get_team_feed` alt returnerer — og `my_reactions`
+  gjør at «har JEG heiet» ikke koster den ekstra `reactions`-spørringen
+  **feeden fortsatt betaler per skjermlast** (mulig opprydding senere).
+- **`ORDER BY created_at ASC, id ASC`** fra serveren, fordi det kanoniske
+  valget klientside er «eldste ikke-bilde».
+
+#### KANONISK VALG — OG FALLBACKEN SOM IKKE ER TEORI
+
+`pickCanonicalPost()` (`src/shared/matchEngagement.ts`) velger **eldste rad
+der `post_type <> 'bilde'`**, med `post_id` som tie-break — uten den kunne to
+telefoner heiet på hver sin post for samme mål, og tellerne blitt uenige for
+alltid uten at noen fikk en feilmelding.
+
+⚠️ **Den faller tilbake til eldste tilgjengelige post når det bare finnes
+bildeposter.** Skrivestien kan ikke lage den situasjonen — `start_match`
+(`match_start`), `report_match_event` (`match_event`/`match_end`) og
+`createImagePost` (`bilde`) er verifisert, og hendelsens egen post skrives
+alltid — **men «Slett innlegget» i feeden treffer i dag målposter (P3s andre
+halvvei, ÅPEN i prod til skive 8).** Sletter reporteren målposten, står
+hendelsen igjen med bare bildet sitt, og uten fallbacken ville raden tilbudt
+HEIA uten noe å henge det på.
+
+#### REGLENE ER KODE I `shared/`, IKKE I JSX
+
+- `showsEngagement()` — **rytmemarkørene får ALDRI en linje.** De HAR
+  feed-poster, men er kampens gater, ikke øyeblikk. Fasiten kaller ikke
+  `engRow()` på dem. `bytte`/`kort` er historiske importdata uten post.
+- `allowsHeia()` — **P1: ingen HEIA på mål imot.** Mål uten `teamSide`
+  behandles som mål imot (samme forsiktighetsregel som `nodeKindFor`).
+- `matchHeiaA11yLabel` / `matchCommentA11yLabel` i `matchCopy.ts` — setningen
+  bor der, ikke i JSX, som resten av kampens språk.
+
+#### 🔒 DEN ENE STEDET FASITEN OG P1 VAR UENIGE — BRAGE AVGJORDE
+
+Prototypens `momentHtml` gir mål-imot-raden **ingen** engasjementslinje i det
+hele tatt (`engRow` kalles bare på mål-for-oss, oppdatering og bilde). P1 sier
+«ingen HEIA, men kommentarer er tillatt begge steder».
+**Brages avgjørelse 2026-08-20: P1 vinner. Mål imot får kommentarhandling,
+aldri HEIA — og linja skal være HELT NAKEN og kompakt, uten boks eller pill.**
+
+**HEIA-knappen RENDRES IKKE på mål imot** — den er ikke disablet. En avslått
+knapp ville sagt «du kan heie hvis du får lov», og det er ikke beslutningen.
+
+#### UTTRYKKET — FASITENS `.eng`
+
+`src/components/match/MatchEngagementRow.tsx` (ny). Ingen pill, ingen boks,
+ingen flate: ikon + tall rett på grunnen. Hvile dempet, PÅ er mint. Tallet i
+displayfonten. `tone="goal"` løfter blekket der linja ligger på målswellen —
+samme skille fasiten gjør mellom `.eng button` og `.goal .eng button`.
+
+- **`HeiaHand` i `icons.tsx` (ny)** — fasitens egen hånd-path, med `filled`.
+  Emojien 👏 er riktig i FEEDEN, men bærer sin egen farge: den kan verken bli
+  mint når knappen er på eller dempes til kritt når den er av. Samme presedens
+  som `PlaySolid`/`PauseSolid` fra skive 1. Boblen er `MessageCircle`, som
+  fantes fra før.
+- ⚠️ **SLOTEN FLYTTET: ENGASJEMENTET AVSLUTTER ØYEBLIKKET, ETTER BILDET.**
+  Den sto mellom teksten og bildet fordi den var TOM da plassen ble reservert
+  i skive 1. Med innhold i den ble rekkefølgen «MÅL! → HEIA → bildet» — en
+  handling midt inne i det den handler om. Fasiten legger `engRow()` sist, og
+  et bilde festet til et mål er en del av målet. Voktet som test.
+
+#### ♿ TILGJENGELIGHET — OPPFYLT FOR SKIVE 4s FLATER
+
+- Rolle, label med BETYDNING («Heia på målet på 34 minutter. 12 heier.»),
+  og `accessibilityState={{selected}}`. Tilstanden leses av state-en, ikke av
+  labelen — ellers sies den to ganger på ulikt vis.
+- ⚠️ **44 pt ER LAYOUT (`minHeight`/`minWidth`), IKKE `hitSlop`.** De to
+  knappene er NABOER: to raus hitSlop gir OVERLAPPENDE treffområder, og da
+  avgjør view-rekkefølgen hvem som «vant» trykket i overlappet. `hitSlop`
+  ligger kun på topp/bunn som romslighet. Voktet som test (venstre/høyre
+  hitSlop må være 0).
+- Sloten ligger UTENFOR radens samlede label — voktet som test at ingen
+  forelder har `accessible`. Ryddes den inn, slutter knappene å være egne
+  stopp i VoiceOver, altså umulige å trykke.
+
+#### REALTIME OG CACHE
+
+- **`subscribeToMatch` fikk tre nye hendelser:** `reaction`, `commentDelta`
+  (begge fra UFILTRERTE `reactions`/`comments`-abonnementer — samme løsning og
+  samme RLS-begrunnelse som `subscribeToFeed`; DELETE på reactions trenger
+  `REPLICA IDENTITY FULL`, som 00059 alt ga) og **`engagementPost`**, som er
+  en `feed_posts`-INSERT med `match_event_id`. Uten den siste ville det NYESTE
+  målet vært det eneste man ikke kunne heie på — og det er nettopp det målet
+  folk vil heie på.
+- ⚠️ **Eget HEIA-ekko filtreres I SKJERMEN, ikke i kanalen.**
+  `acquireChannel` deler kanalen, så en «hvem er jeg» fanget i oppsettet ville
+  tilhørt den FØRSTE abonnenten for alltid. `userId` følger derfor med i
+  payloaden. (Feeden har samme latente problem i `subscribeToFeed` — ikke rørt
+  her, men verdt å vite.)
+- **`CommentsScreen` patcher kampens cache for ALLE tre mutasjonene** — ny
+  kommentar, slettet kommentar og HEIA av/på — via `post.eventId`. Derfor er
+  ekkofiltreringen trygg fra begge innganger. Kommentarer trenger ikke
+  avsenderfilter: mens tråden er åpen er kampen ute av fokus og abonnementet
+  revet.
+- **Feed-cachen patches også** når du heier fra kampen. Samme post, to tall —
+  uten patchen ville feeden vist din applaus som ikke gitt til neste refetch.
+
+#### ⚠️ RPC-BUDSJETTET ER FIRE, OG DET ER BEVISST
+
+`get_event_with_rsvp` · `get_match_photos` · `get_team_authors` ·
+**`get_match_feed`**. Lesestien var det som manglet (P1), og den kunne ikke
+presses inn i `get_event_with_rsvp` — den RPC-en deles av alle hendelsestyper,
+og en trening skal ikke betale for kampens engasjement.
+`eventDetailRefetch.test.tsx` vokter lista UTTØMMENDE: dukker
+`get_team_members` opp igjen, faller testen.
+
+#### ⚠️ EN DØD KNAPP SOM MÅTTE LUKKES I SAMME SLAG
+
+**`Comments` fantes i Home- og Inbox-stacken, men IKKE i Kalender-stacken** —
+der `EventDetail` også bor. Kommentarknappen ville kastet på hver kamp åpnet
+fra Kalender. Ruten er lagt inn samme sted, av nøyaktig samme grunn som
+`Invite` måtte følge lagoversikten inn i varselstacken.
+
+#### ÅPENT / BEVISST UTELATT
+
+- **`get_team_feed`-gaten for mål imot er skive 9, ikke denne.** Ikke samme
+  migrasjon: en grant-feil skal ikke kunne ta ned feeden og kampen på én gang.
+  Til den finnes, kan man fortsatt heie på et mål imot FRA FEEDEN.
+- **Ingen `bump`-animasjon på trykket.** Fasiten har den; den hører til
+  skive 6 sammen med `useReducedMotion`, og en ny animasjon uten den ville
+  vært å bygge regresjonen med vilje (samme resonnement som SEIER-pillen).
+- **Publikumstallet** («17 var med gjennom kampen») er fortsatt ikke bygget.
+- **Kommentartråden er krem, også i arket — BESLUTTET (Brage 2026-08-21).**
+  Krem er Heias lyse LESEFLATE. Etter skive 4.1 kommer den opp som bunnark
+  over kampen i stedet for som egen skjerm; en eventuell `#02FFAB`-innramming
+  tas i den samlede Stadium Light-runden. Se `### 🕯 STADIUM LIGHT`.
+- **Luften under et øyeblikk er større enn i fasiten**, fordi 44 pt-boksen
+  sentrerer innholdet sitt. `marginTop` er senket til 2 for å kompensere over;
+  under står radens egen `paddingBottom`. Kjennes på telefon.
+
+#### ✅ SKIVE 4.1 — PRODUKSJONSOVERSETTELSE 2026-08-21
+
+**Funksjonaliteten fra skive 4 var telefongodkjent.** Denne runden rettet
+noe annet: prototypen var fulgt for bokstavelig, og handlingen hadde blitt
+en ANNEN enn den appen allerede har. Fire brudd på `AUTORITETSREGELEN` i én
+liten komponent. **388 tester / 29 suiter grønt** (var 377/28). Lint 12
+kjente — uendret.
+
+**1. `HeiaHand` ER SLETTET FRA `icons.tsx`.**
+Skive 4 tegnet en egen hånd-SVG kopiert fra prototypens CSS-path, med den
+begrunnelsen at «en emoji kan ikke farges mint». ⚠️ **Begrunnelsen var
+feil, og det er den viktigste lærdommen her:** i feeden skifter 👏-glyfen
+ALDRI farge — det er TEKSTEN og pillen som bærer på/av. Det var altså aldri
+noe problem å løse, bare et nytt ikon å vedlikeholde. Kampen bruker nå
+`👏` og `MessageCircle` (14 pt), akkurat som `FeedCard`/`CommentThread`.
+
+**2. SPRÅKET ER APPENS.** «2 HEIA» behandlet HEIA som en måleenhet. Nå
+ordrett feedens mønster: **«Heia» på null, «1 heier», «2 heier»** — og
+kommentaren **«Kommenter» på null, ellers tallet**. Voktet som test.
+
+**3. NY TOKEN `typography.action` — DEN DELTE STEMMEN.**
+HEIA-tallet sto i `fonts.display`, som `theme/tokens.ts` uttrykkelig sier
+«aldri brødtekst/titler». Stemmen (12.5 / 700 / systemfont) lå fra før som
+RÅ TALL i både `FeedCard` og `CommentsScreen`, så skive 4 laget den tredje
+kopien. Nå ett token, og **alle tre flatene peker på det** — identiske
+verdier, så feeden er visuelt uendret. Ingen `letterSpacing`, ingen rå
+`fontFamily` igjen i skivas komponenter.
+
+**4. PÅ/AV ER DET ENESTE SOM OVERSETTES.** Feeden viser «på» som en FLATE
+(`heiaTint`-pill + `heiaInk`). Kampen har ingen flater — retningen sier
+skillet kommer av lys og luft. Tilstanden flyttet derfor til BLEKKET:
+`matchColors.dim` i hvile, `colors.heia` når du har heiet. Samme semantikk
+(mint = HEIA), kampens språk. `tone="goal"`-varianten er BORTE — den var
+enda et prototype-lån (`.goal .eng button` i CSS) og ga to utseender der
+appen har ett.
+
+#### 📱 KOMMENTARENE KOMMER OPP FRA BUNNEN — HER HADDE PROTOTYPEN RETT
+
+**Skive 4 navigerte til `CommentsScreen`.** Riktig fra feeden, feil fra
+kampen: en pågående kamp er noe du STÅR I, og å bli skjøvet ut av den for å
+lese en kommentar er å forlate kampen.
+
+- **`src/components/CommentThread.tsx` (ny)** — hele tråden løftet ut av
+  `CommentsScreen`: lasting, mutasjoner (kommentar, sletting, HEIA), de
+  optimistiske patchene mot BÅDE feed-cachen og kampens engasjement-cache,
+  moderasjonsmenyene og uttrykket. **Én tråd, to innganger** — det var hele
+  poenget med å ikke bygge en parallell kommentarløsning.
+- **`src/components/match/CommentSheet.tsx` (ny)** — `Modal` +
+  `animationType="slide"`, nøyaktig mønsteret `MatchPhotoSheet`,
+  `ReporterSheet` og `TimeSheet` alt bruker. **Ingen ny pakke, ingen native
+  rebuild.**
+- **`CommentsScreen` er nå 46 linjer** — bare rammen (tastatur, `BackBar`,
+  flate). Den lever videre for feedens og varslenes innganger.
+- **Arket er KREM.** Et ark er ikke en flate I verdenen, det ligger OVER
+  den. Krem er Heias lyse leseflate, og en tråd er lesing.
+- **Fast høyde 78 %**, ikke innholdsstyrt: en tom tråd og en tråd med tolv
+  replikker skal ikke gi to ulike ark, og skrivefeltet skal sitte samme sted.
+- **Alle tre veiene ut finnes**, og alle tre er voktet som test:
+  bakgrunnstrykk (med egen a11y-label — ellers er det et stort navnløst
+  trykkfelt VoiceOver leser først), **`onRequestClose` for Android-tilbake**
+  (uten den er arket en blindvei på Android), og slettet innlegg → arket
+  lukker seg i stedet for å stå tomt over kampen.
+- **`accessibilityViewIsModal`** på arket: uten den fortsetter VoiceOver å
+  lese KAMPEN bak, og fokus vandrer mellom to lag som visuelt ikke finnes
+  samtidig.
+- **`key={postId}`** på tråden: bytter du øyeblikk uten at arket lukkes,
+  lastes tråden på nytt i stedet for å vise forrige samtale.
+
+⚠️ **`Comments`-RUTEN I KALENDER-STACKEN ER TRUKKET TILBAKE.** Den ble lagt
+inn i skive 4 fordi kampen navigerte dit. Nå gjør den ikke det, og
+Kalender-stacken har ingen annen inngang til tråden — en registrert rute
+ingenting kan nå er verre enn ingen rute. `AppNavigator.tsx` og
+`KalenderStackParamList` er tilbake til utgangspunktet.
+
+#### ⚖️ HVA SKIVE 4.1 ETTERLOT SOM REGEL
+
+Se `## ⚖️⚖️ AUTORITETSREGELEN` øverst. Den ble skrevet på grunn av denne
+runden, og gjelder alle kommende skiver.
+
+#### ✅ SKIVE 4.2 — TRE RETTELSER FRA TELEFONTESTEN 2026-08-21
+
+Brage: **«Nå er kommentarsiden slik vi vil ha den»** — men arket selv var
+feil på tre punkter. Alle tre kom av at `MatchPhotoSheet`-mønsteret ble
+kopiert rått, uten å spørre om det passet for DENNE flaten.
+
+1. **ARKET KOM OPP ALTFOR AGGRESSIVT.** `animationType="slide"` er systemets
+   egen, og den KASTER arket opp. En samtale skal gli inn og lande.
+   Nå `animationType="none"` + egen `Animated.timing` med
+   `Easing.out(Easing.cubic)`, 340 ms inn / 210 ms ut — full fart i starten,
+   myk landing. Samme verktøy som `DateField` og `MatchPulseCard` alt bruker;
+   `transform`/`opacity` går på native driver, **ingen ny pakke**.
+   `useReducedMotion` er koblet på: er innstillingen på, står arket bare der.
+2. **DEN SVARTE VASKEN ER BORTE.** `rgba(0,0,0,0.5)` slukket den grønne
+   verdenen — og da er hele grunnen til å bruke et ark borte, for kampen
+   skal fortsatt være DER bak. Nå **kampens eget scrim** (`#081B13`, samme
+   som `MatchTimeline` og `MatchPhotoRail`) på 0.32, som SENKER verdenen i
+   stedet for å male over den. Den toner inn med arket i stedet for å slå på.
+   Voktet som test: ingen svart bakgrunn bak arket.
+3. **TOPPEN ER EN GRIPEFLATE.** `PanResponder` (innebygd i RN) på hodet —
+   håndtaket og tittelen. Dra ned forbi 28 % av høyden, eller slipp med fart,
+   så lukker den; kortere enn det spretter den tilbake.
+   ⚠️ **Gesten ligger på HODET, ikke på hele arket:** under ligger en
+   scrollende tråd, og en drag-to-dismiss over den ville kjempet med
+   scrollen på hver eneste sveip. Voktet som test.
+
+⚠️ **ALLE VEIER UT GÅR NÅ GJENNOM SAMME ANIMASJON** (`requestClose`) —
+bakgrunnstrykk, Android-tilbake, dra ned og slettet innlegg. Ellers ville
+noen av dem fått arket til å forsvinne med et klipp.
+⚠️ **Testene måtte lære det:** lukkingen er animert, så `onClose` kommer
+FØRST når bevegelsen er ferdig. Uten `jest.advanceTimersByTime` ville testene
+«bevist» at knappene er døde.
+
+390 tester / 29 suiter grønt. Lint 12 kjente — uendret.
+
+#### ✅ SKIVE 4.3 — DRAGET VIRKET IKKE 2026-08-21
+
+Brage: **«siste som mangler er at jeg kan bevege kommentarseksjonen ved å ta
+på toppen av den»** — gripeflaten fra 4.2 var der i koden, men ikke i
+fingeren. To ting kunne stoppe den, og begge er rettet, fordi bare den ene
+kan ikke bevises uten enhet:
+
+1. **RESPONDEREN BLE ALDRI VUNNET.** 4.2 hadde BARE
+   `onMoveShouldSetPanResponder` med en 4 pt-terskel — riktig tanke på en
+   flate med knapper, feil her. Hodet har ingenting å trykke på, og
+   berøringen starter som regel på tittel-`Text`-en, så responderen måtte
+   vinnes gjennom en forhandling andre lag kan komme i veien for. Nå tas den
+   **ved berøring og i capture-fasen** (`onStartShouldSetPanResponder` +
+   `…Capture`), pluss `onPanResponderTerminationRequest: () => false` så
+   ingen kan overta MIDT i draget. Et rent trykk lander i release med
+   `dy ≈ 0` og blir en no-op. Voktet som test.
+2. ⚠️ **DRIVEREN ER BYTTET TIL JS FOR DETTE ARKET — bevisst unntak.**
+   Resten av appen animerer `transform`/`opacity` på native driver, og det er
+   riktig for fyr-og-glem-bevegelser. Her følger verdien FINGEREN, og
+   fingeren kommer inn via `PanResponder` — altså fra JS-tråden uansett. Med
+   native driver må hver `setValue` under draget krysse brua til den native
+   grafen, og nettopp den kombinasjonen (native tween + JS `setValue` på
+   samme node) gjør et bunnark-drag upålitelig. Prisen er at åpne-/
+   lukkebevegelsen på 340 ms kjører på JS-tråden — ett `transform` på én
+   flate, på en skjerm som ellers står stille. **`DRIVER`-konstanten er ett
+   sted, så den kan flippes tilbake hvis dette viser seg unødvendig.**
+
+Dessuten `collapsable={false}` på hodet: på Android kan en View som bare
+bærer layout bli optimalisert bort av det native treet, og da forsvinner
+treffområdet med den. (Ikke årsaken på iPhone, men gratis forsikring.)
+
+390 tester / 29 suiter grønt. Lint 12 kjente — uendret.
+
+#### ✅ SKIVE 4.4 — UTGLIDNINGEN RYKKET 2026-08-21
+
+Brage: **«hvis jeg drar litt fort ned så skal den gå smooth ned av seg
+selv»** og **«den rykker litt når man gjør dette nå»**.
+
+**Årsaken var ÉN kurve.** Alle utganger delte `Easing.in(Easing.cubic)` — en
+kurve som starter på NULL fart. Slapp du arket mens det var i bevegelse,
+stoppet det altså HELT OPP i slippøyeblikket og tok sats på nytt. Det er
+rykket. Det er også hvorfor «gå smooth ned av seg selv» ikke virket: arket
+gjorde det, bare med et fartssprang først.
+
+**Nå følger fingerens fart med ut.** `slideOut` tar en `flickSpeed` (px/ms):
+
+- **Fra fingeren:** `Easing.linear`, og varigheten regnes som *hvor langt det
+  er igjen / farten*. Da finnes det **ikke noe fartssprang i det hele tatt**
+  i slippøyeblikket. Den brå stoppen på slutten ser ingen — arket er utenfor
+  skjermen da. Gulv 1.2 px/ms (et treigt slipp skal ikke bli snegle) og tak
+  360 ms.
+- **Fra et TRYKK** (bakgrunn, Android-tilbake, slettet innlegg): arket står
+  stille, og da er det riktig å ta av. `Easing.in(Easing.cubic)` beholdes.
+
+⚠️ **`dragY`-refen er en del av fiksen, ikke bokføring:** uten den regnet
+utglidningen varigheten fra FULL høyde selv om arket allerede lå halvveis
+nede, og gikk dermed halvparten så fort som fingeren.
+`translateY.__getValue()` ville gitt samme tall, men er privat API.
+
+**Terskelen senket til 0.5 px/ms** (var 0.7), så «litt fort» faktisk teller —
+0.7 krevde et bevisst kast.
+
+390 tester / 29 suiter grønt. Lint 12 kjente — uendret.
+
+#### 📱 TELEFONKONTROLLEN — RUNDE 2
+
+1. **HEIA-linja:** står det «Heia» før noen har heiet, og «1 heier» /
+   «2 heier» etterpå? Ser den ut som SAMME handling som i feeden?
+2. **Trykk HEIA:** går teksten til mint? Trykk igjen — tilbake til dempet?
+3. **Kommentaren:** står det «Kommenter» på null og tallet ellers?
+4. **Trykk kommentaren i en LIVE kamp:** glir arket opp og LANDER, i stedet
+   for å bli kastet opp? Ser du den grønne kampen bak, bare dempet — ingen
+   svart vask? Skriv en kommentar, **dra arket ned etter toppen**:
+   **er du fortsatt i kampen, på samme sted i forløpet?**
+   Prøv også en kort drag som IKKE skal lukke — spretter den tilbake?
+   Og et lite KAST nedover: glir arket videre i samme fart, uten å stoppe og
+   ta sats på nytt (4.4)?
+   Og en drag som starter nede i tråden — den skal SCROLLE, ikke lukke.
+5. **Tastaturet i arket:** dekker det skrivefeltet, eller løftes feltet?
+6. **Android-tilbake / sveip:** lukker arket, ikke skjermen.
+7. **Samme fra en FERDIGSPILT kamp.**
+8. **Fra FEEDEN** skal kommentaren fortsatt åpne fullskjerm som før — og fra
+   et VARSEL likeså. Tråden skal se helt lik ut begge steder.
+9. **Tallet:** kommenter fra arket, lukk det — står tallet riktig på raden?
+10. **VoiceOver med arket åpent:** leses BARE arket, ikke kampen bak?
+11. **Stor tekst (XXL)** på HEIA-linja og i arket.
+
+#### 📱 TELEFONKONTROLLEN — SJEKKLISTE
+
+Åpne en LIVE kamp (eller start en), og etterpå en FERDIGSPILT:
+
+1. **Leses linja som del av øyeblikket, eller som en knapperad?** Den skal
+   ikke ha boks, ramme eller pill noe sted.
+2. **Trykk HEIA på et mål.** Slår tallet til med én gang? Blir hånden fylt og
+   mint? Trykk igjen — går det tilbake?
+3. **Mål IMOT: er det INGEN HEIA der, bare kommentaren?** Og er den naken nok
+   — eller gjør den skiferstripa for høy? (Dette er stedet P1 vant over
+   fasiten; si fra hvis du heller vil ha fasitens helt tomme rad.)
+4. **Rytmemarkørene** (avspark, pause, 2. omgang, slutt): ingen linje i det
+   hele tatt.
+5. **Et mål MED bilde:** kommer HEIA UNDER bildet, ikke mellom «MÅL!» og
+   bildet? (Og se samtidig etter 3.1-regresjonen — lagets lys skal nå helt
+   ned forbi bildet.)
+6. **Trykk kommentaren** → tråden åpnes → skriv en kommentar → tilbake:
+   **står tallet riktig med én gang?** Gjenta med kampen åpnet fra
+   **Kalender-fanen** — det var en død knapp før denne skiva.
+7. **To telefoner:** heia fra den ene, se at tallet beveger seg på den andre
+   uten refresh. Og at DIN egen ikke telles to ganger.
+8. **Et ferskt mål:** rapporter et mål og prøv å heie på det med én gang.
+   Knappen skal bli levende i løpet av et øyeblikk — ikke være stille død.
+9. **Stor tekst (XXL):** holder linja, eller sprenger «12 HEIA» kolonnen?
+10. **VoiceOver:** sveip gjennom et mål — øyeblikket er ETT stopp, og HEIA og
+    kommentar er TO EGNE stopp etterpå, med hele setningen og «valgt» når du
+    har heiet.
+11. **Trykkpresisjon:** treffer du HEIA og kommentaren hver for seg uten å
+    bomme, også med tommelen i fart?
+
+---
+
 ### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
 
 **Skiverekkefølgen er godkjent av Brage.** Skive 1 er levert. Neste er
@@ -928,15 +1476,75 @@ en REELL begrensning.
 | 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` + 1.1 |
 | 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT `23df9ed` (+2.1 +2.2) |
 | 3 | **Kamprapporten på samme grunn** | ✅ LEVERT OG TELEFONGODKJENT `1b0390d` + 3.1 `95c092f` |
-| 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ⏭️ NESTE, godkjent, se P1 |
-| 5 | **Kampens puls** (`PulseCurve`) | se memoiseringsregelen |
+| 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ✅ LEVERT OG TELEFONGODKJENT + 4.1–4.4. Migrasjon I PROD |
+| 5 | **Kampens puls** (`PulseCurve`) | ⏭️ NESTE — se memoiseringsregelen |
 | 6 | **Sticky-bar + Reduce Motion** | |
 | 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
 | 8 | **Angre mål** (10 s) | se P3 |
 | 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
 
-#### ▶️ SKIVE 4 — HVA SOM ALREDE ER AVKLART
+#### ▶️ SKIVE 5 — KAMPENS PULS: HVA SOM ALLEREDE ER AVKLART
+
+**Plassen finnes fysisk allerede.** Telefonkontrollen i skive 2 spurte
+uttrykkelig om «arena → (tom plass der pulsen skal inn i skive 5) → forløp»
+var for brå overgang — Brage sa den sto til. Pulsen fyller det rommet.
+
+**Fra den frosne retningen (ikke relitigér):**
+- Egen kompakt seksjon (~90 px) UNDER stillingen, sted/reporter og
+  avatarene. **Åpent på grunnen, ingen container.**
+- «KAMPENS PULS» til venstre, **`NÅ 40′` til høyre — aldri et nakent minutt.**
+- **Formen kommer av ØYEBLIKKENE, ikke av en energimodell:** mål for oss =
+  minttopp, mål imot = søkk, bilde = lys mint, oppdatering = gull.
+- **HEIA endrer GLØDERADIEN, aldri kurvens høyde** — derfor kan den ikke bli
+  en påstand om hvem som presser.
+- **Ingen akser, tall, prosenter eller analyseestetikk.**
+- Det tredje rommet har sin egen tone klar og UBRUKT: `matchColors.pulse`
+  (#1A4433, L*~23). Kontrastvakten i `matchContrast.test.ts` har allerede
+  gullverdier for den.
+
+**⚠️ MEMOISERINGSNØKKELEN ER LÅST (se `PulseCurve` i P-bolken):**
+IKKE `matchEvents.length` alene — det gir stale kurver ved redigering,
+sletting, angre eller endret hendelsesdata uten endret antall. Nøkkelen må
+dekke **event-ID, type, sekvens/minutt, slettestatus og relevant HEIA-sum**.
+**Minutt-tickeren skal ALDRI tegne kurven på nytt.** (Samme regel som
+`MatchTimeline`s flettememo: et tick-tall i deps ville regnet hele
+stillings- og bildeflettingen på nytt hvert 30. sekund.)
+
+**HEIA-summen finnes nå.** Skive 4 ga `useMatchEngagement` →
+`buildMatchEngagement`, som allerede har tellerne per øyeblikk. Pulsen skal
+lese DERFRA, ikke hente på nytt — og HEIA-summen er en del av
+memoiseringsnøkkelen.
+
+**⚠️ IKKE FORVEKSLE MED `MatchPulseCard`.** Den finnes i `src/components/`,
+heter nesten det samme og brukes av **InboxScreen** («lagets puls» i
+varslene). Den har ingenting med kampens pulskurve å gjøre og skal ikke
+røres.
+
+**Alt som viser kampminuttet arver SAMME beregnede tid i samme tick** —
+hodet, pulsen, retningsmarkøren og sticky-baren. Det var prototypens ene
+ekte bug (hodet 40′, pulsen 37′). `MatchTimeline` tar allerede `nowMinute`
+som PROP og kaller aldri `Date.now()`; pulsen skal gjøre det samme.
+
+**A11y:** pulskurven er atmosfære, ikke innhold —
+`accessibilityElementsHidden` + `importantForAccessibility="no-hide-descendants"`,
+som krittlinja, nodene, swellen og skrimene. Seksjonens OVERSKRIFT og
+minuttet skal derimot leses.
+
+**Bevegelse:** `useReducedMotion` er koblet på SEIER-pillen (skive 3) og
+kommentararket (4.2). Skive 6 kobler den på `useGoalMoment`, `LiveBadge` og
+pulsen — men **legger du inn en NY animasjon i pulsen nå, skal den ha den
+med én gang.** Å bygge regresjonen med vilje er ikke et alternativ.
+
+**Ryddejobb som ligger og venter (egen liten sak, ikke skive 5):**
+`ScoreBoard.tsx` har ingen kallesteder igjen i det hele tatt — kun
+`components/index.ts` eksporterer den. Kan trolig slettes.
+
+#### ▶️ SKIVE 4 — HVA SOM VAR AVKLART FØR BYGGING (historikk)
+
+➡️ **Skiva er BYGGET — se `### ⏳ SKIVE 4 BYGGET` over for hva som faktisk
+ble laget, og for telefonsjekklista.** Bolken her står som den var, fordi den
+er kartleggingen som ble brukt.
 
 **Migrasjonen er GODKJENT og spesifisert: `00071_kampfeed.sql` med
 `get_match_feed(evt_id)`, UTEN skjemaendring.** Hele begrunnelsen — hvorfor
@@ -1045,6 +1653,12 @@ skive 4 tar HEIA/kommentarer, skive 5 skjuler pulskurven.
 label · påmeldtstripa er ÉTT stopp («Påmeldt, 14. Erlend Hagen, …») med
 ansiktene skjult · «Rediger» har rolle, label og 44 pt · bildestripas
 overskrift er `header`, thumbene hadde rolle og label fra før.
+
+✅ **OPPFYLT FOR SKIVE 4s FLATER:** HEIA og kommentar har rolle, label med
+betydning fra `matchCopy`, `accessibilityState={{selected}}`, og **44 pt som
+LAYOUT — ikke `hitSlop`** (naboknapper med raus hitSlop får overlappende
+treffområder). Sloten ligger utenfor øyeblikkets samlede label, voktet som
+test. Se `### ⏳ SKIVE 4 BYGGET`.
 
 ---
 

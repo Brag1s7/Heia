@@ -10,6 +10,7 @@ import {
 } from '../media/resolver';
 import {uploadFileToBucket} from '../media/upload';
 import type {MediaRef} from '../media/types';
+import type {MatchFeedPost} from '../../shared/matchEngagement';
 import type {FeedItem, UserRole} from '../../shared/types';
 
 // Merkevare-reaksjonen: 👏 «Heia». Én emoji nå (utvides senere ved behov).
@@ -604,4 +605,40 @@ export async function getMatchPhotos(eventId: string): Promise<MatchPhoto[]> {
   await primeMediaUrls(paths);
 
   return photos;
+}
+
+/**
+ * KAMPENS ENGASJEMENT — HEIA og kommentarer per øyeblikk (00071).
+ *
+ * Én rad per ikke-slettet post på kampen, med tellerne og mine egne
+ * reaksjoner. Hvilken av dem som er den KANONISKE for et øyeblikk avgjøres i
+ * `shared/matchEngagement` — koblingen er 1:N med vilje (et kampbilde bærer
+ * samme `match_event_id`), og valget må være deterministisk.
+ *
+ * ⚠️ EMOJIEN BOR HER, IKKE I SQL. RPC-en returnerer alle reaksjonene på
+ * posten; `HEIA_EMOJI` er fortsatt eneste sted 👏 er skrevet ned. Det er også
+ * derfor «har jeg heiet» ikke koster en ekstra spørring slik feeden gjør:
+ * `my_reactions` kommer med i samme rad.
+ */
+export async function getMatchFeed(eventId: string): Promise<MatchFeedPost[]> {
+  const {data, error} = await supabase.rpc('get_match_feed', {
+    evt_id: eventId,
+  });
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as any[]).map(r => {
+    const counts = (r.reaction_counts ?? {}) as Record<string, number>;
+    const mine = (r.my_reactions ?? []) as string[];
+    return {
+      postId: r.post_id as string,
+      matchEventId: (r.match_event_id as string) ?? undefined,
+      postType: r.post_type as string,
+      createdAt: new Date(r.created_at),
+      heiaCount: counts[HEIA_EMOJI] ?? 0,
+      commentCount: Number(r.comment_count ?? 0),
+      iReacted: mine.includes(HEIA_EMOJI),
+    };
+  });
 }

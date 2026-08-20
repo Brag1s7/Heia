@@ -204,6 +204,27 @@ export const typography = {
     color: colors.textTertiary,
   } satisfies TextStyle,
 
+  /**
+   * SOSIALE HANDLINGER — «👏 2 heier», «Kommenter».
+   *
+   * Én stemme for hele appen. Den satt før som rå tall i `FeedCard` og
+   * `CommentsScreen`, og da kampskjermen fikk sin egen engasjementslinje
+   * (skive 4) oppsto den tredje kopien — med DISPLAYFONTEN på tallet, som
+   * `fonts` uttrykkelig sier aldri skal brukes til brødtekst. Tokenet
+   * finnes for at de tre ikke kan drifte fra hverandre igjen.
+   *
+   * Fargen overstyres av flaten: krem-verdenen bruker `textSecondary`
+   * (aktiv: `heiaInk` på `heiaTint`-pill), kampverdenen `matchColors.dim`
+   * (aktiv: `colors.heia`). Selve STEMMEN — størrelse, vekt, familie — er
+   * den samme.
+   */
+  action: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    fontFamily,
+    color: colors.textSecondary,
+  } satisfies TextStyle,
+
   label: {
     fontSize: 13,
     fontWeight: '500',

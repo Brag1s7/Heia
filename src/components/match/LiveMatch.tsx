@@ -65,6 +65,11 @@ interface LiveMatchProps {
   matchEvents: MatchEvent[];
   photos: MatchPhoto[];
   authorFor: (userId: string) => User | undefined;
+  /** HEIA + kommentarer per øyeblikk (skive 4) — se `MatchTimeline`. */
+  renderEngagement?: (entry: {
+    event?: MatchEvent;
+    photo?: MatchPhoto;
+  }) => React.ReactNode;
   onChangeReporter: () => void;
   onReporterAction: (type: ReporterActionType) => void;
   onPickPhoto: () => void;
@@ -82,6 +87,7 @@ export function LiveMatch({
   isReporter,
   photos,
   authorFor,
+  renderEngagement,
   onChangeReporter,
   onReporterAction,
   onPickPhoto,
@@ -179,6 +185,7 @@ export function LiveMatch({
           newestFirst
           nowMinute={minute}
           authorFor={authorFor}
+          renderEngagement={renderEngagement}
           onPressPhoto={onPressPhoto}
         />
       </ScrollView>

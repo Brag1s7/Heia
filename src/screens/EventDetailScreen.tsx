@@ -43,6 +43,8 @@ import {
 } from '../components';
 import {FinishedMatch} from '../components/match/FinishedMatch';
 import {LiveMatch} from '../components/match/LiveMatch';
+import {MatchEngagementRow} from '../components/match/MatchEngagementRow';
+import {CommentSheet} from '../components/match/CommentSheet';
 import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
@@ -50,18 +52,24 @@ import {useAuth, useActiveTeam, useNotifications} from '../context';
 import type {TeamAuthor, TeamMember} from '../lib/api/members';
 import {useTeamAuthors, useTeamMembers} from '../lib/queries/members';
 import {
+  adjustMatchEngagement,
   applyMatchEventInsert,
   applyMatchSessionUpdate,
   eventDetailKey,
   invalidateEventDetail,
+  invalidateMatchEngagement,
   invalidateMatchPhotos,
   markEventDetailStale,
+  markMatchEngagementStale,
   markMatchPhotosStale,
+  matchEngagementKey,
   matchPhotosKey,
   patchEventDetail,
   useEventDetail,
+  useMatchEngagement,
   useMatchPhotos,
 } from '../lib/queries/eventDetail';
+import {patchFeedItem} from '../lib/queries/feed';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {
   getTournamentMatches,
@@ -73,9 +81,21 @@ import {
   subscribeToMatch,
   type ReportMatchEventInput,
 } from '../lib/api/events';
-import {createImagePost, type MatchPhoto} from '../lib/api/feed';
+import {
+  createImagePost,
+  toggleReaction,
+  type MatchPhoto,
+} from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
+import {
+  allowsHeia,
+  buildMatchEngagement,
+  showsEngagement,
+  type MatchFeedPost,
+} from '../shared/matchEngagement';
+import {matchCommentA11yLabel, matchHeiaA11yLabel} from '../shared/matchCopy';
+import {GRID_FONT_CAP} from '../shared/matchGridGeometry';
 import {dayRangeLabel} from '../shared/calendar';
 import {eventIsUpcoming} from '../shared/eventForm';
 import type {
@@ -99,6 +119,7 @@ const NO_PHOTOS: MatchPhoto[] = [];
 // men referansen må uansett være stabil, ellers regner hver memo nedstrøms
 // på nytt ved hvert minutt-tick.
 const NO_MATCH_EVENTS: MatchEvent[] = [];
+const NO_MATCH_FEED: MatchFeedPost[] = [];
 
 const dayNamesLong = [
   'Søndag',
@@ -229,6 +250,8 @@ export function EventDetailScreen({route, navigation}: Props) {
   const {eventId} = route.params;
 
   const teamName = activeTeamSpace?.displayName ?? '';
+  // Brukes til å filtrere bort mitt eget realtime-ekko på HEIA (skive 4).
+  const myId = currentUser?.id;
 
   // B2: hendelsen bor i query-cachen (P7-nøkkelen ['event', id]).
   // Redigeringsmodal-fella fra 2026-08-07 (lukker seg tilbake hit med gammel
@@ -252,6 +275,9 @@ export function EventDetailScreen({route, navigation}: Props) {
   const [pendingPhoto, setPendingPhoto] = useState<PickedImage | null>(null);
   const [publishingPhoto, setPublishingPhoto] = useState(false);
   const [galleryPhotoId, setGalleryPhotoId] = useState<string | null>(null);
+  // Samtalen om ett øyeblikk, som bunnark OVER kampen (skive 4.1) — ikke en
+  // skjerm man sendes bort til. `null` = arket er lukket.
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
 
   // Turnering: kampene lastes for seg og refetches ved fokus — «Ny kamp»
   // lukker modalen tilbake hit, og å komme tilbake fra en kamp skal vise
@@ -317,6 +343,125 @@ export function EventDetailScreen({route, navigation}: Props) {
   const matchPhotos = photosQuery.data ?? NO_PHOTOS;
   const refetchPhotos = photosQuery.refetch;
 
+  // ---------------------------------------------------------------------
+  // KAMPENS ENGASJEMENT (skive 4) — HEIA og kommentarer per øyeblikk.
+  //
+  // Den fjerde RPC-en på kampskjermen, og et bevisst valg: koblingen mellom
+  // øyeblikket og den kanoniske feed-posten (00071) er hele skiva, og egen
+  // sti betyr at et HEIA aldri koster en re-lasting av kampforløpet.
+  // Feiler den, lever kampen videre — linja tegnes med nuller og disablede
+  // knapper i stedet for å ta ned skjermen.
+  // ---------------------------------------------------------------------
+  const matchFeed =
+    useMatchEngagement(eventId, isMatchEvent).data ?? NO_MATCH_FEED;
+  const engagement = useMemo(
+    () => buildMatchEngagement(matchFeed),
+    [matchFeed],
+  );
+
+  const handleMatchHeia = useCallback(
+    async (postId: string, currentlyReacted: boolean) => {
+      const delta = currentlyReacted ? -1 : 1;
+      // Optimistisk rett i cachen — et HEIA skal kjennes i samme sekund som
+      // fingeren treffer, ikke etter en rundtur.
+      adjustMatchEngagement(eventId, postId, {
+        heia: delta,
+        iReacted: !currentlyReacted,
+      });
+      // ⚠️ FEEDEN VISER DEN SAMME POSTEN. Uten denne patchen ville et HEIA
+      // gitt i kampen stått ureagert i feeden til neste refetch — samme
+      // post, to tall. En no-op når feeden ikke er i cachen.
+      const patchFeed = (reacted: boolean, d: 1 | -1) => {
+        if (!activeTeamSpaceId) return;
+        patchFeedItem(activeTeamSpaceId, postId, p => ({
+          ...p,
+          iReacted: reacted,
+          heiaCount: Math.max(0, (p.heiaCount ?? 0) + d),
+        }));
+      };
+      patchFeed(!currentlyReacted, delta);
+      try {
+        await toggleReaction(postId, currentlyReacted);
+      } catch {
+        adjustMatchEngagement(eventId, postId, {
+          heia: -delta,
+          iReacted: currentlyReacted,
+        });
+        patchFeed(currentlyReacted, -delta as 1 | -1);
+      }
+    },
+    [eventId, activeTeamSpaceId],
+  );
+
+  // ⚠️ ARK, IKKE NAVIGASJON. Fra kampen skal samtalen komme opp FORAN
+  // kampen: en pågående kamp er noe du står i, og å bli skjøvet ut av den
+  // for å lese en kommentar er å forlate den. `CommentsScreen` lever videre
+  // for feedens og varslenes innganger — det er SAMME tråd (`CommentThread`),
+  // bare en annen ramme.
+  const handleMatchComment = useCallback((postId: string) => {
+    setCommentPostId(postId);
+  }, []);
+
+  /**
+   * Én engasjementslinje, eller ingenting.
+   *
+   * ⚠️ TRE REGLER, OG ALLE TRE ER PRODUKT, IKKE VISNING:
+   *   · Rytmemarkørene (avspark/pause/2. omgang/slutt) HAR feed-poster, men
+   *     får aldri en linje — de er kampens gater, ikke øyeblikk.
+   *   · Mål IMOT får kommentarer, aldri HEIA (P1, låst).
+   *   · Et frittstående kampbilde er sin egen post; `MatchPhoto.id` ER
+   *     post-id-en, så det trenger ikke det kanoniske valget.
+   * Reglene bor i `shared/matchEngagement` så de kan testes uten en skjerm.
+   */
+  const renderEngagement = useCallback(
+    ({event: ev, photo}: {event?: MatchEvent; photo?: MatchPhoto}) => {
+      if (photo) {
+        const entry = engagement.byPost.get(photo.id);
+        return (
+          <MatchEngagementRow
+            engagement={entry}
+            canHeia
+            heiaLabel={matchHeiaA11yLabel({
+              subject: 'photo',
+              count: entry?.heiaCount ?? 0,
+            })}
+            commentLabel={matchCommentA11yLabel({
+              subject: 'photo',
+              count: entry?.commentCount ?? 0,
+            })}
+            fontCap={GRID_FONT_CAP}
+            onHeia={handleMatchHeia}
+            onComment={handleMatchComment}
+          />
+        );
+      }
+      if (!ev || !showsEngagement(ev)) {
+        return null;
+      }
+      const entry = engagement.byMatchEvent.get(ev.id);
+      return (
+        <MatchEngagementRow
+          engagement={entry}
+          canHeia={allowsHeia(ev)}
+          heiaLabel={matchHeiaA11yLabel({
+            subject: ev,
+            minute: ev.minute,
+            count: entry?.heiaCount ?? 0,
+          })}
+          commentLabel={matchCommentA11yLabel({
+            subject: ev,
+            minute: ev.minute,
+            count: entry?.commentCount ?? 0,
+          })}
+          fontCap={GRID_FONT_CAP}
+          onHeia={handleMatchHeia}
+          onComment={handleMatchComment}
+        />
+      );
+    },
+    [engagement, handleMatchHeia, handleMatchComment],
+  );
+
   // Kampen er i gang (også i pause — da telles minuttene fortsatt).
   const isUnderway =
     event?.matchStatus === 'live' || event?.matchStatus === 'halfTime';
@@ -348,6 +493,7 @@ export function EventDetailScreen({route, navigation}: Props) {
   // `isInvalidated` ved retur og resyncer straks, uansett 60 s-regelen.
   useScreenFocusRefetch(eventDetailKey(eventId));
   useScreenFocusRefetch(matchPhotosKey(eventId));
+  useScreenFocusRefetch(matchEngagementKey(eventId));
 
   // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
   // ville stillingen stått stille til hun selv dro for å oppdatere.
@@ -370,6 +516,14 @@ export function EventDetailScreen({route, navigation}: Props) {
       if (!liveMatchSessionId) return;
       let eventTimer: ReturnType<typeof setTimeout> | null = null;
       let photoTimer: ReturnType<typeof setTimeout> | null = null;
+      let engagementTimer: ReturnType<typeof setTimeout> | null = null;
+      const scheduleEngagementRefetch = () => {
+        if (engagementTimer) clearTimeout(engagementTimer);
+        engagementTimer = setTimeout(() => {
+          engagementTimer = null;
+          invalidateMatchEngagement(eventId);
+        }, 400);
+      };
       const scheduleEventRefetch = () => {
         if (eventTimer) clearTimeout(eventTimer);
         eventTimer = setTimeout(() => {
@@ -399,6 +553,29 @@ export function EventDetailScreen({route, navigation}: Props) {
               invalidateMatchPhotos(eventId);
             }, 400);
             break;
+          case 'engagementPost':
+            // Et ferskt øyeblikk fikk nettopp sin kanoniske post. Debounced,
+            // for et mål skriver flere rader i samme transaksjon.
+            scheduleEngagementRefetch();
+            break;
+          case 'reaction':
+            // ⚠️ EGET EKKO FILTRERES HER, IKKE I KANALEN. Trykket mitt er
+            // alt applisert optimistisk; ekkoet ville talt to ganger.
+            // Filteret står her fordi `acquireChannel` deler kanalen, og en
+            // «hvem er jeg» fanget i oppsettet ville tilhørt den første
+            // abonnenten for alltid.
+            if (evt.userId !== myId) {
+              adjustMatchEngagement(eventId, evt.postId, {heia: evt.delta});
+            }
+            break;
+          case 'commentDelta':
+            // Ingen avsenderfilter: kommentarer skrives i `CommentsScreen`,
+            // og mens den er åpen er kampen ute av fokus — abonnementet her
+            // er revet, så mitt eget ekko kan aldri nå denne linja.
+            adjustMatchEngagement(eventId, evt.postId, {
+              comments: evt.delta,
+            });
+            break;
           case 'resync':
             // Kanalen har vært nede — hendelser kan være tapt. Hent begge
             // stiene straks (P6-reconnect-raden); dette er også broen som
@@ -406,6 +583,7 @@ export function EventDetailScreen({route, navigation}: Props) {
             // i fokus hele tiden).
             invalidateEventDetail(eventId);
             invalidateMatchPhotos(eventId);
+            invalidateMatchEngagement(eventId);
             break;
         }
       });
@@ -417,11 +595,13 @@ export function EventDetailScreen({route, navigation}: Props) {
         // straks — det som skjedde i mellomtiden kan aldri bli stående.
         if (eventTimer) clearTimeout(eventTimer);
         if (photoTimer) clearTimeout(photoTimer);
+        if (engagementTimer) clearTimeout(engagementTimer);
         markEventDetailStale(eventId);
         markMatchPhotosStale(eventId);
+        markMatchEngagementStale(eventId);
         unsubscribe();
       };
-    }, [liveMatchSessionId, eventId]),
+    }, [liveMatchSessionId, eventId, myId]),
   );
 
   // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
@@ -800,6 +980,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           isReporter={isCurrentUserReporter}
           photos={matchPhotos}
           authorFor={authorFor}
+          renderEngagement={renderEngagement}
           onChangeReporter={() => setReporterSheetVisible(true)}
           onReporterAction={handleReporterAction}
           onPickPhoto={handlePickPhoto}
@@ -838,6 +1019,12 @@ export function EventDetailScreen({route, navigation}: Props) {
           initialPhotoId={galleryPhotoId}
           onClose={() => setGalleryPhotoId(null)}
         />
+
+        <CommentSheet
+          postId={commentPostId}
+          teamSpaceId={activeTeamSpaceId ?? ''}
+          onClose={() => setCommentPostId(null)}
+        />
       </>
     );
   }
@@ -862,6 +1049,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           reporter={reporter}
           isAdmin={isCurrentUserAdmin}
           authorFor={authorFor}
+          renderEngagement={renderEngagement}
           onPressPhoto={photo => setGalleryPhotoId(photo.id)}
           onEdit={() => navigation.navigate('NewEvent', {eventId})}
         />
@@ -870,6 +1058,12 @@ export function EventDetailScreen({route, navigation}: Props) {
           photos={matchPhotos}
           initialPhotoId={galleryPhotoId}
           onClose={() => setGalleryPhotoId(null)}
+        />
+
+        <CommentSheet
+          postId={commentPostId}
+          teamSpaceId={activeTeamSpaceId ?? ''}
+          onClose={() => setCommentPostId(null)}
         />
       </>
     );

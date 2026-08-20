@@ -483,3 +483,73 @@ describe('MatchTimeline — målswellen dekker HELE målet, også bildet', () =>
     }
   });
 });
+
+describe('MatchTimeline — engasjementet avslutter øyeblikket (skive 4)', () => {
+  const PHOTO_ON_GOAL = {
+    id: 'p1',
+    media: {bucket: 'feed-media', path: 'a.jpg'},
+    caption: 'Full jubel',
+    authorName: 'Kari Nordbø',
+    createdAt: new Date(2026, 7, 20, 18, 34),
+    matchEventId: 'g1',
+  } as never;
+
+  function goalWithEngagement() {
+    return render({
+      matchEvents: [ev('g1', 'mål', 34, {teamSide: 'home'})],
+      photos: [PHOTO_ON_GOAL],
+      startedAt: new Date(2026, 7, 20, 18, 0),
+      renderEngagement: () => <RNText>ENGASJEMENT</RNText>,
+    });
+  }
+
+  it('legger HEIA/kommentarer ETTER bildet, ikke mellom teksten og bildet', () => {
+    // ⚠️ Sloten sto opprinnelig mellom innholdet og bildet, fordi den var tom
+    // da plassen ble reservert i skive 1. Med innhold i den ble rekkefølgen
+    // «MÅL! → HEIA → bildet» — altså en handling midt inne i det den handler
+    // om. Fasiten legger `engRow()` sist i hvert øyeblikk, og et bilde festet
+    // til et mål er en del av målet.
+    const t = texts(goalWithEngagement());
+    expect(t.indexOf('Full jubel')).toBeGreaterThanOrEqual(0);
+    expect(t.indexOf('ENGASJEMENT')).toBeGreaterThan(t.indexOf('Full jubel'));
+  });
+
+  it('holder sloten UTENFOR øyeblikkets samlede a11y-label', () => {
+    // En `accessible`-beholder svelger alt inni seg. Havner HEIA der, slutter
+    // knappene å være egne stopp i VoiceOver — altså umulige å trykke.
+    const tree = goalWithEngagement();
+    const node = tree.root
+      .findAllByType(RNText)
+      .find(n => textOf(n) === 'ENGASJEMENT')!;
+
+    let cur: typeof node | null = node.parent;
+    while (cur) {
+      expect(cur.props.accessible).not.toBe(true);
+      cur = cur.parent;
+    }
+  });
+
+  it('tilbyr sloten på hver rad, også på bilderaden', () => {
+    // Selve REGLENE (ingen linje på rytmemarkørene, ingen HEIA på mål imot)
+    // bor i `shared/matchEngagement` og testes der — griddet skal bare tilby
+    // plassen, ellers kunne en regel aldri gjelde en bilderad.
+    const seen: string[] = [];
+    render({
+      matchEvents: [ev('g1', 'mål', 34, {teamSide: 'home'})],
+      photos: [
+        {
+          id: 'p2',
+          media: {bucket: 'feed-media', path: 'b.jpg'},
+          authorName: 'Kari Nordbø',
+          createdAt: new Date(2026, 7, 20, 18, 40),
+        } as never,
+      ],
+      startedAt: new Date(2026, 7, 20, 18, 0),
+      renderEngagement: entry => {
+        seen.push(entry.event ? `event:${entry.event.id}` : `photo:${entry.photo!.id}`);
+        return null;
+      },
+    });
+    expect(seen).toEqual(['event:g1', 'photo:p2']);
+  });
+});

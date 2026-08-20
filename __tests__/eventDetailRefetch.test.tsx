@@ -404,11 +404,19 @@ test('ferdig kamp: 3 RPC, signering én batch med begge varianter, forløpet vis
   //    en frossen kamprapport — samme hull som 00067 §2 lukket for
   //    kommentarfeltet. `get_team_authors` har ingen statusfilter.
   //
-  // Budsjettet skal fortsatt være TRE. Blir det fire, er rosteret sluppet
-  // inn igjen på en flate som ikke bruker det.
+  // ⚠️ BUDSJETTET ER FIRE FRA SKIVE 4, og det fjerde kallet er navngitt her
+  // med vilje: `get_match_feed` (00071) er den KANONISKE KOBLINGEN mellom et
+  // øyeblikk og feed-posten HEIA og kommentarer henger på. Den kunne ikke
+  // presses inn i `get_event_with_rsvp` — den RPC-en deles av alle
+  // hendelsestyper, og en trening skal ikke betale for kampens engasjement.
+  //
+  // Lista er uttømmende, ikke en nedre grense: dukker `get_team_members` opp
+  // igjen, er rosteret sluppet inn på en flate som ikke bruker det, og da
+  // skal denne testen falle.
   const rpcNames = supabase.rpc.mock.calls.map((c: unknown[]) => c[0]).sort();
   expect(rpcNames).toEqual([
     'get_event_with_rsvp',
+    'get_match_feed',
     'get_match_photos',
     'get_team_authors',
   ]);
