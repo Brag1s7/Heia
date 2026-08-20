@@ -1,11 +1,13 @@
 import React, {useMemo} from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius, fonts} from '../theme';
+import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
+import {colors, matchColors, spacing, fonts} from '../theme';
 import {MediaImage} from '../lib/media/MediaImage';
-import {Camera} from './icons';
+import {EventNode} from './EventNode';
 import {MatchEventRow} from './MatchEventRow';
+import {useMatchGrid, NOW_DOT, type MatchGrid} from '../shared/matchGridGeometry';
 import type {MatchPhoto} from '../lib/api/feed';
-import type {MatchEvent} from '../shared/types';
+import type {MatchEvent, User} from '../shared/types';
 
 interface MatchTimelineProps {
   matchEvents: MatchEvent[];
@@ -14,6 +16,23 @@ interface MatchTimelineProps {
   startedAt?: Date;
   /** Live-modus vil ha det ferskeste øverst; kamprapporten leses forfra. */
   newestFirst?: boolean;
+  /**
+   * Kampminuttet NÅ, til retningsmarkøren.
+   *
+   * ⚠️ PROP, ALDRI EGEN UTREGNING. Alt som viser kampminuttet skal oppdateres
+   * fra samme kilde i samme tick — hodet, pulsen, retningsmarkøren og
+   * sticky-baren. Prototypen hadde nettopp den bugen: kamphodet viste 40′ mens
+   * pulsen sto igjen på 37′ fordi tickeren bare oppdaterte den ene.
+   * Ingen komponent her inne kaller `Date.now()` eller `setInterval`.
+   */
+  nowMinute?: number;
+  /** Slår opp reporteren bak en oppdatering. Noden sier HVA, avataren HVEM. */
+  authorFor?: (userId: string) => User | undefined;
+  /** HEIA + kommentarer per øyeblikk — se `MatchEventRow.engagement`. */
+  renderEngagement?: (entry: {
+    event?: MatchEvent;
+    photo?: MatchPhoto;
+  }) => React.ReactNode;
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
@@ -42,6 +61,184 @@ function minuteOf(photo: MatchPhoto, startedAt?: Date): number {
 }
 
 /**
+ * KRITTLINJA — én sammenhengende strek gjennom hele forløpet.
+ *
+ * 1 px, varm off-white, ~22 %. Dempet mellom hendelsene, våkner i nodene.
+ * Toner inn og ut i endene så den ikke stopper brått.
+ *
+ * ⚠️ Ingen hendelse får sin egen ekstra vertikale linje. Et mål TENNER den
+ * samme linja i mint — samme x, samme bredde — og det gjøres inne i målraden
+ * (se `MatchEventRow`), ikke som et eget lag her. Da trenger vi ingen måling
+ * av radhøyder, og tenningen dekker nøyaktig målets utstrekning.
+ */
+function ChalkLine({grid}: {grid: MatchGrid}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        styles.chalk,
+        {left: grid.threadLeft, width: grid.threadWidth},
+      ]}>
+      <Svg width="100%" height="100%">
+        <Defs>
+          <LinearGradient id="chalkFade" x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0" stopColor="#EAFFF6" stopOpacity={0} />
+            <Stop offset="0.04" stopColor="#EAFFF6" stopOpacity={0.22} />
+            <Stop offset="0.96" stopColor="#EAFFF6" stopOpacity={0.22} />
+            <Stop offset="1" stopColor="#EAFFF6" stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+        <Rect x="0" y="0" width="100%" height="100%" fill="url(#chalkFade)" />
+      </Svg>
+    </View>
+  );
+}
+
+/**
+ * RETNINGSMARKØREN — «NÅ · 40′ · Nyeste øverst, bla nedover i kampen».
+ *
+ * Uten den er en omvendt kronologisk liste bare forvirrende. På ferdig kamp
+ * snus den: «SLUTT · Kampen leses forfra».
+ */
+function NowMarker({
+  grid,
+  newestFirst,
+  nowMinute,
+}: {
+  grid: MatchGrid;
+  newestFirst: boolean;
+  nowMinute?: number;
+}) {
+  const live = newestFirst;
+  const dotTop = 3;
+
+  return (
+    <View
+      style={[
+        styles.nowMarker,
+        {paddingLeft: grid.contentLeft, paddingRight: grid.gutter},
+      ]}>
+      <View
+        pointerEvents="none"
+        style={[
+          styles.nowDot,
+          {left: grid.nodeCenter - NOW_DOT / 2, top: dotTop},
+          live ? styles.nowDotLive : styles.nowDotDone,
+        ]}
+      />
+      <Text
+        style={styles.nowText}
+        maxFontSizeMultiplier={grid.fontCap}>
+        {live ? `NÅ · ${nowMinute ?? 0}′` : 'SLUTT'}
+      </Text>
+      <Text style={styles.nowSub} maxFontSizeMultiplier={grid.fontCap}>
+        {live
+          ? 'Nyeste øverst — bla nedover i kampen'
+          : 'Kampen leses forfra'}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * ET GENERELT KAMPBILDE — bildet ER flaten, kant til kant.
+ *
+ * Lå tidligere som en håndkopiert tvilling av `MatchEventRow`s radgeometri.
+ * Nå deler den `EventNode` og `matchGrid` med alle andre rader, så det
+ * fysisk ikke går an å få to ulike tidslinjer i samme scroll.
+ */
+function PhotoRow({
+  photo,
+  minute,
+  grid,
+  engagement,
+  onPress,
+}: {
+  photo: MatchPhoto;
+  minute: number;
+  grid: MatchGrid;
+  engagement?: React.ReactNode;
+  onPress?: () => void;
+}) {
+  const known = minute !== Number.MAX_SAFE_INTEGER;
+
+  return (
+    <View style={styles.photoRow}>
+      <Pressable
+        onPress={onPress}
+        style={({pressed}) => [pressed && styles.pressed]}>
+        <MediaImage
+          media={photo.media}
+          variant="thumb"
+          style={styles.photoImage}
+          resizeMode="cover"
+        />
+      </Pressable>
+
+      {/* Skrim slik at kritt, minutt og tekst holder seg lesbare uansett
+          hva som er på bildet. */}
+      <View style={styles.photoScrim} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="shotScrim" x1="0%" y1="0%" x2="0%" y2="100%">
+              <Stop offset="0" stopColor="#08140E" stopOpacity={0} />
+              <Stop offset="0.46" stopColor="#08140E" stopOpacity={0.5} />
+              <Stop offset="1" stopColor="#08140E" stopOpacity={0.92} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#shotScrim)" />
+        </Svg>
+      </View>
+      <View style={styles.photoTopScrim} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="shotTop" x1="0%" y1="0%" x2="0%" y2="100%">
+              <Stop offset="0" stopColor="#08140E" stopOpacity={0.55} />
+              <Stop offset="1" stopColor="#08140E" stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#shotTop)" />
+        </Svg>
+      </View>
+
+      <EventNode kind="photo" grid={grid} top={14} />
+      <Text
+        style={[
+          styles.minute,
+          {
+            left: grid.minuteLeft,
+            width: grid.minuteWidth,
+            top: 14 + grid.minuteTop,
+            fontSize: grid.minuteFontSize,
+            color: matchColors.text,
+          },
+        ]}
+        maxFontSizeMultiplier={grid.fontCap}>
+        {known ? `${minute}′` : ''}
+      </Text>
+
+      <View
+        style={[
+          styles.photoBody,
+          {paddingLeft: grid.contentLeft, paddingRight: grid.gutter},
+        ]}>
+        {photo.caption && (
+          <Text
+            style={[styles.photoCaption, {maxWidth: grid.measureMax}]}
+            maxFontSizeMultiplier={grid.fontCap}>
+            {photo.caption}
+          </Text>
+        )}
+        <Text style={styles.photoBy} maxFontSizeMultiplier={grid.fontCap}>
+          {photo.authorName}
+        </Text>
+        {engagement}
+      </View>
+    </View>
+  );
+}
+
+/**
  * Kampens forløp som én kronologisk liste. Et bilde knyttet til en hendelse
  * henger på hendelsen; et generelt kampbilde er sitt eget innslag på det
  * minuttet det ble lagt ut.
@@ -54,8 +251,13 @@ export function MatchTimeline({
   photos,
   startedAt,
   newestFirst = false,
+  nowMinute,
+  authorFor,
+  renderEngagement,
   onPressPhoto,
 }: MatchTimelineProps) {
+  const grid = useMatchGrid();
+
   const entries = useMemo<Entry[]>(() => {
     // Løpende stilling — kampens dramaturgi. Regnes klientside ved å telle
     // mål-radene i serverens kronologiske rekkefølge (ORDER BY sequence);
@@ -129,120 +331,202 @@ export function MatchTimeline({
 
     const ordered = merged.map(m => m.entry);
     return newestFirst ? ordered.reverse() : ordered;
+    // ⚠️ `nowMinute` hører IKKE hjemme i denne lista. Et tick-tall her ville
+    // regnet hele stillings- og bildeflettingen på nytt hvert 30. sekund.
+    // Retningsmarkøren leser minuttet utenfor memoen.
   }, [matchEvents, photos, startedAt, newestFirst]);
 
   return (
     <View>
-      {entries.map((entry, index) =>
-        entry.kind === 'event' ? (
-          <MatchEventRow
-            key={entry.key}
-            event={entry.event}
-            isLatest={newestFirst && index === 0}
-            photos={entry.photos}
-            score={entry.score}
-            onPressPhoto={onPressPhoto}
-          />
-        ) : (
-          <View key={entry.key} style={styles.photoRow}>
-            <View style={styles.timeline}>
-              <View style={styles.iconCircle}>
-                <Camera size={15} color={colors.textSecondary} />
-              </View>
-              <View style={styles.line} />
-            </View>
+      <View style={[styles.eyebrow, {paddingLeft: grid.minuteLeft}]}>
+        <View
+          pointerEvents="none"
+          style={[styles.eyebrowDot, {left: grid.nodeCenter - 3.5}]}
+        />
+        <Text style={styles.eyebrowText} maxFontSizeMultiplier={grid.fontCap}>
+          {newestFirst ? 'Det som skjer' : 'Kampens historie'}
+        </Text>
+      </View>
 
-            <View style={styles.content}>
-              <Text style={styles.minute}>
-                {entry.minute === Number.MAX_SAFE_INTEGER
-                  ? 'Bilde'
-                  : `${entry.minute}'`}
-              </Text>
-              <Pressable
-                onPress={
-                  onPressPhoto ? () => onPressPhoto(entry.photo) : undefined
-                }
-                style={({pressed}) => [
-                  styles.photo,
-                  pressed && styles.photoPressed,
-                ]}>
-                {/* Thumb i forløpet (B2): raden er en forhåndsvisning på
-                    ~180 pt — trykket åpner galleriet, som laster display. */}
-                <MediaImage
-                  media={entry.photo.media}
-                  variant="thumb"
-                  style={styles.photoImage}
-                  resizeMode="cover"
-                />
-                {entry.photo.caption && (
-                  <Text style={styles.caption}>{entry.photo.caption}</Text>
-                )}
-              </Pressable>
-              <Text style={styles.author}>{entry.photo.authorName}</Text>
-            </View>
-          </View>
-        ),
-      )}
+      {/* Krittlinja eies av denne wrapperen og rendres som FØRSTE barn:
+          RN maler i render-rekkefølge, og negativ zIndex er upålitelig på
+          Android. Alt som skal ligge oppå kommer etterpå. */}
+      <View style={styles.thread}>
+        <ChalkLine grid={grid} />
+
+        <NowMarker
+          grid={grid}
+          newestFirst={newestFirst}
+          nowMinute={nowMinute}
+        />
+
+        {entries.map(entry =>
+          entry.kind === 'event' ? (
+            <MatchEventRow
+              key={entry.key}
+              event={entry.event}
+              grid={grid}
+              photos={entry.photos}
+              score={entry.score}
+              author={
+                entry.event.reportedBy
+                  ? authorFor?.(entry.event.reportedBy)
+                  : undefined
+              }
+              engagement={renderEngagement?.({event: entry.event})}
+              onPressPhoto={onPressPhoto}
+            />
+          ) : (
+            <PhotoRow
+              key={entry.key}
+              photo={entry.photo}
+              minute={entry.minute}
+              grid={grid}
+              engagement={renderEngagement?.({photo: entry.photo})}
+              onPress={
+                onPressPhoto ? () => onPressPhoto(entry.photo) : undefined
+              }
+            />
+          ),
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  photoRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
+  eyebrow: {
+    position: 'relative',
+    paddingTop: 28,
+    paddingBottom: 12,
+    paddingRight: spacing.xl,
   },
-  timeline: {
-    alignItems: 'center',
-    width: 32,
+  // Gullprikken markerer porten mellom pulsen og forløpet — og den er
+  // punktet krittlinja starter fra.
+  eyebrowDot: {
+    position: 'absolute',
+    bottom: 16,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: colors.gold,
   },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surfaceMuted,
+  eyebrowText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.65,
+    textTransform: 'uppercase',
+    color: matchColors.dim,
   },
-  line: {
-    flex: 1,
-    width: 2,
-    backgroundColor: colors.border,
-    marginTop: spacing.xs,
+  thread: {
+    position: 'relative',
   },
-  content: {
-    flex: 1,
-    gap: spacing.xs,
-    paddingBottom: spacing.sm,
+  chalk: {
+    position: 'absolute',
+    top: 0,
+    bottom: 6,
+    zIndex: 0,
   },
-  minute: {
-    fontSize: 16,
+  // --- Retningsmarkøren ---
+  nowMarker: {
+    position: 'relative',
+    paddingTop: 2,
+    paddingBottom: 10,
+  },
+  nowDot: {
+    position: 'absolute',
+    width: NOW_DOT,
+    height: NOW_DOT,
+    borderRadius: NOW_DOT / 2,
+    zIndex: 2,
+  },
+  nowDotLive: {
+    backgroundColor: colors.heia,
+    shadowColor: colors.heia,
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.55,
+    shadowRadius: 7,
+    elevation: 4,
+  },
+  // Fasiten demper SLUTT-markøren med opacity alene — den bytter ALDRI farge.
+  // Mint er markørens signatur; i krittfarge smelter den sammen med eyebrow-
+  // teksten rett over. Ingen `elevation` her: på Android tegnes den utenfor
+  // viewets opacity og gir en hardere skygge enn den dempede tilstanden skal ha.
+  nowDotDone: {
+    backgroundColor: colors.heia,
+    shadowColor: colors.heia,
+    shadowOffset: {width: 0, height: 0},
+    shadowOpacity: 0.55,
+    shadowRadius: 7,
+    opacity: 0.5,
+  },
+  nowText: {
     fontFamily: fonts.display,
-    color: colors.textPrimary,
+    fontSize: 12.5,
+    letterSpacing: 1.75,
+    textTransform: 'uppercase',
+    color: colors.heia,
   },
-  photo: {
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  nowSub: {
+    marginTop: 3,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    color: matchColors.dim,
+    opacity: 0.85,
   },
-  photoPressed: {
-    opacity: 0.8,
+  // --- Bilderaden ---
+  photoRow: {
+    position: 'relative',
+    marginVertical: 8,
   },
   photoImage: {
     width: '100%',
-    height: 180,
-    backgroundColor: colors.background,
+    height: 300,
+    backgroundColor: matchColors.timeline,
   },
-  caption: {
-    ...typography.bodySmall,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  photoScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '74%',
   },
-  author: {
-    ...typography.caption,
+  photoTopScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: 90,
+  },
+  photoBody: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingBottom: 12,
+  },
+  photoCaption: {
+    fontSize: 16.5,
+    lineHeight: 23,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  photoBy: {
+    marginTop: 5,
+    fontSize: 12,
+    fontWeight: '700',
+    color: 'rgba(255, 255, 255, 0.78)',
+  },
+  minute: {
+    position: 'absolute',
+    textAlign: 'right',
+    fontFamily: fonts.display,
+    color: matchColors.dim,
+    letterSpacing: -0.1,
+    zIndex: 2,
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

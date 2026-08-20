@@ -26,6 +26,7 @@ export {NextEventCarousel} from './NextEventCarousel';
 export {LiveBadge} from './LiveBadge';
 export {ScoreBoard} from './ScoreBoard';
 export {MatchEventRow} from './MatchEventRow';
+export {EventNode, nodeKindFor, type NodeKind} from './EventNode';
 export {LiveMatchBanner} from './LiveMatchBanner';
 export {MatchPulseCard} from './MatchPulseCard';
 export {ReporterActions} from './ReporterActions';

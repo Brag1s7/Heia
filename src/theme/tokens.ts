@@ -66,6 +66,66 @@ export const colors = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// KAMPVERDENEN — «de tre grønne rommene» (designretning FROSSET 2026-08-20,
+// docs/prototypes/kampskjerm/index.html er fasit).
+//
+// Egen eksport, ikke flere navn i `colors`, av én grunn: disse fargene er
+// KUN gyldige på kampflaten. Havner `arenaTop` på en lys skjerm, er det en
+// feil — og et separat navnerom gjør den feilen synlig i diffen i stedet for
+// å gjemme den blant 40 andre `colors.`-oppslag.
+//
+// Rommene skilles av TONE OG LYS, aldri av bokser eller rammer. Trinnene er
+// satt i opplevd lyshet (L*), ikke på øyemål:
+//
+//   Rom          Farge      L*     tekst / dempet / mint
+//   Arena topp   #25563F    32.7   8.1 / 4.9 / 6.4
+//   Arena bunn   #1D4633    26.4   10.2 / 6.1 / 8.0
+//   Puls         #1A4433    ~23    11.7 / 7.0 / 9.2
+//   Kampforløp   #123325    18.5   13.2 / 7.9 / 10.4
+//
+// ⚠️ TO FELLER SOM SER RIKTIGE UT OG MÅLER FEIL:
+//   1. `light` (#3B8062) er LYS, ikke en tekstflate — 4.5:1, kun stor tekst.
+//   2. På ARENAFLATEN faller `colors.stadiumDim` (#A9CCBC) til 3.7:1. Bruk
+//      `dim` (#C8E6D8) i stedet. Dette er den ene detaljen som ellers ser
+//      helt riktig ut. Kontrastvakten i __tests__ er der for å holde den.
+// ---------------------------------------------------------------------------
+export const matchColors = {
+  // Grunnen — kampverdenens bunn, edge-to-edge. FAST: lagfargen rører den
+  // aldri, den legges bare som lys OPPÅ (derfor blir rødt lag aldri brunt).
+  groundTop: '#0B1911',
+  groundMid: '#183F30',
+  groundLow: '#0E291D',
+
+  // De fire rommene
+  arenaTop: '#25563F',
+  arenaBottom: '#1D4633',
+  pulse: '#1A4433',
+  timeline: '#123325',
+
+  // Blekk
+  text: '#EAFFF6',
+  /** Dempet tekst PÅ KAMPFLATE. Erstatter colors.stadiumDim her — se felle 2. */
+  dim: '#C8E6D8',
+  /** Lys flate, ikke tekst. 4.5:1 — kun stor tekst. */
+  light: '#3B8062',
+
+  // Motstanderen: skifer. Aldri coral — coral betyr LIVE og ingenting annet.
+  opponent: '#46525C',
+  opponentNode: 'rgba(143, 163, 172, 0.26)',
+  opponentInk: '#C3D4DA',
+
+  // Feiringens kjerne er ALLTID mint/krem med mørkt blekk. Lagfargen er en
+  // stråle i ytterkanten, aldri under tekst.
+  goalLight: '#DDFFEF',
+
+  // Stadionkritt — linjespråket. 1 px, varm off-white, 20-24 %.
+  // Aldri rette linjer over hele bredden, aldri rammer.
+  chalk: 'rgba(234, 255, 246, 0.22)',
+  chalkStrong: 'rgba(234, 255, 246, 0.34)',
+  chalkFaint: 'rgba(234, 255, 246, 0.15)',
+} as const;
+
+// ---------------------------------------------------------------------------
 // Typografi — titler med pondus, store rounded tall (Nunito, bundlet).
 // ---------------------------------------------------------------------------
 const fontFamily = Platform.select({

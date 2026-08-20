@@ -391,12 +391,26 @@ test('ferdig kamp: 3 RPC, signering én batch med begge varianter, forløpet vis
   });
   await flushWaves();
 
-  // --- Budsjettet: hendelsen + bildene + medlemmene, én gang hver ---
+  // --- Budsjettet: hendelsen + bildene + FORFATTERNE, én gang hver ---
+  //
+  // Fortsatt tre kall, men det tredje er byttet fra `get_team_members` til
+  // `get_team_authors` (kampskjermens designskive):
+  //
+  //  · Rosteret brukes kun av ReporterBar/ReporterSheet, og begge er gatet på
+  //    live/kommende kamp. En FERDIG kamp har aldri brukt det til noe.
+  //  · Forfatterne trengs derimot: kampforløpet viser navn og avatar på
+  //    reporterens oppdateringer, og `get_team_members` filtrerer bort
+  //    utmeldte. Slo reporteren seg av laget, ble hele hennes stemme anonym i
+  //    en frossen kamprapport — samme hull som 00067 §2 lukket for
+  //    kommentarfeltet. `get_team_authors` har ingen statusfilter.
+  //
+  // Budsjettet skal fortsatt være TRE. Blir det fire, er rosteret sluppet
+  // inn igjen på en flate som ikke bruker det.
   const rpcNames = supabase.rpc.mock.calls.map((c: unknown[]) => c[0]).sort();
   expect(rpcNames).toEqual([
     'get_event_with_rsvp',
     'get_match_photos',
-    'get_team_members',
+    'get_team_authors',
   ]);
   // Ferdig kamp = ingen realtime-kanal.
   expect(supabase.channel).not.toHaveBeenCalled();

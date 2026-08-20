@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,15 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, fonts, shadows} from '../theme';
+import {
+  colors,
+  typography,
+  spacing,
+  radius,
+  fonts,
+  shadows,
+  matchColors,
+} from '../theme';
 import {
   BackBar,
   Card,
@@ -39,8 +47,8 @@ import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam, useNotifications} from '../context';
-import type {TeamMember} from '../lib/api/members';
-import {useTeamMembers} from '../lib/queries/members';
+import type {TeamAuthor, TeamMember} from '../lib/api/members';
+import {useTeamAuthors, useTeamMembers} from '../lib/queries/members';
 import {
   applyMatchEventInsert,
   applyMatchSessionUpdate,
@@ -84,6 +92,7 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 // Stabile tomme referanser: `?? []` ville gitt railens FlatList ny data-ref
 // hver render (minuttickeren re-rendrer skjermen hvert 30. sekund på live).
 const NO_MEMBERS: TeamMember[] = [];
+const NO_AUTHORS: TeamAuthor[] = [];
 const NO_PHOTOS: MatchPhoto[] = [];
 
 const dayNamesLong = [
@@ -268,8 +277,33 @@ export function EventDetailScreen({route, navigation}: Props) {
   // faller tilbake på et navnløst medlem i stedet for å påstå at rollen er
   // ledig.
   const isMatchEvent = event?.matchSessionId != null;
+  // Rosteret brukes KUN av reporter-UI-et (ReporterBar + ReporterSheet), og
+  // begge er gatet på live/kommende kamp. Den frosne rapporten trenger det
+  // ikke — så den skal heller ikke betale for kallet.
+  const needsRoster = isMatchEvent && event?.matchStatus !== 'finished';
   const teamMembers =
-    useTeamMembers(isMatchEvent ? activeTeamSpaceId : null).data ?? NO_MEMBERS;
+    useTeamMembers(needsRoster ? activeTeamSpaceId : null).data ?? NO_MEMBERS;
+
+  // Reporteren bak en oppdatering i kampforløpet. Noden sier HVA som skjedde,
+  // avataren sier HVEM.
+  //
+  // ⚠️ FORFATTERE, IKKE MEDLEMMER. `get_team_members` filtrerer på
+  // `status IN ('active','invited')`, så en reporter som forlater laget
+  // forsvinner derfra — og da ville hver eneste oppdatering hun skrev mistet
+  // navn og avatar i en FROSSET kamprapport. Det er nøyaktig hullet 00067 §2
+  // lukket for kommentarfeltet; `get_team_authors` har ingen statusfilter og
+  // er derfor riktig kilde for forfatterskap. Samme 5-min-cache.
+  const teamAuthors =
+    useTeamAuthors(isMatchEvent ? activeTeamSpaceId : null).data ?? NO_AUTHORS;
+  const authorsById = useMemo(() => {
+    const map = new Map<string, TeamAuthor>();
+    for (const a of teamAuthors) map.set(a.id, a);
+    return map;
+  }, [teamAuthors]);
+  const authorFor = useCallback(
+    (userId: string) => authorsById.get(userId),
+    [authorsById],
+  );
 
   // Kampbilder — egen query-sti (P6-splitten): et mål re-laster aldri
   // bildene. Feiler den, lever kampsiden videre (isError ignoreres bevisst —
@@ -787,14 +821,17 @@ export function EventDetailScreen({route, navigation}: Props) {
           )}
 
           {/* Kampforløp — bildene ligger i forløpet, ikke i en egen seksjon.
-              Under kampen skal ingenting konkurrere med stillingen. */}
-          <SectionHeader title="Kampforløp" />
+              Under kampen skal ingenting konkurrere med stillingen.
+              SectionHeader er borte med vilje: forløpet har sin egen eyebrow
+              med gullprikken krittlinja starter fra. */}
           <View style={styles.timeline}>
             <MatchTimeline
               matchEvents={matchEvents}
               photos={matchPhotos}
               startedAt={event.startedAt}
               newestFirst
+              nowMinute={matchMinute}
+              authorFor={authorFor}
               onPressPhoto={photo => setGalleryPhotoId(photo.id)}
             />
           </View>
@@ -1087,17 +1124,15 @@ export function EventDetailScreen({route, navigation}: Props) {
 
       {isFinishedMatch &&
         (finishedMatchEvents.length > 0 || matchPhotos.length > 0) && (
-          <>
-            <SectionHeader title="Kampforløp" />
-            <View style={styles.timeline}>
-              <MatchTimeline
-                matchEvents={finishedMatchEvents}
-                photos={matchPhotos}
-                startedAt={event.startedAt}
-                onPressPhoto={photo => setGalleryPhotoId(photo.id)}
-              />
-            </View>
-          </>
+          <View style={styles.timeline}>
+            <MatchTimeline
+              matchEvents={finishedMatchEvents}
+              photos={matchPhotos}
+              startedAt={event.startedAt}
+              authorFor={authorFor}
+              onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+            />
+          </View>
         )}
 
       {/* RSVP — meningsløst på en ferdigspilt kamp. */}
@@ -1223,9 +1258,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
   },
+  // Kampforløpet er kant-til-kant: hver rad setter sin EGEN venstremarg fra
+  // matchGrid, og bildene går helt ut i kanten. En paddingHorizontal her
+  // ville gjort «bildet ER flaten» fysisk umulig.
+  //
+  // Flaten er foreløpig lokal. I skive 2 blir hele skjermen grønn og denne
+  // bakgrunnen forsvinner — forløpet ligger da rett på grunnen, som frosset.
   timeline: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    backgroundColor: matchColors.timeline,
+    paddingBottom: spacing.lg,
   },
   notificationRow: {
     flexDirection: 'row',

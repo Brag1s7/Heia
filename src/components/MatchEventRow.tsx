@@ -1,237 +1,597 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius, fonts} from '../theme';
+import Svg, {
+  Defs,
+  LinearGradient,
+  Path,
+  RadialGradient,
+  Rect,
+  Stop,
+} from 'react-native-svg';
+import {colors, matchColors, spacing, fonts} from '../theme';
+import {swellCap} from '../shared/teamColors';
 import {MediaImage} from '../lib/media/MediaImage';
-import {
-  ArrowLeftRight,
-  Ball,
-  BookingCard,
-  Flag,
-  MessageCircle,
-  Pause,
-  Play,
-} from './icons';
-import {ScoreChip} from './ScoreChip';
+import {avatarRef} from '../lib/media/avatar';
+import {Avatar} from './Avatar';
+import {EventNode, nodeKindFor} from './EventNode';
+import {useActiveTeam} from '../context';
+import type {MatchGrid} from '../shared/matchGridGeometry';
 import type {MatchPhoto} from '../lib/api/feed';
-import type {MatchEvent} from '../shared/types';
+import type {MatchEvent, User} from '../shared/types';
+
+/**
+ * ÉN HENDELSE I KAMPFORLØPET — hendelsesgriddet (designretning FROSSET
+ * 2026-08-20, docs/prototypes/kampskjerm/index.html er fasit).
+ *
+ * ---------------------------------------------------------------------------
+ * GRIDDET: ikonnode → minutt → innhold, i FASTE kolonner.
+ *
+ * Minuttet står ALLTID i samme kolonne — aldri over overskriften ett sted og
+ * etter navnet et annet. Det er dét som gjør at man kan sveipe nedover og
+ * bare lese 34′ · 31′ · 29′ · 25′. Avstanden er kompakt og kronologisk, ikke
+ * proporsjonal med tid: tidslinja er en fortelling, ikke en akse.
+ *
+ * Node og minutt posisjoneres ABSOLUTT, aldri i en flex-kolonne. En
+ * flex-basert justering flytter seg når linjehøyden vokser, og da vandrer
+ * minuttet oppover kolonnen ved stor tekst. Tallene kommer fra
+ * `matchGridGeometry.ts` og er voktet av `__tests__/matchGrid.test.ts`.
+ *
+ * ---------------------------------------------------------------------------
+ * FLATENE HAR INGEN RAMME, SKYGGE ELLER KORTRADIUS.
+ *
+ * Skillet kommer av LYS og LUFT. Fire uttrykk, alle rett på stadiongrunnen:
+ *
+ *   MÅL FOR OSS      lagfarget swell med buet, opplyst overkant
+ *   MÅL IMOT         dempet skiferstripe — ingen feiring, ingen HEIA
+ *   REPORTERSTEMMEN  tekst rett på grunnen, ekstremt svakt lys bak.
+ *                    Ingen boks. To på rad skilles av luft, node og minutt.
+ *   BILDE            bildet ER flaten, kant til kant
+ *   RYTMEMARKØR      avspark/pause/omgang/slutt — krittstrek + etikett
+ */
 
 interface MatchEventRowProps {
   event: MatchEvent;
-  isLatest?: boolean;
-  /** Bilder som hører til nettopp dette øyeblikket — vises under teksten. */
+  grid: MatchGrid;
+  /** Bilder som hører til nettopp dette øyeblikket. */
   photos?: MatchPhoto[];
   /** Stillingen etter øyeblikket («2–1») — settes på mål og slutt. */
   score?: string;
+  /** Reporteren bak en oppdatering. Noden sier HVA, avataren sier HVEM. */
+  author?: User;
+  /**
+   * HEIA + kommentarer for dette øyeblikket.
+   *
+   * Slot, ikke innhold: engasjementet henger på den KANONISKE feed-posten
+   * (`feed_posts.match_event_id`), og den koblingen bygges i sin egen skive.
+   * Griddet reserverer plassen nå så raden ikke må omskrives da — og så
+   * luften mellom hendelsene stemmer allerede på telefontesten.
+   */
+  engagement?: React.ReactNode;
   onPressPhoto?: (photo: MatchPhoto) => void;
 }
 
-interface Marker {
-  icon: React.ReactNode;
-  bg: string;
-  /** Liten gulldetalj på sirkelen — kun mål for oss (feiring: grønt/gult). */
-  goldDot?: boolean;
+/** Rytmemarkørene er kampens gater, ikke hendelser man leser. */
+function isGate(event: MatchEvent): boolean {
+  return (
+    event.type === 'avspark' ||
+    event.type === 'andre_omgang' ||
+    event.type === 'pause' ||
+    event.type === 'slutt'
+  );
 }
 
-// P5-skannbarhet: ballen betyr MÅL og ingenting annet, og kun mål for OSS
-// feires (mint + gulldetalj). Mål imot er informasjon — dempet nøytral, aldri
-// coral (låst: coral = live-status; «ingen TAP-roping»). Avspark/fortsettelse
-// er spillet i gang (nøytral pil, ikke feiring), slutt lukker kampen på
-// stadion-mørk markør.
-function markerFor(event: MatchEvent): Marker {
-  switch (event.type) {
-    case 'mål':
-      // teamSide mangler (skal ikke skje etter 00020) → dempet som mål imot:
-      // bedre å underfeire eget mål enn å feire motstanderens.
-      return event.teamSide === 'home'
-        ? {
-            icon: <Ball size={16} color={colors.heiaInk} />,
-            bg: colors.heiaTint,
-            goldDot: true,
-          }
-        : {
-            icon: <Ball size={16} color={colors.textSecondary} />,
-            bg: colors.surfaceMuted,
-          };
-    case 'avspark':
-    case 'andre_omgang':
-      return {
-        icon: <Play size={15} color={colors.textSecondary} />,
-        bg: colors.surfaceMuted,
-      };
-    case 'pause':
-      return {
-        icon: <Pause size={15} color={colors.textSecondary} />,
-        bg: colors.surfaceMuted,
-      };
-    case 'slutt':
-      return {
-        icon: <Flag size={15} color={colors.stadiumText} />,
-        bg: colors.stadium,
-      };
-    case 'bytte':
-      return {
-        icon: <ArrowLeftRight size={15} color={colors.textSecondary} />,
-        bg: colors.surfaceMuted,
-      };
-    case 'kort':
-      return {icon: <BookingCard size={16} />, bg: colors.sun};
-    case 'melding':
-      return {
-        icon: <MessageCircle size={15} color={colors.textSecondary} />,
-        bg: colors.surfaceMuted,
-      };
-  }
+function gateLabel(event: MatchEvent, score?: string): string {
+  const base =
+    event.type === 'avspark'
+      ? 'Avspark'
+      : event.type === 'andre_omgang'
+        ? '2. omgang'
+        : event.type === 'pause'
+          ? 'Pause'
+          : 'Slutt';
+  return score ? `${base} · ${score}` : base;
+}
+
+/**
+ * MÅLSWELLEN — grunnen løftes der et mål ligger. Ingen kort, ingen ramme.
+ *
+ * ⚠️ FEIRINGENS KJERNE ER ALLTID MINT/KREM MED MØRKT BLEKK. Lagfargen er en
+ * STRÅLE i ytterkanten, klemt så den aldri havner under tekst. Det er hele
+ * grunnen til at et rødt lag aldri blir brunt her.
+ *
+ * Den buede overkanten kan ikke uttrykkes i RN: prototypens
+ * `border-radius: 46% 46% 0 0 / 34px 34px 0 0` er en elliptisk radius, og RN
+ * har verken det eller inset-skygge. Den tegnes derfor i svg — og de firkantede
+ * hjørnene «klippes» ved å male grunnfargen tilbake over dem, som er den
+ * eneste måten å kutte en kurve i RN uten en maskepakke.
+ */
+function GoalSwell({grid, teamColor}: {grid: MatchGrid; teamColor: string}) {
+  const w = grid.width;
+  const dome = 34;
+  // VAKTEN. Uten kort å gjemme seg bak står teksten rett på det lagfargede
+  // lyset, så styrken må avledes av lagfargen — aldri hardkodes. Et lyst lag
+  // (gult, lyseblått) klemmes langt ned; et mørkt lag får full stråle.
+  const cap = swellCap(teamColor);
+  // Kuppelen: flat ved kantene, løftet på midten. Samme grunne bue som
+  // prototypens elliptiske radius gir.
+  const curve = `M0 ${dome} C ${w * 0.14} 0, ${w * 0.86} 0, ${w} ${dome}`;
+
+  return (
+    <>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="swellTeam" x1="0%" y1="0%" x2="100%" y2="30%">
+              <Stop offset="0" stopColor={teamColor} stopOpacity={cap.peak} />
+              <Stop offset="0.56" stopColor={teamColor} stopOpacity={0} />
+            </LinearGradient>
+            {/* Fasiten legger BEGGE gradientene i ett lag og multipliserer
+                hele laget med swell-peaken. Her er de to lag, så peaken må
+                ganges inn i mint-radialen også — ellers lyser den ~1.8x for
+                sterkt og feiringen blir grell i stedet for varm. */}
+            <RadialGradient id="swellMint" cx="4%" cy="46%" rx="126%" ry="118%">
+              <Stop
+                offset="0"
+                stopColor={colors.heia}
+                stopOpacity={0.34 * cap.peak}
+              />
+              <Stop offset="0.6" stopColor={colors.heia} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#swellTeam)" />
+          <Rect x="0" y="0" width="100%" height="100%" fill="url(#swellMint)" />
+        </Svg>
+      </View>
+
+      {/* Kuppelen + lyskanten på overkanten. Ligger øverst i raden med fast
+          høyde, så pathen kan regnes i faktiske punkter. */}
+      <View
+        style={[styles.swellDome, {height: dome}]}
+        pointerEvents="none">
+        <Svg width={w} height={dome}>
+          {/* Maler grunnen tilbake over de firkantede hjørnene. */}
+          <Path
+            d={`${curve} L ${w} 0 L 0 0 Z`}
+            fill={matchColors.timeline}
+          />
+          <Path
+            d={curve}
+            stroke={matchColors.chalk}
+            strokeWidth={1}
+            fill="none"
+          />
+        </Svg>
+      </View>
+    </>
+  );
 }
 
 export function MatchEventRow({
   event,
-  isLatest = false,
+  grid,
   photos,
   score,
+  author,
+  engagement,
   onPressPhoto,
 }: MatchEventRowProps) {
-  const marker = markerFor(event);
+  const {activeTeamSpace} = useActiveTeam();
+  const teamColor = activeTeamSpace?.color || colors.heiaInk;
+
+  const kind = nodeKindFor(event.type, event.teamSide);
+  const isGoalUs = kind === 'goalUs';
+  const isGoalThem = kind === 'goalThem';
+  const isVoice = event.type === 'melding';
+  const gate = isGate(event);
+
+  // Radens toppluft avgjør hvor noden og minuttet lander — begge sitter på
+  // den første innholdslinja, og prototypen gir hver flate sin egen luft.
+  const padTop = isGoalUs ? 24 : isVoice ? 12 : 15;
+  const padBottom = isGoalUs ? 18 : isVoice ? 12 : 15;
+
+  const minuteStyle = {
+    left: grid.minuteLeft,
+    width: grid.minuteWidth,
+    top: padTop + grid.minuteTop,
+    fontSize: grid.minuteFontSize,
+  };
 
   return (
-    <View style={[styles.container, isLatest && styles.latest]}>
-      <View style={styles.timeline}>
-        <View>
-          <View style={[styles.iconCircle, {backgroundColor: marker.bg}]}>
-            {marker.icon}
-          </View>
-          {marker.goldDot && <View style={styles.goldDot} />}
+    <View
+      style={[
+        styles.row,
+        {
+          paddingLeft: grid.contentLeft,
+          paddingRight: grid.gutter,
+          paddingTop: padTop,
+          paddingBottom: padBottom,
+        },
+        // Luften rundt flaten. To oppdateringer på rad skilles av LUFT, node
+        // og minutt — aldri av bokser.
+        isGoalUs
+          ? styles.spacedGoal
+          : isVoice
+            ? styles.spacedVoice
+            : isGoalThem
+              ? styles.spacedAgainst
+              : null,
+      ]}>
+      {isGoalUs && <GoalSwell grid={grid} teamColor={teamColor} />}
+
+      {/* MÅL-TENNINGEN: den samme krittlinja tennes i mint — samme x, samme
+          bredde. Ingen hendelse får sin egen ekstra vertikale linje.
+          Den ligger HER, inne i målraden, i stedet for som et eget lag i
+          MatchTimeline: da trengs ingen måling av radhøyder, og tenningen
+          dekker nøyaktig målets utstrekning. Noden maler over den. */}
+      {isGoalUs && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.ignition,
+            {left: grid.threadLeft, width: grid.threadWidth},
+          ]}
+        />
+      )}
+
+      {/* Mål imot: dempet skiferstripe som toner ut mot høyre. Informasjon,
+          ikke feiring — og aldri coral. */}
+      {isGoalThem && (
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="againstFade" x1="0%" y1="0%" x2="100%" y2="0%">
+                <Stop
+                  offset="0"
+                  stopColor={matchColors.opponent}
+                  stopOpacity={0.42}
+                />
+                <Stop
+                  offset="0.72"
+                  stopColor={matchColors.opponent}
+                  stopOpacity={0}
+                />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#againstFade)" />
+          </Svg>
         </View>
-        <View style={styles.line} />
-      </View>
+      )}
+
+      {/* Reporterens stemme: ekstremt svakt grønt lys bak teksten, som toner
+          helt ut mot høyre. Ingen boks, ingen ramme, ingen sidestrek. */}
+      {isVoice && (
+        <View
+          style={[styles.voiceGlow, {left: grid.minuteLeft + grid.minuteWidth}]}
+          pointerEvents="none">
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="voiceGlow" x1="0%" y1="0%" x2="100%" y2="20%">
+                <Stop offset="0" stopColor={colors.heia} stopOpacity={0.075} />
+                <Stop offset="0.38" stopColor={colors.heia} stopOpacity={0.025} />
+                <Stop offset="0.76" stopColor={colors.heia} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#voiceGlow)" />
+          </Svg>
+        </View>
+      )}
+
+      <EventNode kind={kind} grid={grid} top={padTop} />
+
+      <Text
+        style={[styles.minute, minuteStyle]}
+        maxFontSizeMultiplier={grid.fontCap}
+        allowFontScaling>
+        {event.minute}′
+      </Text>
 
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.minute}>{event.minute}'</Text>
-          {event.player && (
-            <Text style={styles.player}>{event.player}</Text>
-          )}
-          {/* Stillingen etter øyeblikket — kampens dramaturgi leses i
-              høyremargen. Mørk chip: kampen bor alltid på mørk flate. */}
-          {score && (
-            <View style={styles.scoreWrap}>
-              <ScoreChip score={score} />
+        {isGoalUs ? (
+          <>
+            <View
+              style={[
+                styles.goalHead,
+                grid.goalStacked && styles.goalHeadStacked,
+              ]}>
+              <Text
+                style={[styles.goalWord, {fontSize: grid.goalFont}]}
+                maxFontSizeMultiplier={grid.fontCap}
+                numberOfLines={1}
+                adjustsFontSizeToFit>
+                MÅL!
+              </Text>
+              {score && (
+                <Text
+                  style={[styles.goalTally, {fontSize: grid.goalFont * 0.87}]}
+                  maxFontSizeMultiplier={grid.fontCap}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit>
+                  {score}
+                </Text>
+              )}
             </View>
-          )}
-        </View>
-        <Text style={styles.description}>{event.description}</Text>
-
-        {photos?.map(photo => (
-          <Pressable
-            key={photo.id}
-            onPress={onPressPhoto ? () => onPressPhoto(photo) : undefined}
-            style={({pressed}) => [styles.photo, pressed && styles.photoPressed]}>
-            {/* Thumb her også (B2): samme forhåndsvisningsflate som resten
-                av forløpet — display bor i galleriet. */}
-            <MediaImage
-              media={photo.media}
-              variant="thumb"
-              style={styles.photoImage}
-              resizeMode="cover"
-            />
-            {photo.caption && (
-              <Text style={styles.photoCaption}>{photo.caption}</Text>
+            {event.player && (
+              <Text style={styles.goalWho} maxFontSizeMultiplier={grid.fontCap}>
+                {event.player}
+              </Text>
             )}
-          </Pressable>
-        ))}
+            {!!event.description && (
+              <Text
+                style={[styles.goalNote, {maxWidth: grid.measureMax}]}
+                maxFontSizeMultiplier={grid.fontCap}>
+                {event.description}
+              </Text>
+            )}
+          </>
+        ) : isGoalThem ? (
+          <View style={styles.againstRow}>
+            <Text
+              style={styles.againstText}
+              maxFontSizeMultiplier={grid.fontCap}>
+              {event.description}
+            </Text>
+            {score && (
+              <Text
+                style={styles.againstTally}
+                maxFontSizeMultiplier={grid.fontCap}>
+                {score}
+              </Text>
+            )}
+          </View>
+        ) : isVoice ? (
+          <>
+            <View style={styles.voiceTop}>
+              {author && (
+                <Avatar
+                  size="sm"
+                  name={author.name}
+                  media={avatarRef(author.avatarPath)}
+                  color={author.avatarColor}
+                  style={styles.voiceAvatar}
+                />
+              )}
+              <Text
+                style={styles.voiceName}
+                maxFontSizeMultiplier={grid.fontCap}
+                numberOfLines={1}>
+                {author
+                  ? `${author.name.split(' ')[0]} oppdaterer`
+                  : 'Oppdatering'}
+              </Text>
+            </View>
+            <Text
+              style={[styles.voiceText, {maxWidth: grid.measureMax}]}
+              maxFontSizeMultiplier={grid.fontCap}>
+              {event.description}
+            </Text>
+          </>
+        ) : gate ? (
+          // Krittstrek + etikett + krittstrek. Kampens gater leses som rytme,
+          // ikke som hendelser.
+          <View style={styles.gateRow}>
+            <View style={styles.gateLine} />
+            <Text style={styles.gateLabel} maxFontSizeMultiplier={grid.fontCap}>
+              {gateLabel(event, score)}
+            </Text>
+            <View style={styles.gateLine} />
+          </View>
+        ) : (
+          // bytte / kort — kun historiske data, aldri rapportert fra appen.
+          <Text style={styles.plainText} maxFontSizeMultiplier={grid.fontCap}>
+            {event.description}
+          </Text>
+        )}
+
+        {engagement}
       </View>
+
+      {/* Bildet ER flaten — kant til kant, aldri en innfelt blokk i
+          innholdskolonnen. Derfor ligger det UTENFOR `content`, som bærer
+          radens 82 pt venstremarg. */}
+      {photos?.map(photo => (
+        <Pressable
+          key={photo.id}
+          onPress={onPressPhoto ? () => onPressPhoto(photo) : undefined}
+          style={({pressed}) => [
+            styles.photo,
+            // Bryter ut av radens padding. Negative marginer er det eneste
+            // RN har for «kant til kant» inne i en padded forelder.
+            {marginLeft: -grid.contentLeft, marginRight: -grid.gutter},
+            pressed && styles.pressed,
+          ]}>
+          {/* Thumb i forløpet (B2): raden er en forhåndsvisning — trykket
+              åpner galleriet, som laster display. */}
+          <MediaImage
+            media={photo.media}
+            variant="thumb"
+            style={styles.photoImage}
+            resizeMode="cover"
+          />
+          {photo.caption && (
+            <Text
+              style={[
+                styles.photoCaption,
+                {paddingLeft: grid.contentLeft, paddingRight: grid.gutter},
+              ]}
+              maxFontSizeMultiplier={grid.fontCap}>
+              {photo.caption}
+            </Text>
+          )}
+        </Pressable>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
+  row: {
+    position: 'relative',
+    // Bevisst UTEN overflow:'hidden'. Swellens firkantede hjørner klippes av
+    // svg-en som maler grunnen tilbake over dem, så klippingen trengs ikke —
+    // og på iOS spiser overflow:'hidden' skyggen, altså nodens mint-glød.
   },
-  latest: {
-    backgroundColor: colors.heiaSoft,
-    marginHorizontal: -spacing.lg,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.sm,
+  spacedGoal: {
+    marginTop: 8,
+    marginBottom: 8,
   },
-  timeline: {
-    alignItems: 'center',
-    width: 32,
+  spacedVoice: {
+    marginTop: 12,
   },
-  iconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+  spacedAgainst: {
+    marginTop: 4,
+    marginBottom: 4,
   },
-  // Gulldetaljen på mål for oss — hvit kant løfter den av mint-sirkelen.
-  goldDot: {
+  swellDome: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    width: 11,
-    height: 11,
-    borderRadius: 5.5,
-    backgroundColor: colors.gold,
-    borderWidth: 2,
-    borderColor: colors.surface,
+    left: 0,
+    right: 0,
+    top: 0,
   },
-  line: {
-    flex: 1,
-    width: 2,
-    backgroundColor: colors.border,
-    marginTop: spacing.xs,
+  ignition: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    backgroundColor: colors.heia,
+    opacity: 0.85,
+    zIndex: 1,
   },
-  content: {
-    flex: 1,
-    gap: spacing.xs,
-    paddingBottom: spacing.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+  voiceGlow: {
+    position: 'absolute',
+    right: 0,
+    top: 2,
+    bottom: 0,
   },
   minute: {
-    fontSize: 16,
+    position: 'absolute',
+    textAlign: 'right',
     fontFamily: fonts.display,
-    color: colors.textPrimary,
+    color: matchColors.dim,
+    letterSpacing: -0.1,
+    zIndex: 2,
   },
-  player: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    flexShrink: 1,
+  content: {
+    position: 'relative',
   },
-  // Stillingen skyves til høyremargen — kolonnen med tall leses vertikalt.
-  scoreWrap: {
-    marginLeft: 'auto',
+  // --- Mål for oss ---
+  goalHead: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
-  description: {
-    ...typography.body,
-    lineHeight: 22,
+  goalHeadStacked: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 2,
   },
-  photo: {
-    marginTop: spacing.xs,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+  goalWord: {
+    fontFamily: fonts.display,
+    color: matchColors.text,
+    letterSpacing: -2,
   },
-  photoPressed: {
+  goalTally: {
+    fontFamily: fonts.display,
+    color: colors.heia,
+    letterSpacing: -1.8,
+  },
+  goalWho: {
+    marginTop: 9,
+    fontSize: 17,
+    fontWeight: '700',
+    color: matchColors.text,
+  },
+  goalNote: {
+    marginTop: 3,
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: matchColors.dim,
+  },
+  // --- Mål imot ---
+  againstRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  againstText: {
+    flex: 1,
+    fontSize: 14.5,
+    fontWeight: '700',
+    color: matchColors.dim,
+  },
+  againstTally: {
+    fontFamily: fonts.display,
+    fontSize: 17,
+    color: matchColors.text,
     opacity: 0.8,
+  },
+  // --- Reporterens stemme ---
+  voiceTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  voiceAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    // Gullringen ER noden for stemmen — avataren sitter på linja.
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 197, 61, 0.55)',
+  },
+  voiceName: {
+    flexShrink: 1,
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: matchColors.text,
+    letterSpacing: 0.1,
+  },
+  voiceText: {
+    marginTop: 6,
+    fontSize: 16,
+    lineHeight: 24,
+    color: matchColors.text,
+  },
+  // --- Rytmemarkør ---
+  gateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  gateLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: matchColors.chalkFaint,
+  },
+  gateLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: matchColors.dim,
+  },
+  plainText: {
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: matchColors.dim,
+  },
+  // --- Bilde på et øyeblikk ---
+  photo: {
+    marginTop: spacing.sm,
+  },
+  pressed: {
+    opacity: 0.85,
   },
   photoImage: {
     width: '100%',
-    height: 180,
-    backgroundColor: colors.background,
+    height: 200,
+    // Laste-platen må være GRUNNEN, ikke colors.background — den ville
+    // blinket hvitt på den mørke flaten mens thumben dekodes.
+    backgroundColor: matchColors.timeline,
   },
   photoCaption: {
-    ...typography.bodySmall,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    marginTop: 6,
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: matchColors.dim,
   },
 });
