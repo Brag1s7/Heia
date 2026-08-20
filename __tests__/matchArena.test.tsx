@@ -38,7 +38,7 @@ const BASE = {
   homeScore: 2,
   awayScore: 1,
   teamColor: '#D92B2B',
-  paused: false,
+  phase: 'live' as const,
   minute: 40,
 };
 
@@ -137,9 +137,64 @@ describe('klokka er en prop, aldri en egen utregning', () => {
   });
 
   it('viser INGEN minutt i pause — tallet ville vært feil før kampuret', () => {
-    const t = texts(render({paused: true, minute: 25}));
+    const t = texts(render({phase: 'paused', minute: 25}));
     expect(t).toContain('Etter 1. omgang');
     expect(t.some(x => x.includes('25′'))).toBe(false);
+  });
+});
+
+/**
+ * FERDIG KAMP (skive 3) — samme arena, tre ting skifter.
+ *
+ * Den viktigste testen her er den som IKKE handler om utseende: coral er låst
+ * til LIVE. Blir `LiveBadge` gjenbrukt med enda et flagg, lekker coral ut i
+ * rapporten, og fargesemantikken er ikke lenger en regel.
+ */
+describe('rapporten er den samme arenaen, roligere', () => {
+  const DONE = {phase: 'finished' as const, dateLabel: '20. aug · 18:00'};
+
+  it('bytter LIVE mot SLUTT — coral betyr live og ingenting annet', () => {
+    const t = texts(render(DONE));
+    expect(t).toContain('SLUTT');
+    expect(t).not.toContain('LIVE');
+    expect(t).not.toContain('PAUSE');
+  });
+
+  it('setter datoen der klokka sto — kampen er historie, ikke et minutt', () => {
+    const t = texts(render(DONE));
+    expect(t).toContain('20. aug · 18:00');
+    expect(t.some(x => x.includes('omgang'))).toBe(false);
+    expect(t.some(x => x.includes('40′'))).toBe(false);
+  });
+
+  it('roper SEIER når det ble en — og tier ellers', () => {
+    expect(texts(render(DONE))).toContain('SEIER');
+    expect(texts(render({...DONE, homeScore: 1, awayScore: 3}))).not.toContain(
+      'SEIER',
+    );
+    // Uavgjort er ingen seier, og det finnes ingen tap-pill.
+    expect(texts(render({...DONE, homeScore: 2, awayScore: 2}))).not.toContain(
+      'SEIER',
+    );
+  });
+
+  it('bøyer reporteren i fortid — hun rapporterer ikke lenger', () => {
+    const t = texts(render({...DONE, reporterName: 'Jarle Vestli'}));
+    expect(t).toContain('Jarle rapporterte');
+    // «nå» hører til den pågående kampen, ikke rapporten.
+    expect(t).not.toContain('nå');
+  });
+
+  it('slukker gløden på tallet — den er den pågående kampens signatur', () => {
+    const {StyleSheet} = require('react-native');
+    const glow = (tree: ReactTestRenderer.ReactTestRenderer) => {
+      const node = tree.root.findAll(
+        n => typeof n.type === 'string' && textOf(n) === '2–1',
+      )[0];
+      return !!StyleSheet.flatten(node.props.style).textShadowRadius;
+    };
+    expect(glow(render())).toBe(true);
+    expect(glow(render(DONE))).toBe(false);
   });
 });
 

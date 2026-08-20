@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
   Animated,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
 import {colors, fonts, matchColors, radius, spacing} from '../../theme';
 import {LiveBadge} from '../LiveBadge';
 import {TeamBadge} from '../TeamBadge';
+import {useReducedMotion} from '../useReducedMotion';
 import {matchScoreA11yLabel} from '../../shared/matchCopy';
 
 /**
@@ -31,7 +32,26 @@ import {matchScoreA11yLabel} from '../../shared/matchCopy';
  * (serveren regner `now() - started_at`, se P2), så et tall der ville vært
  * feil. «Etter 1. omgang» er sant uansett. Når kampuret blir
  * serverautoritativt (skive 7) kan tallet komme tilbake.
+ *
+ * ---------------------------------------------------------------------------
+ * FERDIG KAMP (skive 3) er den SAMME arenaen, ikke en ny flate.
+ *
+ * Det er hele poenget med rapporten: kampen du fulgte er den kampen du kommer
+ * tilbake til. Tre ting skifter, og ikke flere — LIVE-merket blir en flat
+ * SLUTT-pill, klokka blir datoen, og en gullpill sier SEIER når det ble en.
+ *
+ * ⚠️ CORAL BLIR ALDRI BRUKT HER. `LiveBadge` er coral, og coral betyr LIVE og
+ * ingenting annet (låst fargesemantikk). En «ferdig»-tilstand på LiveBadge
+ * ville gjort merket til en generell statuspill, og da lekker coral ut i
+ * rapporten — derfor en egen flat pill i stedet for enda et flagg på badgen.
  */
+
+/**
+ * Kampens tre tilstander på arenaen. Var `paused: boolean` i skive 2 — en
+ * boolsk kunne ikke uttrykke den tredje, og to boolske ville latt «pause OG
+ * ferdig» oppstå.
+ */
+export type MatchArenaPhase = 'live' | 'paused' | 'finished';
 
 interface MatchArenaProps {
   homeTeam: string;
@@ -40,9 +60,14 @@ interface MatchArenaProps {
   awayScore: number;
   /** Lagets farge — arenaens lys, klemt av `arenaLightCap` i flaten. */
   teamColor: string;
-  paused: boolean;
+  phase: MatchArenaPhase;
   /** Kampminuttet NÅ. Prop, aldri egen utregning. */
   minute?: number;
+  /**
+   * Ferdig kamp: «20. aug · 18:00» der klokka står under kampen. Kampen er
+   * historie, og da er datoen det eneste tidstallet som fortsatt betyr noe.
+   */
+  dateLabel?: string;
   /** Er andre omgang i gang? Utledes av kampforløpet hos kalleren. */
   secondHalf?: boolean;
   location?: string;
@@ -67,14 +92,17 @@ export function MatchArena({
   homeScore,
   awayScore,
   teamColor,
-  paused,
+  phase,
   minute,
+  dateLabel,
   secondHalf,
   location,
   reporterName,
   scoreScale,
 }: MatchArenaProps) {
   const {width, fontScale} = useWindowDimensions();
+  const paused = phase === 'paused';
+  const finished = phase === 'finished';
 
   // ⚠️ DYNAMIC TYPE XXL PÅ DET STORE TALLET (handoffens punkt 7).
   // Fasitens 78 px score i tre kolonner sprenger på 430 pt med stor tekst.
@@ -85,21 +113,61 @@ export function MatchArena({
   const scoreFont = width < 360 ? 46 : width < 390 ? 54 : 62;
   const stacked = fontScale >= 1.35 || width < 340;
 
-  const clock = paused
+  // ⚠️ ÉN KILDE TIL DET SOM STÅR I KLOKKESLOTTEN. Slotten er «når», og hva
+  // «når» betyr skifter med fasen: minutt under kampen, omgang i pause,
+  // datoen etterpå. Deles den opp i tre steder, drifter de fra hverandre —
+  // det var nettopp prototypens ene ekte bug.
+  const clock = finished
+    ? dateLabel ?? ''
+    : paused
     ? `Etter ${secondHalf ? '2.' : '1.'} omgang`
     : `${secondHalf ? '2.' : '1.'} omgang · ${minute ?? 0}′`;
-  const clockLabel = paused
+  const clockLabel = finished
+    ? dateLabel
+    : paused
     ? `Pause etter ${secondHalf ? 'andre' : 'første'} omgang`
     : `${secondHalf ? 'Andre' : 'Første'} omgang, ${
         minute ?? 0
       } minutter spilt`;
+
+  // SEIER-pillen spretter inn — både i det kampen ender med seier, og hver
+  // gang rapporten åpnes. Samme øyeblikk `ScoreBoard` hadde; her er den bare
+  // flyttet inn i verdenen.
+  //
+  // ⚠️ NY BEVEGELSE ⇒ REDUCE MOTION MED EN GANG. Skive 6 kobler hooken på det
+  // som allerede animerer (`useGoalMoment`, `LiveBadge`, pulsen); å legge en
+  // ny animasjon inn UTEN den ville vært å bygge den regresjonen med vilje.
+  const reducedMotion = useReducedMotion();
+  const isWin = finished && homeScore > awayScore;
+  const seierIn = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!isWin) {
+      seierIn.setValue(0);
+      return;
+    }
+    if (reducedMotion) {
+      // Ingen bevegelse — men pillen skal fortsatt være der. «Reduce Motion
+      // fjerner bevegelsen, ikke innholdet.»
+      seierIn.setValue(1);
+      return;
+    }
+    const spring = Animated.spring(seierIn, {
+      toValue: 1,
+      delay: 250,
+      friction: 5,
+      tension: 120,
+      useNativeDriver: true,
+    });
+    spring.start();
+    return () => spring.stop();
+  }, [isWin, reducedMotion, seierIn]);
 
   const score = (
     <Animated.Text
       style={[
         styles.score,
         {fontSize: scoreFont},
-        !paused && styles.scoreGlow,
+        phase === 'live' && styles.scoreGlow,
         scoreScale ? {transform: [{scale: scoreScale}]} : null,
       ]}
       maxFontSizeMultiplier={1.25}
@@ -149,19 +217,36 @@ export function MatchArena({
 
   const meta = [
     location,
-    reporterName ? `${reporterName.split(' ')[0]} rapporterer` : null,
+    reporterName
+      ? `${reporterName.split(' ')[0]} ${
+          finished ? 'rapporterte' : 'rapporterer'
+        }`
+      : null,
   ].filter(Boolean) as string[];
 
   return (
     <View>
       <View style={styles.top}>
-        <LiveBadge paused={paused} />
-        <Text
-          style={styles.clock}
-          maxFontSizeMultiplier={1.4}
-          accessibilityLabel={clockLabel}>
-          {clock}
-        </Text>
+        {finished ? (
+          <View
+            style={styles.endPill}
+            accessible
+            accessibilityLabel="Kampen er slutt">
+            <Text style={styles.endPillText} maxFontSizeMultiplier={1.3}>
+              SLUTT
+            </Text>
+          </View>
+        ) : (
+          <LiveBadge paused={paused} />
+        )}
+        {clock ? (
+          <Text
+            style={styles.clock}
+            maxFontSizeMultiplier={1.4}
+            accessibilityLabel={clockLabel}>
+            {clock}
+          </Text>
+        ) : null}
       </View>
 
       {/* ÉN HENDELSE = ÉTT STOPP gjelder også her: stillingen leses som en
@@ -192,6 +277,22 @@ export function MatchArena({
         )}
       </View>
 
+      {isWin && (
+        <View style={styles.result}>
+          <Animated.View
+            style={{opacity: seierIn, transform: [{scale: seierIn}]}}>
+            {/* Gull, ikke mint. Fasiten gir SEIER gullpillen — mint er
+                stillingen, og stillingen står rett over. To mintflater over
+                hverandre ville gjort feiringen til en gjentakelse av tallet. */}
+            <View style={styles.seier} accessible accessibilityLabel="Seier">
+              <Text style={styles.seierText} maxFontSizeMultiplier={1.3}>
+                SEIER
+              </Text>
+            </View>
+          </Animated.View>
+        </View>
+      )}
+
       {meta.length > 0 && (
         <View
           style={styles.meta}
@@ -205,7 +306,7 @@ export function MatchArena({
               </Text>
             </React.Fragment>
           ))}
-          {!paused && (
+          {phase === 'live' && (
             <>
               <Text style={styles.metaSep}>·</Text>
               <Text style={styles.metaNow} maxFontSizeMultiplier={1.5}>
@@ -226,6 +327,38 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     minHeight: 26,
+  },
+  // Den flate SLUTT-pillen. Krittfamilien, ikke coral og ikke gull: gull er
+  // reporterens stemme og feiringen, og pillen her er verken.
+  endPill: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255, 255, 255, 0.13)',
+    alignSelf: 'flex-start',
+  },
+  endPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: matchColors.text,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  result: {
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  seier: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: colors.gold,
+  },
+  seierText: {
+    fontFamily: fonts.display,
+    fontSize: 12.5,
+    letterSpacing: 2,
+    color: colors.goldInk,
   },
   clock: {
     fontFamily: fonts.display,

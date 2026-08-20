@@ -1,11 +1,11 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 2 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 3)
+## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 3 BYGGET, VENTER PÅ TELEFONKONTROLL)
 
-**✅ SKIVE 2 ER TELEFONGODKJENT AV BRAGE 2026-08-20: «det er bra nå».**
-Godkjenningen kom etter TRE runder på enhet, og de to rettelsesrundene er
-verdt å lese før du rører kampflaten — de har et felles mønster (se
-`SKIVE 2.2`). **Neste er skive 3: kamprapporten på samme grunn.**
+**⏳ SKIVE 3 ER BYGGET OG VENTER PÅ BRAGES TELEFONTEST.** Skive 1 og 2 er
+levert og telefongodkjent (`93e75ca`, `23df9ed`). Skive 3 — kamprapporten på
+samme grunn — er bygget i samme mønster og skal kontrolleres på enhet FØR
+noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
 
 **LES I DENNE REKKEFØLGEN:**
 1. `### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20` — P1 mål imot ·
@@ -19,12 +19,14 @@ verdt å lese før du rører kampflaten — de har et felles mønster (se
 4. `### ✅ SKIVE 2 LEVERT` — grunnen, arenaen, uttrekket og hele
    a11y-jobben. **Les også 2.1 og 2.2 i samme bolk: to feil som var RIKTIG
    kode i skive 1 og ble feil av at flaten under endret seg.**
-5. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1+2s
-   flater; skive 3–5 tar sine.
-6. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 3 er neste) og
-   listen over hva som ellers blir hvite flekker på grønt. **Den listen
-   gjelder fortsatt for skive 3s flater.**
-7. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
+5. `### ⏳ SKIVE 3 BYGGET` — kamprapporten, og de tre beslutningene den
+   tvang fram (påmeldte, «Rediger», SLUTT/SEIER). **Sjekklista for
+   telefonkontrollen ligger der.**
+6. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1–3s
+   flater; skive 4–5 tar sine.
+7. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 4 er neste) og
+   listen over hva som ellers blir hvite flekker på grønt.
+8. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
    Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
    repoet.
 
@@ -702,6 +704,161 @@ Husstilen i repoet er i tillegg **`bracketSpacing: false`** og
 Bør trolig bare skrives inn i `.prettierrc.js`, men det er en egen liten
 beslutning og ble ikke gjort her.
 
+⚠️ **DEL TO AV FELLA, FUNNET I SKIVE 3: repoet er pinnet på prettier 2.8.8,
+men flere filer er formatert av en prettier 3.x.** Kjører man repoets egen
+prettier på en slik fil, REVERSERES formateringen — parentesene rundt `??` i
+ternærer forsvinner, malstrenger brytes om, importlister kollapser. På
+`EventDetailScreen.tsx` ble en 100-linjers endring til en 577-linjers diff,
+med FLAGGENE PÅ. Det er ikke mellomromsstøy man kan ignorere; det er ekte
+kodeendringer i kode man ikke har rørt.
+**Regelen inntil versjonen er avklart: kjør prettier på NYE filer, og
+håndformatér endringer i gamle.** Kontroller alltid med
+`git diff --stat` etterpå — en diff som er mye større enn endringen ER
+fellen.
+
+---
+
+---
+
+### ⏳ SKIVE 3 BYGGET 2026-08-20 — KAMPRAPPORTEN PÅ SAMME GRUNN
+
+**Ren JS. Ingen nye pakker, ingen native endringer, ingen migrasjon.**
+342 tester / 26 suiter grønt (var 316/25). Lint 12 kjente — uendret.
+Ruten, de tre stackene og B2-cachen er urørt.
+
+#### HVA SOM ER BYGGET
+
+- **`src/components/match/FinishedMatch.tsx` (ny)** — samme mønster som
+  `LiveMatch`: `showReport`-grenen deles med trening, sosialt, kommende kamp,
+  turnering og avlyst kamp, så verdenen kan ikke legges rundt hele returen.
+  Rekkefølgen er arena → (egen tittel + beskrivelse) → bildestripe → forløp →
+  påmeldte → «Rediger».
+- **`MatchArena` tar nå `phase: 'live' | 'paused' | 'finished'`**, ikke
+  `paused: boolean`. En boolsk kunne ikke uttrykke den tredje tilstanden, og
+  to boolske ville latt «pause OG ferdig» oppstå. `LiveMatch` sender
+  `paused ? 'paused' : 'live'`.
+- **`src/components/match/MatchAttendance.tsx` (ny)** — påmeldte som
+  ansikter på rad, ikke som liste. **Brages valg**, se beslutningen under.
+
+#### RAPPORTEN ER DEN SAMME ARENAEN — TRE TING SKIFTER, IKKE FLERE
+
+Det er hele poenget: kampen du fulgte er kampen du kommer tilbake til.
+Verdenen er den samme, bare roligere (`phase="finished"` demper lagene i
+grunnen — den slukker dem ikke, en slukket verden ville gjort rapporten til
+en arkivside).
+
+1. **LIVE → SLUTT.** Flat krittpill (`rgba(255,255,255,.13)`), ikke et nytt
+   flagg på `LiveBadge`. ⚠️ **Grunnen er fargesemantikken:** `LiveBadge` er
+   coral, og coral betyr LIVE og ingenting annet. En «ferdig»-tilstand på
+   badgen ville gjort den til en generell statuspill, og da lekker coral ut i
+   rapporten. Voktet som test.
+2. **Klokka → datoen.** Klokkeslotten er «når», og hva «når» betyr skifter
+   med fasen: minutt under kampen, omgang i pause, `20. aug · 18:00` etterpå.
+   **Utledet ÉN gang**, samme regel som prototypens ene ekte bug satte.
+3. **SEIER-pillen.** Gull med gullblekk (fasitens `.a-result .seier`) — ikke
+   appens mint `StatusPill`: stillingen står i mint rett over, og to
+   mintflater over hverandre gjør feiringen til en gjentakelse av tallet.
+   Ingen tap-pill, ingen uavgjort-pill. Gløden på tallet slukkes; den er den
+   pågående kampens signatur.
+
+⚠️ **INGEN MÅLFLOD, INGEN `useGoalMoment` I RAPPORTEN.** Stillingen er ferdig,
+og en feiring som fyrer hver gang rapporten åpnes ville vært en påstand om at
+noe skjer nå. SEIER-pillen er rapportens eneste øyeblikk.
+
+#### 🔒 TRE BESLUTNINGER SOM MÅTTE TAS (handoffens «reelle beslutning»)
+
+1. **PÅMELDTLISTA BLE EN AVATARSTRIPE — Brages valg 2026-08-20.**
+   På en KOMMENDE kamp er påmeldingen en handling (hvem mangler svar, hvem må
+   purres), og da er radene riktige — de står urørt der. På en SPILT kamp er
+   den et faktum, og en radtabell med hvite linjer midt i kampverdenen er
+   akkurat det admin-språket retningen holder ute. Fasitens eget uttrykk for
+   en gruppe mennesker på arenaen er ansikter på rad (`.a-crowd`).
+   **Prisen, bevisst tatt:** «Meldt av <forelder>» vises ikke i rapporten.
+   Navnene står i sin helhet, ikke klippet — rapporten er eneste sted de
+   finnes etter kampen, og det finnes ingen «vis alle» å trykke på.
+2. **«REDIGER» MÅTTE FØLGE MED NED.** Det var ikke en smakssak: kampsiden er
+   ENESTE inngang til å rette en spilt kamp, så blir knappen igjen på den
+   lyse flaten finnes det ingen vei til den i det hele tatt. Krittkantet
+   trykkflate nederst (44 pt), samme språk som reporterknappene, aldri hvit.
+3. **`MatchPhotoGallery` FLYTTET IKKE.** Den er en fullskjerms modal på svart
+   og har ingen flate i verdenen — den var aldri en hvit flekk.
+
+#### ⚠️ 2.2-MØNSTERET FANT ÉN TIL
+
+**`MatchPhotoRail`s lasteplate var `matchColors.timeline`.** Varianten ble
+bygget i skive 2 for en flate som ikke fantes ennå, og fargen var
+kampforløpets. Men stripa står ikke i kampforløpet — den står på GRUNNEN,
+over det rommet. En flat romfarge på feil rom er nøyaktig fella fra skive 2.2.
+**Nå et scrim** (`rgba(8,27,19,.55)`), som senker det som ligger under og
+derfor er riktig uansett hvilken tone stripa havner på.
+
+Samme resonnement traff ringen rundt de overlappende ansiktene: prototypen
+bruker `border: 2px solid var(--arena-b)`, altså flaten malt tilbake. Ringen
+er derfor et scrim her også — den ble aldri bygget som grunnfarge.
+
+#### NYE GULLVERDIER
+
+- **`matchContrast.test.ts`**: SLUTT-pillen (kritt med alfa **regnet ut mot
+  arenaen under**, ikke som om den var hvit — da ville den «bestått» med 17:1
+  og målt noe som ikke finnes noe sted), gullpillen med gullblekk, og «+N» i
+  påmeldtstripa mot grunnen.
+- **`finishedMatch.test.tsx` (ny)**: rapporten monterer som én grønn verden,
+  ingen kremfamilie, **ingen coral**, forløpet leses forfra, «Rediger» finnes
+  for trener og ikke for medlem, påmeldte er ett stopp med BARNETS navn.
+  ⚠️ **Fixturen har bilder med vilje** — både bildestripa og bilderadene
+  rendres kun når det finnes bilder, og begge var lyse flater før denne
+  skiva. En tom `photos`-liste ville gjort fargetesten blind for nettopp de to.
+- **`matchArena.test.tsx`**: fasen, coral-forbudet, datoen i klokkeslotten,
+  SEIER kun ved seier (ikke ved uavgjort), og at gløden slukkes.
+
+#### REDUCE MOTION ER MED FOR DENNE ANIMASJONEN
+
+`useReducedMotion` er koblet på SEIER-pillen. Skive 6 kobler den på det som
+allerede animerer (`useGoalMoment`, `LiveBadge`, pulsen) — men å legge inn en
+NY animasjon uten den ville vært å bygge den regresjonen med vilje.
+«Reduse bevegelse fjerner bevegelsen, ikke innholdet»: pillen står der, den
+spretter bare ikke.
+
+#### ÅPENT / BEVISST UTELATT
+
+- **Publikumstallet fra fasiten** («17 var med gjennom kampen» med ansikter)
+  er IKKE bygget. Det er engasjement, og engasjementet kommer i skive 4 med
+  den kanoniske koblingen. Påmeldtstripa er påmelding, ikke publikum — de to
+  skal ikke blandes.
+- **Kampuret er urørt** (P2 / skive 7). Rapporten viser ingen spilletid, kun
+  dato og klokkeslett for avspark.
+- **`styles.timeline` i `EventDetailScreen` lever fortsatt**, men bare som
+  sisteutvei: en FERDIG kamp uten stilling eller motstander blir aldri en
+  rapport og faller ned i den lyse grenen. Begge felt er `?`-typet, så
+  tilfellet kan ikke typebevises bort.
+- **Avlyst kamp er ikke rørt.** Den har `phase="cancelled"` klar i
+  `MatchGround`, men står fortsatt på den lyse flaten — «FØR KAMP ER UTE I
+  DENNE RUNDEN» gjelder den også.
+
+#### 📱 TELEFONKONTROLL — IKKE GJENNOMFØRT ENNÅ
+
+Åpne en FERDIGSPILT kamp (Hjem/Kalender/Sesongen → en kamp med resultat):
+
+1. **Er det åpenbart samme kamp som live-flaten?** Buen, de tre rommene,
+   lagets lys — eller føles rapporten som en annen skjerm?
+2. **SLUTT-pillen og datoen** øverst: leses de som «dette er over», eller ser
+   den flate pillen bare ut som en dempet LIVE?
+3. **SEIER-pillen** — spretter den inn ~250 ms etter at siden lander? Er gull
+   riktig ved siden av det mint-tallet, eller konkurrerer de?
+   (Test også en kamp som ble TAP eller uavgjort: da skal det ikke stå noe.)
+4. **Bildestripa på grunnen.** Blinker det krem mens thumbene lastes?
+5. **Forløpet leses forfra** — «Kampens historie», avspark øverst,
+   SLUTT-markøren, og krittlinja UAVBRUTT gjennom målradene (2.2-regresjonen).
+6. **Påmeldtstripa**: ser den ut som mennesker, eller som en avkortet liste?
+   Blir navnerekka for lang på et lag med 18?
+7. **«Rediger»** — tydelig nok som krittkant, og fører den til
+   redigeringsskjermen?
+8. **Stor tekst (XXL)** på rapporten: stabler tallet seg, og holder
+   navnerekka?
+9. **VoiceOver**: sveip fra toppen — SLUTT, stillingen som én setning, SEIER,
+   forløpet ett stopp per hendelse, påmeldte som ETT stopp, «Rediger».
+10. **Kanten under push** — blinker det krem når rapporten åpnes fra Hjem?
+
 ---
 
 ### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
@@ -714,8 +871,8 @@ en REELL begrensning.
 |---|---|---|
 | 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` + 1.1 |
 | 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT `23df9ed` (+2.1 +2.2) |
-| 3 | **Kamprapporten på samme grunn** | ⏭️ NESTE |
-| 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | godkjent, se P1 |
+| 3 | **Kamprapporten på samme grunn** | ⏳ BYGGET — venter på telefonkontroll |
+| 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ⏭️ NESTE, godkjent, se P1 |
 | 5 | **Kampens puls** (`PulseCurve`) | se memoiseringsregelen |
 | 6 | **Sticky-bar + Reduce Motion** | |
 | 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
@@ -801,6 +958,11 @@ AKSEPTANSEKRITERIUM. En skive er ikke ferdig før dens flater oppfyller:
 **Hvor:** skive 2 og 3 tar flatene sine (arena, reporterbar, rapport),
 skive 4 tar HEIA/kommentarer, skive 5 skjuler pulskurven.
 **Griddet fra skive 1 tas i skive 2**, mens radene uansett røres.
+
+✅ **OPPFYLT FOR SKIVE 3s FLATER:** SLUTT- og SEIER-pillene er egne stopp med
+label · påmeldtstripa er ÉTT stopp («Påmeldt, 14. Erlend Hagen, …») med
+ansiktene skjult · «Rediger» har rolle, label og 44 pt · bildestripas
+overskrift er `header`, thumbene hadde rolle og label fra før.
 
 ---
 

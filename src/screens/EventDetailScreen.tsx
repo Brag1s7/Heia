@@ -28,7 +28,6 @@ import {
   ListRow,
   EventCard,
   HeroSurface,
-  ScoreBoard,
   StadiumSurface,
   StatusPill,
   TeamBadge,
@@ -42,6 +41,7 @@ import {
   Skeleton,
   SkeletonCard,
 } from '../components';
+import {FinishedMatch} from '../components/match/FinishedMatch';
 import {LiveMatch} from '../components/match/LiveMatch';
 import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
@@ -843,20 +843,44 @@ export function EventDetailScreen({route, navigation}: Props) {
   }
 
   // -----------------------------------------------------------------------
-  // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp) + KAMPRAPPORT
+  // KAMPRAPPORT-MODUS (skive 3)
   // -----------------------------------------------------------------------
-  // Kamprapporten snur rekkefølgen: resultatet ER historien på en spilt kamp,
-  // så scoreboardet møter deg først og «hvor og når» demoteres til én linje.
-  // Før åpnet siden med et administrativt infokort, og selve kampen lå under.
-  const showReport = isFinishedMatch && !!event.score && !!event.opponent;
+  // Den spilte kampen bor i den SAMME verdenen som den live — samme grunn,
+  // samme arena, samme forløp, bare roligere. Egen komponent av samme grunn
+  // som `LiveMatch`: grenen under deles med trening, sosialt, kommende kamp,
+  // turnering og avlyst kamp, og de skal ikke bli grønne av at rapporten ble
+  // det.
+  if (isFinishedMatch && event.score && event.opponent) {
+    return (
+      <>
+        <FinishedMatch
+          event={event}
+          matchEvents={finishedMatchEvents}
+          teamName={teamName}
+          teamColor={activeTeamSpace?.color || colors.heiaInk}
+          photos={matchPhotos}
+          reporter={reporter}
+          isAdmin={isCurrentUserAdmin}
+          authorFor={authorFor}
+          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+          onEdit={() => navigation.navigate('NewEvent', {eventId})}
+        />
 
-  const whenWhere = [
-    formatDateLong(event.startTime),
-    formatTime(event.startTime),
-    event.location,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+        <MatchPhotoGallery
+          photos={matchPhotos}
+          initialPhotoId={galleryPhotoId}
+          onClose={() => setGalleryPhotoId(null)}
+        />
+      </>
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp)
+  // -----------------------------------------------------------------------
+  // ⚠️ En FERDIG kamp UTEN stilling eller motstander faller hit. Den er ingen
+  // rapport — det finnes ikke noe resultat å vise — men bildene og forløpet
+  // skal fortsatt være der, på den lyse flaten som før.
 
   // En avlyst kamp er ingen kampdag — nøytral «Avlyst»-pill (som kalenderen).
   const infoPill =
@@ -869,22 +893,7 @@ export function EventDetailScreen({route, navigation}: Props) {
       <BackBar title="Hendelse" />
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
-      {showReport ? (
-        <View style={styles.report}>
-          <ScoreBoard
-            homeTeam={teamName}
-            awayTeam={event.opponent!}
-            homeScore={event.score!.home}
-            awayScore={event.score!.away}
-            matchStatus={event.matchStatus!}
-          />
-          <Text style={styles.reportTitle}>{event.title}</Text>
-          <Text style={styles.reportMeta}>{whenWhere}</Text>
-          {event.description && (
-            <Text style={styles.description}>{event.description}</Text>
-          )}
-        </View>
-      ) : isUpcomingMatch && event.opponent ? (
+      {isUpcomingMatch && event.opponent ? (
         /* Kampdag (P5B): motstander + avspark fortjener mer enn sort på
            hvitt — en liten stadion-smak, IKKE full ScoreBoard (det er
            live-kampens språk). RSVP og «Start kamp»-flyten består under. */
@@ -1131,24 +1140,18 @@ export function EventDetailScreen({route, navigation}: Props) {
 
       {/* Oppmøteliste. På en spilt kamp er «Kommer» fortid, og «Ikke svart»
           er ren støy — påmeldingen blir en enkel deltakerliste i stedet. */}
-      {(!showReport || attendees.coming.length > 0) && (
-        <AttendanceSection
-          title={
-            showReport
-              ? `Påmeldt (${attendees.coming.length})`
-              : `Kommer (${attendees.coming.length})`
-          }
-          users={attendees.coming}
-          emptyText="Ingen har svart ennå"
-        />
-      )}
-      {attendees.notComing.length > 0 && !showReport && (
+      <AttendanceSection
+        title={`Kommer (${attendees.coming.length})`}
+        users={attendees.coming}
+        emptyText="Ingen har svart ennå"
+      />
+      {attendees.notComing.length > 0 && (
         <AttendanceSection
           title={`Kan ikke (${attendees.notComing.length})`}
           users={attendees.notComing}
         />
       )}
-      {attendees.pending.length > 0 && !showReport && (
+      {attendees.pending.length > 0 && (
         <AttendanceSection
           title={`Ikke svart (${attendees.pending.length})`}
           users={attendees.pending}
@@ -1363,20 +1366,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.stadiumDim,
     textAlign: 'center',
-  },
-  // Kamprapportens topp: resultatet først, «hvor og når» som undertekst.
-  report: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    gap: spacing.xs,
-  },
-  reportTitle: {
-    ...typography.heading2,
-    marginTop: spacing.lg,
-  },
-  reportMeta: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
   },
   description: {
     ...typography.body,

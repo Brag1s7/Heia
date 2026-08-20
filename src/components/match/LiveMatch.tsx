@@ -129,7 +129,7 @@ export function LiveMatch({
             homeScore={home}
             awayScore={away}
             teamColor={teamColor}
-            paused={paused}
+            phase={paused ? 'paused' : 'live'}
             minute={minute}
             secondHalf={secondHalf}
             location={event.location}

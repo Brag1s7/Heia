@@ -1,5 +1,5 @@
 import {arenaLightCap, floodCap, swellCap} from '../src/shared/teamColors';
-import {matchColors} from '../src/theme';
+import {colors, matchColors} from '../src/theme';
 
 /**
  * KAMPFLATENS KONTRASTVAKT — gullverdier, ikke kommentarer.
@@ -245,5 +245,48 @@ describe('floodCap — måløyeblikket hvitvasker aldri stillingen', () => {
 
   it('faller trygt tilbake på ugyldig farge', () => {
     expect(floodCap('ikke en farge').peak).toBe(0.78);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SKIVE 3 — RAPPORTENS TO PILLER
+//
+// Ferdig kamp innfører de eneste to flatene i kampverdenen som ikke er en av
+// de fire grønne rommene: den flate SLUTT-pillen (kritt med alfa OPPÅ
+// arenaen) og gull-SEIER-pillen. Begge bærer tekst, og begge er derfor
+// gullverdier her og ikke en kommentar om at «det ser greit ut».
+//
+// ⚠️ EN ALFAFLATE MÅ REGNES UT MOT DET SOM LIGGER UNDER. Måler man
+// `rgba(255,255,255,.13)` som om den var hvit, «består» pillen med 17:1 og
+// det er meningsløst — den er ikke hvit noe sted.
+// ---------------------------------------------------------------------------
+
+/** Én farge med alfa lagt over en annen. Det øyet faktisk ser. */
+function over(fg: string, alpha: number, bg: string): string {
+  const f = rgb(fg);
+  const b = rgb(bg);
+  const mix = f.map((v, i) => Math.round(alpha * v + (1 - alpha) * b[i]));
+  return `#${mix.map(v => v.toString(16).padStart(2, '0')).join('')}`;
+}
+
+describe('rapportens piller bærer typen sin', () => {
+  it('SLUTT-pillen leses på arenaen — den er kritt med alfa, ikke hvit', () => {
+    const surface = over('#FFFFFF', 0.13, matchColors.arenaTop);
+    // 11 px versal-etikett med sperring, ikke brødtekst: kravet er 4.5:1.
+    // (Måler ~5.7. Skulle noen senke alfaen for å dempe pillen, faller den
+    // gjennom her i stedet for stille på en telefon.)
+    expect(ratio(matchColors.text, surface)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('SEIER-pillen er gull med gullblekk — aldri krem på gull', () => {
+    expect(ratio(colors.goldInk, colors.gold)).toBeGreaterThanOrEqual(4.5);
+    // Og motprøven: kampens eget blekk på gull ville vært uleselig. Det er
+    // grunnen til at pillen har sitt eget mørke blekk og ikke arver flatens.
+    expect(ratio(matchColors.text, colors.gold)).toBeLessThan(3);
+  });
+
+  it('«+N» i påmeldtstripa leses på grunnen den faktisk ligger på', () => {
+    const surface = over(matchColors.text, 0.16, matchColors.groundLow);
+    expect(ratio(matchColors.text, surface)).toBeGreaterThanOrEqual(7);
   });
 });

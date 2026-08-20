@@ -69,7 +69,9 @@ export function MatchPhotoRail({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={[styles.title, onMatch && styles.titleMatch]}>
+        <Text
+          style={[styles.title, onMatch && styles.titleMatch]}
+          accessibilityRole="header">
           Kampbilder
         </Text>
         <Text style={[styles.count, onMatch && styles.countMatch]}>
@@ -128,13 +130,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.surface,
   },
-  // Laste-platen må være GRUNNEN, ikke hvitt — ellers blinker den krem mens
+  // Laste-platen må være mørk, ikke hvit — ellers blinker den krem mens
   // thumben dekodes, på nøyaktig den flaten som aldri skal være hvit.
+  //
+  // ⚠️ ET SCRIM, IKKE `matchColors.timeline`. Platen var kampforløpets farge
+  // da varianten ble bygget (skive 2), men stripa står ikke i kampforløpet —
+  // den står på GRUNNEN, over det rommet. En flat romfarge på feil rom er
+  // nøyaktig fella fra skive 2.2. Et scrim senker det som ligger under, og er
+  // derfor riktig uansett hvilken tone stripa havner på.
   thumbMatch: {
-    backgroundColor: matchColors.timeline,
+    backgroundColor: 'rgba(8, 27, 19, 0.55)',
   },
   thumbImageMatch: {
-    backgroundColor: matchColors.timeline,
+    backgroundColor: 'rgba(8, 27, 19, 0.55)',
   },
   pressed: {
     opacity: 0.7,
