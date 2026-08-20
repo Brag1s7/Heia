@@ -1,11 +1,13 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 3 BYGGET, VENTER PÅ TELEFONKONTROLL)
+## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 3 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 4)
 
-**⏳ SKIVE 3 ER BYGGET, RUNDE 1 AV TELEFONTESTEN ER TATT.** Én reell feil
-kom ut av den (`SKIVE 3.1` — målswellen dekket ikke bildet, og årsaken var
-`height="100%"` inne i svg, ikke gradienten skive 2.2 rettet). Runde 2
-gjenstår.** Skive 1 og 2 er
+**✅ SKIVE 3 ER TELEFONGODKJENT AV BRAGE 2026-08-20: «Nå funker det».**
+Godkjenningen kom etter TO runder. Runde 1 ga én reell feil — `SKIVE 3.1`,
+målswellen dekket ikke bildet — og årsaken var IKKE gradienten skive 2.2
+rettet, men `height="100%"` inne i svg. **Les 3.1 før du rører en flate i
+kampverdenen; diagnosemetoden der gjelder alt som ligger over innhold av
+variabel høyde.** Neste er skive 4: kanonisk kobling + HEIA/kommentarer. Skive 1 og 2 er
 levert og telefongodkjent (`93e75ca`, `23df9ed`). Skive 3 — kamprapporten på
 samme grunn — er bygget i samme mønster og skal kontrolleres på enhet FØR
 noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
@@ -13,7 +15,7 @@ noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
 **LES I DENNE REKKEFØLGEN:**
 1. `### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20` — P1 mål imot ·
    P2 kampuret · P3 angre · P4 kampknappen · PulseCurve-memoiseringen.
-   Ingen av dem skal relitigeres.
+   Ingen av dem skal relitigeres. **P1 er selve oppgaven i skive 4.**
 2. `### ✅ SKIVE 1 LEVERT` — hva som er bygget, og **to rettelser til den
    frosne bolken som fortsatt står feil i den**.
 3. `### ✅ SKIVE 1.1` — fem rettelser fra telefontesten, og PRINSIPPET de
@@ -22,13 +24,12 @@ noe nytt startes. Sjekklista står i `### ⏳ SKIVE 3 BYGGET`.
 4. `### ✅ SKIVE 2 LEVERT` — grunnen, arenaen, uttrekket og hele
    a11y-jobben. **Les også 2.1 og 2.2 i samme bolk: to feil som var RIKTIG
    kode i skive 1 og ble feil av at flaten under endret seg.**
-5. `### ⏳ SKIVE 3 BYGGET` — kamprapporten, og de tre beslutningene den
-   tvang fram (påmeldte, «Rediger», SLUTT/SEIER). **Sjekklista for
-   telefonkontrollen ligger der.**
+5. `### ✅ SKIVE 3 LEVERT` — kamprapporten, de tre beslutningene den tvang
+   fram (påmeldte, «Rediger», SLUTT/SEIER), og **3.1: prosenthøyde i svg,
+   den feilen som overlevde skive 2.2 fordi bare halve årsaken var rettet.**
 6. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1–3s
    flater; skive 4–5 tar sine.
-7. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 4 er neste) og
-   listen over hva som ellers blir hvite flekker på grønt.
+7. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 4 er neste).
 8. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
    Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
    repoet.
@@ -723,11 +724,11 @@ fellen.
 
 ---
 
-### ⏳ SKIVE 3 BYGGET 2026-08-20 — KAMPRAPPORTEN PÅ SAMME GRUNN
+### ✅ SKIVE 3 LEVERT OG TELEFONGODKJENT 2026-08-20 — KAMPRAPPORTEN
 
-**Ren JS. Ingen nye pakker, ingen native endringer, ingen migrasjon.**
-342 tester / 26 suiter grønt (var 316/25). Lint 12 kjente — uendret.
-Ruten, de tre stackene og B2-cachen er urørt.
+Commit `1b0390d` + `95c092f` (3.1). **Ren JS. Ingen nye pakker, ingen native
+endringer, ingen migrasjon.** 345 tester / 26 suiter grønt (var 316/25).
+Lint 12 kjente — uendret. Ruten, de tre stackene og B2-cachen er urørt.
 
 #### HVA SOM ER BYGGET
 
@@ -878,11 +879,13 @@ ingenting. Den kjøres nå med målingen fyrt av.
 
 345 tester / 26 suiter grønt. Lint 12 kjente, uendret.
 
-#### 📱 TELEFONKONTROLL — RUNDE 1 GJENNOMFØRT
+#### 📱 TELEFONKONTROLLEN — GJENNOMFØRT, TO RUNDER
 
-**Runde 1 (2026-08-20): «Alt det andre funker» — kun bildet i målraden var
-feil, se 3.1 over. Punkt 1–4 og 6–10 sto Brage til ved første gjennomgang.**
-Runde 2 gjenstår: kontroller punkt 5 på nytt, og at swellen nå dekker bildet.
+Runde 1 → «Alt det andre funker» (kun målswellen, se 3.1). Runde 2 →
+**godkjent: «Nå funker det».** Alt annet på lista sto Brage til ved første
+gjennomgang.
+
+<details><summary>Sjekklista som ble brukt (til gjenbruk i skive 4)</summary>
 
 Åpne en FERDIGSPILT kamp (Hjem/Kalender/Sesongen → en kamp med resultat):
 
@@ -906,6 +909,12 @@ Runde 2 gjenstår: kontroller punkt 5 på nytt, og at swellen nå dekker bildet.
    forløpet ett stopp per hendelse, påmeldte som ETT stopp, «Rediger».
 10. **Kanten under push** — blinker det krem når rapporten åpnes fra Hjem?
 
+**⚠️ LEGG TIL I RUNDE 2 HVIS EN RADFLATE RØRES:** et mål MED bilde og et mål
+IMOT med bilde. Det var den ene kombinasjonen som avslørte 3.1, og
+skiferstripa hadde aldri vært testet med bilde i det hele tatt.
+
+</details>
+
 ---
 
 ### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
@@ -918,7 +927,7 @@ en REELL begrensning.
 |---|---|---|
 | 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` + 1.1 |
 | 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT `23df9ed` (+2.1 +2.2) |
-| 3 | **Kamprapporten på samme grunn** | ⏳ BYGGET — venter på telefonkontroll |
+| 3 | **Kamprapporten på samme grunn** | ✅ LEVERT OG TELEFONGODKJENT `1b0390d` + 3.1 `95c092f` |
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ⏭️ NESTE, godkjent, se P1 |
 | 5 | **Kampens puls** (`PulseCurve`) | se memoiseringsregelen |
 | 6 | **Sticky-bar + Reduce Motion** | |
@@ -927,7 +936,33 @@ en REELL begrensning.
 | 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
 
-#### ▶️ SKIVE 3 — HVA SOM ALLEREDE ER KARTLAGT
+#### ▶️ SKIVE 4 — HVA SOM ALREDE ER AVKLART
+
+**Migrasjonen er GODKJENT og spesifisert: `00071_kampfeed.sql` med
+`get_match_feed(evt_id)`, UTEN skjemaendring.** Hele begrunnelsen — hvorfor
+skrivestien allerede er robust, hvorfor det IKKE skal være indeks på
+`match_event_id`, og hvorfor det IKKE skal være UNIQUE — står i `P1` over.
+Les den før du skriver SQL.
+
+Fra kampskjermens side er plassen alt reservert:
+- **`MatchEventRow` har en `engagement`-slot**, og `MatchTimeline` tar
+  `renderEngagement({event, photo})`. Raden skal ikke omskrives.
+- **Sloten ligger UTENFOR den samlede a11y-labelen med vilje** — HEIA og
+  kommentarer er handlinger med egne labels og egen state, ikke en del av
+  setningen om hva som skjedde. Ikke «rydd» den inn i `accessible`-gruppa.
+- **A11y-kravet gjelder skive 4s flater:** `accessibilityRole="button"`,
+  en label som sier hva som skjer («Heia på målet på 34 minutter»),
+  `accessibilityState={{selected}}`, og **44 pt** — HEIA/kommentar-radene er
+  ikon + tall og optisk små, så de trenger `hitSlop`.
+- **P1 er låst: ingen HEIA på mål imot.** Kommentarer er tillatt.
+- **`get_team_feed`-gaten er skive 9, ikke denne.** Ikke samme migrasjon: en
+  grant-feil skal ikke kunne ta ned feeden og kampen på én gang.
+
+⚠️ **`ScoreBoard.tsx` er nå UBRUKT i kampsporet.** Kamprapporten bruker
+`MatchArena`, live-kampen gjør det samme. Sjekk om den har andre kallesteder
+før den eventuelt fjernes — det er en egen liten opprydding, ikke skive 4.
+
+#### 📎 SKIVE 3 — KARTLEGGINGEN SOM BLE BRUKT (historikk)
 
 Rapportgrenen ble lest gjennom rett før skive 2 ble lukket. Dette er hva
 den består av i dag (`EventDetailScreen`, «VANLIG EVENT-MODUS + KAMPRAPPORT»),
