@@ -1,6 +1,18 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-20 — KAMPSKJERMENS DESIGNRETNING ER FROSSET. NESTE SAMTALE: IMPLEMENTERING, se bolken rett under)
+## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 1 AV KAMPSKJERMEN ER LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 2)
+
+**LES I DENNE REKKEFØLGEN:**
+1. `### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20` — P1 mål imot ·
+   P2 kampuret · P3 angre · P4 kampknappen · PulseCurve-memoiseringen.
+   Ingen av dem skal relitigeres.
+2. `### ✅ SKIVE 1 LEVERT` — hva som er bygget, og **to rettelser til den
+   frosne bolken som fortsatt står feil i den**.
+3. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen og hva skive 2 MÅ ta med.
+4. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
+   Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
+   repoet.
+
 
 **✅ PROFILBILDE ER TELEFONTESTET OG GODKJENT AV BRAGE 2026-08-19: «Alt
 funker på telefon!»** Del to av skiva — SELVVALGT AVATARFARGE — er bygget
@@ -209,11 +221,288 @@ inne) · `EventNode` (delt node-komponent) · retningsmarkøren · krittlinja.
 
 ---
 
-### ▶️▶️ NESTE SAMTALE: KAMPSKJERMEN — DISKUSJON FØRST, IKKE BYGGING
+### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20 — IKKE RELITIGÉR
 
-**Brages beslutning 2026-08-20:** neste økt er en samtale om å FORBEDRE
-KAMPSKJERMEN. Ikke start med å foreslå en skive, og ikke bygg noe før
-retningen er valgt sammen med ham.
+Disse ble tatt etter at skive 1 var bygget og telefongodkjent. De er
+BESLUTNINGER, ikke forslag. Les dem før du rører kampsporet.
+
+#### P1 — MÅL IMOT: kommentarer, ingen HEIA
+
+**Ingen HEIA på mål imot — verken i kampen ELLER i feeden.** Kommentarer er
+tillatt begge steder. Det er samme kanoniske post, så regelen må gjelde
+begge flatene; en HEIA-knapp i feeden på et mål imot bryter beslutningen selv
+om kampskjermen skjuler sin.
+
+- ✅ **GODKJENT: `00071_kampfeed.sql` med `get_match_feed(evt_id)`, UTEN
+  skjemaendring.** Skrivestien er allerede robust: `report_match_event`
+  (00021:150-153) og `start_match` (00020:83) gjør en UBETINGET
+  `INSERT INTO feed_posts (…, match_event_id)` i samme transaksjon som
+  hendelsen, utenfor alle IF-grener. Alle seks typene som kan opprettes får
+  post. Det som manglet var LESESTIEN: `get_event_with_rsvp` returnerer ingen
+  `feed_post_id` (00020:289-303), så klienten kunne ikke finne posten.
+  - **Ingen indeks på `match_event_id`.** RPC-en filtrerer på `fp.event_id`,
+    som allerede er indeksert (`idx_feed_posts_event_id`, 00060:96-98), og
+    grupperer klientside — samme mønster som `MatchTimeline` bruker for
+    bilder. En indeks på `match_event_id` ville vært død vekt.
+  - **Ingen UNIQUE.** Koblingen er 1:N MED VILJE — kampbilder bærer samme
+    `match_event_id` (00028:5-8). En unique-constraint ville brutt
+    `createImagePost` og kunne feilet mot prod-data. Kanonisk post velges
+    deterministisk klientside: raden der `post_type <> 'bilde'`.
+- ⏳ **`get_team_feed`-endringen (feedens HEIA-gate) er EGEN SKIVE, TATT
+  ETTER at kampskjermen er telefontestet.** Ikke i samme migrasjon: en
+  grant-feil skal ikke kunne ta ned feeden og kampen på én gang. Feeden kan
+  i dag ikke se forskjell på et mål og en beskjed (00070:147-150 gir bare
+  `match_minute/status/home/away`), så den trenger `match_events.type` og
+  `team_side` ut. **DROP+CREATE ⇒ grantene MÅ gjenskapes (00061-fella), og
+  vanlig medlemsadgang skal kontrolleres eksplisitt etterpå.**
+
+#### P2 — KAMPURET: faktisk spilt tid
+
+**Heia viser FAKTISK SPILT TID.** Klokka starter ved avspark, **fryses i
+pause**, og andre omgang **fortsetter fra minuttet første omgang sluttet**.
+Ingen normert 45/35/30/25-modell. Ingen «45+2». **Ingen ekstra opplysning
+ved kampstart** — reporteren skal ikke taste omgangslengde i appens mest
+tidskritiske øyeblikk, og Heia har uansett ikke datagrunnlag for en
+fotballkonvensjon som varierer per aldersklasse og idrett.
+
+**Implementeringen skal være SERVERAUTORITATIV:** akkumulert spilletid +
+tidspunktet klokka sist startet. **`started_at` skal ALDRI skrives om** —
+historikken er historikk.
+
+**App, server, push, puls, tidslinje og sticky-bar skal arve SAMME beregnede
+tid.** I dag finnes tre uavhengige regnestykker (`EventDetailScreen`,
+`LiveMatchBanner`, `InboxScreen`), og ingen av dem trekker fra pausen —
+serveren gjør det heller ikke (`FLOOR((now() - started_at)/60)`, 00021, og
+`status` settes til `'pause'` uten at `started_at` røres).
+
+⚠️ **Deployrekkefølge: server FØRST, verifisert med en manuell
+pause/gjenoppta-runde mot prod, DERETTER app.** Motsatt rekkefølge gir en
+skjerm som viser 25′ over en tidslinje som sier 35′.
+
+#### P3 — ANGRE: 10 sekunder, og da fantes målet aldri
+
+**Angrevinduet er 10 sekunder.** Innenfor vinduet skal målet forsvinne fra
+BRUKERFLATENE som om det aldri skjedde:
+
+- hendelsen og feed-posten fjernes fra brukerflatene
+- stillingen reverseres
+- reaksjoner og kommentarer fjernes
+- innboksvarselet fjernes eller markeres trukket tilbake
+- **intern audit BEHOLDES** (`audit_log`, 00012, service-role-only)
+
+**En allerede levert push kan ikke trekkes tilbake.** Er den sendt, skal
+brukeren få et kort KORRIGERINGSVARSEL med riktig stilling.
+
+⚠️ **TO FARLIGE HALVVEIER FINNES ALLEREDE I PROD, og de skal stenges i samme
+slag:**
+1. RLS-policyen «Reporter or admin can delete match events» (00014:163-172)
+   er kallbar fra hvilken som helst klient, uten opprydding.
+2. **«Slett innlegget» i feeden treffer målposter.** Trykker reporteren den:
+   posten forsvinner, men stillingen står på 2–1, hendelsen står i
+   kampforløpet og varselet ligger i innboksen. Brukeren tror hun har
+   angret. Det er verre enn ingen angre-funksjon.
+
+**Den generelle «Slett innlegget» skal stenges for systemgenererte poster
+med `match_event_id` — BÅDE i UI og i databaserettigheter.** De skal kun
+kunne endres gjennom autoritativ kamp-RPC.
+
+⚠️ `match_events` trenger `REPLICA IDENTITY FULL`, ellers når en DELETE
+aldri tilskuerne (samme begrunnelse som 00059 ga for `reactions`): uten FULL
+bærer payloaden kun PK, filteret matcher ikke, og tilskueren sitter igjen
+med korrigert stilling i toppen og to mål i forløpet.
+
+#### P4 — KAMPKNAPPEN
+
+**Sluttmodellen står:**
+
+| Tilstand | Knappen |
+|---|---|
+| Ingen livekamp (idle) | `KAMP` → Sesongen |
+| Én livekamp, utenfor kampen | live-resultat/status → åpner kampen (registrerer IKKE HEIA) |
+| Inne i livekamp, publikum | `HEIA!` |
+| Inne i livekamp, reporter | `RAPPORTER` |
+| Ferdig / ingen live | tilbake til `KAMP` |
+
+- **Dagens pluss kan beholdes MIDLERTIDIG mens inngangene flyttes, men er
+  IKKE den endelige idle-tilstanden.**
+- ⚠️ **FØR plussen fjernes MÅ:** «Del med laget» ha fått en **permanent**
+  inngang på Hjem, og «Ny hendelse» en **permanent** inngang i
+  Kalender/Sesongen. I dag finnes Kalender-inngangen kun i tom-tilstand
+  (`KalenderScreen.tsx`), så fjernes plussen før det, mister en trener med
+  ikke-tom kalender enhver vei til å opprette noe.
+- **Flere samtidige livekamper utsettes til cross-team-støtten finnes.**
+- **Tab-barens stadionvariant skal være RUTESPESIFIKK.** Hjem, Kalender,
+  Varsler og Profil skal ikke endres som en bieffekt. Det er mulig rent uten
+  custom `tabBar`: biblioteket leser `tabBarStyle` kun fra den FOKUSERTE
+  rutens options, så de andre fanene er uendret ved konstruksjon. Behold
+  `height: 88` i begge varianter — endres den, reflower scenen midt i en push.
+
+#### PulseCurve — memoiseringsnøkkelen
+
+**IKKE memoiser på `matchEvents.length` alene.** Det gir stale kurver ved
+redigering, sletting, angre eller endret hendelsesdata uten endret antall.
+
+Nøkkelen må dekke **event-ID, type, sekvens/minutt, slettestatus og relevant
+HEIA-sum**. Bruk stabil arrayreferanse eller en strukturell avhengighet.
+
+**Minutt-tickeren skal ALDRI tegne kurven på nytt** — kun reelle hendelses-
+og engasjementsendringer skal gjøre det. (Samme regel som allerede gjelder
+`MatchTimeline`s flettememo: et tick-tall i deps ville regnet hele
+stillings- og bildeflettingen på nytt hvert 30. sekund.)
+
+Rydd samtidig `?? []` i `EventDetailScreen` (fersk tom array per render) med
+en stabil `NO_MATCH_EVENTS`-konstant ved siden av `NO_MEMBERS`/`NO_PHOTOS` —
+men **`length` skal ikke være eneste sannhet**.
+
+---
+
+### ✅ SKIVE 1 LEVERT OG TELEFONGODKJENT 2026-08-20 — HENDELSESGRIDDET
+
+Commit `93e75ca`. **Ren JS**, ingen nye pakker, ingen native endringer,
+ingen migrasjon. 261 tester / 22 suiter grønt, lint ett hakk UNDER baseline.
+
+- **`src/shared/matchGridGeometry.ts` (ny) — geometrien er RESPONSIV.**
+  Prototypens 27/44/74/82 er målt på 430 pt og er fasit for UTTRYKKET, ikke
+  en universell konstant. Tallene dekomponerer til én kjede
+  (`railLeft + node + gap1 + minutt + gap2`), og innrykk/gap komprimeres i
+  tre trinn på smale telefoner. **Ikonets og minuttkolonnens VERTIKALE FLUKT
+  er låst** og holder ved alle tekststørrelser. Voktet på
+  **320 / 375 / 390 / 393 / 430 pt × fontScale 1 / 1.235 (XXL) / 1.6** i
+  `__tests__/matchGrid.test.ts`.
+  ⚠️ `GRID_FONT_CAP` (1.6) må settes som `maxFontSizeMultiplier` på HVER
+  `<Text>` i griddet — klemmer du geometrien men ikke teksten, åpner det seg
+  et gap som vokser til iOS' ×3.571.
+- **`src/components/EventNode.tsx` (ny)** — node- og ikongeometrien lå i to
+  pikselidentiske kopier i `MatchEventRow` og `MatchTimeline`. Nå én.
+- **Avspark og pause fikk FYLTE glyfer** (`PlaySolid`/`PauseSolid` i
+  `icons.tsx`) etter fasiten. **De delte Lucide-eksportene `Play`/`Pause` er
+  URØRT** — de brukes av reporterknappene og klubbetalingsloggen, der
+  outline er riktig. (Handoff-linja «alle ikonene i icons.tsx, ingen nye
+  trengs» er dermed ikke lenger helt sann.)
+- **`swellCap()` i `teamColors.ts` — KONTRASTVAKTEN ER KODE, IKKE EN
+  KOMMENTAR.** Den klemmer lagfargens styrke i målswellen til brødteksten
+  holder 7:1 og mint-stillingen 4.5:1. **Dette er grunnen til at et rødt lag
+  aldri blir brunt.** Første utkast hardkodet 0.55; funnet av review.
+  Gullverdier for åtte lagfarger i `__tests__/matchContrast.test.ts`.
+- **`authorFor` slår opp i `get_team_authors`, IKKE `get_team_members`.**
+  Sistnevnte filtrerer på `status IN ('active','invited')`, så en reporter
+  som forlater laget ville mistet navn og avatar på hver oppdatering i en
+  FROSSET kamprapport — samme hull som 00067 §2 lukket for kommentarfeltet.
+  **RPC-budsjettet står stille på 3**: rosteret gates bort på ferdig kamp,
+  der `ReporterBar`/`ReporterSheet` uansett ikke finnes.
+- **`MatchEventRow` har en `engagement`-slot.** Plassen til HEIA og
+  kommentarer er RESERVERT, så raden ikke må omskrives når den kanoniske
+  koblingen bygges.
+
+**⚠️ TO RETTELSER TIL BOLKEN OVER — de står der fortsatt, og de er feil:**
+
+1. **«På arenaflaten faller dempet tekst til 3.7:1»: TALLET REPRODUSERER
+   IKKE.** `colors.stadiumDim` (#A9CCBC) på #25563F måler **4.86:1**, og
+   tabellen i samme bolk sier 4.9 på nøyaktig samme linje. De to påstandene
+   er uenige, og tabellen har rett. **Byttet til `#C8E6D8` er likevel
+   riktig** — men fordi 4.86 er marginalt (ingen luft mot 4.5-grensen) og
+   langt under 7:1-kravet brødtekst skal ha. #C8E6D8 gir 6.35.
+2. **Punkt 6 («reporterpanelet bruker fortsatt `▶ ❚❚ ⚑`») VAR ALLEREDE
+   FIKSET** da bolken ble skrevet. `ReporterActions.tsx` mapper alle seks
+   handlingene til ekte ikonkomponenter. De siste emojiene i kampsporet
+   sitter i `MatchPhotoSheet.tsx`.
+
+**Én bevisst rettelse AV PROTOTYPEN:** den har `.node{left:26}` og
+`.thread{left:27}` — nodesenter 26, trådsenter 27.75, altså 1.75 pt
+skjevhet. Usynlig i nettleseren, synlig på @3x der noden sitter PÅ linja.
+Handoff-en sier «node sentrert på x=27», og den vant: `railLeft` er 13.5.
+44 / 74 / 82 er uendret.
+
+---
+
+### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
+
+**Skiverekkefølgen er godkjent av Brage.** Skive 1 er levert. Neste er
+skive 2. Ikke åpne designretningen på nytt med mindre React Native avdekker
+en REELL begrensning.
+
+| # | Skive | Status |
+|---|---|---|
+| 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` |
+| 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ⏭️ NESTE |
+| 3 | **Kamprapporten på samme grunn** | |
+| 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | godkjent, se P1 |
+| 5 | **Kampens puls** (`PulseCurve`) | se memoiseringsregelen |
+| 6 | **Sticky-bar + Reduce Motion** | |
+| 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
+| 8 | **Angre mål** (10 s) | se P3 |
+| 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
+| 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
+
+**FØR KAMP ER UTE I DENNE RUNDEN.** Ingen nedtelling, ingen «13 av 18
+kommer». Kommende kamp beholder dagens flate. Live og ferdig kamp først.
+
+**⚠️ SKIVE 2 MÅ TA MED alt som ellers blir hvite flekker på grønt:**
+`ReporterBar` · `ReporterActions` · «Du følger kampen direkte»-kortet ·
+`MatchPhotoRail` · `BackBar` (hardkoder `colors.textPrimary` — trenger
+VARIANT, ikke endret default; den deles med 17 skjermer) · `StatusBar`
+(mønsteret finnes i `ProfileHeader.tsx`) · stackens
+`contentStyle: colors.background`, som ellers blinker krem i kantene under
+push · og den lokale mørke flaten fra skive 1 (`styles.timeline`), som skal
+BORT når grunnen tar over.
+
+**Arenaformen skal i en NY `ArenaSurface`** — `StadiumSurface` har 11
+kallesteder og `ScoreChip` arver alt fra den.
+
+---
+
+---
+
+### 🧩 CLAUDE SKILLS — VURDERT 2026-08-20, INGENTING INSTALLERT
+
+Kildebasert gjennomgang bestilt av Brage før skive 2. **Ingen skill er
+installert, og ingen skal installeres uten at han sier fra.**
+
+| Skill | Dom | Når |
+|---|---|---|
+| `apple-design` (emilkowalski/skills, MIT) | **Bruk senere, som review** | ETTER skive 5–6, aldri som styring av skive 2 |
+| `react-native-best-practices` (callstackincubator, MIT) | **Bruk senere, som ytelses-review** | Når pulsen + mange rader finnes (skive 5) |
+| `animate-expo` (samme repo) | **AVVIS** | — |
+| `emil-design-eng`, `animate`, `review-animations` | **AVVIS** (web/CSS-spesifikke) | — |
+| `awesome-skills/mobile-app-design` | **AVVIS** (ulisensiert, foreldet, generiske «2026-trender») | — |
+| Web-a11y-skills (axe-core/jsx-a11y/WCAG) | **AVVIS** — forutsetter DOM/ARIA | — |
+
+**⚠️ `animate-expo` er ikke bare dårlig tilpasset — den er direkte i strid.**
+Dens HARDE REGEL er «Reanimated, not core `Animated`», og den krever
+`react-native-worklets`, `react-native-gesture-handler`, `expo-router` og
+`expo-haptics`, installert med `npx expo install`. Heia er bar RN 0.83 med
+React Navigation, og har bevisst IKKE reanimated.
+
+**⚠️ To ting `apple-design` ALDRI får styre i Heia:**
+1. **§12 Materials & depth** anbefaler `backdrop-filter`-translusens som
+   bærende hierarki. Det er Liquid Glass-retningen, RN kan det ikke uten en
+   native blur-pakke, og kampskjermens hierarki kommer av TONE OG LYS i tre
+   grønne rom. Frosset.
+2. **§15 Typografi** sier «default to the platform's system font». Heia
+   bundler Nunito med vilje.
+
+Den har **ikke** `disable-model-invocation`, og beskrivelsen treffer
+«reviewing gesture-driven UI / typography / reduced-motion» — altså ville
+den kunne fyre av seg selv midt i skive 2. Installeres den, skal
+`disable-model-invocation: true` legges til i frontmatteret lokalt.
+
+**🔴 DET SKILLENE AVDEKKET, SOM INGEN SKILL TRENGS FOR Å FIKSE:**
+Appen har 66 `accessibilityLabel` og 62 `accessibilityRole` — men
+**kampsporet har NULL.** `MatchEventRow`, `MatchTimeline`, `EventNode`,
+`ScoreBoard`, `MatchPhotoRail` og `ReporterActions` har ikke én eneste
+a11y-prop eller `hitSlop`. En kamptidslinje VoiceOver ikke kan lese, er en
+kamp en blind forelder ikke kan følge. **Husmønsteret finnes allerede 66
+steder — dette er ikke et kunnskapshull, det er en jobb som ikke er gjort.**
+Legg den inn i skive 2/3 mens flatene uansett røres.
+
+---
+
+### 📚 KAMPFLATENS HISTORIKK OG STÅENDE AVGRENSNINGER (bakgrunn, ikke en oppgave)
+
+**Denne bolken var «neste samtale» frem til 2026-08-20.** Den samtalen er
+holdt, retningen er valgt og skive 1 er levert — men LISTENE UNDER GJELDER
+FORTSATT, og de er grunnen til at flere nærliggende ideer allerede er
+avvist. Les dem før du foreslår noe på kampflaten.
 
 **LES DISSE BOLKENE FØRST** (de er kampflatens historikk, og alt der er
 allerede godkjent på telefon — ikke gjenoppfinn dem):
