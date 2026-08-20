@@ -1,15 +1,18 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import Svg, {
+  ClipPath,
   Defs,
+  G,
   LinearGradient,
   Path,
   RadialGradient,
   Rect,
   Stop,
 } from 'react-native-svg';
-import {colors, matchColors, spacing, fonts} from '../theme';
+import {colors, matchColors, radius, spacing, fonts} from '../theme';
 import {swellCap} from '../shared/teamColors';
+import {matchEventA11yLabel, matchPhotoA11yLabel} from '../shared/matchCopy';
 import {MediaImage} from '../lib/media/MediaImage';
 import {avatarRef} from '../lib/media/avatar';
 import {Avatar} from './Avatar';
@@ -45,7 +48,8 @@ import type {MatchEvent, User} from '../shared/types';
  *   MÅL IMOT         dempet skiferstripe — ingen feiring, ingen HEIA
  *   REPORTERSTEMMEN  tekst rett på grunnen, ekstremt svakt lys bak.
  *                    Ingen boks. To på rad skilles av luft, node og minutt.
- *   BILDE            bildet ER flaten, kant til kant
+ *   BILDE            i innholdskolonnen som all annen tekst (telefontest
+ *                    2026-08-20 — se kommentaren nede ved bilderaden)
  *   RYTMEMARKØR      avspark/pause/omgang/slutt — krittstrek + etikett
  */
 
@@ -85,10 +89,10 @@ function gateLabel(event: MatchEvent, score?: string): string {
     event.type === 'avspark'
       ? 'Avspark'
       : event.type === 'andre_omgang'
-        ? '2. omgang'
-        : event.type === 'pause'
-          ? 'Pause'
-          : 'Slutt';
+      ? '2. omgang'
+      : event.type === 'pause'
+      ? 'Pause'
+      : 'Slutt';
   return score ? `${base} · ${score}` : base;
 }
 
@@ -117,52 +121,63 @@ function GoalSwell({grid, teamColor}: {grid: MatchGrid; teamColor: string}) {
   const curve = `M0 ${dome} C ${w * 0.14} 0, ${w * 0.86} 0, ${w} ${dome}`;
 
   return (
-    <>
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="swellTeam" x1="0%" y1="0%" x2="100%" y2="30%">
-              <Stop offset="0" stopColor={teamColor} stopOpacity={cap.peak} />
-              <Stop offset="0.56" stopColor={teamColor} stopOpacity={0} />
-            </LinearGradient>
-            {/* Fasiten legger BEGGE gradientene i ett lag og multipliserer
-                hele laget med swell-peaken. Her er de to lag, så peaken må
-                ganges inn i mint-radialen også — ellers lyser den ~1.8x for
-                sterkt og feiringen blir grell i stedet for varm. */}
-            <RadialGradient id="swellMint" cx="4%" cy="46%" rx="126%" ry="118%">
-              <Stop
-                offset="0"
-                stopColor={colors.heia}
-                stopOpacity={0.34 * cap.peak}
-              />
-              <Stop offset="0.6" stopColor={colors.heia} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <Svg width="100%" height="100%">
+        <Defs>
+          {/* ⚠️ KLIPP, IKKE OVERMALING (telefontest 2026-08-20).
+              Kuppelen ble før laget ved å male grunnfargen (#123325) tilbake
+              over de firkantede hjørnene. Det virket så lenge raden lå på en
+              flat, mørk egen flate — men fra skive 2 ligger den på GRUNNEN,
+              og da var overmalingen en ugjennomsiktig plate i feil farge som
+              KUTTET KRITTLINJA i de øverste 34 punktene av hver målrad.
+              Nå klippes hele swellen til formen sin i stedet. Ingen opasitet
+              legges noe sted, og linja går uavbrutt gjennom.
+              Bunnen settes vilkårlig dypt: svg-en klipper uansett til
+              viewporten, og raden har ingen kjent høyde her. */}
+          <ClipPath id="swellClip">
+            <Path d={`${curve} L ${w} 4000 L 0 4000 Z`} />
+          </ClipPath>
+          {/* ⚠️ HELT HORISONTAL (`y2="0%"`). Med `y2="30%"` roterte
+              gradienten når raden ble høy — og en målrad MED BILDE er tre
+              ganger så høy som en uten. Da rakk lagets lys aldri ned til
+              bildet, og bildet ble hengende løsrevet under et mål som
+              sluttet midtveis. Feiringen skal dekke hele øyeblikket. */}
+          <LinearGradient id="swellTeam" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0" stopColor={teamColor} stopOpacity={cap.peak} />
+            <Stop offset="0.56" stopColor={teamColor} stopOpacity={0} />
+          </LinearGradient>
+          {/* Fasiten legger BEGGE gradientene i ett lag og multipliserer
+              hele laget med swell-peaken. Her er de to lag, så peaken må
+              ganges inn i mint-radialen også — ellers lyser den ~1.8x for
+              sterkt og feiringen blir grell i stedet for varm. */}
+          <RadialGradient id="swellMint" cx="4%" cy="46%" rx="126%" ry="118%">
+            <Stop
+              offset="0"
+              stopColor={colors.heia}
+              stopOpacity={0.34 * cap.peak}
+            />
+            <Stop offset="0.6" stopColor={colors.heia} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+
+        <G clipPath="url(#swellClip)">
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#swellTeam)" />
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#swellMint)" />
-        </Svg>
-      </View>
+        </G>
 
-      {/* Kuppelen + lyskanten på overkanten. Ligger øverst i raden med fast
-          høyde, så pathen kan regnes i faktiske punkter. */}
-      <View
-        style={[styles.swellDome, {height: dome}]}
-        pointerEvents="none">
-        <Svg width={w} height={dome}>
-          {/* Maler grunnen tilbake over de firkantede hjørnene. */}
-          <Path
-            d={`${curve} L ${w} 0 L 0 0 Z`}
-            fill={matchColors.timeline}
-          />
-          <Path
-            d={curve}
-            stroke={matchColors.chalk}
-            strokeWidth={1}
-            fill="none"
-          />
-        </Svg>
-      </View>
-    </>
+        {/* Lyskanten på kuppelen — kritt, ikke ramme. */}
+        <Path
+          d={curve}
+          stroke={matchColors.chalk}
+          strokeWidth={1}
+          fill="none"
+        />
+      </Svg>
+    </View>
   );
 }
 
@@ -196,25 +211,28 @@ export function MatchEventRow({
     fontSize: grid.minuteFontSize,
   };
 
+  // ÉN HENDELSE = ÉTT STOPP I VOICEOVER. Setningen bygges i matchCopy, ikke
+  // her: rekkefølgen MINUTT → HVA → HVEM → DETALJ er en regel som skal kunne
+  // testes, ikke en tilfeldig sammensetning av JSX-tekster.
+  const a11yLabel = matchEventA11yLabel(event, {
+    score,
+    authorName: author?.name,
+  });
+
   return (
     <View
       style={[
-        styles.row,
-        {
-          paddingLeft: grid.contentLeft,
-          paddingRight: grid.gutter,
-          paddingTop: padTop,
-          paddingBottom: padBottom,
-        },
+        styles.outer,
+        {paddingBottom: padBottom},
         // Luften rundt flaten. To oppdateringer på rad skilles av LUFT, node
         // og minutt — aldri av bokser.
         isGoalUs
           ? styles.spacedGoal
           : isVoice
-            ? styles.spacedVoice
-            : isGoalThem
-              ? styles.spacedAgainst
-              : null,
+          ? styles.spacedVoice
+          : isGoalThem
+          ? styles.spacedAgainst
+          : null,
       ]}>
       {isGoalUs && <GoalSwell grid={grid} teamColor={teamColor} />}
 
@@ -239,7 +257,12 @@ export function MatchEventRow({
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <Svg width="100%" height="100%">
             <Defs>
-              <LinearGradient id="againstFade" x1="0%" y1="0%" x2="100%" y2="0%">
+              <LinearGradient
+                id="againstFade"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="0%">
                 <Stop
                   offset="0"
                   stopColor={matchColors.opponent}
@@ -252,7 +275,13 @@ export function MatchEventRow({
                 />
               </LinearGradient>
             </Defs>
-            <Rect x="0" y="0" width="100%" height="100%" fill="url(#againstFade)" />
+            <Rect
+              x="0"
+              y="0"
+              width="100%"
+              height="100%"
+              fill="url(#againstFade)"
+            />
           </Svg>
         </View>
       )}
@@ -266,41 +295,64 @@ export function MatchEventRow({
           telefontest 2026-08-20): teksten står rett på grunnen. Noden og
           minuttet bærer skillet, og to på rad skilles av luft. */}
 
-      <EventNode kind={kind} grid={grid} top={padTop} />
+      {/* ⚠️ HVORFOR EN INNER-WRAPPER, OG IKKE `accessible` PÅ HELE RADEN:
+          en `accessible`-beholder svelger alt inni seg — bildet og
+          engasjement-sloten ville sluttet å være egne stopp, altså umulige å
+          trykke med VoiceOver. Wrapperen dekker derfor nøyaktig øyeblikkets
+          TEKST (node + minutt + innhold), mens bildet og HEIA/kommentarer
+          ligger utenfor som egne elementer.
 
-      <Text
-        style={[styles.minute, minuteStyle]}
-        maxFontSizeMultiplier={grid.fontCap}
-        allowFontScaling>
-        {event.minute}′
-      </Text>
+          GEOMETRIEN ER URØRT: radens paddinger flyttet fra ytterboksen til
+          denne (bunnpaddingen ble igjen ute, så luften under et bilde er den
+          samme som før), og absolutt posisjonering måles fra samme kant.
+          `zIndex: 2` fordi måltenningen ligger på 1 og ellers ville malt seg
+          over noden på Android. */}
+      <View
+        accessible
+        accessibilityLabel={a11yLabel}
+        style={[
+          styles.inner,
+          {
+            paddingLeft: grid.contentLeft,
+            paddingRight: grid.gutter,
+            paddingTop: padTop,
+          },
+        ]}>
+        <EventNode kind={kind} grid={grid} top={padTop} />
 
-      <View style={styles.content}>
-        {isGoalUs ? (
-          <>
-            <View
-              style={[
-                styles.goalHead,
-                grid.goalStacked && styles.goalHeadStacked,
-              ]}>
-              <Text
-                style={[styles.goalWord, {fontSize: grid.goalFont}]}
-                maxFontSizeMultiplier={grid.fontCap}
-                numberOfLines={1}
-                adjustsFontSizeToFit>
-                MÅL!
-              </Text>
-              {score && (
+        <Text
+          style={[styles.minute, minuteStyle]}
+          maxFontSizeMultiplier={grid.fontCap}
+          allowFontScaling>
+          {event.minute}′
+        </Text>
+
+        <View style={styles.content}>
+          {isGoalUs ? (
+            <>
+              <View
+                style={[
+                  styles.goalHead,
+                  grid.goalStacked && styles.goalHeadStacked,
+                ]}>
                 <Text
-                  style={[styles.goalTally, {fontSize: grid.goalFont * 0.87}]}
+                  style={[styles.goalWord, {fontSize: grid.goalFont}]}
                   maxFontSizeMultiplier={grid.fontCap}
                   numberOfLines={1}
                   adjustsFontSizeToFit>
-                  {score}
+                  MÅL!
                 </Text>
-              )}
-            </View>
-            {/* ⚠️ KUN DET BRUKEREN FAKTISK SKREV.
+                {score && (
+                  <Text
+                    style={[styles.goalTally, {fontSize: grid.goalFont * 0.87}]}
+                    maxFontSizeMultiplier={grid.fontCap}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit>
+                    {score}
+                  </Text>
+                )}
+              </View>
+              {/* ⚠️ KUN DET BRUKEREN FAKTISK SKREV.
                 `event.description` er SYNTETISK for mål — `describeMatchEvent`
                 (lib/api/events.ts) stemper alltid «Mål for oss» / «Mål for
                 <motstander>», og legger reporterens frie tekst i `player`
@@ -309,88 +361,113 @@ export function MatchEventRow({
                 noen hadde skrevet det. MÅL! + stillingen sier det allerede.
                 Mål IMOT beholder sin `description` — der ER etiketten
                 innholdet, og raden har ingen annen tekst. */}
-            {event.player && (
-              <Text
-                style={[styles.goalWho, {maxWidth: grid.measureMax}]}
-                maxFontSizeMultiplier={grid.fontCap}>
-                {event.player}
-              </Text>
-            )}
-          </>
-        ) : isGoalThem ? (
-          <View style={styles.againstRow}>
-            <Text
-              style={styles.againstText}
-              maxFontSizeMultiplier={grid.fontCap}>
-              {event.description}
-            </Text>
-            {score && (
-              <Text
-                style={styles.againstTally}
-                maxFontSizeMultiplier={grid.fontCap}>
-                {score}
-              </Text>
-            )}
-          </View>
-        ) : isVoice ? (
-          <>
-            <View style={styles.voiceTop}>
-              {author && (
-                <Avatar
-                  size="sm"
-                  name={author.name}
-                  media={avatarRef(author.avatarPath)}
-                  color={author.avatarColor}
-                  style={styles.voiceAvatar}
-                />
+              {event.player && (
+                <Text
+                  style={[styles.goalWho, {maxWidth: grid.measureMax}]}
+                  maxFontSizeMultiplier={grid.fontCap}>
+                  {event.player}
+                </Text>
               )}
+            </>
+          ) : isGoalThem ? (
+            <View style={styles.againstRow}>
               <Text
-                style={styles.voiceName}
-                maxFontSizeMultiplier={grid.fontCap}
-                numberOfLines={1}>
-                {author
-                  ? `${author.name.split(' ')[0]} oppdaterer`
-                  : 'Oppdatering'}
+                style={styles.againstText}
+                maxFontSizeMultiplier={grid.fontCap}>
+                {event.description}
               </Text>
+              {score && (
+                <Text
+                  style={styles.againstTally}
+                  maxFontSizeMultiplier={grid.fontCap}>
+                  {score}
+                </Text>
+              )}
             </View>
-            <Text
-              style={[styles.voiceText, {maxWidth: grid.measureMax}]}
-              maxFontSizeMultiplier={grid.fontCap}>
+          ) : isVoice ? (
+            <>
+              <View style={styles.voiceTop}>
+                {author && (
+                  <Avatar
+                    size="sm"
+                    name={author.name}
+                    media={avatarRef(author.avatarPath)}
+                    color={author.avatarColor}
+                    style={styles.voiceAvatar}
+                  />
+                )}
+                <Text
+                  style={styles.voiceName}
+                  maxFontSizeMultiplier={grid.fontCap}
+                  numberOfLines={1}>
+                  {author
+                    ? `${author.name.split(' ')[0]} oppdaterer`
+                    : 'Oppdatering'}
+                </Text>
+              </View>
+              <Text
+                style={[styles.voiceText, {maxWidth: grid.measureMax}]}
+                maxFontSizeMultiplier={grid.fontCap}>
+                {event.description}
+              </Text>
+            </>
+          ) : gate ? (
+            // Krittstrek + etikett + krittstrek. Kampens gater leses som rytme,
+            // ikke som hendelser.
+            <View style={styles.gateRow}>
+              <View style={styles.gateLine} />
+              <Text
+                style={styles.gateLabel}
+                maxFontSizeMultiplier={grid.fontCap}>
+                {gateLabel(event, score)}
+              </Text>
+              <View style={styles.gateLine} />
+            </View>
+          ) : (
+            // bytte / kort — kun historiske data, aldri rapportert fra appen.
+            <Text style={styles.plainText} maxFontSizeMultiplier={grid.fontCap}>
               {event.description}
             </Text>
-          </>
-        ) : gate ? (
-          // Krittstrek + etikett + krittstrek. Kampens gater leses som rytme,
-          // ikke som hendelser.
-          <View style={styles.gateRow}>
-            <View style={styles.gateLine} />
-            <Text style={styles.gateLabel} maxFontSizeMultiplier={grid.fontCap}>
-              {gateLabel(event, score)}
-            </Text>
-            <View style={styles.gateLine} />
-          </View>
-        ) : (
-          // bytte / kort — kun historiske data, aldri rapportert fra appen.
-          <Text style={styles.plainText} maxFontSizeMultiplier={grid.fontCap}>
-            {event.description}
-          </Text>
-        )}
-
-        {engagement}
+          )}
+        </View>
       </View>
 
-      {/* Bildet ER flaten — kant til kant, aldri en innfelt blokk i
-          innholdskolonnen. Derfor ligger det UTENFOR `content`, som bærer
-          radens 82 pt venstremarg. */}
+      {/* HEIA + kommentarer. Ligger UTENFOR den samlede labelen med vilje —
+          de er handlinger med egne labels og egen state, ikke en del av
+          setningen om hva som skjedde. */}
+      {engagement && (
+        <View
+          style={{paddingLeft: grid.contentLeft, paddingRight: grid.gutter}}>
+          {engagement}
+        </View>
+      )}
+
+      {/* ⚠️ BILDET LIGGER I INNHOLDSKOLONNEN, IKKE KANT TIL KANT.
+          Den frosne retningen sa «bildet ER flaten». På telefon med ekte
+          data ble det feil (Brage, telefontest 2026-08-20): et fullbredt,
+          lyst rektangel kutter den grønne verdenen i to og drar blikket bort
+          fra kampen — nettopp motsatt av at ingenting skal konkurrere med
+          stillingen. Grunnen til at det så riktig ut FØR skive 2 er at
+          bildet den gang lå på en flat, mørk egen flate; nå ligger det på en
+          verden det bryter.
+          Samme prinsipp som skive 1.1 satte: prototypen er fasit for
+          identitet og hierarki, ikke piksel for piksel når det fungerer
+          dårligere med ekte data.
+          Bildet står derfor i den samme kolonnen som all annen tekst, med
+          node og minutt i skinna ved siden av — som hver eneste andre rad. */}
       {photos?.map(photo => (
         <Pressable
           key={photo.id}
           onPress={onPressPhoto ? () => onPressPhoto(photo) : undefined}
+          accessibilityRole="imagebutton"
+          accessibilityLabel={matchPhotoA11yLabel({
+            minute: event.minute,
+            authorName: photo.authorName,
+            caption: photo.caption,
+          })}
           style={({pressed}) => [
             styles.photo,
-            // Bryter ut av radens padding. Negative marginer er det eneste
-            // RN har for «kant til kant» inne i en padded forelder.
-            {marginLeft: -grid.contentLeft, marginRight: -grid.gutter},
+            {paddingLeft: grid.contentLeft, paddingRight: grid.gutter},
             pressed && styles.pressed,
           ]}>
           {/* Thumb i forløpet (B2): raden er en forhåndsvisning — trykket
@@ -403,10 +480,7 @@ export function MatchEventRow({
           />
           {photo.caption && (
             <Text
-              style={[
-                styles.photoCaption,
-                {paddingLeft: grid.contentLeft, paddingRight: grid.gutter},
-              ]}
+              style={styles.photoCaption}
               maxFontSizeMultiplier={grid.fontCap}>
               {photo.caption}
             </Text>
@@ -418,11 +492,17 @@ export function MatchEventRow({
 }
 
 const styles = StyleSheet.create({
-  row: {
+  // Ytterboksen bærer flatene (swell, tenning, skiferstripe) og bildet.
+  outer: {
     position: 'relative',
     // Bevisst UTEN overflow:'hidden'. Swellens firkantede hjørner klippes av
     // svg-en som maler grunnen tilbake over dem, så klippingen trengs ikke —
     // og på iOS spiser overflow:'hidden' skyggen, altså nodens mint-glød.
+  },
+  // Innerboksen bærer griddet og er øyeblikkets ENE stopp for skjermleser.
+  inner: {
+    position: 'relative',
+    zIndex: 2,
   },
   spacedGoal: {
     marginTop: 8,
@@ -434,12 +514,6 @@ const styles = StyleSheet.create({
   spacedAgainst: {
     marginTop: 4,
     marginBottom: 4,
-  },
-  swellDome: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
   },
   ignition: {
     position: 'absolute',
@@ -565,7 +639,13 @@ const styles = StyleSheet.create({
   },
   photoImage: {
     width: '100%',
-    height: 200,
+    // Forholdstall, ikke fast høyde: kolonnen er smalere enn skjermen og
+    // varierer med enhet og tekststørrelse, så 200 pt ville vært nesten
+    // kvadratisk på én telefon og en stripe på en annen.
+    aspectRatio: 4 / 3,
+    borderRadius: radius.md,
+    // Uten dette får ikke radiusen tak i selve bildet på Android.
+    overflow: 'hidden',
     // Laste-platen må være GRUNNEN, ikke colors.background — den ville
     // blinket hvitt på den mørke flaten mens thumben dekodes.
     backgroundColor: matchColors.timeline,

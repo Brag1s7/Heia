@@ -297,3 +297,97 @@ export function swellCap(hex: string): SwellCap {
     capped: true,
   };
 }
+
+// ---------------------------------------------------------------------------
+// ARENAENS LAGFARGE-KLEMME (skive 2)
+//
+// Samme klasse feil som swellCap vokter, ett rom lenger opp. Arenaflaten er
+// kampverdenens LYSESTE rom (#25563F, 8.11:1 for brødtekst) — den har altså
+// nesten ingen luft mot 7:1-kravet før noe legges oppå. Og noe legges oppå:
+// lagets lys ligger i venstre halvdel, nøyaktig der lagmerket og lagnavnet
+// står.
+//
+// Uten denne vakten ville et gult eller lyseblått lag løftet flaten under sitt
+// eget navn til teksten forsvant — den samme feilen som gjorde at et rødt lag
+// kunne bli brunt i målswellen, bare med motsatt fortegn.
+// ---------------------------------------------------------------------------
+
+/** Arenaens toppflate — den lagfargede strålen blandes INN i denne. */
+const ARENA_SURFACE: Rgb = [0x25, 0x56, 0x3f]; // matchColors.arenaTop
+/** Prototypens ønskede styrke på `.arena::after`s lagradial. */
+const ARENA_WANT = 0.34;
+
+/**
+ * Hvor sterkt lagfargen får lyse på arenaflaten.
+ *
+ * Kravene er de samme som i swellen fordi teksten er den samme: lagnavnet er
+ * brødtekst (7:1) og stillingen er mint (4.5:1). Bare grunnflaten er en annen,
+ * og den er lysere — derfor er dette en EGEN funksjon og ikke et kall til
+ * swellCap: å gjenbruke swellens mørkere base ville gitt en klemme som måler
+ * riktig på feil flate.
+ */
+export function arenaLightCap(hex: string): SwellCap {
+  const team = parseHex(hex);
+  if (!team) {
+    return {peak: ARENA_WANT, textRatio: 0, mintRatio: 0, capped: false};
+  }
+
+  for (let a = ARENA_WANT; a >= 0.02; a -= 0.01) {
+    const blended = mix(ARENA_SURFACE, team, a);
+    const textRatio = contrast(MATCH_TEXT, blended);
+    const mintRatio = contrast(MATCH_MINT, blended);
+    if (textRatio >= 7 && mintRatio >= 4.5) {
+      return {peak: a, textRatio, mintRatio, capped: a < ARENA_WANT - 0.001};
+    }
+  }
+
+  const floor = mix(ARENA_SURFACE, team, 0.02);
+  return {
+    peak: 0.02,
+    textRatio: contrast(MATCH_TEXT, floor),
+    mintRatio: contrast(MATCH_MINT, floor),
+    capped: true,
+  };
+}
+
+/** Målflodens ønskede styrke. Prototypens `FLOOD_WANT`. */
+const FLOOD_WANT = 0.78;
+
+export interface FloodCap {
+  /** Lagfargens maksimale dekkevne i måløyeblikkets flod over grunnen. */
+  peak: number;
+  /** Målt kontrast for mint-stillingen på den klemte flaten. */
+  mintRatio: number;
+  capped: boolean;
+}
+
+/**
+ * Hvor sterkt lagfargen får lyse i MÅLFLODEN over grunnen.
+ *
+ * Floden er kort og dekker hele verdenen, så kravet er et annet enn swellens:
+ * det eneste som må overleve den er STILLINGEN, og den er 60+ px — altså stor
+ * tekst, 3:1. Brødteksten stilles det ikke krav til her, for i det sekundet
+ * floden står på sitt sterkeste er det tallet man ser på.
+ *
+ * Uten klemmen ville et gult lag hvitvasket hele skjermen i akkurat det
+ * øyeblikket brukeren skal lese den nye stillingen.
+ */
+export function floodCap(hex: string): FloodCap {
+  const team = parseHex(hex);
+  if (!team) {
+    return {peak: FLOOD_WANT, mintRatio: 0, capped: false};
+  }
+
+  for (let a = FLOOD_WANT; a >= 0.05; a -= 0.01) {
+    const mintRatio = contrast(MATCH_MINT, mix(MATCH_GROUND, team, a));
+    if (mintRatio >= 3) {
+      return {peak: a, mintRatio, capped: a < FLOOD_WANT - 0.001};
+    }
+  }
+
+  return {
+    peak: 0.05,
+    mintRatio: contrast(MATCH_MINT, mix(MATCH_GROUND, team, 0.05)),
+    capped: true,
+  };
+}

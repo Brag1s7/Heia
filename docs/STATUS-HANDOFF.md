@@ -1,6 +1,11 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 1 + 1.1 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 2)
+## ▶️▶️ START HER (oppdatert 2026-08-20 — SKIVE 2 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 3)
+
+**✅ SKIVE 2 ER TELEFONGODKJENT AV BRAGE 2026-08-20: «det er bra nå».**
+Godkjenningen kom etter TRE runder på enhet, og de to rettelsesrundene er
+verdt å lese før du rører kampflaten — de har et felles mønster (se
+`SKIVE 2.2`). **Neste er skive 3: kamprapporten på samme grunn.**
 
 **LES I DENNE REKKEFØLGEN:**
 1. `### 🔒🔒 PRODUKTBESLUTNINGER LÅST AV BRAGE 2026-08-20` — P1 mål imot ·
@@ -11,10 +16,15 @@
 3. `### ✅ SKIVE 1.1` — fem rettelser fra telefontesten, og PRINSIPPET de
    satte: prototypen er fasit for identitet og hierarki, ikke noe som
    kopieres piksel for piksel når det fungerer dårligere med ekte data.
-4. `### ♿ TILGJENGELIGHET` — OBLIGATORISK akseptansekriterium fra og med
-   skive 2. Kampsporet har null a11y-props i dag.
-5. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen og hva skive 2 MÅ ta med.
-6. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
+4. `### ✅ SKIVE 2 LEVERT` — grunnen, arenaen, uttrekket og hele
+   a11y-jobben. **Les også 2.1 og 2.2 i samme bolk: to feil som var RIKTIG
+   kode i skive 1 og ble feil av at flaten under endret seg.**
+5. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1+2s
+   flater; skive 3–5 tar sine.
+6. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 3 er neste) og
+   listen over hva som ellers blir hvite flekker på grønt. **Den listen
+   gjelder fortsatt for skive 3s flater.**
+7. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
    Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
    repoet.
 
@@ -475,6 +485,223 @@ rader beholder sine verdier; de skal ikke backfilles.
 
 ---
 
+### ✅ SKIVE 2 LEVERT OG TELEFONGODKJENT 2026-08-20 — GRUNNEN OG ARENAEN
+
+**Ren JS. Ingen nye pakker, ingen native endringer, ingen migrasjon.**
+316 tester / 25 suiter grønt (var 263/22). Lint 12 kjente — ett hakk UNDER
+baseline. Ruten, de tre stackene og B2-cachen er urørt.
+
+#### HVA SOM ER BYGGET
+
+- **`src/components/match/MatchGround.tsx` (ny) — verdenens bunn**,
+  statuslinje til tab-bar. Prototypens `.ground` lag for lag: base 172°,
+  gull- og mintflomlys, lagets lys i venstre skulder, motstanderens skifer i
+  høyre, gresslyset nedenfra, midtlinje + to banebuer i kritt. Faser
+  (live / pause / ferdig / avlyst) demper lagene fra ÉN tabell.
+  ⚠️ **Lagfargen rører aldri grunnen** — den legges bare som lys oppå.
+- **`src/components/match/ArenaSurface.tsx` (ny) — platået med buet
+  underkant.** Fasitens elliptiske radius finnes ikke i RN, og heller ikke
+  inset-skygge: hele flaten er ÉN svg-`Path`, og alt innhold klippes til den
+  med `ClipPath`. Da oppstår de firkantede hjørnene aldri, og de trenger ikke
+  males bort slik målswellen må gjøre det. Lyskanten er kurven strøket i
+  kritt. **Prisen er en `onLayout`-måling** — én frame flat grønn, samme
+  mønster som `ProfileHeader`.
+  ⚠️ **`StadiumSurface` er URØRT.** Den har 11 kallesteder og `ScoreChip`
+  arver alt fra den; en buet underkant der ville truffet feed, lister og
+  varselkort i samme slag.
+- **`src/components/match/MatchArena.tsx` (ny) — kampens hode.** LIVE-pill +
+  klokke, lagmerker med lagfarget/skifer strek, stort mint-tall, metalinja
+  «sted · hvem rapporterer · nå» som TYPE PÅ FLATEN. Ingen chips, ingen kort.
+- **`src/components/match/LiveMatch.tsx` (ny) — uttrekket.**
+  `EventDetailScreen` er 147 linjer lettere. State, handlere, realtime og
+  modalene ble IGJEN i skjermen — de hører til livssyklusen; komponenten er
+  flaten og tar alt den viser som props.
+
+#### TRE VAKTER SOM ER KODE, IKKE KOMMENTARER
+
+1. **`arenaLightCap()`** (`teamColors.ts`) — arenaen er kampens LYSESTE rom
+   (8.11:1 for brødtekst, altså nesten ingen luft mot 7:1). Lagets lys ligger
+   nøyaktig der lagmerket og lagnavnet står. Uten klemmen ville et gult lag
+   spist sitt eget navn. Klemmer alltid HARDERE enn `swellCap` — det er
+   testet, så en dag flatene endres oppdages det.
+2. **`floodCap()`** — måløyeblikkets flod over hele verdenen. Kravet er et
+   annet enn swellens: det eneste som må overleve floden er STILLINGEN, og
+   den er stor tekst (3:1). Porten fra prototypens egen `floodCap`.
+3. **Grunnen ble en TEKSTFLATE.** Reporterlinja og forløpet ligger nå rett på
+   den. Nye gullverdier i `matchContrast.test.ts` for alle tre grunntoner,
+   pluss vakten som sier at grunnens midttone er LYSERE enn kampforløpet —
+   det fjerde rommet kan derfor ikke oppstå av seg selv, og
+   `MatchTimeline ground` må tegne scrimet.
+
+#### MÅLFEIRINGEN FLYTTET FRA KORTET TIL VERDENEN
+
+`ScoreBoard`s firkantede mint-vask over stadionflaten ville tegnet et
+rektangulært blink over arenaens BUEDE underkant. Floden ligger derfor på
+grunnen, der fasiten har den (`.g-flood`). Spretten på tallet er uendret, og
+**begge arver samme `useGoalMoment`** — to kall ville gitt to animasjoner som
+drifter fra hverandre.
+
+#### INGEN HVITE FLEKKER — ALT SOM MÅTTE FÅ EN VARIANT
+
+`BackBar` · `ReporterBar` · `ReporterActions` · `MatchPhotoRail` fikk
+**`variant`, aldri endret default** — `BackBar` alene deles med 17 skjermer.
+I tillegg: `StatusBar` light-content med fokusvakt (ProfileHeader-mønsteret),
+stackens `contentStyle` satt mørk for kampen, og skive 1s lokale
+`styles.timeline` erstattet av rom-scrimet.
+
+- **«Du følger kampen direkte» var et hvitt kort.** Beskjeden er verdt å
+  beholde — den forklarer hvorfor det ikke finnes en oppdater-knapp — men
+  den er en fotnote, ikke et kort. Nå én dempet linje på grunnen.
+- **Tilbakelinja heter «Kampen», ikke «Hendelse».** Fasitens navtitle.
+- **`__tests__/liveMatch.test.tsx` vokter regelen maskinelt:** ingen farge i
+  kampverdenen får tilhøre kremfamilien. Den fant én ekte lekkasje under
+  bygging (en overlevende `borderSubtle` i reporterlinja).
+  ⚠️ Rent hvitt er BEVISST ikke bannlyst: den frosne retningen har selv to
+  hvite ting i kampen — platen bak lagets logo, og typen på LIVE-pillen.
+
+#### ♿ TILGJENGELIGHET — KRAVET ER OPPFYLT FOR SKIVE 1+2s FLATER
+
+- **Setningen bor i `matchCopy.ts`**, ikke i JSX: `matchEventA11yLabel`,
+  `matchPhotoA11yLabel`, `matchScoreA11yLabel`. Rekkefølgen MINUTT → HVA →
+  HVEM → DETALJ er en regel som skal kunne testes.
+- ⚠️ **Labelen SIER hva som skjedde på et mål, selv om skjermen ikke gjør
+  det.** Etter skive 1.1 viser raden bare `player` under MÅL! — for øyet er
+  noden nok, for øret er den ingenting.
+- ⚠️ **HVORFOR RADEN BLE RESTRUKTURERT:** en `accessible`-beholder SVELGER
+  alt inni seg — bildet og engasjement-sloten ville sluttet å være egne
+  stopp, altså umulige å trykke med VoiceOver. Labelen sitter derfor på en
+  inner-wrapper rundt node + minutt + innhold, mens bildet og HEIA ligger
+  utenfor. **Geometrien er urørt** (paddingene flyttet, bunnpaddingen ble
+  igjen ute så luften under et bilde er den samme), og `matchGrid.test.ts`
+  står grønn.
+- Dekorativ svg skjult overalt: krittlinja, nodene, swellen, skrimene,
+  grunnen, arenaen, rom-scrimet.
+- 44 pt: `hitSlop` på «Bytt»; resten måler over fra før.
+
+#### 📱 TELEFONKONTROLLEN — GJENNOMFØRT, TRE RUNDER
+
+Runde 1 → skive 2.1 (bildene). Runde 2 → skive 2.2 (swellen og krittlinja).
+Runde 3 → **godkjent**. Alt annet på lista under sto Brage til ved første
+gjennomgang: buen, de tre rommene, lagets lys, det store tallet,
+reporterpanelet, kanten under push og VoiceOver.
+
+<details><summary>Sjekklista som ble brukt (til gjenbruk i skive 3)</summary>
+
+1. **Buen under arenaen.** Er den for dyp? For grunn? Ser lyskanten ut som en
+   kant, eller som en strek?
+2. **Er de tre rommene faktisk tre rom?** Arena → (tom plass der pulsen skal
+   inn i skive 5) → forløp. Uten pulsen mellom er overgangen kanskje for brå.
+3. **Lagets lys på arenaen** — prøv et lyst lag (gult). Vakten sier det er
+   lesbart; spørsmålet er om det fortsatt ser ut som LAGETS farge.
+4. **Det store tallet med stor tekst.** Stabler det seg pent på XXL, eller
+   ser det ut som en feil?
+5. **Reporterpanelet uten hvite knapper** — er «Mål oss» fortsatt tydelig
+   nok hovedhandling når naboene er krittkanter og ikke hvite kort?
+6. **Kanten under push.** Blinker det fortsatt krem når kampen åpnes fra
+   Hjem/Kalender/Varsler?
+7. **VoiceOver** (Innstillinger → Tilgjengelighet): sveip gjennom forløpet og
+   hør at hver hendelse er ETT stopp som starter med minuttet.
+
+#### ✅ SKIVE 2.1 — ÉN RETTELSE FRA TELEFONTESTEN 2026-08-20
+
+Brage: **«Alt funker på telefonen utenom dette.»** Én ting, og den var reell.
+
+**BILDENE DEKKET HELE SKJERMEN.** Den frosne retningen sier «bildet ER
+flaten, kant til kant», og prototypen har det slik. Med ekte data på den nye
+grunnen ble det feil: et fullbredt, lyst rektangel kutter den grønne verdenen
+i to og drar blikket bort fra kampen — motsatt av regelen om at ingenting
+skal konkurrere med stillingen.
+
+⚠️ **Og det er derfor det så riktig ut FØR skive 2:** i skive 1 lå bildet på
+en flat, mørk egen flate (`styles.timeline`). Det var flaten som bar bildet.
+Da grunnen tok over, hadde bildet ingenting å ligge på lenger — det ble
+liggende OPPÅ verdenen i stedet for i den. Bredden var uendret; det var
+konteksten som endret seg.
+
+**Nå står bildene i innholdskolonnen som all annen tekst**, med node og
+minutt i skinna — nøyaktig som hver eneste andre rad. Gjelder begge
+bildeflatene:
+- **Bilde på en hendelse** (`MatchEventRow`): venstremarg = `contentLeft`.
+- **Generelt kampbilde** (`MatchTimeline.PhotoRow`): var kant-til-kant med
+  tekst OPPÅ bildet. Nå node + minutt i skinna, bildet i kolonnen, teksten
+  UNDER. **De to skrimene forsvant samtidig** — de fantes bare for å holde
+  hvit tekst lesbar over et vilkårlig fotografi.
+
+**Fast høyde (200/300 pt) er byttet mot `aspectRatio: 4 / 3`.** Kolonnen er
+smalere enn skjermen og varierer med enhet og tekststørrelse; en fast høyde
+ville vært nesten kvadratisk på én telefon og en stripe på en annen. Begge
+bildeflatene bruker samme forhold, så to bilder etter hverandre ikke får hver
+sin form. `radius.md` på begge.
+
+**Voktet i `matchTimeline.test.tsx`** («bildene står i innholdskolonnen»):
+begge bildeflatene måles mot `grid.contentLeft`, og bilderaden må ha minuttet
+i den faste kolonnen. Hele poenget med griddet er at ALT innhold står i samme
+kolonne — den regelen skal ikke kunne skli tilbake ved neste redigering.
+
+#### ✅ SKIVE 2.2 — TO RETTELSER TIL, SAMME KVELD
+
+Brage: **«det er fremdeles stygt ved mål, ved oppdatering ser det bedre ut
+men tidslinjen kuttes.»** To feil, og de hang sammen — begge kom av at
+målraden fortsatt oppførte seg som om den lå på skive 1s flate.
+
+**1. LAGETS LYS RAKK IKKE NED TIL BILDET.** Swellens lagfarge-gradient var
+`x1=0% y1=0% x2=100% y2=30%` — altså litt på skrå. I `objectBoundingBox`
+roterer en slik gradient med boksens FORM: en målrad med bilde er tre ganger
+så høy som en uten, og da ble gradienten nesten loddrett i stedet for
+vannrett. Lyset sluttet midtveis, og bildet ble hengende løsrevet under et
+mål som visuelt stoppet før det var ferdig.
+**Nå `y2="0%"` — helt horisontal, altså høyde-uavhengig.** Feiringen dekker
+hele øyeblikket, bildet inkludert, og bildet leses som en del av målet.
+
+**2. KUPPELEN KUTTET KRITTLINJA.** Den buede overkanten ble laget ved å male
+GRUNNFARGEN (`matchColors.timeline`, #123325) tilbake over de firkantede
+hjørnene — den eneste måten å kutte en kurve i RN uten maskepakke, og helt
+usynlig så lenge raden lå på nettopp den fargen. Fra skive 2 ligger den på
+GRUNNEN. Da var overmalingen plutselig en ugjennomsiktig plate i FEIL farge,
+tvers over hele bredden, i de øverste 34 punktene av hver målrad — og der
+forsvant tidslinja.
+**Nå klippes swellen til formen sin** (`ClipPath`, samme teknikk som
+`ArenaSurface`). Ingen dekkende flate legges noe sted, og linja går
+uavbrutt gjennom. `swellDome`-stilen er borte.
+
+⚠️ **MØNSTERET ER VERDT Å HUSKE:** begge feilene var kode som var RIKTIG i
+skive 1 og ble FEIL av at flaten under endret seg. Se etter flere av dem —
+alt som «maler grunnen tilbake» eller antar en fast radhøyde.
+
+**Voktet i `matchTimeline.test.tsx`:** ingen `fill` i kampforløpet får være
+noe annet enn `none` eller en gradient (`url(#…)`) — altså ingen plate over
+skinna — og måltenningen må ligge på nøyaktig `threadLeft`/`threadWidth`.
+
+</details>
+
+#### ÅPENT / BEVISST UTELATT
+
+- **Tab-baren er fortsatt krem.** Rutespesifikk stadionvariant er skive 6/10
+  (P4), ikke denne skiva.
+- **`MatchPhotoRail`s `match`-variant er bygget, men ubrukt** — stripa vises
+  kun på ferdig kamp, altså skive 3. Den lå på skive 2-lista i handoffen og
+  er tatt mens fila uansett ble rørt.
+- **Ingen løpende bevegelse i grunnen.** Fasitens pustende `g-pulse-a/b`,
+  bølgen og aurora hører til skive 5/6 sammen med `useReducedMotion`.
+- **Kampuret er urørt** (P2 / skive 7). Arenaen viser derfor INGEN minutt i
+  pause — klokka teller fortsatt under pause i dag, så tallet ville vært
+  feil. «Etter 1. omgang» er sant uansett.
+- **Omgangen leses av forløpet** (finnes det en `andre_omgang`-rad?), ikke av
+  klokka. Det er den eneste sanne kilden vi har før P2.
+
+#### ⚠️ FELLE FUNNET UNDERVEIS: PRETTIER-KONFIGEN MATCHER IKKE HUSSTILEN
+
+`.prettierrc.js` setter bare `arrowParens`, `singleQuote` og `trailingComma`.
+Husstilen i repoet er i tillegg **`bracketSpacing: false`** og
+**`bracketSameLine: true`** (`{left: x}`, og `>` på samme linje). Kjører man
+`prettier --write` uten flaggene, formateres HELE fila om — og en
+15-linjers endring blir en 600-linjers diff.
+**Til den slår til igjen:** `--no-bracket-spacing --bracket-same-line`.
+Bør trolig bare skrives inn i `.prettierrc.js`, men det er en egen liten
+beslutning og ble ikke gjort her.
+
+---
+
 ### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
 
 **Skiverekkefølgen er godkjent av Brage.** Skive 1 er levert. Neste er
@@ -484,8 +711,8 @@ en REELL begrensning.
 | # | Skive | Status |
 |---|---|---|
 | 1 | **Hendelsesgriddet** | ✅ LEVERT OG TELEFONGODKJENT `93e75ca` + 1.1 |
-| 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ⏭️ NESTE |
-| 3 | **Kamprapporten på samme grunn** | |
+| 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT + 2.1 + 2.2 |
+| 3 | **Kamprapporten på samme grunn** | ⏭️ NESTE |
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | godkjent, se P1 |
 | 5 | **Kampens puls** (`PulseCurve`) | se memoiseringsregelen |
 | 6 | **Sticky-bar + Reduce Motion** | |

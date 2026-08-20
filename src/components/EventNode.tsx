@@ -159,6 +159,12 @@ export function EventNode({kind, grid, top = 0}: EventNodeProps) {
   return (
     <View
       pointerEvents="none"
+      // ⚠️ `pointerEvents="none"` SKJULER IKKE FOR SKJERMLESER. Noden er
+      // atmosfære og betydning på én gang: den sier HVA som skjedde, men den
+      // sier det med form og farge. Betydningen ligger i radens samlede
+      // label — her skal VoiceOver ikke stoppe.
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
       style={[
         styles.node,
         {

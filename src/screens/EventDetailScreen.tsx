@@ -32,7 +32,6 @@ import {
   StadiumSurface,
   StatusPill,
   TeamBadge,
-  ReporterActions,
   ReporterModal,
   ReporterBar,
   ReporterSheet,
@@ -43,6 +42,7 @@ import {
   Skeleton,
   SkeletonCard,
 } from '../components';
+import {LiveMatch} from '../components/match/LiveMatch';
 import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
@@ -82,6 +82,7 @@ import type {
   EventAttendee,
   EventType,
   HeiaEvent,
+  MatchEvent,
   HomeStackParamList,
   RSVPStatus,
   RSVPSummary,
@@ -94,6 +95,10 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 const NO_MEMBERS: TeamMember[] = [];
 const NO_AUTHORS: TeamAuthor[] = [];
 const NO_PHOTOS: MatchPhoto[] = [];
+// ⚠️ `length` er IKKE eneste sannhet (se PulseCurve-regelen i handoffen) —
+// men referansen må uansett være stabil, ellers regner hver memo nedstrøms
+// på nytt ved hvert minutt-tick.
+const NO_MATCH_EVENTS: MatchEvent[] = [];
 
 const dayNamesLong = [
   'Søndag',
@@ -317,6 +322,23 @@ export function EventDetailScreen({route, navigation}: Props) {
     event?.matchStatus === 'live' || event?.matchStatus === 'halfTime';
   const liveMatchSessionId = isUnderway ? event?.matchSessionId : undefined;
 
+  // ⚠️ KORTET BAK SKJERMEN. Stackens `contentStyle` er krem for alle skjermer
+  // (AppNavigator), og det er den flaten som blinker i kantene under push/pop.
+  // Mot kampens grunn ville den blinket KREM inn i en mørkegrønn verden.
+  // Ruten er delt av alle hendelsestyper, så den kan ikke settes statisk i
+  // navigatoren — den må følge hendelsen.
+  //
+  // Én ærlig begrensning: er detaljen ikke i cachen ved åpning, vet vi ikke at
+  // det er en kamp før dataene lander. Da viser skjermen uansett skjelettet
+  // sitt på krem, så det er ingen ny feil — bare ikke en fullstendig fiks.
+  useEffect(() => {
+    navigation.setOptions({
+      contentStyle: {
+        backgroundColor: isUnderway ? matchColors.groundTop : colors.background,
+      },
+    });
+  }, [navigation, isUnderway]);
+
   // Fokus-broen (B2): 60 s-regelen fra P6. (Skjermen refetchet før ved HVERT
   // fokus — dette er selve kallbesparelsen i skiven.) Live-kampens behov for
   // ferskvare løses IKKE med lavere staleMs her — en staleMs som flipper når
@@ -505,7 +527,7 @@ export function EventDetailScreen({route, navigation}: Props) {
 
   // Rapporten leses som en historie: avspark først, slutt sist. Motsatt av
   // live-modus, der det ferskeste skal ligge øverst.
-  const finishedMatchEvents = event.matchEvents ?? [];
+  const finishedMatchEvents = event.matchEvents ?? NO_MATCH_EVENTS;
 
   const attendees = event.attendees;
 
@@ -760,82 +782,29 @@ export function EventDetailScreen({route, navigation}: Props) {
   // LIVE KAMP-MODUS
   // -----------------------------------------------------------------------
   if (isLiveMatch && event.score && event.opponent) {
-    const matchEvents = event.matchEvents ?? [];
+    const matchEvents = event.matchEvents ?? NO_MATCH_EVENTS;
 
     return (
-      <View style={styles.screen}>
-        <BackBar title="Hendelse" />
-        <ScrollView
-          contentContainerStyle={{
-            paddingBottom: insets.bottom + spacing['3xl'],
-          }}>
-          {/* Scoreboard */}
-          <View style={styles.section}>
-            <ScoreBoard
-              homeTeam={teamName}
-              awayTeam={event.opponent}
-              homeScore={event.score.home}
-              awayScore={event.score.away}
-              matchStatus={event.matchStatus!}
-              minute={matchMinute}
-            />
-          </View>
-
-          {/* Reporter-bar */}
-          <View style={styles.section}>
-            <ReporterBar
-              reporter={reporter}
-              isAdmin={isCurrentUserAdmin}
-              isMe={isCurrentUserReporter}
-              onChangeReporter={() => setReporterSheetVisible(true)}
-            />
-          </View>
-
-          {/* Kampvarsler for tilskuere (ikke reporter) */}
-          {!isCurrentUserReporter && (
-            <View style={styles.section}>
-              <Card>
-                <View style={styles.notificationRow}>
-                  <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>
-                      Du følger kampen direkte
-                    </Text>
-                    <Text style={styles.notificationDesc}>
-                      Stillingen og kampforløpet oppdaterer seg av seg selv.
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-            </View>
-          )}
-
-          {/* Reporter-verktøy — kun synlig for aktiv reporter */}
-          {isCurrentUserReporter && (
-            <View style={styles.section}>
-              <ReporterActions
-                onAction={handleReporterAction}
-                isPaused={event.matchStatus === 'halfTime'}
-                onPhoto={handlePickPhoto}
-              />
-            </View>
-          )}
-
-          {/* Kampforløp — bildene ligger i forløpet, ikke i en egen seksjon.
-              Under kampen skal ingenting konkurrere med stillingen.
-              SectionHeader er borte med vilje: forløpet har sin egen eyebrow
-              med gullprikken krittlinja starter fra. */}
-          <View style={styles.timeline}>
-            <MatchTimeline
-              matchEvents={matchEvents}
-              photos={matchPhotos}
-              startedAt={event.startedAt}
-              newestFirst
-              nowMinute={matchMinute}
-              authorFor={authorFor}
-              onPressPhoto={photo => setGalleryPhotoId(photo.id)}
-            />
-          </View>
-        </ScrollView>
+      // Kampen er sin egen verden og eier hele skjermen (skive 2). Det som ble
+      // igjen her er state, handlere, realtime og modalene — de hører til
+      // skjermens livssyklus, ikke til flaten.
+      <>
+        <LiveMatch
+          event={event}
+          matchEvents={matchEvents}
+          teamName={teamName}
+          teamColor={activeTeamSpace?.color || colors.heiaInk}
+          minute={matchMinute}
+          reporter={reporter}
+          isAdmin={isCurrentUserAdmin}
+          isReporter={isCurrentUserReporter}
+          photos={matchPhotos}
+          authorFor={authorFor}
+          onChangeReporter={() => setReporterSheetVisible(true)}
+          onReporterAction={handleReporterAction}
+          onPickPhoto={handlePickPhoto}
+          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+        />
 
         {/* Reporter-modal */}
         <ReporterModal
@@ -869,7 +838,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           initialPhotoId={galleryPhotoId}
           onClose={() => setGalleryPhotoId(null)}
         />
-      </View>
+      </>
     );
   }
 
@@ -1259,32 +1228,16 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
   },
   // Kampforløpet er kant-til-kant: hver rad setter sin EGEN venstremarg fra
-  // matchGrid, og bildene går helt ut i kanten. En paddingHorizontal her
-  // ville gjort «bildet ER flaten» fysisk umulig.
+  // matchGrid, og krittlinja + nodene lever i den margen. En
+  // paddingHorizontal her ville forskjøvet hele skinna.
   //
-  // Flaten er foreløpig lokal. I skive 2 blir hele skjermen grønn og denne
-  // bakgrunnen forsvinner — forløpet ligger da rett på grunnen, som frosset.
+  // ⚠️ KUN KAMPRAPPORTEN IGJEN. Live-kampen ligger nå rett på grunnen
+  // (`MatchTimeline ground`), der det fjerde rommet tegnes som et scrim i
+  // stedet for en egen flate. Denne bakgrunnen forsvinner når rapporten
+  // flytter ned på samme grunn (skive 3).
   timeline: {
     backgroundColor: matchColors.timeline,
     paddingBottom: spacing.lg,
-  },
-  notificationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  notificationInfo: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  notificationTitle: {
-    ...typography.body,
-    fontWeight: '600',
-  },
-  notificationDesc: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
   },
   // Info-kortet (P5B): aksentbåndet ligger kant-i-kant med kortets topp, så
   // paddingen bor i båndet og kroppen — ikke på kortet selv.

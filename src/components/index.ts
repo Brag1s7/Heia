@@ -48,6 +48,11 @@ export {MatchPhotoSheet} from './MatchPhotoSheet';
 export {MatchPhotoRail} from './MatchPhotoRail';
 export {MatchPhotoGallery} from './MatchPhotoGallery';
 export {MatchTimeline} from './MatchTimeline';
+// Kampverdenen (skive 2) — grunnen, arenaen og selve kampskjermen.
+export {MatchGround} from './match/MatchGround';
+export {ArenaSurface} from './match/ArenaSurface';
+export {MatchArena} from './match/MatchArena';
+export {LiveMatch} from './match/LiveMatch';
 export {
   Skeleton,
   SkeletonCard,

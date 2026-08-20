@@ -174,7 +174,9 @@ describe('MatchTimeline — alle radvariantene monterer', () => {
   });
 
   it('faller tilbake på «Oppdatering» når forfatteren ikke er lastet', () => {
-    const t = texts(render({newestFirst: true, nowMinute: 40, authorFor: undefined}));
+    const t = texts(
+      render({newestFirst: true, nowMinute: 40, authorFor: undefined}),
+    );
     expect(t).toContain('Oppdatering');
     expect(t).not.toContain('Jarle oppdaterer');
   });
@@ -191,7 +193,10 @@ describe('MatchTimeline — minuttet står i samme kolonne', () => {
 
     expect(minutes.length).toBe(EVENTS.length);
     const flat = (s: unknown) =>
-      Object.assign({}, ...(Array.isArray(s) ? s.flat(9) : [s]).filter(Boolean));
+      Object.assign(
+        {},
+        ...(Array.isArray(s) ? s.flat(9) : [s]).filter(Boolean),
+      );
 
     for (const m of minutes) {
       const style = flat(m.props.style);
@@ -241,5 +246,145 @@ describe('MatchTimeline — retningsmarkøren', () => {
     );
     // Ingen prop → 0, ikke «NaN′» og ikke dagens klokkeslett.
     expect(texts(render({newestFirst: true}))).toContain('NÅ · 0′');
+  });
+});
+
+describe('MatchTimeline — bildene står i innholdskolonnen', () => {
+  /**
+   * ⚠️ TELEFONTEST 2026-08-20. Den frosne retningen sa «bildet ER flaten,
+   * kant til kant». Med ekte data på grunnen kuttet et fullbredt lyst
+   * rektangel den grønne verdenen i to, og Brage ba om at bildene «passer
+   * inn på samme måte som resten av innholdet i tidslinjen».
+   *
+   * Det er ikke en smakssak man kan skli tilbake fra ved neste redigering:
+   * hele poenget med griddet er at ALT innhold står i samme kolonne.
+   */
+  const {width, fontScale} = require('react-native').Dimensions.get('window');
+  const g = matchGrid(width, fontScale);
+  const RNView = require('react-native').View;
+
+  const flat = (s: unknown) =>
+    Object.assign({}, ...(Array.isArray(s) ? s.flat(9) : [s]).filter(Boolean));
+
+  /** Bildene i treet — mocket MediaImage arver stilen den fikk. */
+  function images(tree: ReactTestRenderer.ReactTestRenderer) {
+    return tree.root
+      .findAllByType(RNView)
+      .filter(n => flat(n.props.style).aspectRatio !== undefined);
+  }
+
+  /** Nærmeste forelder som faktisk setter en venstremarg. */
+  function columnLeftOf(node: ReactTestRenderer.ReactTestInstance): number {
+    let cur: ReactTestRenderer.ReactTestInstance | null = node;
+    while (cur) {
+      const style = flat(
+        typeof cur.props.style === 'function' ? undefined : cur.props.style,
+      );
+      if (typeof style.paddingLeft === 'number') return style.paddingLeft;
+      cur = cur.parent;
+    }
+    return -1;
+  }
+
+  const PHOTO = {
+    id: 'p1',
+    media: {bucket: 'feed-media', path: 'a.jpg'},
+    caption: 'Full jubel',
+    authorName: 'Kari Nordbø',
+    createdAt: new Date(2026, 7, 20, 18, 34),
+  } as never;
+
+  it('gir et generelt kampbilde samme venstremarg som teksten', () => {
+    const tree = render({
+      matchEvents: [],
+      photos: [PHOTO],
+      startedAt: new Date(2026, 7, 20, 18, 0),
+    });
+    const found = images(tree);
+    expect(found).toHaveLength(1);
+    expect(columnLeftOf(found[0])).toBe(g.contentLeft);
+  });
+
+  it('gir et bilde PÅ en hendelse den samme margen', () => {
+    const tree = render({
+      matchEvents: [ev('g1', 'mål', 34, {teamSide: 'home'})],
+      photos: [{...(PHOTO as object), matchEventId: 'g1'} as never],
+      startedAt: new Date(2026, 7, 20, 18, 0),
+    });
+    const found = images(tree);
+    expect(found).toHaveLength(1);
+    expect(columnLeftOf(found[0])).toBe(g.contentLeft);
+  });
+
+  it('gir bilderaden node og minutt i skinna, som alle andre rader', () => {
+    const tree = render({
+      matchEvents: [],
+      photos: [PHOTO],
+      startedAt: new Date(2026, 7, 20, 18, 0),
+    });
+    const minutes = minuteLabels(tree);
+    expect(minutes).toHaveLength(1);
+    const style = flat(minutes[0].props.style);
+    expect(style.left).toBe(g.minuteLeft);
+    expect(style.width).toBe(g.minuteWidth);
+  });
+});
+
+describe('MatchTimeline — måltenningen maler aldri over krittlinja', () => {
+  /**
+   * ⚠️ TELEFONTEST 2026-08-20: «tidslinjen kuttes».
+   *
+   * Målswellens kuppel ble laget ved å male GRUNNFARGEN (#123325) tilbake
+   * over de firkantede hjørnene. Det var usynlig så lenge målraden lå på en
+   * flat, mørk egen flate — men fra skive 2 ligger den på grunnen, og da var
+   * overmalingen en ugjennomsiktig plate i FEIL farge som kuttet krittlinja
+   * i de øverste 34 punktene av hver målrad.
+   *
+   * Regelen som erstattet den: swellen KLIPPES til formen sin. Ingenting i
+   * kampforløpet får legge en dekkende flate over skinna.
+   */
+  it('bruker bare gradienter og kritt — ingen dekkende fyllfarge', () => {
+    const tree = render({
+      matchEvents: [ev('g1', 'mål', 34, {teamSide: 'home'})],
+      newestFirst: true,
+      nowMinute: 40,
+    });
+
+    const fills = tree.root
+      .findAll(n => typeof n.props.fill === 'string')
+      .map(n => String(n.props.fill));
+
+    expect(fills.length).toBeGreaterThan(0);
+    for (const fill of fills) {
+      // `none` = bare strek (lyskanten). `url(#…)` = gradient, altså noe som
+      // slipper linja gjennom. Alt annet er en plate.
+      expect(fill === 'none' || fill.startsWith('url(')).toBe(true);
+    }
+  });
+
+  it('tenner den samme linja i mint — samme x og bredde som kritt', () => {
+    const tree = render({
+      matchEvents: [ev('g1', 'mål', 34, {teamSide: 'home'})],
+      newestFirst: true,
+      nowMinute: 40,
+    });
+    const {width, fontScale} = require('react-native').Dimensions.get('window');
+    const g = matchGrid(width, fontScale);
+    const flat = (s: unknown) =>
+      Object.assign(
+        {},
+        ...(Array.isArray(s) ? s.flat(9) : [s]).filter(Boolean),
+      );
+
+    const RNView = require('react-native').View;
+    const ignition = tree.root
+      .findAllByType(RNView)
+      .map(n => flat(n.props.style))
+      .filter(
+        st => st.backgroundColor === '#02FFAB' && st.width === g.threadWidth,
+      );
+
+    expect(ignition).toHaveLength(1);
+    expect(ignition[0].left).toBe(g.threadLeft);
   });
 });

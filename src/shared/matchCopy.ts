@@ -1,4 +1,5 @@
 import type {NotificationMatch} from '../lib/api/notifications';
+import type {MatchEventType} from './types';
 
 // ---------------------------------------------------------------------------
 // Kampens SPRÅK, ett sted.
@@ -90,4 +91,129 @@ export function matchEventLine(
     default:
       return fallback;
   }
+}
+
+// ---------------------------------------------------------------------------
+// KAMPENS SPRÅK FOR SKJERMLESER (skive 2 — obligatorisk akseptansekriterium)
+//
+// «En kamptidslinje VoiceOver ikke kan lese, er en kamp en blind forelder
+// ikke kan følge.»
+//
+// REGELEN: ÉN HENDELSE = ÉTT STOPP. Raden leser hele øyeblikket i rekkefølgen
+// MINUTT → HVA → HVEM → DETALJ, ikke fire stopp (node, minutt, overskrift,
+// tekst). Derfor bor setningen her, som en ren funksjon — ikke som strenger
+// spredt utover JSX-en, der ingen kan teste at rekkefølgen holder.
+//
+// ⚠️ Denne teksten er IKKE den samme som radens synlige tekst, og skal ikke
+// være det. Skjermen viser «MÅL!» stort med stillingen ved siden av og noden
+// som bærer betydningen; det leses ikke opp av seg selv. Labelen sier det
+// noden viser.
+// ---------------------------------------------------------------------------
+
+/** «34 minutter» / «1 minutt» — kampminuttet som tale, ikke som symbol. */
+function minuteSpoken(minute: number): string {
+  return minute === 1 ? '1 minutt' : `${minute} minutter`;
+}
+
+/** Fornavnet alene — det er slik reporteren omtales i raden. */
+function firstName(name: string): string {
+  return name.trim().split(/\s+/)[0] || name;
+}
+
+/** Setter sammen ledd til én setning uten doble punktum eller tomme ledd. */
+function sentence(parts: (string | undefined)[]): string {
+  return parts
+    .map(p => p?.trim())
+    .filter((p): p is string => !!p)
+    .map(p => (/[.!?:]$/.test(p) ? p : `${p}.`))
+    .join(' ');
+}
+
+export interface MatchEventA11yInput {
+  type: MatchEventType;
+  minute: number;
+  description?: string;
+  player?: string;
+  teamSide?: 'home' | 'away';
+}
+
+/**
+ * Hele øyeblikket som én setning.
+ *
+ *   «34 minutter. Mål for oss, 2–1. Erlend Hagen.»
+ *   «31 minutter. Jarle oppdaterer: Vi presser høyt nå.»
+ *   «45 minutter. Slutt, 3–2.»
+ *
+ * `score` er stillingen ETTER øyeblikket (samme verdi raden viser), og
+ * `authorName` er reporteren bak en oppdatering.
+ */
+export function matchEventA11yLabel(
+  event: MatchEventA11yInput,
+  opts: {score?: string; authorName?: string} = {},
+): string {
+  const when = minuteSpoken(event.minute);
+  const {score, authorName} = opts;
+
+  switch (event.type) {
+    case 'mål': {
+      // ⚠️ For mål er `description` SYNTETISK («Mål for oss» / «Mål for X»),
+      // og reporterens frie tekst ligger i `player` — se describeMatchEvent.
+      // Skjermen viser bare `player`; labelen må derimot si HVA som skjedde,
+      // for noden er det eneste som sier det, og en node kan ikke leses.
+      const what =
+        event.teamSide === 'home'
+          ? 'Mål for oss'
+          : event.description || 'Mål for motstanderen';
+      return sentence([
+        score ? `${when}. ${what}, ${score}` : `${when}. ${what}`,
+        event.player,
+      ]);
+    }
+    case 'melding':
+      return authorName
+        ? `${when}. ${firstName(authorName)} oppdaterer: ${
+            event.description ?? ''
+          }`.trim()
+        : sentence([`${when}. Oppdatering`, event.description]);
+    case 'avspark':
+      return `${when}. Avspark.`;
+    case 'andre_omgang':
+      return `${when}. Andre omgang.`;
+    case 'pause':
+      return score ? `${when}. Pause, ${score}.` : `${when}. Pause.`;
+    case 'slutt':
+      return score ? `${when}. Slutt, ${score}.` : `${when}. Slutt.`;
+    case 'bytte':
+      return sentence([`${when}. Bytte`, event.description]);
+    case 'kort':
+      return sentence([`${when}. Kort`, event.description]);
+  }
+}
+
+/** Et kampbilde som ett stopp. Minuttet mangler på bilder uten kjent start. */
+export function matchPhotoA11yLabel(opts: {
+  minute?: number;
+  authorName?: string;
+  caption?: string;
+}): string {
+  const when =
+    opts.minute !== undefined ? minuteSpoken(opts.minute) : undefined;
+  return sentence([
+    when,
+    opts.authorName ? `Bilde fra ${opts.authorName}` : 'Kampbilde',
+    opts.caption,
+  ]);
+}
+
+/**
+ * Arenaens stilling som én setning. Tallet står i mint uten ord rundt seg på
+ * skjermen — «2–1» alene ville blitt lest som «to bindestrek en».
+ */
+export function matchScoreA11yLabel(opts: {
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number;
+  awayScore: number;
+}): string {
+  return `${opts.homeTeam} ${opts.homeScore}, ${opts.awayTeam} ${opts.awayScore}.`;
 }

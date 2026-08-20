@@ -35,7 +35,12 @@ export function LiveBadge({paused}: LiveBadgeProps) {
   }, [pulseAnim, paused]);
 
   return (
-    <View style={[styles.container, paused && styles.containerPaused]}>
+    <View
+      // Ett stopp, én betydning: merket ER statusen. Uten labelen leser
+      // VoiceOver bare ordet «LIVE», som ikke sier hva det gjelder.
+      accessible
+      accessibilityLabel={paused ? 'Pause i kampen' : 'Kampen sendes direkte'}
+      style={[styles.container, paused && styles.containerPaused]}>
       <Animated.View
         style={[
           styles.dot,

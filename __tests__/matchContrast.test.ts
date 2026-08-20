@@ -1,4 +1,4 @@
-import {swellCap} from '../src/shared/teamColors';
+import {arenaLightCap, floodCap, swellCap} from '../src/shared/teamColors';
 import {matchColors} from '../src/theme';
 
 /**
@@ -119,11 +119,14 @@ describe('swellCap — lagfargen får aldri spise lesbarheten', () => {
     '#DB2777', // rosa
   ];
 
-  it.each(TEAM_COLORS)('%s holder både 7:1 for tekst og 4.5:1 for mint', hex => {
-    const cap = swellCap(hex);
-    expect(cap.textRatio).toBeGreaterThanOrEqual(7);
-    expect(cap.mintRatio).toBeGreaterThanOrEqual(4.5);
-  });
+  it.each(TEAM_COLORS)(
+    '%s holder både 7:1 for tekst og 4.5:1 for mint',
+    hex => {
+      const cap = swellCap(hex);
+      expect(cap.textRatio).toBeGreaterThanOrEqual(7);
+      expect(cap.mintRatio).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 
   it('holder seg innenfor 2–60 %', () => {
     for (const hex of TEAM_COLORS) {
@@ -150,5 +153,97 @@ describe('swellCap — lagfargen får aldri spise lesbarheten', () => {
     const cap = swellCap('ikke en farge');
     expect(cap.peak).toBe(0.6);
     expect(Number.isFinite(cap.peak)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SKIVE 2 — GRUNNEN BLE EN TEKSTFLATE
+//
+// Frem til nå sto all kamptekst på et KORT. Fra og med skive 2 ligger
+// reporterlinja, «du følger kampen» og hele forløpet RETT PÅ GRUNNEN. Da er
+// grunnens tre toner ikke lenger bare atmosfære — de er tekstflater, og de
+// må måles som det.
+// ---------------------------------------------------------------------------
+const GROUND = {
+  'Grunn topp': matchColors.groundTop,
+  'Grunn midt': matchColors.groundMid,
+  'Grunn bunn': matchColors.groundLow,
+};
+
+describe('grunnen bærer blekket sitt — den er ikke bare bakgrunn lenger', () => {
+  it.each(Object.entries(GROUND))(
+    '%s holder 7:1 for brødtekst OG for den dempede',
+    (_room, surface) => {
+      expect(ratio(matchColors.text, surface)).toBeGreaterThanOrEqual(7);
+      expect(ratio(matchColors.dim, surface)).toBeGreaterThanOrEqual(7);
+    },
+  );
+
+  it('grunnens midttone er LYSERE enn kampforløpet — derfor scrimet', () => {
+    // Det fjerde rommet (#123325) kan ikke oppstå av seg selv på en grunn som
+    // er lysere enn det. MatchTimeline tegner derfor et scrim når `ground` er
+    // satt. Slettes det, forsvinner rommet — og denne testen sier fra.
+    expect(luminance(rgb(matchColors.groundMid))).toBeGreaterThan(
+      luminance(rgb(matchColors.timeline)),
+    );
+  });
+});
+
+describe('arenaLightCap — lagets lys spiser aldri lagets eget navn', () => {
+  const TEAM_COLORS = [
+    '#1E7A46',
+    '#D92B2B',
+    '#1D4ED8',
+    '#FFC53D',
+    '#12315E',
+    '#E8590C',
+    '#0F766E',
+    '#DB2777',
+  ];
+
+  it.each(TEAM_COLORS)('%s holder 7:1 for tekst og 4.5:1 for mint', hex => {
+    const cap = arenaLightCap(hex);
+    expect(cap.textRatio).toBeGreaterThanOrEqual(7);
+    expect(cap.mintRatio).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('klemmer HARDERE enn swellen — arenaen er kampens lyseste rom', () => {
+    // Samme farge, to flater: #25563F har 8.11:1 for brødtekst mot swellens
+    // #14382A på 11.4:1. Mindre luft ⇒ mindre lagfarge. Er det motsatt en
+    // dag, er en av de to flatene endret uten at vakten fulgte med.
+    for (const hex of TEAM_COLORS) {
+      expect(arenaLightCap(hex).peak).toBeLessThanOrEqual(swellCap(hex).peak);
+    }
+  });
+
+  it('gult klemmes, marineblått gjør det ikke', () => {
+    expect(arenaLightCap('#FFC53D').peak).toBeLessThan(
+      arenaLightCap('#12315E').peak,
+    );
+    expect(arenaLightCap('#12315E').capped).toBe(false);
+  });
+
+  it('faller trygt tilbake på ugyldig farge', () => {
+    expect(arenaLightCap('ikke en farge').peak).toBe(0.34);
+  });
+});
+
+describe('floodCap — måløyeblikket hvitvasker aldri stillingen', () => {
+  it.each(['#1E7A46', '#D92B2B', '#1D4ED8', '#FFC53D', '#12315E'])(
+    '%s lar mint-tallet holde 3:1 gjennom hele floden',
+    hex => {
+      // Stillingen er det ENESTE som må overleve floden — og den er 60+ px,
+      // altså stor tekst. Brødteksten er ikke det man leser i det sekundet.
+      expect(floodCap(hex).mintRatio).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  it('slipper lagfargen lengre til enn swellen gjør', () => {
+    // Floden er kort og har bare ETT krav; swellen står permanent og har to.
+    expect(floodCap('#12315E').peak).toBeGreaterThan(swellCap('#12315E').peak);
+  });
+
+  it('faller trygt tilbake på ugyldig farge', () => {
+    expect(floodCap('ikke en farge').peak).toBe(0.78);
   });
 });

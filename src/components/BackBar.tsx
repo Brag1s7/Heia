@@ -2,7 +2,7 @@ import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import {colors, typography, spacing} from '../theme';
+import {colors, matchColors, typography, spacing} from '../theme';
 import {ChevronLeft} from './icons';
 
 /**
@@ -16,23 +16,38 @@ import {ChevronLeft} from './icons';
  * 44 pt høyde under statusfeltet, chevron + «Tilbake» i samme tint som før,
  * valgfri sentrert tittel der native-headeren hadde en.
  */
-export function BackBar({title}: {title?: string}) {
+/**
+ * ⚠️ VARIANT, IKKE ENDRET DEFAULT. Linja deles med 17 skjermer og hardkoder
+ * `colors.textPrimary`. Kampen bor på mørk grunn og trenger krittfarget blekk
+ * — men det er kampens unntak, ikke appens nye normal.
+ */
+export function BackBar({
+  title,
+  variant = 'default',
+}: {
+  title?: string;
+  variant?: 'default' | 'match';
+}) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const onMatch = variant === 'match';
+  const ink = onMatch ? matchColors.text : colors.textPrimary;
 
   return (
     <View style={[styles.bar, {marginTop: insets.top}]}>
       {title ? (
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, onMatch && {color: ink}]} numberOfLines={1}>
           {title}
         </Text>
       ) : null}
       <Pressable
         onPress={navigation.goBack}
         hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Tilbake"
         style={({pressed}) => [styles.back, pressed && styles.backPressed]}>
-        <ChevronLeft size={26} color={colors.textPrimary} strokeWidth={2.2} />
-        <Text style={styles.label}>Tilbake</Text>
+        <ChevronLeft size={26} color={ink} strokeWidth={2.2} />
+        <Text style={[styles.label, onMatch && {color: ink}]}>Tilbake</Text>
       </Pressable>
     </View>
   );

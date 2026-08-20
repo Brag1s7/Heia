@@ -1,11 +1,16 @@
 import React, {useMemo} from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
-import {colors, matchColors, spacing, fonts} from '../theme';
+import {colors, matchColors, radius, spacing, fonts} from '../theme';
 import {MediaImage} from '../lib/media/MediaImage';
 import {EventNode} from './EventNode';
 import {MatchEventRow} from './MatchEventRow';
-import {useMatchGrid, NOW_DOT, type MatchGrid} from '../shared/matchGridGeometry';
+import {
+  useMatchGrid,
+  NOW_DOT,
+  type MatchGrid,
+} from '../shared/matchGridGeometry';
+import {matchPhotoA11yLabel} from '../shared/matchCopy';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent, User} from '../shared/types';
 
@@ -34,6 +39,13 @@ interface MatchTimelineProps {
     photo?: MatchPhoto;
   }) => React.ReactNode;
   onPressPhoto?: (photo: MatchPhoto) => void;
+  /**
+   * Forløpet ligger rett på kampens grunn (skive 2), ikke på en egen mørk
+   * flate. Da må det FJERDE ROMMET tegnes her: et scrim som senker grunnen
+   * fra ~L*26 til L*18.5. Uten det er «kampforløp» og «puls» samme tone, og
+   * den frosne retningen sier at rommene skilles av tone og lys.
+   */
+  ground?: boolean;
 }
 
 type Entry =
@@ -75,10 +87,9 @@ function ChalkLine({grid}: {grid: MatchGrid}) {
   return (
     <View
       pointerEvents="none"
-      style={[
-        styles.chalk,
-        {left: grid.threadLeft, width: grid.threadWidth},
-      ]}>
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[styles.chalk, {left: grid.threadLeft, width: grid.threadWidth}]}>
       <Svg width="100%" height="100%">
         <Defs>
           <LinearGradient id="chalkFade" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -120,6 +131,8 @@ function NowMarker({
       ]}>
       <View
         pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
         style={[
           styles.nowDot,
           {left: grid.nodeCenter - NOW_DOT / 2, top: dotTop},
@@ -132,7 +145,16 @@ function NowMarker({
           under den retningen helt av seg selv, og setningen ble stående
           som varig instruksjon på en flate som skal være kampen — ikke en
           bruksanvisning. Samme for «Kampen leses forfra» i rapporten. */}
-      <Text style={styles.nowText} maxFontSizeMultiplier={grid.fontCap}>
+      <Text
+        style={styles.nowText}
+        maxFontSizeMultiplier={grid.fontCap}
+        // Retningen er hele poenget med markøren, og den er usynlig for en
+        // skjermleser: «NÅ · 81′» sier ingenting om at lista går bakover.
+        accessibilityLabel={
+          live
+            ? `Nå, ${nowMinute ?? 0} minutter spilt. Nyeste øverst.`
+            : 'Kampen er slutt. Forløpet leses forfra.'
+        }>
         {live ? `NÅ · ${nowMinute ?? 0}′` : 'SLUTT'}
       </Text>
     </View>
@@ -140,11 +162,21 @@ function NowMarker({
 }
 
 /**
- * ET GENERELT KAMPBILDE — bildet ER flaten, kant til kant.
+ * ET GENERELT KAMPBILDE — én rad som alle andre.
  *
- * Lå tidligere som en håndkopiert tvilling av `MatchEventRow`s radgeometri.
- * Nå deler den `EventNode` og `matchGrid` med alle andre rader, så det
- * fysisk ikke går an å få to ulike tidslinjer i samme scroll.
+ * ⚠️ VAR KANT TIL KANT MED TEKSTEN OPPÅ BILDET. Den frosne retningen sa
+ * «bildet ER flaten». På telefon med ekte data ble det feil (Brage,
+ * telefontest 2026-08-20): et fullbredt, lyst rektangel kutter den grønne
+ * verdenen i to, og et bilde midt i kampforløpet drar blikket bort fra
+ * kampen. På den flate, mørke egen-flaten fra skive 1 fungerte det; på
+ * grunnen gjør det ikke det.
+ *
+ * Nå: node og minutt i skinna, bildet i innholdskolonnen, teksten UNDER
+ * bildet i stedet for oppå. Det gjør også at de to skrimene forsvant — de
+ * fantes bare for å holde tekst lesbar over et vilkårlig fotografi.
+ *
+ * Raden deler `EventNode` og `matchGrid` med alle andre rader, så det fysisk
+ * ikke går an å få to ulike tidslinjer i samme scroll.
  */
 function PhotoRow({
   photo,
@@ -160,77 +192,73 @@ function PhotoRow({
   onPress?: () => void;
 }) {
   const known = minute !== Number.MAX_SAFE_INTEGER;
+  // Samme toppluft som de nøytrale radene i MatchEventRow, så noden og
+  // minuttet lander på nøyaktig samme høyde over sitt innhold.
+  const padTop = 15;
 
   return (
-    <View style={styles.photoRow}>
-      <Pressable
-        onPress={onPress}
-        style={({pressed}) => [pressed && styles.pressed]}>
-        <MediaImage
-          media={photo.media}
-          variant="thumb"
-          style={styles.photoImage}
-          resizeMode="cover"
-        />
-      </Pressable>
-
-      {/* Skrim slik at kritt, minutt og tekst holder seg lesbare uansett
-          hva som er på bildet. */}
-      <View style={styles.photoScrim} pointerEvents="none">
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="shotScrim" x1="0%" y1="0%" x2="0%" y2="100%">
-              <Stop offset="0" stopColor="#08140E" stopOpacity={0} />
-              <Stop offset="0.46" stopColor="#08140E" stopOpacity={0.5} />
-              <Stop offset="1" stopColor="#08140E" stopOpacity={0.92} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#shotScrim)" />
-        </Svg>
-      </View>
-      <View style={styles.photoTopScrim} pointerEvents="none">
-        <Svg width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="shotTop" x1="0%" y1="0%" x2="0%" y2="100%">
-              <Stop offset="0" stopColor="#08140E" stopOpacity={0.55} />
-              <Stop offset="1" stopColor="#08140E" stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#shotTop)" />
-        </Svg>
-      </View>
-
-      <EventNode kind="photo" grid={grid} top={14} />
-      <Text
-        style={[
-          styles.minute,
-          {
-            left: grid.minuteLeft,
-            width: grid.minuteWidth,
-            top: 14 + grid.minuteTop,
-            fontSize: grid.minuteFontSize,
-            color: matchColors.text,
-          },
-        ]}
-        maxFontSizeMultiplier={grid.fontCap}>
-        {known ? `${minute}′` : ''}
-      </Text>
-
+    <View style={[styles.photoRow, {paddingBottom: padTop}]}>
       <View
         style={[
-          styles.photoBody,
-          {paddingLeft: grid.contentLeft, paddingRight: grid.gutter},
+          styles.photoInner,
+          {
+            paddingLeft: grid.contentLeft,
+            paddingRight: grid.gutter,
+            paddingTop: padTop,
+          },
         ]}>
-        {photo.caption && (
-          <Text
-            style={[styles.photoCaption, {maxWidth: grid.measureMax}]}
-            maxFontSizeMultiplier={grid.fontCap}>
-            {photo.caption}
-          </Text>
-        )}
-        <Text style={styles.photoBy} maxFontSizeMultiplier={grid.fontCap}>
-          {photo.authorName}
+        <EventNode kind="photo" grid={grid} top={padTop} />
+        <Text
+          style={[
+            styles.minute,
+            {
+              left: grid.minuteLeft,
+              width: grid.minuteWidth,
+              top: padTop + grid.minuteTop,
+              fontSize: grid.minuteFontSize,
+            },
+          ]}
+          maxFontSizeMultiplier={grid.fontCap}
+          importantForAccessibility="no"
+          accessibilityElementsHidden>
+          {known ? `${minute}′` : ''}
         </Text>
+
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="imagebutton"
+          // Bildet ER raden, så det er også radens ene stopp: minuttet,
+          // fotografen og teksten leses HER. De synlige kopiene under er
+          // skjult, ellers ville VoiceOver lest det samme fire ganger.
+          accessibilityLabel={matchPhotoA11yLabel({
+            minute: known ? minute : undefined,
+            authorName: photo.authorName,
+            caption: photo.caption,
+          })}
+          style={({pressed}) => [pressed && styles.pressed]}>
+          <MediaImage
+            media={photo.media}
+            variant="thumb"
+            style={styles.photoImage}
+            resizeMode="cover"
+          />
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants">
+            {photo.caption ? (
+              <Text
+                style={[styles.photoCaption, {maxWidth: grid.measureMax}]}
+                maxFontSizeMultiplier={grid.fontCap}>
+                {photo.caption}
+              </Text>
+            ) : null}
+            <Text style={styles.photoBy} maxFontSizeMultiplier={grid.fontCap}>
+              {photo.authorName}
+            </Text>
+          </View>
+        </Pressable>
+
+        {/* Engasjementet er handlinger med egne labels — utenfor det skjulte. */}
         {engagement}
       </View>
     </View>
@@ -254,6 +282,7 @@ export function MatchTimeline({
   authorFor,
   renderEngagement,
   onPressPhoto,
+  ground = false,
 }: MatchTimelineProps) {
   const grid = useMatchGrid();
 
@@ -336,13 +365,48 @@ export function MatchTimeline({
   }, [matchEvents, photos, startedAt, newestFirst]);
 
   return (
-    <View>
+    <View style={styles.root}>
+      {/* DET FJERDE ROMMET. Ikke en flate med egen farge — et scrim som
+          senker den samme grunnen. Derfor ligger det her og ikke som en
+          `backgroundColor` på skjermen: en farge ville vært en boks, og
+          bokser er nettopp det retningen forbyr. */}
+      {ground && (
+        <View
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants">
+          <Svg width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="roomFade" x1="0%" y1="0%" x2="0%" y2="100%">
+                <Stop offset="0" stopColor="#081B13" stopOpacity={0.5} />
+                <Stop offset="0.18" stopColor="#081B13" stopOpacity={0.34} />
+                <Stop offset="0.46" stopColor="#081B13" stopOpacity={0.24} />
+                <Stop offset="1" stopColor="#081B13" stopOpacity={0.2} />
+              </LinearGradient>
+            </Defs>
+            <Rect
+              x="0"
+              y="0"
+              width="100%"
+              height="100%"
+              fill="url(#roomFade)"
+            />
+          </Svg>
+        </View>
+      )}
+
       <View style={[styles.eyebrow, {paddingLeft: grid.minuteLeft}]}>
         <View
           pointerEvents="none"
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
           style={[styles.eyebrowDot, {left: grid.nodeCenter - 3.5}]}
         />
-        <Text style={styles.eyebrowText} maxFontSizeMultiplier={grid.fontCap}>
+        <Text
+          style={styles.eyebrowText}
+          accessibilityRole="header"
+          maxFontSizeMultiplier={grid.fontCap}>
           {newestFirst ? 'Det som skjer' : 'Kampens historie'}
         </Text>
       </View>
@@ -394,6 +458,9 @@ export function MatchTimeline({
 }
 
 const styles = StyleSheet.create({
+  root: {
+    position: 'relative',
+  },
   eyebrow: {
     position: 'relative',
     paddingTop: 28,
@@ -469,45 +536,36 @@ const styles = StyleSheet.create({
   // --- Bilderaden ---
   photoRow: {
     position: 'relative',
-    marginVertical: 8,
+  },
+  // Bærer griddet: node og minutt posisjoneres absolutt fra DENNE kanten,
+  // som ligger på samme x som alle andre raders ytterkant.
+  photoInner: {
+    position: 'relative',
+    zIndex: 2,
   },
   photoImage: {
     width: '100%',
-    height: 300,
+    // Forholdstall, ikke fast høyde — kolonnen varierer med enhet og
+    // tekststørrelse. Samme forhold som bildet på en hendelse, så to bilder
+    // rett etter hverandre ikke får hver sin form.
+    aspectRatio: 4 / 3,
+    borderRadius: radius.md,
+    overflow: 'hidden',
     backgroundColor: matchColors.timeline,
   },
-  photoScrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '74%',
-  },
-  photoTopScrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    height: 90,
-  },
-  photoBody: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingBottom: 12,
-  },
+  // Teksten står nå UNDER bildet, på grunnen — ikke i hvitt oppå et
+  // vilkårlig fotografi. Derfor kampverdenens eget blekk.
   photoCaption: {
-    fontSize: 16.5,
+    marginTop: 9,
+    fontSize: 16,
     lineHeight: 23,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    color: matchColors.text,
   },
   photoBy: {
     marginTop: 5,
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: 'rgba(255, 255, 255, 0.78)',
+    color: matchColors.dim,
   },
   minute: {
     position: 'absolute',

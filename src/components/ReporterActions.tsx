@@ -1,6 +1,13 @@
 import React, {useRef} from 'react';
 import {View, Text, Pressable, StyleSheet, Animated} from 'react-native';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {
+  colors,
+  matchColors,
+  typography,
+  spacing,
+  radius,
+  shadows,
+} from '../theme';
 import {Ball, Camera, Flag, MessageCircle, Pause, Play} from './icons';
 
 export type ReporterActionType =
@@ -15,6 +22,19 @@ interface ActionButton {
   type: ReporterActionType;
   label: string;
 }
+
+/**
+ * Hva knappen GJØR, som setning. En etikett på to ord («Mål oss») er nok når
+ * man ser griddet; den er ikke nok når den leses opp alene.
+ */
+const ACTION_A11Y: Record<ReporterActionType, string> = {
+  mål_oss: 'Registrer mål for oss',
+  mål_dem: 'Registrer mål for motstanderen',
+  pause: 'Sett kampen i pause',
+  andre_omgang: 'Start andre omgang',
+  slutt: 'Avslutt kampen',
+  melding: 'Skriv en oppdatering til laget',
+};
 
 // Ikon per handling — Ball for mål (samme tegning som artifacten), Play for
 // «Fortsett». Fargen settes på kallstedet (mint-knappen trenger heiaDeep).
@@ -40,6 +60,12 @@ interface ReporterActionsProps {
    * gjort typen usann om hva som kan rapporteres.
    */
   onPhoto?: () => void;
+  /**
+   * ⚠️ VARIANT, IKKE ENDRET DEFAULT. Panelet er reporterens verktøy og bor
+   * i dag på lys flate. På kampens grunn ville de hvite kortene lest som
+   * «admin» — den frosne retningen forbyr nettopp det.
+   */
+  variant?: 'default' | 'match';
 }
 
 const goalActions: ActionButton[] = [
@@ -55,9 +81,11 @@ const goalActions: ActionButton[] = [
 function GoalButton({
   action,
   onAction,
+  onMatch,
 }: {
   action: ActionButton;
   onAction: (type: ReporterActionType) => void;
+  onMatch: boolean;
 }) {
   const isUs = action.type === 'mål_oss';
   const IconGlyph = ACTION_ICON[action.type];
@@ -83,17 +111,41 @@ function GoalButton({
         onPress={() => onAction(action.type)}
         onPressIn={pressIn}
         onPressOut={pressOut}
+        accessibilityRole="button"
+        accessibilityLabel={ACTION_A11Y[action.type]}
         style={({pressed}) => [
           styles.goalButton,
-          isUs ? styles.goalButtonUs : styles.goalButtonAway,
-          pressed && (isUs ? styles.pressedUs : styles.pressed),
+          isUs
+            ? styles.goalButtonUs
+            : onMatch
+            ? styles.goalButtonAwayMatch
+            : styles.goalButtonAway,
+          pressed &&
+            (isUs
+              ? styles.pressedUs
+              : onMatch
+              ? styles.pressedMatch
+              : styles.pressed),
         ]}>
+        {/* Mintknappen beholder heiaDeep-blekket på begge flater — mint er
+            feiringens farge, og den er lovlig på stadionmørkt. */}
         <IconGlyph
           size={26}
-          color={isUs ? colors.heiaDeep : colors.textPrimary}
+          color={
+            isUs
+              ? colors.heiaDeep
+              : onMatch
+              ? matchColors.text
+              : colors.textPrimary
+          }
           strokeWidth={2}
         />
-        <Text style={[styles.goalLabel, isUs && styles.goalLabelUs]}>
+        <Text
+          style={[
+            styles.goalLabel,
+            isUs && styles.goalLabelUs,
+            !isUs && onMatch && styles.labelMatch,
+          ]}>
           {action.label}
         </Text>
       </Pressable>
@@ -108,7 +160,9 @@ export function ReporterActions({
   onAction,
   isPaused,
   onPhoto,
+  variant = 'default',
 }: ReporterActionsProps) {
+  const onMatch = variant === 'match';
   // Pause og «fortsett» er samme plass i griddet — du er aldri i begge på én
   // gang. Slik unngår vi en knapp som er død halvparten av tiden.
   const smallActions: ActionButton[] = [
@@ -121,7 +175,12 @@ export function ReporterActions({
     <View style={styles.container}>
       <View style={styles.goalRow}>
         {goalActions.map(action => (
-          <GoalButton key={action.type} action={action} onAction={onAction} />
+          <GoalButton
+            key={action.type}
+            action={action}
+            onAction={onAction}
+            onMatch={onMatch}
+          />
         ))}
       </View>
       <View style={styles.row}>
@@ -131,12 +190,20 @@ export function ReporterActions({
             <Pressable
               key={action.type}
               onPress={() => onAction(action.type)}
+              accessibilityRole="button"
+              accessibilityLabel={ACTION_A11Y[action.type]}
               style={({pressed}) => [
                 styles.smallButton,
-                pressed && styles.pressed,
+                onMatch && styles.buttonMatch,
+                pressed && (onMatch ? styles.pressedMatch : styles.pressed),
               ]}>
-              <IconGlyph size={18} color={colors.textPrimary} />
-              <Text style={styles.smallLabel}>{action.label}</Text>
+              <IconGlyph
+                size={18}
+                color={onMatch ? matchColors.text : colors.textPrimary}
+              />
+              <Text style={[styles.smallLabel, onMatch && styles.labelMatch]}>
+                {action.label}
+              </Text>
             </Pressable>
           );
         })}
@@ -146,9 +213,20 @@ export function ReporterActions({
       {onPhoto && (
         <Pressable
           onPress={onPhoto}
-          style={({pressed}) => [styles.photoButton, pressed && styles.pressed]}>
-          <Camera size={18} color={colors.textPrimary} />
-          <Text style={styles.photoLabel}>Legg ut bilde</Text>
+          accessibilityRole="button"
+          accessibilityLabel="Legg ut et bilde fra kampen"
+          style={({pressed}) => [
+            styles.photoButton,
+            onMatch && styles.buttonMatch,
+            pressed && (onMatch ? styles.pressedMatch : styles.pressed),
+          ]}>
+          <Camera
+            size={18}
+            color={onMatch ? matchColors.text : colors.textPrimary}
+          />
+          <Text style={[styles.photoLabel, onMatch && styles.labelMatch]}>
+            Legg ut bilde
+          </Text>
         </Pressable>
       )}
     </View>
@@ -185,9 +263,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  // Kampens knapper: krittkant på grunnen, aldri en hvit plate.
+  goalButtonAwayMatch: {
+    backgroundColor: matchColors.opponentNode,
+    borderWidth: 1,
+    borderColor: matchColors.chalkStrong,
+  },
+  buttonMatch: {
+    backgroundColor: 'transparent',
+    borderColor: matchColors.chalk,
+  },
+  labelMatch: {
+    color: matchColors.text,
+  },
   pressed: {
     backgroundColor: colors.heiaSoft,
     borderColor: colors.heia,
+  },
+  pressedMatch: {
+    backgroundColor: 'rgba(234, 255, 246, 0.12)',
+    borderColor: matchColors.chalkStrong,
   },
   pressedUs: {
     backgroundColor: colors.heiaPressed,
