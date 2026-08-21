@@ -1,6 +1,8 @@
 # HEIA VISUAL SYSTEM — HANDOFF · START HER
 
-**Status 2026-08-22:** Fase 2 (design-artifacts) PÅGÅR. **Ingen visuell retning er godkjent.** Fase 3, brand kit, BRAND_UI-omskriving og implementering er **ikke startet**. Produksjonskoden er urørt gjennom hele designsporet.
+**Status 2026-08-22 (kveld):** Fase 2 (design-artifacts) PÅGÅR. **Ingen visuell retning er godkjent.** «Lysstein» (dagens samtale) er **FORKASTET** — se §13, som også inneholder den nye metodebeslutningen. Fase 3, brand kit, BRAND_UI-omskriving og implementering er **ikke startet**. Produksjonskoden er urørt gjennom hele designsporet.
+
+**Neste samtale starter i §13.** Alle referansebildene må legges ved på nytt (de er ikke i repoet).
 
 Dette dokumentet er den eneste inngangen til neste samtale. Les det i sin helhet før noe tegnes. `docs/STATUS-HANDOFF.md` er fortsatt produktets tekniske handoff og er ikke oppdatert for designsporet — dette dokumentet gjelder foran den for alt visuelt.
 
@@ -80,6 +82,7 @@ Referansebildene ligger i samtalen de ble gitt i — be Brage legge dem ved på 
 | Den første flaten (Kalender, runde 4) | https://claude.ai/code/artifact/6a202afd-60a6-4c24-b97f-f83b26bf46cd | **Avvist som endelig retning.** Grunnflaten var nærmere. |
 | Heia Kritt (retning 1, hele appen) | https://claude.ai/code/artifact/4b5c5d22-c19b-4e7c-a65d-6e5216c47aa8 | **Ikke godkjent.** Navigerbar, demo-pill øverst; hash: `#kal`, `#kamp-rep`, `#kamp-dyp`, `#kal-shny` … |
 | Heia Flomlys (retning 2, hele appen) | https://claude.ai/code/artifact/80cbccb1-86c8-4310-962b-95439bb66dc7 | **Ikke godkjent.** Samme DOM som Kritt, annet stilark. |
+| Heia Lysstein (Hjem, live, runde 4 → 5) | https://claude.ai/code/artifact/8708c090-0ff6-45c7-adde-7267fd8c2c3f | **FORKASTET** (§13). Runde 4 fikk 6,5/10; runde 5 ble glossy spill-UI. Beholdes kun som eksempel på hva som IKKE skal gjøres. |
 
 Merk: de lokale HTML-kildene til artifactene lå i en sesjonsmappe som ikke overlever. Artifactene er de kanoniske kopiene; kilden hentes med WebFetch på lenken.
 
@@ -145,5 +148,66 @@ Ekte layout, knapper, funksjoner, innhold, navigasjon og plasseringer beholdes. 
 
 - **Fase 2 pågår.** Ingen visuell retning er godkjent.
 - Fase 3 (brand kit, omskrevet BRAND_UI.md, designsystem-oppdatering, implementeringsrekkefølge) er **ikke startet**.
-- Ingen produksjonskode, artifacts eller `STATUS-HANDOFF.md` er endret i designsporet. Dette dokumentet er det eneste nye i repoet og er **ikke committet**.
+- Ingen produksjonskode eller `STATUS-HANDOFF.md` er endret i designsporet. Dette dokumentet er det eneste som committes fra designsporet.
 - Åpen gjeld som hører til designsporet (fra STATUS-HANDOFF): pulsens uttrykk (parkert av Brage), Stadium Light-palettbeslutningen (erstattet av nordstjernen), BRAND_UI.md er utdatert (pre-A v2) og må skrives om i fase 3.
+
+---
+
+## 13. Lysstein — forkastet 2026-08-22, og den nye metoden
+
+### Hva som skjedde
+Samtalen 2026-08-22 startet med en referanseaudit og tre foreslåtte materialsystemer (A «Trykk»/papir, B «Drakt»/stoff, C «Lysstein»/kantbelyste frostede plater). Brage valgte C med fire korreksjoner (integrert identitets-header, mørk røykplate som liveinngang, midlertidig Higgsfield-foto, egen varselrød på badget, ingen fokusring på HEIA!). Én Hjem-skjerm (393 pt, live) ble bygget kode-først i HTML/CSS og rendret med headless Chrome. **Runde 4 fikk 6,5/10** («standard avrundede kort med Lysstein-effekter oppå»). **Runde 5**, som skulle la materialet *forme* komponentene, ble tydelig verre: glossy mobilspill-/Candy Crush-komposisjon.
+
+### Hvorfor Lysstein ble forkastet (Brages dom, bekreftet av Fable)
+Det er ikke lenger utførelsen, men **materialspråket som er feil**. Resultatet hadde:
+- synlig 3D-bevel og tykk plastkant (6 px «tykkelse»)
+- glossy gradienter inne i komponentene
+- oppblåste kamera-, score- og HEIA-brikker; flytende candy-knapper
+- store, uniforme avrundede rektangler
+- statusfelt (LIVE/VIKTIG) som så limt eller støpt på ut
+- «fysisk materiale» som ble leketøy/spill-UI
+
+Dette er det **motsatte** av referansene, som viser presise, rolige, gjennomkomponerte systemer: store kontrollerte fargesoner, matte eller forsiktig transparente flater, tynne presise kanter, nested tonalitet, sterke proporsjoner, redaksjonell typografi, fotografi integrert i komposisjonen, komponenter som er originale uten å rope.
+
+**Hvorfor de interne rundene ikke fanget det:** kritikken målte mot egne akseptkriterier («er tykkelsen synlig? brytes konturen? tre luminanstrinn?») — en sjekkliste som belønner *mer* effekt — og referansene ble aldri rendret side om side med kandidaten under kritikk, selv om planen sa det. Når oppskriften er feil, gjør hver runde det verre. Dette er samme feil som §6 allerede dokumenterte (QA i stedet for designkritikk), gjentatt.
+
+### Forbudt fra nå (gjelder alle videre runder)
+Synlig bevel/3D-kant, plastkanter, glossy gradienter i komponenter, oppblåste brikker/kuler, candy-knapper, uniforme store avrundede rektangler, statusetiketter som ser påstøpt ut, glassmorfisme, spillestetikk, **navngitte gimmick-materialer** («Kritt», «Flomlys», «Lysstein» — ikke lag et fjerde), og flere CSS-runder innenfor samme oppskrift.
+
+### Råingredienser som beholdes (ikke ferdig design)
+- den dominante, levende `#02FFAB`-grunnen (Levende flater-meshen)
+- mørkt Heia-blekk `#06291E`
+- den mørke liveinngangen som kontrastpunkt
+- coral KUN for LIVE, gull for viktighet; egen varselrød (`#C8102E`-klasse) på badget
+- eksisterende funksjon, innhold, rekkefølge og navigasjon (produktkontrakten)
+- Higgsfield-fotoet (706×420, jubel etter mål, ryggen til) som midlertidig designbevis — ikke produksjonsressurs
+
+### Målbildet (Brage, ordrett i substans)
+Dominant og levende `#02FFAB`-verden · matte, rolige, presise innholdsflater · mørkt blekk og tydelig typografisk hierarki · få, men sterke silhuetter · ingen glassmorfisme/plast/bevel/candy/spill · bakgrunnen får være energisk, komponentene gir lesero · originalitet gjennom **komposisjon, proporsjon og rollebasert form — ikke effekter** · samme funksjoner og innhold som appen; visuelle proporsjoner og intern komposisjon er åpne.
+
+Syntesen skal hente: komposisjon og levende lys fra Levende flater; lys, fremdrift og selvsikre former fra Visible Progress; atmosfære og ro fra Green Healer; gradienthåndverk og sportsenergi fra det oransje sportsdesignet; lagdeling, typografi og bildeintegrasjon fra Haaland-referansen; den dominante mintverdenen fra Kalender-referansen; materialpresisjon, nested tonalitet og komponenthåndverk fra Goalify. Ingen referanse kopieres.
+
+### Metodebeslutning (LÅST)
+1. **Neste visuelle forsøk begynner ikke med kode.** Det er én statisk, high-fidelity Hjem-komposisjon i 393 pt, bygget med **alle referansene synlige side om side** som målestokk.
+2. **Verktøy:** `design`-skillen (Claude Design-canvas i Claude Code: multi-artboard canvas publisert som artifact). Referansebildene legges inn som egne rammer ved siden av komposisjonen. **Først 2–4 lav-fi retningsrammer som Brage velger mellom; hi-fi bygges først etter valg.** Skillens egne regler gjelder: ingen falsk statuslinje, ingen emoji-ikoner (ekte SVG), ingen gradient-slop, bias mot ro. Ærlig forbehold: rammene er HTML under panseret — metodeendringen er canvaset, side-om-side-referansene og skissetrinnet, ikke renderteknikken. Figma-MCP er et bedre alternativ for statisk komp, men krever at Brage autoriserer connectoren i claude.ai først. Canva er uegnet (malgenerering).
+3. `artifact-design`/HTML-artifact brukes **kun** til å implementere en allerede godkjent retning.
+4. **Ingen nye skills, plugins eller pakker** uten Brages godkjenning.
+5. Bildegenerering kun til foto/tekstur — aldri til å finne opp UI.
+6. **Kritikkregel:** hver kandidat vurderes i 100 % med referansene ved siden av, med spørsmålet «kunne denne ligget på Behance-siden ved siden av Goalify?» — ikke «er kravene oppfylt». En runde som *legger til* effekt i stedet for å fjerne, reverteres. Komposisjon, proporsjon, typografi og rollebasert form først; effekter sist; hårlinjer og matte flater.
+7. Ta så mange reelle interne runder som trengs (10 eller 45) — men etter nullstilt metode, ikke innenfor en forkastet oppskrift.
+8. Telefonen avgjør fortsatt. Ingenting spres til andre skjermer før Hjem er på 9/10.
+
+Verktøykart i sesjonen (kartlagt 2026-08-22): `design` (Claude Design-canvas-forhåndsvisning) · `artifact-design`/`artifact-diagramming` (HTML-artifacts) · Canva MCP (malgenerering/redigering) · Figma MCP (krever auth) · Higgsfield (bilde/video) · headless Chrome-rigg (§11.6). Claude Design på claude.ai/design er ikke tilgjengelig fra Claude Code-forhåndsvisningen.
+
+### Eksterne skills vurdert (lest, IKKE installert — Brage avgjør)
+Brage ba om at skills som kan hentes («Apple design skill eller hva som helst») vurderes. Ærlig vurdering etter lesing av kildene:
+
+| Skill | Hva den faktisk gjør | Verdi for Heia-problemet |
+|---|---|---|
+| **`frontend-design`** (Anthropic, offisiell marketplace — ligger allerede lokalt i `~/.claude/plugins/marketplaces/claude-plugins-official/plugins/frontend-design`, ingen installasjon nødvendig) | Prosess: designplan (palett/type/layout/**signatur**) → kritikk av planen mot «generisk default» → bygg → kritikk med skjermbilder; «spend your boldness in one place», fjern ett tilbehør; AI-slop-kalibrering. | **Høy — prosessen er nøyaktig det som ble hoppet over.** Ingen visuell fasit, men tvinger plan + kritikk før kode. Skal lastes og følges i neste samtale. |
+| **apple-hig-designer-skill-2026** (tristan-mcinnis, GitHub) | HIG-verdier: SF Pro 17/34 pt, 8-pt grid, 44-pt mål, tab-bar 49 pt + safe area, konsentriske radier, Liquid Glass-referanser; leverer HTML/CSS/React. | **Lav–middels.** Native-korrekthet, ikke art direction. Nyttig som *guardrail* for proporsjoner (tab-bar, touch-mål, typeskala) — løser ikke «WOW». |
+| **ios-hig-design** (wondelai/skills) | HIG-sjekkliste m/ 10-poengs revisjonsrubrikk, semantiske farger, SF Symbols, reserverte gester; 11 referansefiler. | **Lav for art direction** (revisjonsverktøy). Kan brukes som native-gjennomgang *etter* at en retning er valgt. |
+| **mobile-app-design** (awesome-skills) | Generiske beste praksiser (touch-mål, WCAG, RN-ytelse), skript for kontrast/touch-mål. | **Lav.** Ingen visuell retning. |
+| **ui-ux-pro-max** (nextlevelbuilder) | Python-CLI som søker i database (79 stiler, 192 paletter, 74 fontpar, 119 UX-regler) og kan generere et `MASTER.md`-designsystem med «dials» (variance/motion/density). | **Middels, med risiko.** Kan gi strukturert stilvokabular og et skriftlig designsystem — men palettene/stilene er generiske og kan dra Heia mot mal-look og bort fra den låste identiteten (`#02FFAB`, blekk, banebuer). Hvis den brukes: kun som *ordbok* for å beskrive retningen presist, aldri som kilde til farger/komponenter. Krever python3 (finnes). |
+
+**Konklusjon (Fable, ærlig):** ingen av disse skillene leverer art direction på referansenivå — de gir enten native-regler eller stildatabaser. Det som manglet var ikke en skill, men metoden: referansene side om side, retning valgt på lav-fi, og kritikk mot referansene i stedet for mot egne kriterier. Anbefaling: (1) bruk `frontend-design` (allerede lokalt) for prosess, (2) `design`-canvaset for komposisjonen, (3) eventuelt én HIG-skill som guardrail etter retningsvalg — kun hvis Brage godkjenner installasjon. Kilder: [apple-hig-designer-skill-2026](https://github.com/tristan-mcinnis/apple-hig-designer-skill-2026), [wondelai/skills ios-hig-design](https://github.com/wondelai/skills/blob/HEAD/ios-hig-design/SKILL.md), [awesome-skills/mobile-app-design](https://github.com/awesome-skills/mobile-app-design), [ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill), [oversikt over UI/UX-skills](https://pasqualepillitteri.it/en/news/576/claude-code-skills-design-uiux-guide).
