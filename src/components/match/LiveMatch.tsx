@@ -1,9 +1,15 @@
 import React, {useCallback, useMemo, useRef} from 'react';
-import {ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
+import {
+  Animated,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {matchColors, spacing} from '../../theme';
-import {BackBar} from '../BackBar';
 import {MatchTimeline} from '../MatchTimeline';
 import {ReporterActions, type ReporterActionType} from '../ReporterActions';
 import {ReporterBar} from '../ReporterBar';
@@ -13,6 +19,7 @@ import {ArenaSurface} from './ArenaSurface';
 import {MatchArena} from './MatchArena';
 import {MatchGround} from './MatchGround';
 import {MatchPulse} from './MatchPulse';
+import {MatchTopBar, useMatchTopBar} from './MatchTopBar';
 import type {MatchPhoto} from '../../lib/api/feed';
 import type {MatchEngagement} from '../../shared/matchEngagement';
 import type {HeiaEventDetail, MatchEvent, User} from '../../shared/types';
@@ -139,6 +146,11 @@ export function LiveMatch({
   const home = event.score?.home ?? 0;
   const away = event.score?.away ?? 0;
 
+  // Toppflaten som blir stillingen når arenaen ruller ut av bildet. All
+  // mekanikk ligger i `useMatchTopBar` — se den for hvorfor båndet MÅLES og
+  // hvorfor terskelen bor i en ref.
+  const topBar = useMatchTopBar();
+
   // Omgangen leses av forløpet, ikke av klokka. Det er den ENESTE kilden vi
   // har i dag som er sann: `andre_omgang` skrives av reporteren, mens et
   // minutt-tall ikke sier noe om hvilken omgang det tilhører før kampuret
@@ -162,27 +174,45 @@ export function LiveMatch({
           statuslinja videre på skjermer som pushes oppå den. */}
       {isFocused && <StatusBar barStyle="light-content" />}
 
-      <BackBar title="Kampen" variant="match" />
+      {/* TOPPFLATEN. Navlinja og stillingen er SAMME rad — se `MatchTopBar`
+          for hvorfor runde 1s `stickyHeaderIndices` ikke kunne bli myk. */}
+      <MatchTopBar
+        progress={topBar.progress}
+        shown={topBar.shown}
+        homeTeam={teamName}
+        awayTeam={event.opponent ?? ''}
+        homeScore={home}
+        awayScore={away}
+        phase={paused ? 'paused' : 'live'}
+        minute={minute}
+      />
 
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        onScroll={topBar.onScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}>
-        <ArenaSurface teamColor={teamColor} style={styles.arena}>
-          <MatchArena
-            homeTeam={teamName}
-            awayTeam={event.opponent ?? ''}
-            homeScore={home}
-            awayScore={away}
-            teamColor={teamColor}
-            phase={paused ? 'paused' : 'live'}
-            minute={minute}
-            secondHalf={secondHalf}
-            location={event.location}
-            reporterName={reporter?.name}
-            scoreScale={scoreScale}
-          />
-        </ArenaSurface>
+        {/* ⚠️ ARENAEN MÅLER SEG SELV. Krysstoningens bånd legges der
+            stillingen forlater toppen, og den høyden er ikke den samme i en
+            live kamp som i en rapport — eller med stor tekst. */}
+        <View onLayout={topBar.onArenaLayout}>
+          <ArenaSurface teamColor={teamColor} style={styles.arena}>
+            <MatchArena
+              homeTeam={teamName}
+              awayTeam={event.opponent ?? ''}
+              homeScore={home}
+              awayScore={away}
+              teamColor={teamColor}
+              phase={paused ? 'paused' : 'live'}
+              minute={minute}
+              secondHalf={secondHalf}
+              location={event.location}
+              reporterName={reporter?.name}
+              scoreScale={scoreScale}
+            />
+          </ArenaSurface>
+        </View>
 
         <View style={styles.reporterRow}>
           <ReporterBar
@@ -246,7 +276,7 @@ export function LiveMatch({
             onPressPhoto={onPressPhoto}
           />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </MatchGround>
   );
 }

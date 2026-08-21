@@ -1,5 +1,6 @@
 import React, {useCallback, useRef} from 'react';
 import {
+  Animated,
   Pressable,
   ScrollView,
   StatusBar,
@@ -10,7 +11,6 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {matchColors, radius, spacing} from '../../theme';
-import {BackBar} from '../BackBar';
 import {MatchPhotoRail} from '../MatchPhotoRail';
 import {MatchTimeline} from '../MatchTimeline';
 import {ArenaSurface} from './ArenaSurface';
@@ -18,6 +18,7 @@ import {MatchArena} from './MatchArena';
 import {MatchAttendance} from './MatchAttendance';
 import {MatchGround} from './MatchGround';
 import {MatchPulse} from './MatchPulse';
+import {MatchTopBar, useMatchTopBar} from './MatchTopBar';
 import {useReducedMotion} from '../useReducedMotion';
 import {MONTHS_SHORT} from '../../shared/calendar';
 import type {MatchPhoto} from '../../lib/api/feed';
@@ -139,6 +140,11 @@ export function FinishedMatch({
   const home = event.score?.home ?? 0;
   const away = event.score?.away ?? 0;
 
+  // Rapporten har toppflaten av samme grunn som kampen: historikken kan være
+  // lang, og da er sluttresultatet det man mister først. Den sier «SLUTT»,
+  // ikke et minutt — samme streng som pulsen, fra samme funksjon.
+  const topBar = useMatchTopBar();
+
   // Standardtittelen («Kamp mot Ridabu») sier ikke mer enn arenaen rett over
   // — samme regel kampdag-flaten alt bruker. Kun en egen tittel tar plassen.
   const ownTitle =
@@ -152,25 +158,42 @@ export function FinishedMatch({
           statuslinja videre på skjermer som pushes oppå den. */}
       {isFocused && <StatusBar barStyle="light-content" />}
 
-      <BackBar title="Kampen" variant="match" />
+      {/* TOPPFLATEN. Navlinja og stillingen er SAMME rad — se `MatchTopBar`
+          for hvorfor runde 1s `stickyHeaderIndices` ikke kunne bli myk. */}
+      <MatchTopBar
+        progress={topBar.progress}
+        shown={topBar.shown}
+        homeTeam={teamName}
+        awayTeam={event.opponent ?? ''}
+        homeScore={home}
+        awayScore={away}
+        phase={'finished'}
+      />
 
-      <ScrollView
+      <Animated.ScrollView
         ref={scrollRef}
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        onScroll={topBar.onScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}>
-        <ArenaSurface teamColor={teamColor} style={styles.arena}>
-          <MatchArena
-            homeTeam={teamName}
-            awayTeam={event.opponent ?? ''}
-            homeScore={home}
-            awayScore={away}
-            teamColor={teamColor}
-            phase="finished"
-            dateLabel={kickoffLabel(event.startTime)}
-            location={event.location}
-            reporterName={reporter?.name}
-          />
-        </ArenaSurface>
+        {/* ⚠️ ARENAEN MÅLER SEG SELV. Krysstoningens bånd legges der
+            stillingen forlater toppen, og den høyden er ikke den samme i en
+            live kamp som i en rapport — eller med stor tekst. */}
+        <View onLayout={topBar.onArenaLayout}>
+          <ArenaSurface teamColor={teamColor} style={styles.arena}>
+            <MatchArena
+              homeTeam={teamName}
+              awayTeam={event.opponent ?? ''}
+              homeScore={home}
+              awayScore={away}
+              teamColor={teamColor}
+              phase="finished"
+              dateLabel={kickoffLabel(event.startTime)}
+              location={event.location}
+              reporterName={reporter?.name}
+            />
+          </ArenaSurface>
+        </View>
 
         {(ownTitle || event.description) && (
           <View style={styles.intro}>
@@ -216,8 +239,7 @@ export function FinishedMatch({
 
             {/* Ingen `newestFirst`: rapporten leses forfra, fra avspark til
                 slutt. Markøren snur seg selv til «SLUTT» av samme grunn. */}
-            <View
-              onLayout={e => (timelineY.current = e.nativeEvent.layout.y)}>
+            <View onLayout={e => (timelineY.current = e.nativeEvent.layout.y)}>
               <MatchTimeline
                 ground
                 matchEvents={matchEvents}
@@ -251,7 +273,7 @@ export function FinishedMatch({
             </Pressable>
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </MatchGround>
   );
 }

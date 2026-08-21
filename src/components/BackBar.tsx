@@ -1,5 +1,5 @@
 import React from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Animated, Pressable, StyleSheet, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {colors, matchColors, typography, spacing} from '../theme';
@@ -20,25 +20,49 @@ import {ChevronLeft} from './icons';
  * ⚠️ VARIANT, IKKE ENDRET DEFAULT. Linja deles med 17 skjermer og hardkoder
  * `colors.textPrimary`. Kampen bor på mørk grunn og trenger krittfarget blekk
  * — men det er kampens unntak, ikke appens nye normal.
+ *
+ * ⚠️ `labelOpacity`/`labelsHidden` ER KAMPENS ANDRE UNNTAK, og de er REN
+ * TILLEGGSFUNKSJON: utelates de, oppfører linja seg nøyaktig som før på de 17
+ * andre skjermene. Kampen bruker dem fordi toppflaten BLIR stillingen når man
+ * blar (`MatchTopBar`): tittelen og ordet «Tilbake» toner ut, mens
+ * **chevronen aldri rører seg**. Den er den samme knappen før og etter, så
+ * det finnes aldri et øyeblikk uten tilbakevei — og aldri to tilbakeknapper.
+ *
+ * ⚠️ TEKSTENE ER `Animated.Text` UANSETT. Det er samme host-komponent som
+ * `Text` og gir ingen forskjell uten en verdi å animere; å bytte JSX-form
+ * etter om en prop finnes ville gitt to kodeveier å teste i stedet for én.
  */
 export function BackBar({
   title,
   variant = 'default',
+  labelOpacity,
+  labelsHidden,
 }: {
   title?: string;
   variant?: 'default' | 'match';
+  /** 1 = «Tilbake · Kampen», 0 = borte. Chevronen påvirkes ALDRI. */
+  labelOpacity?: Animated.AnimatedInterpolation<number> | number;
+  /** Tonet bort ⇒ også borte for skjermleseren. Usynlig betyr helt borte. */
+  labelsHidden?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const onMatch = variant === 'match';
   const ink = onMatch ? matchColors.text : colors.textPrimary;
 
+  const faded = labelOpacity === undefined ? null : {opacity: labelOpacity};
+  const hidden = labelsHidden === true;
+
   return (
     <View style={[styles.bar, {marginTop: insets.top}]}>
       {title ? (
-        <Text style={[styles.title, onMatch && {color: ink}]} numberOfLines={1}>
+        <Animated.Text
+          style={[styles.title, onMatch && {color: ink}, faded]}
+          numberOfLines={1}
+          accessibilityElementsHidden={hidden}
+          importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}>
           {title}
-        </Text>
+        </Animated.Text>
       ) : null}
       <Pressable
         onPress={navigation.goBack}
@@ -47,7 +71,9 @@ export function BackBar({
         accessibilityLabel="Tilbake"
         style={({pressed}) => [styles.back, pressed && styles.backPressed]}>
         <ChevronLeft size={26} color={ink} strokeWidth={2.2} />
-        <Text style={[styles.label, onMatch && {color: ink}]}>Tilbake</Text>
+        <Animated.Text style={[styles.label, onMatch && {color: ink}, faded]}>
+          Tilbake
+        </Animated.Text>
       </Pressable>
     </View>
   );

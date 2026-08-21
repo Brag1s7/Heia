@@ -1,6 +1,7 @@
 import React, {useEffect, useRef} from 'react';
 import {View, Text, StyleSheet, Animated} from 'react-native';
 import {colors, spacing, radius} from '../theme';
+import {useReducedMotion} from './useReducedMotion';
 
 interface LiveBadgeProps {
   /** I pause slutter prikken å pulsere og merket sier «PAUSE» i gult. */
@@ -10,9 +11,21 @@ interface LiveBadgeProps {
 export function LiveBadge({paused}: LiveBadgeProps) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // ⚠️ REDUCE MOTION (skive 6). Prikken slutter å puste, men merket blir
+  // stående i coral og sier fortsatt LIVE: bevegelsen er det som fjernes,
+  // ikke statusen. Betydningen ligger i fargen og ordet, aldri i pulsen —
+  // ellers ville merket vært utilgjengelig for alle som ikke ser bevegelse.
+  const reducedMotion = useReducedMotion();
+
   useEffect(() => {
     // Ingen puls i pause — en stillestående prikk signaliserer «stoppet».
-    if (paused) {
+    //
+    // ⚠️ EN LØPENDE `Animated.loop` DØR IKKE AV SEG SELV. Slås innstillingen
+    // på mens sløyfa går, kjører den videre usynlig for koden og etterlater
+    // prikken på en tilfeldig skala når den stoppes. `stopAnimation()` +
+    // eksplisitt sluttverdi, i den rekkefølgen.
+    if (paused || reducedMotion) {
+      pulseAnim.stopAnimation();
       pulseAnim.setValue(1);
       return;
     }
@@ -32,7 +45,7 @@ export function LiveBadge({paused}: LiveBadgeProps) {
     );
     pulse.start();
     return () => pulse.stop();
-  }, [pulseAnim, paused]);
+  }, [pulseAnim, paused, reducedMotion]);
 
   return (
     <View

@@ -55,6 +55,8 @@ export {MatchArena} from './match/MatchArena';
 // ⚠️ Kampens PULSKURVE (skive 5). Ikke `MatchPulseCard`, som er «lagets
 // puls» i varslene og ikke har noe med kampen å gjøre.
 export {MatchPulse} from './match/MatchPulse';
+// Toppflaten som BLIR stillingen når arenaen ruller ut av bildet (skive 6).
+export {MatchTopBar} from './match/MatchTopBar';
 export {LiveMatch} from './match/LiveMatch';
 export {
   Skeleton,

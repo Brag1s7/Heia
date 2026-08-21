@@ -23,8 +23,12 @@ verdt å lese før neste flate bygges:
 lese den. **`__tests__/pulseModel.harness.test.ts` er designriggen** —
 kjør den og SE på flaten før du leverer noe som tegner (se `### ⏳ SKIVE 5.1`).
 
-**Skive 1–5 er levert og telefongodkjent.** Neste er **SKIVE 6 —
-STICKY-BAR + REDUCE MOTION**.
+**Skive 1–5 er levert og telefongodkjent. SKIVE 6 (sticky-bar + Reduce
+Motion) ER PÅ RUNDE 2** — runde 1 brukte `stickyHeaderIndices` og ble avvist
+på telefonen; bevegelsen er nå muntlig godkjent («Nå funker det veldig
+bra!»), resten av lista står igjen. Se `### ⏳ SKIVE 6 — RUNDE 2`.
+**Les punktet om `stickyHeaderIndices` der før du legger noe fast i en topp.**
+Skive 6 er den SISTE rene flateskiva; 7–10 er funksjonalitet.
 
 **✅ SKIVE 4 ER TELEFONGODKJENT AV BRAGE 2026-08-21: «Godkjent nå!»**
 Kanonisk kobling + HEIA/kommentarer, `00071_kampfeed.sql` **ER I PROD**
@@ -1697,7 +1701,7 @@ en REELL begrensning.
 | 3 | **Kamprapporten på samme grunn** | ✅ LEVERT OG TELEFONGODKJENT `1b0390d` + 3.1 `95c092f` |
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ✅ LEVERT OG TELEFONGODKJENT + 4.1–4.4. Migrasjon I PROD |
 | 5 | **Kampens puls** (`MatchPulse`) | ✅ LEVERT OG TELEFONGODKJENT — 4 runder. Modellen: `docs/KAMPENS-PULS-MODELL.md` |
-| 6 | **Sticky-bar + Reduce Motion** | ⏭️ NESTE |
+| 6 | **Sticky-bar + Reduce Motion** | ⏳ RUNDE 2 — bevegelsen godkjent, resten venter |
 | 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
 | 8 | **Angre mål** (10 s) | se P3 |
 | 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
@@ -1846,6 +1850,142 @@ PULSE_OUT=/tmp/p.html npx jest __tests__/pulseModel.harness.test.ts
     minutt, type, aktør, stilling, heier og kommentarer? Viser
     dobbelttrykk den i historien? **Og kommer du IKKE gjennom et dusin
     markørstopp før kampforløpet?**
+
+</details>
+
+#### ⏳ SKIVE 6 — STICKY-BAR + REDUCE MOTION (RUNDE 2) 2026-08-21
+
+**Nye/endrede filer:** `src/components/match/MatchTopBar.tsx` (flaten +
+`useMatchTopBar`), `BackBar.tsx` (`labelOpacity`/`labelsHidden`, rent
+additivt), `LiveMatch`/`FinishedMatch`, `useGoalMoment.ts`, `LiveBadge.tsx`,
+`__tests__/matchTopBar.test.tsx` (24).
+
+**⚠️⚠️ RUNDE 1 BRUKTE `stickyHeaderIndices` OG BLE AVVIST PÅ TELEFONEN.**
+Brage: «den forsvinner ikke smooth når man blar opp og den kommer for sent
+når man blar ned.» **Dette er den viktigste permanente lærdommen i skiva, og
+den gjelder alt som skal ligge fast i toppen:**
+
+> **`stickyHeaderIndices` fester barnet til en posisjon i INNHOLDET, ikke i
+> skjermen.** `ScrollViewStickyHeader.js` regner
+> `translateY = max(0, scrollY − layoutY)`. Blar du tilbake forbi
+> festepunktet blir translateY 0 i samme frame, og baren HOPPER ned til der
+> den bor i innholdet — midt på skjermen — hvor fadet så spilles av. Den glir
+> ikke bort; den teleporterer og løses opp. «For sent nedover» er samme sak
+> speilvendt: ankeret lå under hele arenaen, så den kunne ikke feste seg før
+> ~430 pt var rullet. Prototypens bar slår til på 190 fordi den er forankret
+> i SKJERMKANTEN (`position: absolute; top: 0`).
+
+**Ingen terskel- eller varighetsjustering kunne rettet det.** Kalenderbolkens
+«ingen egen sticky-løsning» gjelder fortsatt en NAVIGATOR INNE I
+scroll-flaten — den er ikke et forbud mot toppchrome utenfor den.
+
+**LØSNINGEN (Brages valg): HEADEREN BLIR BAREN.** Navlinja og stillingen er
+SAMME rad. Chevronen står stille hele veien — samme knapp før og etter, så
+det finnes aldri et øyeblikk uten tilbakevei og aldri to tilbakeknapper i
+treet. «Tilbake · Kampen» toner ut, «● Stange G10 6–2 Kåffa · SLUTT» toner
+inn. **Krysstoningen drives av scroll-POSISJONEN på native driver**, ikke av
+en boolsk bryter med en `Animated.timing` etterpå: da finnes det ingen
+forsinkelse å ta igjen, og veien ut er veien inn baklengs. Den boolske
+`shown` finnes fortsatt, men styrer BARE tilgjengelighet.
+
+**Seks ting som er verdt å kjenne før noen rører dette:**
+
+1. ⚠️⚠️ **DE TO LAGENE TONER I HVER SITT BÅND — DE KRYSSTONER IKKE.**
+   Runde 3s feil (Brage: «den fader over det som allerede er der. jeg vil at
+   den skal gå over det som står fra før av, slik som html også gjør»):
+   «Tilbake · Kampen» og stillingen lå i SAMME bånd, så midtveis sto begge på
+   50 % oppå hverandre og var uleselige. **Å gjøre platen mer ugjennomsiktig
+   ville ikke hjulpet** — en plate som selv toner inn er halvt gjennomsiktig
+   på halvveien, uansett hvor solid den er til slutt. Grunnen til at HTML-en
+   ikke har problemet er STRUKTURELL: der har navlinja allerede rullet vekk,
+   så det finnes ingenting bak baren. Vi løser det samme med TID i stedet for
+   plass: det gamle er helt borte (0–45 % av båndet) før det nye begynner
+   (50–100 %). Voktet av en test som leser de faktiske inndataområdene.
+2. ⚠️ **REKKEFØLGEN I JSX ER FUNKSJONELL.** Runde 2s ene feil: platen sto
+   ETTER `BackBar` og malte — ugjennomsiktig — rett over chevronen i det
+   baren tonet inn. Tilbakeknappen forsvant nøyaktig når baren kom. (Brage:
+   «Burde det være en tilbakeknapp på den headeren som dukker opp?» — den VAR
+   der, den lå begravd.) Rekkefølgen er **plate → brikke → BackBar →
+   stillingen**, og den er voktet av en test.
+3. ⚠️ **`Animated.event` MED NATIVE DRIVER ER ET OBJEKT, IKKE EN FUNKSJON.**
+   Det er dét som lar `Animated.ScrollView` hekte hendelsen på native side —
+   og det betyr at en ny identitet river koblingen ned og opp igjen.
+   Handleren er derfor STABIL (`[scrollY]`), og båndet leses fra en ref.
+   Lå `band` i deps, ville koblingen blitt revet hver gang arenaen ble målt.
+   (JS-lytteren ligger bak `__getHandler()` — det er slik testene når den.)
+4. ⚠️ **BÅNDET MÅLES, DET GJETTES IKKE.** Arenaen er ikke like høy i en live
+   kamp som i en rapport, og den vokser med stor tekst og lange lagnavn. Et
+   fast tall (prototypens 190) ville truffet feil sted på halvparten av
+   kampene. Samme regel som 3.1: MÅL raden, ikke regn den ut.
+5. ⚠️ **BAREN BLOKKERER IKKE TRYKK, OG SKAL IKKE.** `ScrollView`-en begynner
+   under raden, så det ruller aldri innhold under den. Begge lagene er
+   `pointerEvents="none"` med vilje — ellers ville de drept chevronen som
+   ligger under dem. (Runde 1 måtte tvert imot sende `pointerEvents` gjennom
+   slot-stilen for å hindre at en usynlig bar spiste trykk på reporterraden;
+   det problemet finnes ikke lenger.)
+6. ⚠️ **`useReducedMotion` SVARER GJENNOM ET LØFTE.** Første frame kjenner
+   ikke innstillingen, så en sløyfe REKKER å starte før svaret kommer. Det
+   som betyr noe er derfor ikke «ble det startet noe», men «står det noe
+   igjen og kjører» — og det er dét testene måler. Samme grunn til at
+   `useGoalMoment` nå SPEILER innstillingen i en ref i stedet for å ha den i
+   deps: en ny kjøring av effekten måtte stoppet feiringen midt i fadet, og
+   floden ville blitt stående på en halv opacity for alltid.
+
+**Én ekte bug funnet underveis, uavhengig av skiva:** `useGoalMoment` lot
+både spretten og målfloden overleve komponenten. Fjæren kjørte videre etter
+at kampskjermen var forlatt og forsøkte å koble seg til en `View` som ikke
+fantes lenger. Begge stoppes nå i opprydningen.
+
+**Reduce Motion, hva som faktisk skjer:** spretten på scoren uteblir,
+LiveBadge-prikken slutter å puste (merket blir stående i coral og sier
+fortsatt LIVE), toppflaten bytter HARDT uten krysstoning — en toning som
+følger fingeren er fortsatt bevegelse utløst av scroll, og prototypen gjør
+det samme. **Og målfloden BLIR.** Det er den frosne retningen ordrett:
+bevegelsen fjernes, lysresponsen ikke.
+
+**IKKE BYGGET, MED VILJE:** prototypens pustende `g-pulse-a/b`, bølgen og
+auroraen i `MatchGround`. Det er NY bevegelse, ikke Reduce Motion-kobling.
+
+⚠️ **DESIGNRIGGEN BLE IKKE BYGGET OM FOR RUNDE 2.** Runde 1s rigg
+(`stickyBar.harness.test.tsx`) tegnet den samme innholdsraden i åtte scener
+og er slettet med komponenten. Raden er uendret bortsett fra ÉN ting, og den
+er verdt et blikk på telefonen: **stillingen begynner nå 40 pt inn** i stedet
+for 20, fordi chevronen har sin egen bane. Det er 20 pt mindre bredde i det
+trangeste tilfellet (liten iPhone + XXL + langt lagnavn) — se punkt 9 under.
+
+<details><summary>📱 TELEFONSJEKKLISTA FOR SKIVE 6</summary>
+
+**✅ Bevegelsen er allerede godkjent muntlig av Brage etter runde 2: «Nå
+funker det veldig bra!»** Resten står igjen.
+
+1. **Tilbakeknappen er synlig HELE veien** — også når baren er framme, og
+   også midt i overgangen. (Det var runde 2s feil.)
+1b. **Ingen dobbel tekst midtveis.** Rull SAKTE gjennom overgangen og stopp
+   midt i den: «Tilbake · Kampen» skal være borte før stillingen kommer, og
+   de to skal aldri stå oppå hverandre. (Det var runde 3s feil.) Kjennes
+   glippen der headeren er tom bortsett fra pila som et bytte — eller som et
+   hull?
+2. **Brikken bak chevronen:** leser pilen som en knapp når ordet «Tilbake»
+   er borte, eller ser den ut som dekor?
+3. **Ingen layout-hopp.** Toppen skal stå der den alltid har stått i ro.
+4. **Ingen flimring ved terskelen.** Rull sakte til baren akkurat kommer og
+   stopp der; fling hardt ned og la den sprette tilbake.
+5. **Live, pause og slutt viser samme tekst som hodet og pulsen**, i samme
+   øyeblikk.
+6. **Ferdig kamp:** står det «SLUTT» og riktig sluttresultat?
+7. **Rapporter et mål mens baren er framme:** oppdaterer stillingen i baren
+   seg samtidig som arenaen?
+8. **Reduce Motion på:** baren bytter direkte uten å tone; LIVE-prikken
+   slutter å puste, men merket er der; et mål gir ingen sprett på tallet —
+   **men verdenen skal fortsatt lyse opp.** Er det riktig?
+9. ⚠️ **LITEN IPHONE (SE/mini) + XXL + et LANGT lagnavn samtidig.** Dette er
+   det eneste punktet riggen ikke har sett i den nye utformingen. Klippes
+   noe? Navnene kortes ned til «Ham…» og «Rida…» — er det godt nok, eller
+   skal baren droppe motstanderens navn helt når det blir så trangt?
+10. **VoiceOver:** baren er ÉTT stopp når den er framme («Ham-Kam G14 2,
+    Ridabu G14 1. 36 minutter spilt.»), og finnes IKKE når den er borte.
+    «Kampen» skal være borte for skjermleseren når den er tonet ut. **Og
+    baren skal aldri lese seg selv opp av seg selv når minuttet tikker.**
 
 </details>
 
