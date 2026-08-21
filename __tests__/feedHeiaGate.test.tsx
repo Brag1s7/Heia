@@ -62,6 +62,14 @@ function hasHeia(item: FeedItem): boolean {
   return found.length > 0;
 }
 
+/**
+ * ⚠️ POSTTYPEN ER EN DEL AV FIXTUREN, IKKE PYNT (skive 8).
+ *
+ * Gaten spør om TO ting: er øyeblikket et mål imot, OG er posten systemets
+ * egen. En fixture som lot alt være `melding` ville derfor bestått mens
+ * produksjonen gjorde noe annet — og den ene raden som faktisk driftet
+ * (kampbildet) hadde vært usynlig i suiten.
+ */
 const withMatchEvent = (
   type: FeedItem['matchEvent'] extends infer T
     ? T extends {type: infer U}
@@ -69,7 +77,8 @@ const withMatchEvent = (
       : never
     : never,
   teamSide?: 'home' | 'away',
-): FeedItem => ({...BASE, matchEvent: {type, teamSide}});
+  postType: FeedItem['type'] = 'match_event',
+): FeedItem => ({...BASE, type: postType, matchEvent: {type, teamSide}});
 
 describe('HEIA-pillen i feeden', () => {
   it('FINNES IKKE på mål imot', () => {
@@ -86,12 +95,27 @@ describe('HEIA-pillen i feeden', () => {
     expect(hasHeia(withMatchEvent('mål', undefined))).toBe(false);
   });
 
-  it.each(['avspark', 'pause', 'andre_omgang', 'slutt', 'melding'] as const)(
+  it.each([
+    ['avspark', 'match_start'],
+    ['pause', 'match_event'],
+    ['andre_omgang', 'match_event'],
+    ['slutt', 'match_end'],
+    ['melding', 'match_event'],
+  ] as const)(
     '⚠️ RØRER IKKE %s — feeden er ikke kampforløpet',
-    type => {
-      expect(hasHeia(withMatchEvent(type))).toBe(true);
+    (type, postType) => {
+      expect(hasHeia(withMatchEvent(type, undefined, postType))).toBe(true);
     },
   );
+
+  it('⭐ BRUKERENS BILDE på et mål imot BEHOLDER HEIA (skive 8)', () => {
+    // Et kampbilde bærer SAMME match_event_id som øyeblikket det henger på
+    // (00028), så `get_team_feed` gir det `match_event_type = mål/away`.
+    // Skive 9s gate så bare på det og tok knappen fra brukerens eget bilde.
+    // Basen avviser heller ikke bildet (`trg_no_heia_on_opponent_goal` krever
+    // at posten er systemets), så en skjult knapp her var ren tapt HEIA.
+    expect(hasHeia(withMatchEvent('mål', 'away', 'bilde'))).toBe(true);
+  });
 
   it('rører ikke vanlige poster', () => {
     expect(hasHeia(BASE)).toBe(true);
