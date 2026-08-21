@@ -116,3 +116,41 @@ export function BookingCard({
     </Svg>
   );
 }
+
+/**
+ * Avspark og pause som FYLTE glyfer — kampforløpets krittlinje.
+ *
+ * Fasiten (docs/prototypes/kampskjerm/index.html, `icoPlay`/`icoPause`) tegner
+ * begge med `fill="currentColor" stroke="none"`. På en 27 pt node med 15 pt
+ * ikon forsvinner en 2 pt outline-trekant nesten helt, mens ballen og
+ * kameraet ved siden av leser tydelig.
+ *
+ * De delte Lucide-eksportene `Play`/`Pause` står bevisst URØRT: de brukes av
+ * reporterknappene og av klubbetalingsloggen, der outline er riktig — én fylt
+ * glyf blant fire outline-søsken ville sett ut som en feil.
+ *
+ * `strokeWidth` godtas og ignoreres, så de har samme propsignatur som resten
+ * og kan gjenbrukes der en ikonkomponent forventes.
+ */
+export function PlaySolid({
+  size = 24,
+  color = colors.textPrimary,
+}: BallIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path d="M7 4.2 19 12 7 19.8z" fill={color} />
+    </Svg>
+  );
+}
+
+export function PauseSolid({
+  size = 24,
+  color = colors.textPrimary,
+}: BallIconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x={6.5} y={4.5} width={3.6} height={15} rx={1.2} fill={color} />
+      <Rect x={13.9} y={4.5} width={3.6} height={15} rx={1.2} fill={color} />
+    </Svg>
+  );
+}

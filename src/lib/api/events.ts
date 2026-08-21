@@ -37,8 +37,15 @@ export const MATCH_STATUS_MAP: Record<string, MatchStatus> = {
   avlyst: 'cancelled',
 };
 
+// ⚠️ EKSPLISITT KOLONNELISTE — en ny kolonne i `match_sessions` når IKKE
+// appen før den står her. `played_seconds`/`clock_started_at` (00073) er
+// kampuret; uten dem i denne strengen ville banneret og innboksen falt
+// tilbake på den gamle klokka som teller gjennom pausen, mens kampskjermen
+// (som går via `get_event_with_rsvp`) viste riktig tid. To flater, to
+// minutter — nøyaktig feilen P2 finnes for å hindre.
 const SESSION_COLUMNS =
-  'id, opponent, home_score, away_score, is_home, status, reporter_id, started_at';
+  'id, opponent, home_score, away_score, is_home, status, reporter_id, ' +
+  'started_at, played_seconds, clock_started_at';
 
 const EVENT_COLUMNS = `
   id, type, title, description, location, start_time, end_time, meeting_time,
@@ -102,6 +109,16 @@ function mapEventRow(
     reporterId: session?.reporter_id ?? undefined,
     matchSessionId: session?.id ?? undefined,
     startedAt: session?.started_at ? new Date(session.started_at) : undefined,
+    // P2/00073: kampuret. To tall, ikke ett — `started_at` teller gjennom
+    // pausen og er historikk, ikke klokke. Mangler de, er serveren eldre enn
+    // 00073, og `matchClock` faller tilbake på den gamle oppførselen.
+    playedSeconds:
+      session?.played_seconds === null || session?.played_seconds === undefined
+        ? undefined
+        : Number(session.played_seconds),
+    clockStartedAt: session?.clock_started_at
+      ? new Date(session.clock_started_at)
+      : undefined,
     parentEventId: row.parent_event_id ?? undefined,
   };
 }
@@ -632,6 +649,63 @@ export async function reportMatchEvent(
   }
 }
 
+/** Hva «Korriger mål» faktisk gjør (skive 8, `correct_match_goal` 00075). */
+export interface CorrectMatchGoalInput {
+  /** `edit` retter målet, `cancel` annullerer det. */
+  action: 'edit' | 'cancel';
+  /** `home` = oss, `away` = motstander. Kun ved `edit`. */
+  teamSide?: 'home' | 'away';
+  /** Fri beskrivelse → `match_events.description`. Tom tekst blir NULL. */
+  description?: string;
+  /**
+   * ⚠️ MÅLSCORER ER BEVISST IKKE MED (Brage 2026-08-21).
+   *
+   * RPC-en har fortsatt parameteren `p_player_name` for kompatibilitet, men
+   * KLIENTEN SKAL IKKE EKSPONERE DEN: `report_match_event` har i dag ett
+   * fritekstfelt som havner i `description`, så et eget målscorerfelt bare i
+   * korrigeringen ville gitt to ulike sannheter om hva en målscorer er.
+   * Utsatt til det kan gjøres konsekvent i opprettelse, redigering, feed og
+   * historikk.
+   *
+   * Vi sender derfor alltid `null`, og `00078` gjør at NULL betyr «ikke rør»
+   * — en importert målscorer overlever en korrigering.
+   */
+}
+
+/**
+ * KORRIGER ET MÅL — reporterens og lagadmins domenehandling (skive 8).
+ *
+ * ⚠️ DETTE ER IKKE «REDIGER/SLETT INNLEGG», OG DET ER HELE POENGET.
+ * Den generiske sletteveien i feeden er stengt for målposter (00075): den
+ * fjernet posten, men lot stillingen, hendelsen og innboksvarselet stå — og
+ * brukeren trodde hun hadde angret. Alt som må skje sammen, skjer i RPC-ens
+ * ENE transaksjon: hendelsen, stillingen (telt opp på nytt fra
+ * målhistorikken), feedens stillingssnapshots, engasjementet, varslene og
+ * auditen.
+ *
+ * ⚠️ INGEN LOKAL PATCHING AV STILLINGEN. Den regnes ut server-side, og
+ * halvparten av grunnen til at RPC-en finnes er at klienten ikke skal gjette
+ * den. Kalleren refetcher; realtime gjør resten for de andre telefonene.
+ */
+export async function correctMatchGoal(
+  matchEventId: string,
+  input: CorrectMatchGoalInput,
+): Promise<void> {
+  const {error} = await supabase.rpc('correct_match_goal', {
+    p_match_event_id: matchEventId,
+    p_action: input.action,
+    p_team_side: input.teamSide ?? null,
+    // ⚠️ ALLTID null — se `CorrectMatchGoalInput`. `00078` tolker NULL som
+    // «ikke rør», så en eksisterende målscorer blir stående.
+    p_player_name: null,
+    p_description: input.description ?? null,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 /**
  * Lytter på en pågående kamp. To adskilte callbacks (P6-splitten):
  * `onMatchChange` for stilling/forløp, `onPhotoPost` KUN for nye kampbilder.
@@ -650,13 +724,51 @@ export async function reportMatchEvent(
  * refetch, hendelser kan være tapt. Realtime respekterer RLS, så bare lagets
  * medlemmer får hendelsene.
  *
+ * SKIVE 4 la til engasjementet: `reaction` og `commentDelta` justerer tellerne
+ * lokalt (ingen refetch), og `engagementPost` sier at et ferskt øyeblikk
+ * nettopp fikk sin kanoniske post. Uten det siste ville det NYESTE målet vært
+ * det eneste man ikke kunne heie på — og det er nettopp det man vil heie på.
+ *
  * Returnerer en oppryddingsfunksjon — kall den når skjermen forlates, ellers
  * blir kanalen liggende åpen.
  */
 export type MatchRealtimeEvent =
   | {kind: 'matchEvent'; row: any}
+  /**
+   * En hendelse ble RETTET (skive 8). Bærer hele den nye raden, så forløpet
+   * kan byttes ut på plass uten refetch — stillingen kommer uansett som
+   * `session`, siden korrigeringen skriver `match_sessions` i samme
+   * transaksjon.
+   */
+  | {kind: 'matchEventUpdate'; row: any}
+  /**
+   * En hendelse ble ANNULLERT (skive 8).
+   *
+   * ⚠️ NÅR OSS KUN FORDI `match_events` HAR REPLICA IDENTITY FULL (00075).
+   * Uten den bærer DELETE-payloaden bare PK, filteret `match_session_id`
+   * matcher ikke, og Realtime kan ikke RLS-sjekke hendelsen i det hele tatt —
+   * tilskueren ville sittet igjen med korrigert stilling i toppen og et
+   * annullert mål i forløpet.
+   */
+  | {kind: 'matchEventDelete'; id: string}
   | {kind: 'session'; row: any}
   | {kind: 'photo'}
+  /**
+   * HEIA fra en annen tilskuer (skive 4). `userId` følger med i stedet for å
+   * filtreres bort her: kanalen deles via `acquireChannel`, så en «hvem er
+   * jeg»-verdi fanget i oppsettet ville tilhørt den FØRSTE abonnenten for
+   * alltid. Kalleren kjenner alltid sin egen id, og filtrerer eget ekko der.
+   */
+  | {kind: 'reaction'; postId: string; userId?: string; delta: 1 | -1}
+  /** Ny eller soft-slettet kommentar på en post i kampen. */
+  | {kind: 'commentDelta'; postId: string; delta: 1 | -1}
+  /**
+   * En ny post med `match_event_id` — altså et ferskt øyeblikk som nettopp
+   * fikk sin kanoniske post. Uten denne ville det nyeste målet stått uten
+   * post-id å heie på til neste refetch, og det er nøyaktig det målet folk
+   * vil heie på.
+   */
+  | {kind: 'engagementPost'}
   | {kind: 'fallback'}
   | {kind: 'resync'};
 
@@ -683,6 +795,46 @@ export function subscribeToMatch(
             emit(
               row.id && row.type && row.minute !== undefined
                 ? {kind: 'matchEvent', row}
+                : {kind: 'fallback'},
+            );
+          },
+        )
+        // KORRIGERINGEN (skive 8). To egne abonnementer, ikke en utvidelse av
+        // INSERT-et over: `matchEvent` APPENDER i cachen, og en rettelse som
+        // ble appendet ville gitt målet to ganger i forløpet.
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'match_events',
+            filter: `match_session_id=eq.${matchSessionId}`,
+          },
+          payload => {
+            const row = (payload.new ?? {}) as any;
+            emit(
+              row.id && row.type && row.minute !== undefined
+                ? {kind: 'matchEventUpdate', row}
+                : {kind: 'fallback'},
+            );
+          },
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'match_events',
+            filter: `match_session_id=eq.${matchSessionId}`,
+          },
+          payload => {
+            // `old` er komplett takket være REPLICA IDENTITY FULL. Er den
+            // likevel tom, står serveren uten migrasjonen — da er en refetch
+            // det eneste ærlige svaret.
+            const row = (payload.old ?? {}) as any;
+            emit(
+              row.id
+                ? {kind: 'matchEventDelete', id: row.id}
                 : {kind: 'fallback'},
             );
           },
@@ -720,9 +872,68 @@ export function subscribeToMatch(
             filter: `event_id=eq.${eventId}`,
           },
           payload => {
-            if ((payload.new as any)?.type === 'bilde') {
+            const row = (payload.new ?? {}) as any;
+            if (row.type === 'bilde') {
               emit({kind: 'photo'});
             }
+            // Posten som bærer øyeblikket. Et bilde festet til et mål har
+            // BEGGE deler, og skal derfor treffe begge stiene.
+            if (row.match_event_id) {
+              emit({kind: 'engagementPost'});
+            }
+          },
+        )
+        // ⚠️ UFILTRERT, OG DET ER TRYGT. `reactions` og `comments` har ingen
+        // event_id å filtrere på — samme situasjon som feeden (`subscribeToFeed`)
+        // løste på samme måte. RLS slipper kun gjennom rader du uansett kunne
+        // lest, og en patch for en post som ikke er i kampens oppslag er en
+        // no-op.
+        //
+        // DELETE på reactions krever REPLICA IDENTITY FULL (00059) for at
+        // old-raden skal bære feed_post_id — uten den faller vi tilbake.
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'reactions'},
+          payload => {
+            const p = payload as any;
+            const row =
+              p.eventType === 'INSERT'
+                ? p.new
+                : p.eventType === 'DELETE'
+                ? p.old
+                : null;
+            if (!row) return;
+            if (!row.feed_post_id) {
+              emit({kind: 'fallback'});
+              return;
+            }
+            emit({
+              kind: 'reaction',
+              postId: row.feed_post_id,
+              userId: row.user_id,
+              delta: p.eventType === 'INSERT' ? 1 : -1,
+            });
+          },
+        )
+        .on(
+          'postgres_changes',
+          {event: '*', schema: 'public', table: 'comments'},
+          payload => {
+            const p = payload as any;
+            // Soft-delete (00041) er en UPDATE med deleted_at satt; en
+            // REDIGERING har deleted_at null og skal ikke røre telleren.
+            const delta: 1 | -1 | null =
+              p.eventType === 'INSERT'
+                ? 1
+                : p.eventType === 'UPDATE' && p.new?.deleted_at
+                ? -1
+                : null;
+            if (delta === null) return;
+            emit(
+              p.new?.feed_post_id
+                ? {kind: 'commentDelta', postId: p.new.feed_post_id, delta}
+                : {kind: 'fallback'},
+            );
           },
         );
     },
@@ -803,9 +1014,22 @@ export function mapMatchEventRow(
     type: me.type as MatchEventType,
     minute: me.minute,
     player: me.player_name ?? player,
+    // ⚠️ Kun når `player_name` finnes er de to feltene GARANTERT forskjellige
+    // ting (skive 8 skrev dem fra hverandre). På en eldre målrad ligger
+    // scoreren i `description`, og den er alt vist som `player` over —
+    // uten dette vilkåret ville navnet stått to ganger på raden.
+    note: me.player_name ? (me.description ?? undefined) : undefined,
+    // Kolonnen rå — se `MatchEvent.descriptionRaw` for hvorfor den ikke er
+    // den samme som `note`.
+    descriptionRaw: me.description ?? undefined,
     description,
     teamSide,
     reportedBy: me.reported_by ?? undefined,
+    // ⚠️ 00074. Uten denne hadde pulsen aldri hendelsens EGET tidspunkt og
+    // måtte gjette seg til posisjonen fra `minute` — som etter 00073 er
+    // spilt tid, altså en annen akse enn resten av kurven. Se
+    // `stampOf` i src/shared/matchPulse.ts.
+    createdAt: me.created_at ? new Date(me.created_at) : undefined,
   };
 }
 

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,15 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, fonts, shadows} from '../theme';
+import {
+  colors,
+  typography,
+  spacing,
+  radius,
+  fonts,
+  shadows,
+  matchColors,
+} from '../theme';
 import {
   BackBar,
   Card,
@@ -20,11 +28,9 @@ import {
   ListRow,
   EventCard,
   HeroSurface,
-  ScoreBoard,
   StadiumSurface,
   StatusPill,
   TeamBadge,
-  ReporterActions,
   ReporterModal,
   ReporterBar,
   ReporterSheet,
@@ -35,25 +41,38 @@ import {
   Skeleton,
   SkeletonCard,
 } from '../components';
+import {FinishedMatch} from '../components/match/FinishedMatch';
+import {LiveMatch} from '../components/match/LiveMatch';
+import {MatchEngagementRow} from '../components/match/MatchEngagementRow';
+import {CommentSheet} from '../components/match/CommentSheet';
+import {GoalCorrectionSheet} from '../components/match/GoalCorrectionSheet';
 import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
 import {useAuth, useActiveTeam, useNotifications} from '../context';
-import type {TeamMember} from '../lib/api/members';
-import {useTeamMembers} from '../lib/queries/members';
+import type {TeamAuthor, TeamMember} from '../lib/api/members';
+import {useTeamAuthors, useTeamMembers} from '../lib/queries/members';
 import {
+  adjustMatchEngagement,
   applyMatchEventInsert,
+  applyMatchEventUpdate,
+  applyMatchEventDelete,
   applyMatchSessionUpdate,
   eventDetailKey,
   invalidateEventDetail,
+  invalidateMatchEngagement,
   invalidateMatchPhotos,
   markEventDetailStale,
+  markMatchEngagementStale,
   markMatchPhotosStale,
+  matchEngagementKey,
   matchPhotosKey,
   patchEventDetail,
   useEventDetail,
+  useMatchEngagement,
   useMatchPhotos,
 } from '../lib/queries/eventDetail';
+import {patchFeedItem} from '../lib/queries/feed';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {
   getTournamentMatches,
@@ -63,17 +82,37 @@ import {
   startMatch,
   reportMatchEvent,
   subscribeToMatch,
+  correctMatchGoal,
   type ReportMatchEventInput,
 } from '../lib/api/events';
-import {createImagePost, type MatchPhoto} from '../lib/api/feed';
+import {
+  createImagePost,
+  toggleReaction,
+  type MatchPhoto,
+} from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
+import {
+  allowsHeia,
+  buildMatchEngagement,
+  canCorrectGoal,
+  showsEngagement,
+  type MatchFeedPost,
+} from '../shared/matchEngagement';
+import {
+  matchCommentA11yLabel,
+  matchCorrectA11yLabel,
+  matchHeiaA11yLabel,
+} from '../shared/matchCopy';
+import {GRID_FONT_CAP} from '../shared/matchGridGeometry';
+import {matchMinute as matchMinute_} from '../shared/matchClock';
 import {dayRangeLabel} from '../shared/calendar';
 import {eventIsUpcoming} from '../shared/eventForm';
 import type {
   EventAttendee,
   EventType,
   HeiaEvent,
+  MatchEvent,
   HomeStackParamList,
   RSVPStatus,
   RSVPSummary,
@@ -84,7 +123,13 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'EventDetail'>;
 // Stabile tomme referanser: `?? []` ville gitt railens FlatList ny data-ref
 // hver render (minuttickeren re-rendrer skjermen hvert 30. sekund på live).
 const NO_MEMBERS: TeamMember[] = [];
+const NO_AUTHORS: TeamAuthor[] = [];
 const NO_PHOTOS: MatchPhoto[] = [];
+// ⚠️ `length` er IKKE eneste sannhet (se PulseCurve-regelen i handoffen) —
+// men referansen må uansett være stabil, ellers regner hver memo nedstrøms
+// på nytt ved hvert minutt-tick.
+const NO_MATCH_EVENTS: MatchEvent[] = [];
+const NO_MATCH_FEED: MatchFeedPost[] = [];
 
 const dayNamesLong = [
   'Søndag',
@@ -215,6 +260,8 @@ export function EventDetailScreen({route, navigation}: Props) {
   const {eventId} = route.params;
 
   const teamName = activeTeamSpace?.displayName ?? '';
+  // Brukes til å filtrere bort mitt eget realtime-ekko på HEIA (skive 4).
+  const myId = currentUser?.id;
 
   // B2: hendelsen bor i query-cachen (P7-nøkkelen ['event', id]).
   // Redigeringsmodal-fella fra 2026-08-07 (lukker seg tilbake hit med gammel
@@ -238,6 +285,14 @@ export function EventDetailScreen({route, navigation}: Props) {
   const [pendingPhoto, setPendingPhoto] = useState<PickedImage | null>(null);
   const [publishingPhoto, setPublishingPhoto] = useState(false);
   const [galleryPhotoId, setGalleryPhotoId] = useState<string | null>(null);
+  // Samtalen om ett øyeblikk, som bunnark OVER kampen (skive 4.1) — ikke en
+  // skjerm man sendes bort til. `null` = arket er lukket.
+  const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  // «Korriger mål» (skive 8) — målet som rettes, eller null når arket er
+  // lukket. Arket monteres med `key={id}`, så feltene alltid starter fra den
+  // ferske raden og aldri fra forrige mål man åpnet.
+  const [correctingGoalId, setCorrectingGoalId] = useState<string | null>(null);
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   // Turnering: kampene lastes for seg og refetches ved fokus — «Ny kamp»
   // lukker modalen tilbake hit, og å komme tilbake fra en kamp skal vise
@@ -268,8 +323,33 @@ export function EventDetailScreen({route, navigation}: Props) {
   // faller tilbake på et navnløst medlem i stedet for å påstå at rollen er
   // ledig.
   const isMatchEvent = event?.matchSessionId != null;
+  // Rosteret brukes KUN av reporter-UI-et (ReporterBar + ReporterSheet), og
+  // begge er gatet på live/kommende kamp. Den frosne rapporten trenger det
+  // ikke — så den skal heller ikke betale for kallet.
+  const needsRoster = isMatchEvent && event?.matchStatus !== 'finished';
   const teamMembers =
-    useTeamMembers(isMatchEvent ? activeTeamSpaceId : null).data ?? NO_MEMBERS;
+    useTeamMembers(needsRoster ? activeTeamSpaceId : null).data ?? NO_MEMBERS;
+
+  // Reporteren bak en oppdatering i kampforløpet. Noden sier HVA som skjedde,
+  // avataren sier HVEM.
+  //
+  // ⚠️ FORFATTERE, IKKE MEDLEMMER. `get_team_members` filtrerer på
+  // `status IN ('active','invited')`, så en reporter som forlater laget
+  // forsvinner derfra — og da ville hver eneste oppdatering hun skrev mistet
+  // navn og avatar i en FROSSET kamprapport. Det er nøyaktig hullet 00067 §2
+  // lukket for kommentarfeltet; `get_team_authors` har ingen statusfilter og
+  // er derfor riktig kilde for forfatterskap. Samme 5-min-cache.
+  const teamAuthors =
+    useTeamAuthors(isMatchEvent ? activeTeamSpaceId : null).data ?? NO_AUTHORS;
+  const authorsById = useMemo(() => {
+    const map = new Map<string, TeamAuthor>();
+    for (const a of teamAuthors) map.set(a.id, a);
+    return map;
+  }, [teamAuthors]);
+  const authorFor = useCallback(
+    (userId: string) => authorsById.get(userId),
+    [authorsById],
+  );
 
   // Kampbilder — egen query-sti (P6-splitten): et mål re-laster aldri
   // bildene. Feiler den, lever kampsiden videre (isError ignoreres bevisst —
@@ -278,10 +358,169 @@ export function EventDetailScreen({route, navigation}: Props) {
   const matchPhotos = photosQuery.data ?? NO_PHOTOS;
   const refetchPhotos = photosQuery.refetch;
 
+  // ---------------------------------------------------------------------
+  // KAMPENS ENGASJEMENT (skive 4) — HEIA og kommentarer per øyeblikk.
+  //
+  // Den fjerde RPC-en på kampskjermen, og et bevisst valg: koblingen mellom
+  // øyeblikket og den kanoniske feed-posten (00071) er hele skiva, og egen
+  // sti betyr at et HEIA aldri koster en re-lasting av kampforløpet.
+  // Feiler den, lever kampen videre — linja tegnes med nuller og disablede
+  // knapper i stedet for å ta ned skjermen.
+  // ---------------------------------------------------------------------
+  const matchFeed =
+    useMatchEngagement(eventId, isMatchEvent).data ?? NO_MATCH_FEED;
+  const engagement = useMemo(
+    () => buildMatchEngagement(matchFeed),
+    [matchFeed],
+  );
+
+  const handleMatchHeia = useCallback(
+    async (postId: string, currentlyReacted: boolean) => {
+      const delta = currentlyReacted ? -1 : 1;
+      // Optimistisk rett i cachen — et HEIA skal kjennes i samme sekund som
+      // fingeren treffer, ikke etter en rundtur.
+      adjustMatchEngagement(eventId, postId, {
+        heia: delta,
+        iReacted: !currentlyReacted,
+      });
+      // ⚠️ FEEDEN VISER DEN SAMME POSTEN. Uten denne patchen ville et HEIA
+      // gitt i kampen stått ureagert i feeden til neste refetch — samme
+      // post, to tall. En no-op når feeden ikke er i cachen.
+      const patchFeed = (reacted: boolean, d: 1 | -1) => {
+        if (!activeTeamSpaceId) return;
+        patchFeedItem(activeTeamSpaceId, postId, p => ({
+          ...p,
+          iReacted: reacted,
+          heiaCount: Math.max(0, (p.heiaCount ?? 0) + d),
+        }));
+      };
+      patchFeed(!currentlyReacted, delta);
+      try {
+        await toggleReaction(postId, currentlyReacted);
+      } catch {
+        adjustMatchEngagement(eventId, postId, {
+          heia: -delta,
+          iReacted: currentlyReacted,
+        });
+        patchFeed(currentlyReacted, -delta as 1 | -1);
+      }
+    },
+    [eventId, activeTeamSpaceId],
+  );
+
+  // ⚠️ ARK, IKKE NAVIGASJON. Fra kampen skal samtalen komme opp FORAN
+  // kampen: en pågående kamp er noe du står i, og å bli skjøvet ut av den
+  // for å lese en kommentar er å forlate den. `CommentsScreen` lever videre
+  // for feedens og varslenes innganger — det er SAMME tråd (`CommentThread`),
+  // bare en annen ramme.
+  const handleMatchComment = useCallback((postId: string) => {
+    setCommentPostId(postId);
+  }, []);
+
+  /**
+   * ⚠️ HVEM SOM KAN KORRIGERE — samme regel som `correct_match_goal` (00075)
+   * håndhever: kampens reporter, eller en lagadmin. Regnes HER, og ikke
+   * sammen med de andre rolleflaggene lenger nede, fordi `renderEngagement`
+   * under trenger den.
+   *
+   * Serveren er fasit; dette avgjør bare om knappen TEGNES. En flate som
+   * viser en handling brukeren ikke har lov til, er en flate som lyver.
+   */
+  const canCorrectGoals =
+    event?.type === 'kamp' &&
+    (event.reporterId === myId || isTeamAdmin(activeRole));
+
+  /**
+   * Én engasjementslinje, eller ingenting.
+   *
+   * ⚠️ TRE REGLER, OG ALLE TRE ER PRODUKT, IKKE VISNING:
+   *   · Rytmemarkørene (avspark/pause/2. omgang/slutt) HAR feed-poster, men
+   *     får aldri en linje — de er kampens gater, ikke øyeblikk.
+   *   · Mål IMOT får kommentarer, aldri HEIA (P1, låst).
+   *   · Et frittstående kampbilde er sin egen post; `MatchPhoto.id` ER
+   *     post-id-en, så det trenger ikke det kanoniske valget.
+   * Reglene bor i `shared/matchEngagement` så de kan testes uten en skjerm.
+   */
+  const renderEngagement = useCallback(
+    ({event: ev, photo}: {event?: MatchEvent; photo?: MatchPhoto}) => {
+      if (photo) {
+        const entry = engagement.byPost.get(photo.id);
+        return (
+          <MatchEngagementRow
+            engagement={entry}
+            canHeia
+            heiaLabel={matchHeiaA11yLabel({
+              subject: 'photo',
+              count: entry?.heiaCount ?? 0,
+            })}
+            commentLabel={matchCommentA11yLabel({
+              subject: 'photo',
+              count: entry?.commentCount ?? 0,
+            })}
+            fontCap={GRID_FONT_CAP}
+            onHeia={handleMatchHeia}
+            onComment={handleMatchComment}
+          />
+        );
+      }
+      if (!ev || !showsEngagement(ev)) {
+        return null;
+      }
+      const entry = engagement.byMatchEvent.get(ev.id);
+      // ⚠️ KUN MÅL, og kun for den som har lov. `canCorrectGoal` er den samme
+      // regelen serveren håndhever — rytmemarkørene eier kampuret, og en
+      // melding har ingen stilling å regne om.
+      const correctable = canCorrectGoals && canCorrectGoal(ev);
+      return (
+        <MatchEngagementRow
+          engagement={entry}
+          canHeia={allowsHeia(ev)}
+          onCorrect={correctable ? () => setCorrectingGoalId(ev.id) : undefined}
+          correctLabel={
+            correctable
+              ? matchCorrectA11yLabel({subject: ev, minute: ev.minute})
+              : undefined
+          }
+          heiaLabel={matchHeiaA11yLabel({
+            subject: ev,
+            minute: ev.minute,
+            count: entry?.heiaCount ?? 0,
+          })}
+          commentLabel={matchCommentA11yLabel({
+            subject: ev,
+            minute: ev.minute,
+            count: entry?.commentCount ?? 0,
+          })}
+          fontCap={GRID_FONT_CAP}
+          onHeia={handleMatchHeia}
+          onComment={handleMatchComment}
+        />
+      );
+    },
+    [engagement, handleMatchHeia, handleMatchComment, canCorrectGoals],
+  );
+
   // Kampen er i gang (også i pause — da telles minuttene fortsatt).
   const isUnderway =
     event?.matchStatus === 'live' || event?.matchStatus === 'halfTime';
   const liveMatchSessionId = isUnderway ? event?.matchSessionId : undefined;
+
+  // ⚠️ KORTET BAK SKJERMEN. Stackens `contentStyle` er krem for alle skjermer
+  // (AppNavigator), og det er den flaten som blinker i kantene under push/pop.
+  // Mot kampens grunn ville den blinket KREM inn i en mørkegrønn verden.
+  // Ruten er delt av alle hendelsestyper, så den kan ikke settes statisk i
+  // navigatoren — den må følge hendelsen.
+  //
+  // Én ærlig begrensning: er detaljen ikke i cachen ved åpning, vet vi ikke at
+  // det er en kamp før dataene lander. Da viser skjermen uansett skjelettet
+  // sitt på krem, så det er ingen ny feil — bare ikke en fullstendig fiks.
+  useEffect(() => {
+    navigation.setOptions({
+      contentStyle: {
+        backgroundColor: isUnderway ? matchColors.groundTop : colors.background,
+      },
+    });
+  }, [navigation, isUnderway]);
 
   // Fokus-broen (B2): 60 s-regelen fra P6. (Skjermen refetchet før ved HVERT
   // fokus — dette er selve kallbesparelsen i skiven.) Live-kampens behov for
@@ -292,6 +531,7 @@ export function EventDetailScreen({route, navigation}: Props) {
   // `isInvalidated` ved retur og resyncer straks, uansett 60 s-regelen.
   useScreenFocusRefetch(eventDetailKey(eventId));
   useScreenFocusRefetch(matchPhotosKey(eventId));
+  useScreenFocusRefetch(matchEngagementKey(eventId));
 
   // Dette er hele grunnen til at en forelder kan følge med: uten abonnementet
   // ville stillingen stått stille til hun selv dro for å oppdatere.
@@ -314,6 +554,14 @@ export function EventDetailScreen({route, navigation}: Props) {
       if (!liveMatchSessionId) return;
       let eventTimer: ReturnType<typeof setTimeout> | null = null;
       let photoTimer: ReturnType<typeof setTimeout> | null = null;
+      let engagementTimer: ReturnType<typeof setTimeout> | null = null;
+      const scheduleEngagementRefetch = () => {
+        if (engagementTimer) clearTimeout(engagementTimer);
+        engagementTimer = setTimeout(() => {
+          engagementTimer = null;
+          invalidateMatchEngagement(eventId);
+        }, 400);
+      };
       const scheduleEventRefetch = () => {
         if (eventTimer) clearTimeout(eventTimer);
         eventTimer = setTimeout(() => {
@@ -327,6 +575,23 @@ export function EventDetailScreen({route, navigation}: Props) {
             if (!applyMatchEventInsert(eventId, evt.row)) {
               scheduleEventRefetch();
             }
+            break;
+          // KORRIGERINGEN (skive 8). Rettelsen byttes ut PÅ PLASS og
+          // annulleringen fjernes; stillingen kommer for seg som `session`,
+          // ferdig omregnet av serveren.
+          case 'matchEventUpdate':
+            if (!applyMatchEventUpdate(eventId, evt.row)) {
+              scheduleEventRefetch();
+            }
+            // Ble målet et mål IMOT, er HEIA-ene slettet i basen (00075).
+            // Tellerne står igjen med gamle tall til engasjementet hentes.
+            scheduleEngagementRefetch();
+            break;
+          case 'matchEventDelete':
+            if (!applyMatchEventDelete(eventId, evt.id)) {
+              scheduleEventRefetch();
+            }
+            scheduleEngagementRefetch();
             break;
           case 'session':
             if (!applyMatchSessionUpdate(eventId, evt.row)) {
@@ -343,6 +608,29 @@ export function EventDetailScreen({route, navigation}: Props) {
               invalidateMatchPhotos(eventId);
             }, 400);
             break;
+          case 'engagementPost':
+            // Et ferskt øyeblikk fikk nettopp sin kanoniske post. Debounced,
+            // for et mål skriver flere rader i samme transaksjon.
+            scheduleEngagementRefetch();
+            break;
+          case 'reaction':
+            // ⚠️ EGET EKKO FILTRERES HER, IKKE I KANALEN. Trykket mitt er
+            // alt applisert optimistisk; ekkoet ville talt to ganger.
+            // Filteret står her fordi `acquireChannel` deler kanalen, og en
+            // «hvem er jeg» fanget i oppsettet ville tilhørt den første
+            // abonnenten for alltid.
+            if (evt.userId !== myId) {
+              adjustMatchEngagement(eventId, evt.postId, {heia: evt.delta});
+            }
+            break;
+          case 'commentDelta':
+            // Ingen avsenderfilter: kommentarer skrives i `CommentsScreen`,
+            // og mens den er åpen er kampen ute av fokus — abonnementet her
+            // er revet, så mitt eget ekko kan aldri nå denne linja.
+            adjustMatchEngagement(eventId, evt.postId, {
+              comments: evt.delta,
+            });
+            break;
           case 'resync':
             // Kanalen har vært nede — hendelser kan være tapt. Hent begge
             // stiene straks (P6-reconnect-raden); dette er også broen som
@@ -350,6 +638,7 @@ export function EventDetailScreen({route, navigation}: Props) {
             // i fokus hele tiden).
             invalidateEventDetail(eventId);
             invalidateMatchPhotos(eventId);
+            invalidateMatchEngagement(eventId);
             break;
         }
       });
@@ -361,11 +650,13 @@ export function EventDetailScreen({route, navigation}: Props) {
         // straks — det som skjedde i mellomtiden kan aldri bli stående.
         if (eventTimer) clearTimeout(eventTimer);
         if (photoTimer) clearTimeout(photoTimer);
+        if (engagementTimer) clearTimeout(engagementTimer);
         markEventDetailStale(eventId);
         markMatchPhotosStale(eventId);
+        markMatchEngagementStale(eventId);
         unsubscribe();
       };
-    }, [liveMatchSessionId, eventId]),
+    }, [liveMatchSessionId, eventId, myId]),
   );
 
   // Kampminuttet regnes ut fra started_at, men ingenting re-rendrer skjermen
@@ -465,13 +756,23 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Speiler start_match: admin, eller en reporter som alt er utpekt.
   const canStartMatch = isCurrentUserAdmin || isCurrentUserReporter;
 
+  // ⚠️ P2: FAKTISK SPILT TID, og ÉN utregning for hele appen. Var
+  // `now − startedAt` her, i `LiveMatchBanner` og i `InboxScreen` — tre
+  // kopier som alle telte gjennom pausen. Se `src/shared/matchClock.ts`.
   const matchMinute = event.startedAt
-    ? Math.max(0, Math.floor((nowMs - event.startedAt.getTime()) / 60_000))
+    ? matchMinute_(
+        {
+          playedSeconds: event.playedSeconds,
+          clockStartedAt: event.clockStartedAt,
+          startedAt: event.startedAt,
+        },
+        nowMs,
+      )
     : undefined;
 
   // Rapporten leses som en historie: avspark først, slutt sist. Motsatt av
   // live-modus, der det ferskeste skal ligge øverst.
-  const finishedMatchEvents = event.matchEvents ?? [];
+  const finishedMatchEvents = event.matchEvents ?? NO_MATCH_EVENTS;
 
   const attendees = event.attendees;
 
@@ -648,6 +949,38 @@ export function EventDetailScreen({route, navigation}: Props) {
     setReporterModalVisible(true);
   };
 
+  /**
+   * KORRIGER ET MÅL (skive 8).
+   *
+   * ⚠️ INGEN LOKAL PATCHING AV STILLINGEN. Den telles opp på nytt fra
+   * målhistorikken server-side, og feedens stillingssnapshots skrives om i
+   * samme transaksjon — det finnes ikke noe å gjette riktig her. Vi
+   * refetcher; de andre telefonene får sitt via realtime.
+   *
+   * Engasjementet invalideres i tillegg: en annullering tar posten med seg,
+   * og en rettelse til «mål imot» sletter HEIA-ene på den.
+   */
+  const submitCorrection = async (
+    matchEventId: string,
+    input: Parameters<typeof correctMatchGoal>[1],
+  ) => {
+    if (savingCorrection) return;
+    setSavingCorrection(true);
+    try {
+      await correctMatchGoal(matchEventId, input);
+      setCorrectingGoalId(null);
+      invalidateMatchEngagement(eventId);
+      await refetchEvent();
+    } catch (e) {
+      Alert.alert(
+        'Kunne ikke korrigere målet',
+        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+      );
+    } finally {
+      setSavingCorrection(false);
+    }
+  };
+
   const handleReportSubmit = (description: string) => {
     setReporterModalVisible(false);
     submitAction(selectedActionType, description);
@@ -722,83 +1055,65 @@ export function EventDetailScreen({route, navigation}: Props) {
     }
   };
 
+  /**
+   * «KORRIGER MÅL»-ARKET (skive 8).
+   *
+   * ⚠️ BOR I BEGGE KAMPGRENENE, og det er hele forskjellen fra et angrevindu:
+   * korrigeringen er VARIG. Et feilregistrert mål oppdages like ofte når
+   * rapporten leses dagen etter som mens kampen går.
+   *
+   * ⚠️ `key` PÅ ØYEBLIKKET. Arket initialiserer feltene sine én gang (se
+   * komponenten); uten nøkkelen ville et nytt mål åpnet arket med forrige
+   * måls målscorer i feltet.
+   */
+  const correctingGoal = correctingGoalId
+    ? (event.matchEvents ?? NO_MATCH_EVENTS).find(e => e.id === correctingGoalId)
+    : undefined;
+  const correctionSheet = correctingGoal ? (
+    <GoalCorrectionSheet
+      key={correctingGoal.id}
+      visible
+      event={correctingGoal}
+      opponent={event.opponent ?? 'motstanderen'}
+      saving={savingCorrection}
+      onSave={input =>
+        submitCorrection(correctingGoal.id, {action: 'edit', ...input})
+      }
+      onCancelGoal={() => submitCorrection(correctingGoal.id, {action: 'cancel'})}
+      onClose={() => setCorrectingGoalId(null)}
+    />
+  ) : null;
+
   // -----------------------------------------------------------------------
   // LIVE KAMP-MODUS
   // -----------------------------------------------------------------------
   if (isLiveMatch && event.score && event.opponent) {
-    const matchEvents = event.matchEvents ?? [];
+    const matchEvents = event.matchEvents ?? NO_MATCH_EVENTS;
 
     return (
-      <View style={styles.screen}>
-        <BackBar title="Hendelse" />
-        <ScrollView
-          contentContainerStyle={{
-            paddingBottom: insets.bottom + spacing['3xl'],
-          }}>
-          {/* Scoreboard */}
-          <View style={styles.section}>
-            <ScoreBoard
-              homeTeam={teamName}
-              awayTeam={event.opponent}
-              homeScore={event.score.home}
-              awayScore={event.score.away}
-              matchStatus={event.matchStatus!}
-              minute={matchMinute}
-            />
-          </View>
-
-          {/* Reporter-bar */}
-          <View style={styles.section}>
-            <ReporterBar
-              reporter={reporter}
-              isAdmin={isCurrentUserAdmin}
-              isMe={isCurrentUserReporter}
-              onChangeReporter={() => setReporterSheetVisible(true)}
-            />
-          </View>
-
-          {/* Kampvarsler for tilskuere (ikke reporter) */}
-          {!isCurrentUserReporter && (
-            <View style={styles.section}>
-              <Card>
-                <View style={styles.notificationRow}>
-                  <View style={styles.notificationInfo}>
-                    <Text style={styles.notificationTitle}>
-                      Du følger kampen direkte
-                    </Text>
-                    <Text style={styles.notificationDesc}>
-                      Stillingen og kampforløpet oppdaterer seg av seg selv.
-                    </Text>
-                  </View>
-                </View>
-              </Card>
-            </View>
-          )}
-
-          {/* Reporter-verktøy — kun synlig for aktiv reporter */}
-          {isCurrentUserReporter && (
-            <View style={styles.section}>
-              <ReporterActions
-                onAction={handleReporterAction}
-                isPaused={event.matchStatus === 'halfTime'}
-                onPhoto={handlePickPhoto}
-              />
-            </View>
-          )}
-
-          {/* Kampforløp — bildene ligger i forløpet, ikke i en egen seksjon.
-              Under kampen skal ingenting konkurrere med stillingen. */}
-          <SectionHeader title="Kampforløp" />
-          <View style={styles.timeline}>
-            <MatchTimeline
-              matchEvents={matchEvents}
-              photos={matchPhotos}
-              startedAt={event.startedAt}
-              newestFirst
-              onPressPhoto={photo => setGalleryPhotoId(photo.id)}
-            />
-          </View>
-        </ScrollView>
+      // Kampen er sin egen verden og eier hele skjermen (skive 2). Det som ble
+      // igjen her er state, handlere, realtime og modalene — de hører til
+      // skjermens livssyklus, ikke til flaten.
+      <>
+        <LiveMatch
+          event={event}
+          matchEvents={matchEvents}
+          teamName={teamName}
+          teamColor={activeTeamSpace?.color || colors.heiaInk}
+          minute={matchMinute}
+          nowMs={nowMs}
+          reporter={reporter}
+          isAdmin={isCurrentUserAdmin}
+          isReporter={isCurrentUserReporter}
+          photos={matchPhotos}
+          authorFor={authorFor}
+          engagement={engagement}
+          renderEngagement={renderEngagement}
+          onChangeReporter={() => setReporterSheetVisible(true)}
+          onReporterAction={handleReporterAction}
+          onPickPhoto={handlePickPhoto}
+          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+        />
 
         {/* Reporter-modal */}
         <ReporterModal
@@ -832,25 +1147,67 @@ export function EventDetailScreen({route, navigation}: Props) {
           initialPhotoId={galleryPhotoId}
           onClose={() => setGalleryPhotoId(null)}
         />
-      </View>
+
+        <CommentSheet
+          postId={commentPostId}
+          teamSpaceId={activeTeamSpaceId ?? ''}
+          onClose={() => setCommentPostId(null)}
+        />
+
+        {correctionSheet}
+      </>
     );
   }
 
   // -----------------------------------------------------------------------
-  // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp) + KAMPRAPPORT
+  // KAMPRAPPORT-MODUS (skive 3)
   // -----------------------------------------------------------------------
-  // Kamprapporten snur rekkefølgen: resultatet ER historien på en spilt kamp,
-  // så scoreboardet møter deg først og «hvor og når» demoteres til én linje.
-  // Før åpnet siden med et administrativt infokort, og selve kampen lå under.
-  const showReport = isFinishedMatch && !!event.score && !!event.opponent;
+  // Den spilte kampen bor i den SAMME verdenen som den live — samme grunn,
+  // samme arena, samme forløp, bare roligere. Egen komponent av samme grunn
+  // som `LiveMatch`: grenen under deles med trening, sosialt, kommende kamp,
+  // turnering og avlyst kamp, og de skal ikke bli grønne av at rapporten ble
+  // det.
+  if (isFinishedMatch && event.score && event.opponent) {
+    return (
+      <>
+        <FinishedMatch
+          event={event}
+          matchEvents={finishedMatchEvents}
+          teamName={teamName}
+          teamColor={activeTeamSpace?.color || colors.heiaInk}
+          photos={matchPhotos}
+          reporter={reporter}
+          isAdmin={isCurrentUserAdmin}
+          authorFor={authorFor}
+          engagement={engagement}
+          renderEngagement={renderEngagement}
+          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+          onEdit={() => navigation.navigate('NewEvent', {eventId})}
+        />
 
-  const whenWhere = [
-    formatDateLong(event.startTime),
-    formatTime(event.startTime),
-    event.location,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+        <MatchPhotoGallery
+          photos={matchPhotos}
+          initialPhotoId={galleryPhotoId}
+          onClose={() => setGalleryPhotoId(null)}
+        />
+
+        <CommentSheet
+          postId={commentPostId}
+          teamSpaceId={activeTeamSpaceId ?? ''}
+          onClose={() => setCommentPostId(null)}
+        />
+
+        {correctionSheet}
+      </>
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // VANLIG EVENT-MODUS (trening, sosialt, kommende kamp)
+  // -----------------------------------------------------------------------
+  // ⚠️ En FERDIG kamp UTEN stilling eller motstander faller hit. Den er ingen
+  // rapport — det finnes ikke noe resultat å vise — men bildene og forløpet
+  // skal fortsatt være der, på den lyse flaten som før.
 
   // En avlyst kamp er ingen kampdag — nøytral «Avlyst»-pill (som kalenderen).
   const infoPill =
@@ -863,22 +1220,7 @@ export function EventDetailScreen({route, navigation}: Props) {
       <BackBar title="Hendelse" />
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
-      {showReport ? (
-        <View style={styles.report}>
-          <ScoreBoard
-            homeTeam={teamName}
-            awayTeam={event.opponent!}
-            homeScore={event.score!.home}
-            awayScore={event.score!.away}
-            matchStatus={event.matchStatus!}
-          />
-          <Text style={styles.reportTitle}>{event.title}</Text>
-          <Text style={styles.reportMeta}>{whenWhere}</Text>
-          {event.description && (
-            <Text style={styles.description}>{event.description}</Text>
-          )}
-        </View>
-      ) : isUpcomingMatch && event.opponent ? (
+      {isUpcomingMatch && event.opponent ? (
         /* Kampdag (P5B): motstander + avspark fortjener mer enn sort på
            hvitt — en liten stadion-smak, IKKE full ScoreBoard (det er
            live-kampens språk). RSVP og «Start kamp»-flyten består under. */
@@ -1087,17 +1429,15 @@ export function EventDetailScreen({route, navigation}: Props) {
 
       {isFinishedMatch &&
         (finishedMatchEvents.length > 0 || matchPhotos.length > 0) && (
-          <>
-            <SectionHeader title="Kampforløp" />
-            <View style={styles.timeline}>
-              <MatchTimeline
-                matchEvents={finishedMatchEvents}
-                photos={matchPhotos}
-                startedAt={event.startedAt}
-                onPressPhoto={photo => setGalleryPhotoId(photo.id)}
-              />
-            </View>
-          </>
+          <View style={styles.timeline}>
+            <MatchTimeline
+              matchEvents={finishedMatchEvents}
+              photos={matchPhotos}
+              startedAt={event.startedAt}
+              authorFor={authorFor}
+              onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+            />
+          </View>
         )}
 
       {/* RSVP — meningsløst på en ferdigspilt kamp. */}
@@ -1127,24 +1467,18 @@ export function EventDetailScreen({route, navigation}: Props) {
 
       {/* Oppmøteliste. På en spilt kamp er «Kommer» fortid, og «Ikke svart»
           er ren støy — påmeldingen blir en enkel deltakerliste i stedet. */}
-      {(!showReport || attendees.coming.length > 0) && (
-        <AttendanceSection
-          title={
-            showReport
-              ? `Påmeldt (${attendees.coming.length})`
-              : `Kommer (${attendees.coming.length})`
-          }
-          users={attendees.coming}
-          emptyText="Ingen har svart ennå"
-        />
-      )}
-      {attendees.notComing.length > 0 && !showReport && (
+      <AttendanceSection
+        title={`Kommer (${attendees.coming.length})`}
+        users={attendees.coming}
+        emptyText="Ingen har svart ennå"
+      />
+      {attendees.notComing.length > 0 && (
         <AttendanceSection
           title={`Kan ikke (${attendees.notComing.length})`}
           users={attendees.notComing}
         />
       )}
-      {attendees.pending.length > 0 && !showReport && (
+      {attendees.pending.length > 0 && (
         <AttendanceSection
           title={`Ikke svart (${attendees.pending.length})`}
           users={attendees.pending}
@@ -1223,27 +1557,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
   },
+  // Kampforløpet er kant-til-kant: hver rad setter sin EGEN venstremarg fra
+  // matchGrid, og krittlinja + nodene lever i den margen. En
+  // paddingHorizontal her ville forskjøvet hele skinna.
+  //
+  // ⚠️ KUN KAMPRAPPORTEN IGJEN. Live-kampen ligger nå rett på grunnen
+  // (`MatchTimeline ground`), der det fjerde rommet tegnes som et scrim i
+  // stedet for en egen flate. Denne bakgrunnen forsvinner når rapporten
+  // flytter ned på samme grunn (skive 3).
   timeline: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  notificationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  notificationInfo: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  notificationTitle: {
-    ...typography.body,
-    fontWeight: '600',
-  },
-  notificationDesc: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+    backgroundColor: matchColors.timeline,
+    paddingBottom: spacing.lg,
   },
   // Info-kortet (P5B): aksentbåndet ligger kant-i-kant med kortets topp, så
   // paddingen bor i båndet og kroppen — ikke på kortet selv.
@@ -1369,20 +1693,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.stadiumDim,
     textAlign: 'center',
-  },
-  // Kamprapportens topp: resultatet først, «hvor og når» som undertekst.
-  report: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    gap: spacing.xs,
-  },
-  reportTitle: {
-    ...typography.heading2,
-    marginTop: spacing.lg,
-  },
-  reportMeta: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
   },
   description: {
     ...typography.body,

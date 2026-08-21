@@ -36,6 +36,7 @@ import {
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
+import {isSystemMatchPost} from '../shared/matchEngagement';
 import {getLiveMatch} from '../lib/api/events';
 import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
 import {
@@ -530,7 +531,13 @@ export function TeamHomeScreen() {
           onPress: () => promptReport('feed_post', post.id),
         });
       }
-      if (own || canBroadcast) {
+      // ⚠️ SYSTEMETS KAMPPOSTER KAN IKKE SLETTES HERFRA (P3, skive 8).
+      // «Slett innlegget» var en LØGN på et mål: posten forsvant, men
+      // stillingen sto på 2–1, hendelsen sto i kampforløpet og varselet lå i
+      // innboksen — brukeren trodde hun hadde angret. Basen avviser det nå
+      // (`soft_delete_post`, 00075); her fjernes knappen, så den aldri
+      // TILBYS. Et kampBILDE er brukerens eget innhold og beholder sin.
+      if ((own || canBroadcast) && !isSystemMatchPost(post.type)) {
         buttons.push({
           text: 'Slett innlegget',
           style: 'destructive',

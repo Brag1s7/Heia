@@ -1,12 +1,18 @@
 import React, {useCallback} from 'react';
 import {View, Text, Pressable, FlatList, StyleSheet} from 'react-native';
-import {colors, typography, spacing, radius} from '../theme';
+import {colors, matchColors, typography, spacing, radius} from '../theme';
 import {MediaImage} from '../lib/media/MediaImage';
 import type {MatchPhoto} from '../lib/api/feed';
 
 interface MatchPhotoRailProps {
   photos: MatchPhoto[];
   onPressPhoto: (photo: MatchPhoto) => void;
+  /**
+   * ⚠️ VARIANT, IKKE ENDRET DEFAULT. Stripa står i dag på appens lyse flate.
+   * Når rapporten flytter ned på grunnen (skive 3) må overskriften og
+   * lasteplatene følge med, ellers blir de to hvite flekker på grønt.
+   */
+  variant?: 'default' | 'match';
 }
 
 const photoKeyExtractor = (photo: MatchPhoto) => photo.id;
@@ -25,22 +31,37 @@ const ThumbGap = () => <View style={styles.thumbGap} />;
  * FlatList med windowSize 3 (B2): en kamp med mange bilder laster bare de
  * synlige thumbene (+ ett viewport hver vei), ikke hele railen ved mount.
  */
-export function MatchPhotoRail({photos, onPressPhoto}: MatchPhotoRailProps) {
+export function MatchPhotoRail({
+  photos,
+  onPressPhoto,
+  variant = 'default',
+}: MatchPhotoRailProps) {
+  const onMatch = variant === 'match';
   const renderThumb = useCallback(
-    ({item}: {item: MatchPhoto}) => (
+    ({item, index}: {item: MatchPhoto; index: number}) => (
       <Pressable
         onPress={() => onPressPhoto(item)}
-        style={({pressed}) => [styles.thumb, pressed && styles.pressed]}>
+        accessibilityRole="imagebutton"
+        accessibilityLabel={
+          item.caption
+            ? `Kampbilde ${index + 1}. ${item.caption}`
+            : `Kampbilde ${index + 1}`
+        }
+        style={({pressed}) => [
+          styles.thumb,
+          onMatch && styles.thumbMatch,
+          pressed && styles.pressed,
+        ]}>
         {/* 96 pt-rute → thumb-varianten (480 px holder i massevis). */}
         <MediaImage
           media={item.media}
           variant="thumb"
-          style={styles.thumbImage}
+          style={[styles.thumbImage, onMatch && styles.thumbImageMatch]}
           resizeMode="cover"
         />
       </Pressable>
     ),
-    [onPressPhoto],
+    [onPressPhoto, onMatch],
   );
 
   if (photos.length === 0) return null;
@@ -48,8 +69,12 @@ export function MatchPhotoRail({photos, onPressPhoto}: MatchPhotoRailProps) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Kampbilder</Text>
-        <Text style={styles.count}>
+        <Text
+          style={[styles.title, onMatch && styles.titleMatch]}
+          accessibilityRole="header">
+          Kampbilder
+        </Text>
+        <Text style={[styles.count, onMatch && styles.countMatch]}>
           {photos.length === 1 ? '1 bilde' : `${photos.length} bilder`}
         </Text>
       </View>
@@ -83,8 +108,14 @@ const styles = StyleSheet.create({
   title: {
     ...typography.heading3,
   },
+  titleMatch: {
+    color: matchColors.text,
+  },
   count: {
     ...typography.caption,
+  },
+  countMatch: {
+    color: matchColors.dim,
   },
   rail: {
     paddingHorizontal: spacing.lg,
@@ -98,6 +129,20 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
     backgroundColor: colors.surface,
+  },
+  // Laste-platen må være mørk, ikke hvit — ellers blinker den krem mens
+  // thumben dekodes, på nøyaktig den flaten som aldri skal være hvit.
+  //
+  // ⚠️ ET SCRIM, IKKE `matchColors.timeline`. Platen var kampforløpets farge
+  // da varianten ble bygget (skive 2), men stripa står ikke i kampforløpet —
+  // den står på GRUNNEN, over det rommet. En flat romfarge på feil rom er
+  // nøyaktig fella fra skive 2.2. Et scrim senker det som ligger under, og er
+  // derfor riktig uansett hvilken tone stripa havner på.
+  thumbMatch: {
+    backgroundColor: 'rgba(8, 27, 19, 0.55)',
+  },
+  thumbImageMatch: {
+    backgroundColor: 'rgba(8, 27, 19, 0.55)',
   },
   pressed: {
     opacity: 0.7,

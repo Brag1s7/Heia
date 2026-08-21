@@ -31,6 +31,7 @@ import {buildEntries, groupByAge, mergeNotifications} from '../shared/inbox';
 import type {Entry, HeiaNotification} from '../shared/inbox';
 import {getLiveMatch} from '../lib/api/events';
 import {useTeamAuthors} from '../lib/queries/members';
+import {matchMinute} from '../shared/matchClock';
 import type {HeiaEvent} from '../shared/types';
 import type {InboxStackParamList} from '../shared/types';
 
@@ -413,11 +414,16 @@ export function InboxScreen() {
   }, [sections]);
 
   const isPaused = liveMatch?.matchStatus === 'halfTime';
+  // ⚠️ P2: samme utregning som kampskjermen og banneret.
   const liveMinute =
     liveMatch && !isPaused && liveMatch.startedAt
-      ? Math.max(
-          0,
-          Math.floor((nowTick - liveMatch.startedAt.getTime()) / 60000),
+      ? matchMinute(
+          {
+            playedSeconds: liveMatch.playedSeconds,
+            clockStartedAt: liveMatch.clockStartedAt,
+            startedAt: liveMatch.startedAt,
+          },
+          nowTick,
         )
       : null;
 

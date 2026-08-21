@@ -26,6 +26,7 @@ export {NextEventCarousel} from './NextEventCarousel';
 export {LiveBadge} from './LiveBadge';
 export {ScoreBoard} from './ScoreBoard';
 export {MatchEventRow} from './MatchEventRow';
+export {EventNode, nodeKindFor, type NodeKind} from './EventNode';
 export {LiveMatchBanner} from './LiveMatchBanner';
 export {MatchPulseCard} from './MatchPulseCard';
 export {ReporterActions} from './ReporterActions';
@@ -47,6 +48,16 @@ export {MatchPhotoSheet} from './MatchPhotoSheet';
 export {MatchPhotoRail} from './MatchPhotoRail';
 export {MatchPhotoGallery} from './MatchPhotoGallery';
 export {MatchTimeline} from './MatchTimeline';
+// Kampverdenen (skive 2) — grunnen, arenaen og selve kampskjermen.
+export {MatchGround} from './match/MatchGround';
+export {ArenaSurface} from './match/ArenaSurface';
+export {MatchArena} from './match/MatchArena';
+// ⚠️ Kampens PULSKURVE (skive 5). Ikke `MatchPulseCard`, som er «lagets
+// puls» i varslene og ikke har noe med kampen å gjøre.
+export {MatchPulse} from './match/MatchPulse';
+// Toppflaten som BLIR stillingen når arenaen ruller ut av bildet (skive 6).
+export {MatchTopBar} from './match/MatchTopBar';
+export {LiveMatch} from './match/LiveMatch';
 export {
   Skeleton,
   SkeletonCard,

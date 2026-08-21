@@ -7,6 +7,7 @@ import {Avatar} from './Avatar';
 import {avatarRef} from '../lib/media/avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
+import {feedAllowsHeia} from '../shared/matchEngagement';
 import type {FeedItem} from '../shared/types';
 
 interface FeedCardProps {
@@ -91,7 +92,7 @@ function Marker({item, onUnpin}: {item: FeedItem; onUnpin?: () => void}) {
     if (item.type === 'match_event') {
       // Minuttet er øyeblikkets identitet; stillingen i øyeblikket bor i
       // teksten. Kampens NÅ-stilling ville motsagt den på historiske mål.
-      const minute = match?.minute ?? item.matchEvent?.minute;
+      const minute = match?.minute;
       return (
         <ScoreChip
           label={minute !== undefined ? `${minute}′` : 'Kamp'}
@@ -131,6 +132,29 @@ export function FeedCard({
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
   const strong = item.isPinned || isMatchType(item) || item.type === 'resultat';
   const heiaCount = item.heiaCount ?? 0;
+
+  // ⚠️ P1, LÅST: INGEN HEIA PÅ MÅL IMOT — HELLER IKKE HER.
+  // Det er den SAMME kanoniske posten som inne i kampskjermen, der knappen
+  // bevisst ikke finnes siden skive 4. Uten denne gaten kunne man heie på
+  // baklengsmålet fra Hjem, og heiet dukket opp igjen inne i kampen.
+  //
+  // ⚠️ SMAL MED VILJE. Feedens gate er ikke kampens: kampen viser
+  // engasjement kun på mål og meldinger, mens feeden har HEIA på avspark,
+  // bilder og vanlige innlegg — og skal beholde det.
+  //
+  // ⚠️ SMALNET I SKIVE 8. Gaten så før KUN på `matchEvent`, og et BILDE
+  // festet til et baklengsmål bærer den samme koblingen (00028) — så
+  // brukerens eget bilde mistet HEIA-en sin. `feedAllowsHeia` krever i
+  // tillegg at posten er SYSTEMETS egen målpost, som er nøyaktig det
+  // `trg_no_heia_on_opponent_goal` (00075) avviser på skrivesiden. Klient og
+  // base stiller nå samme spørsmål; drifter de, blir knappen død.
+  //
+  // `matchEvent` mangler på alt som ikke er en kamphendelse, og på servere
+  // eldre enn 00072. Begge deler betyr «som før».
+  const canHeia = feedAllowsHeia({
+    postType: item.type,
+    matchEvent: item.matchEvent,
+  });
   const commentCount = item.commentCount ?? 0;
 
   // Heia, Kommenter, forstørr og «løsne» er egne Pressables inne i kortet.
@@ -201,21 +225,27 @@ export function FeedCard({
 
       {/* Reaksjoner — designede pills, aktiv 👏 er et Heia-øyeblikk */}
       <View style={styles.reactions}>
-        <Pressable
-          onPress={onHeia}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Heia"
-          style={({pressed}) => [
-            styles.reactPill,
-            item.iReacted && styles.reactPillOn,
-            pressed && styles.reactPillPressed,
-          ]}>
-          <Text
-            style={[styles.reactText, item.iReacted && styles.reactTextOn]}>
-            👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
-          </Text>
-        </Pressable>
+        {/* ⚠️ P1: PILLEN RENDRES IKKE PÅ MÅL IMOT — den er ikke disabled.
+            En avslått knapp ville sagt «du kan heie hvis du får lov», og det
+            er ikke beslutningen: det finnes ingen HEIA der. Kommentarpillen
+            står naken igjen alene, akkurat som i kampforløpet. */}
+        {canHeia && (
+          <Pressable
+            onPress={onHeia}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Heia"
+            style={({pressed}) => [
+              styles.reactPill,
+              item.iReacted && styles.reactPillOn,
+              pressed && styles.reactPillPressed,
+            ]}>
+            <Text
+              style={[styles.reactText, item.iReacted && styles.reactTextOn]}>
+              👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
+            </Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={onComment}
           hitSlop={8}
@@ -363,11 +393,9 @@ const styles = StyleSheet.create({
   reactPillPressed: {
     opacity: 0.7,
   },
-  reactText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
+  // Stemmen bor i `typography.action` — delt med kommentartråden og
+  // kampens engasjementslinje, så de tre ikke kan drifte fra hverandre.
+  reactText: typography.action,
   reactTextOn: {
     color: colors.heiaInk,
   },

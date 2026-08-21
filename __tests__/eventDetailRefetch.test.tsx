@@ -66,9 +66,17 @@ jest.mock('../src/lib/supabase', () => {
     return q;
   };
 
+  // ⚠️ HANDLERNE RUTES PÅ TABELL **OG** HENDELSESTYPE (skive 8).
+  // Fram til korrigeringen fantes hadde `match_events` bare ÉN handler, så
+  // tabellen alene var nok. Nå er det tre (INSERT/UPDATE/DELETE), og en mock
+  // som fyrer alle tre på én payload er ikke lenger en modell av Supabase —
+  // den ville gjort hvert mål til en fallback-refetch i testen, uten at noe
+  // slikt skjer i produksjon.
+  const eventOf = (cb: (p: unknown) => void) => (cb as any).__event as string;
   const channelObj: any = {
     on: jest.fn((_type: string, filter: any, cb: (p: unknown) => void) => {
       realtimeHandlers.push(cb);
+      (cb as any).__event = (filter?.event as string) ?? '*';
       const table = (filter?.table as string) ?? '*';
       (handlersByTable[table] = handlersByTable[table] ?? []).push(cb);
       return channelObj;
@@ -127,10 +135,17 @@ jest.mock('../src/lib/supabase', () => {
         }
       }
     },
-    /** Målrettet payload til én tabells handlere (B3 payload-først). */
+    /**
+     * Målrettet payload til én tabells handlere (B3 payload-først).
+     * Ruter på `payload.eventType` når den finnes — se kommentaren ved `on`.
+     */
     __fire: (table: string, payload: unknown, n = 1) => {
+      const kind = (payload as {eventType?: string})?.eventType;
       for (let i = 0; i < n; i++) {
         for (const handler of [...(handlersByTable[table] ?? [])]) {
+          if (kind && eventOf(handler) !== '*' && eventOf(handler) !== kind) {
+            continue;
+          }
           handler(payload);
         }
       }
@@ -391,12 +406,34 @@ test('ferdig kamp: 3 RPC, signering én batch med begge varianter, forløpet vis
   });
   await flushWaves();
 
-  // --- Budsjettet: hendelsen + bildene + medlemmene, én gang hver ---
+  // --- Budsjettet: hendelsen + bildene + FORFATTERNE, én gang hver ---
+  //
+  // Fortsatt tre kall, men det tredje er byttet fra `get_team_members` til
+  // `get_team_authors` (kampskjermens designskive):
+  //
+  //  · Rosteret brukes kun av ReporterBar/ReporterSheet, og begge er gatet på
+  //    live/kommende kamp. En FERDIG kamp har aldri brukt det til noe.
+  //  · Forfatterne trengs derimot: kampforløpet viser navn og avatar på
+  //    reporterens oppdateringer, og `get_team_members` filtrerer bort
+  //    utmeldte. Slo reporteren seg av laget, ble hele hennes stemme anonym i
+  //    en frossen kamprapport — samme hull som 00067 §2 lukket for
+  //    kommentarfeltet. `get_team_authors` har ingen statusfilter.
+  //
+  // ⚠️ BUDSJETTET ER FIRE FRA SKIVE 4, og det fjerde kallet er navngitt her
+  // med vilje: `get_match_feed` (00071) er den KANONISKE KOBLINGEN mellom et
+  // øyeblikk og feed-posten HEIA og kommentarer henger på. Den kunne ikke
+  // presses inn i `get_event_with_rsvp` — den RPC-en deles av alle
+  // hendelsestyper, og en trening skal ikke betale for kampens engasjement.
+  //
+  // Lista er uttømmende, ikke en nedre grense: dukker `get_team_members` opp
+  // igjen, er rosteret sluppet inn på en flate som ikke bruker det, og da
+  // skal denne testen falle.
   const rpcNames = supabase.rpc.mock.calls.map((c: unknown[]) => c[0]).sort();
   expect(rpcNames).toEqual([
     'get_event_with_rsvp',
+    'get_match_feed',
     'get_match_photos',
-    'get_team_members',
+    'get_team_authors',
   ]);
   // Ferdig kamp = ingen realtime-kanal.
   expect(supabase.channel).not.toHaveBeenCalled();
@@ -586,6 +623,73 @@ test('live kamp payload-først (B3): mål = cache-patch og NULL refetch; reconne
   await flushWaves(true);
   expect(rpcCalls('get_event_with_rsvp')).toBe(2);
   expect(rpcCalls('get_match_photos')).toBe(2);
+
+  await ReactTestRenderer.act(async () => {
+    renderer?.unmount();
+  });
+});
+
+test('korrigering (skive 8): rettelse bytter raden PÅ PLASS, annullering fjerner den', async () => {
+  jest.useFakeTimers();
+  const {__fire} = jest.requireMock('../src/lib/supabase');
+  jest.clearAllMocks();
+  mockRpc({
+    get_event_with_rsvp: kampRow('live'),
+    get_match_photos: [],
+    get_team_members: [],
+  });
+
+  const cachedDetail = () => queryClient.getQueryData<any>(['event', 'evt-1']);
+
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+  await flushWaves(true);
+  const opened = rpcCalls('get_event_with_rsvp');
+  expect(cachedDetail()?.matchEvents?.map((e: any) => e.id)).toEqual(['me-1']);
+
+  // --- Reporteren retter målet til et mål IMOT. Hos tilskueren skal raden
+  // BYTTES UT, ikke legges til. Ble UPDATE rutet til INSERT-handleren, sto
+  // målet plutselig to ganger i forløpet. ---
+  await ReactTestRenderer.act(async () => {
+    __fire('match_events', {
+      eventType: 'UPDATE',
+      new: {
+        id: 'me-1',
+        match_session_id: 'ms-1',
+        type: 'mål',
+        minute: 12,
+        team_side: 'away',
+        player_name: 'Ukjent',
+        description: 'Feilregistrert',
+        sequence: 1,
+      },
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  const rettet = cachedDetail();
+  expect(rettet?.matchEvents).toHaveLength(1);
+  expect(rettet?.matchEvents?.[0]?.teamSide).toBe('away');
+  expect(rettet?.matchEvents?.[0]?.player).toBe('Ukjent');
+  // `note` settes KUN når player_name finnes — ellers ville et gammelt mål
+  // vist scorernavnet to ganger på raden.
+  expect(rettet?.matchEvents?.[0]?.note).toBe('Feilregistrert');
+  expect(rpcCalls('get_event_with_rsvp')).toBe(opened);
+
+  // --- …og annullerer det. DELETE-payloaden bærer hele den gamle raden,
+  // og det gjør den KUN fordi match_events har REPLICA IDENTITY FULL
+  // (00075). Uten den ville tilskueren sittet igjen med korrigert stilling i
+  // toppen og et annullert mål i forløpet. ---
+  await ReactTestRenderer.act(async () => {
+    __fire('match_events', {
+      eventType: 'DELETE',
+      old: {id: 'me-1', match_session_id: 'ms-1', type: 'mål', minute: 12},
+    });
+    jest.advanceTimersByTime(1000);
+  });
+  expect(cachedDetail()?.matchEvents).toEqual([]);
+  expect(rpcCalls('get_event_with_rsvp')).toBe(opened);
 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();

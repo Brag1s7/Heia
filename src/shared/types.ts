@@ -48,6 +48,29 @@ export interface MatchEvent {
   minute: number;
   player?: string;
   description: string;
+  /**
+   * ⚠️ MÅLETS FRIE BESKRIVELSE — og KUN når den er noe annet enn målscoreren.
+   *
+   * `report_match_event` har historisk hatt ÉTT tekstfelt, og det havnet i
+   * `match_events.description` og ble vist som målscorer. «Korriger mål»
+   * (skive 8) skriver de to fra hverandre: scoreren i `player_name`,
+   * beskrivelsen i `description`. `note` settes derfor bare når `player_name`
+   * finnes — ellers ville en gammel målpost vist samme navn to ganger.
+   * Se `mapMatchEventRow`.
+   */
+  note?: string;
+  /**
+   * ⚠️ `match_events.description` RÅ — den ENESTE riktige kilden når feltet
+   * skal REDIGERES, og den er en annen enn både `description` og `note`.
+   *
+   *   · `description` er SYNTETISK på mål («Mål for oss»), ikke kolonnen.
+   *   · `note` er kolonnen, men KUN når den er noe annet enn målscoreren —
+   *     riktig for visning, feil for redigering: på et mål der reporteren
+   *     skrev fritekst ved rapportering ligger teksten i `description` og
+   *     `note` er `undefined`. Prefylte korrigeringsarket fra `note`, ville
+   *     feltet stått tomt, og et lagre hadde SLETTET teksten.
+   */
+  descriptionRaw?: string;
   /** `home` = oss, `away` = motstander. Satt for mål. */
   teamSide?: 'home' | 'away';
   reportedBy?: string;
@@ -123,8 +146,21 @@ export interface HeiaEvent {
   reporterId?: string;
   /** Satt for kamper. Nøkkelen skriving mot match_sessions/match_events går på. */
   matchSessionId?: string;
-  /** Satt når kampen er startet. Kampminuttet regnes ut fra denne. */
+  /**
+   * ⚠️ HISTORIKK, IKKE KLOKKE (P2/00073). Når kampen faktisk begynte.
+   * Skrives ALDRI om. Kampminuttet regnes IKKE av denne lenger — den teller
+   * gjennom pausen. Se `playedSeconds`/`clockStartedAt` og
+   * `src/shared/matchClock.ts`.
+   */
   startedAt?: Date;
+  /**
+   * Akkumulert FAKTISK SPILT TID fram til forrige stopp (00073).
+   * `undefined` = serveren er eldre enn 00073; da faller `matchClock` tilbake
+   * på den gamle oppførselen. Se `matchPlayedSeconds`.
+   */
+  playedSeconds?: number;
+  /** Når kampuret sist ble startet. `undefined` = uret står. (00073) */
+  clockStartedAt?: Date;
   /**
    * Turneringen kampen hører til (00032). En turneringskamp er en HELT
    * VANLIG kamp — samme kampmotor, samme live-rapportering, samme kort —
@@ -176,7 +212,6 @@ export interface FeedItem {
   content: string;
   /** Bildet som path + variant (P4) — aldri en ferdig URL. `MediaImage` viser den. */
   media?: MediaRef;
-  matchEvent?: MatchEvent;
   /**
    * Kampkontekst fra `get_team_feed` (00029). Satt på poster som hører til en
    * kamp. `home`/`away` er kampens stilling NÅ (ferdig kamp: sluttresultatet);
@@ -187,6 +222,18 @@ export interface FeedItem {
     status: MatchStatus;
     home: number;
     away: number;
+  };
+  /**
+   * ⚠️ P1: HVA KAMPØYEBLIKKET ER — satt kun når posten ER en kamphendelse
+   * (00072). Feeden kunne før ikke se forskjell på et baklengsmål og en
+   * beskjed fra treneren, og tegnet HEIA på begge.
+   *
+   * `undefined` betyr «vanlig post» ELLER «serveren har ikke 00072 ennå».
+   * Begge skal oppføre seg som før — feeden har HEIA på alt annet.
+   */
+  matchEvent?: {
+    type: MatchEventType;
+    teamSide?: 'home' | 'away';
   };
   eventId?: string;
   /** «Varsle hele laget» — festet øverst i feeden, varslet alle (00024). */

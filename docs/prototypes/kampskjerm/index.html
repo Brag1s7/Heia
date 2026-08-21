@@ -1,0 +1,1789 @@
+<title>Levende flater</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap">
+
+<style>
+/* ==========================================================================
+   HEIA — RUNDE 3: LEVENDE FLATER
+   Isolert prototype. Ingen produksjonskode.
+
+   PRINSIPPET: innholdet former flaten. Ingen generiske kort.
+
+   Heia har allerede TO flatefamilier i koden — StadiumSurface (mørk, flomlys,
+   banebuer) og HeroSurface (mint→krem, banebuer). Runde 2 innførte et TREDJE
+   språk: hvite/lyse rektangler. Det var feilen. Runde 3 bygger hvert øyeblikk
+   av de to som allerede finnes, pluss lys.
+
+   FIRE FLATER I KAMPVERDENEN:
+     ARENA  lysere tonal grønn platå med buet underkant — bærer stillingen
+     BANE   selve grunnen — rytmemarkører og reporterens stemme står RETT på den
+     SWELL  et lagfarget lysfelt i grunnen der et mål ligger
+     FOTO   bildet ER flaten, kant til kant
+
+   INGEN av dem har ramme, skygge eller kortradius. Skille kommer av LYS og
+   LUFT. Bevegelse er kun transform + opacity (native driver i RN).
+   ========================================================================== */
+
+:root {
+  --bench: #14181A; --bench-2: #1B2124; --bench-line: #2A3236;
+  --bench-ink: #E6EEE9; --bench-dim: #8FA39A; --bench-faint: #5D6E67;
+
+  /* Heias låste tokens */
+  --heia: #02FFAB; --heia-pressed: #00D492; --heia-ink: #087A5A;
+  --heia-deep: #08392E; --heia-tint: #C6FFE9;
+  --background: #F6F8F0; --surface: #FFFFFF; --surface-muted: #F1F4EA;
+  --sun: #FFF9E7; --sun-border: #F2E4BC;
+  --stadium: #10251D; --stadium-text: #EAFFF6; --stadium-dim: #A9CCBC;
+  --text-primary: #11241B; --text-secondary: #5F7265; --text-tertiary: #93A195;
+  --border: #DFE7D8; --border-subtle: #E9EEE1;
+  --live: #FF5A5F; --gold: #FFC53D; --gold-ink: #5C4A00;
+  --info: #3D7BF5; --remind: #8B5CF6;
+
+  /* Kampverdenens grunn — FAST. Lagfargen rører den aldri. */
+  --g-top: #0B1911; --g-mid: #183F30; --g-low: #0E291D;
+  /* Arenaen: samme verden, løftet ett hakk */
+  --arena-a: #25563F; --arena-b: #1D4633;
+
+  --team: #1E7A46; --opp: #46525C;
+  --flood-peak: .78; --swell-peak: .55;
+
+  --display: "Nunito", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1100px 700px at 50% -10%, #1E272A 0%, rgba(30,39,42,0) 65%), var(--bench);
+  color: var(--bench-ink); font-family: var(--ui); -webkit-font-smoothing: antialiased;
+  display: flex; justify-content: center; gap: 38px; padding: 32px 24px 52px; min-height: 100%;
+}
+
+/* ===================== VERKSTEDET ===================== */
+.bench { width: 318px; flex: 0 0 318px; display: flex; flex-direction: column; gap: 15px; }
+.bench-mark { display: inline-flex; align-items: center; gap: 8px; font-family: var(--display);
+  font-weight: 900; font-size: 13.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--heia); }
+.bench-mark::before { content: ""; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--heia); box-shadow: 0 0 12px rgba(2,255,171,.75); }
+.bench-title { font-size: 20px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 0; }
+.bench-sub { font-size: 12.5px; line-height: 1.55; color: var(--bench-dim); margin: 6px 0 0; }
+.bench-sub b { color: var(--heia); font-weight: 700; }
+.panel { background: var(--bench-2); border: 1px solid var(--bench-line); border-radius: 14px;
+  padding: 13px; display: flex; flex-direction: column; gap: 10px; }
+.panel-label { font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--bench-faint); margin: 0; }
+.seg { display: flex; flex-wrap: wrap; gap: 5px; }
+.seg button { font: inherit; font-size: 12px; font-weight: 600; padding: 7px 10px; border-radius: 8px;
+  cursor: pointer; background: #232B2F; color: var(--bench-dim); border: 1px solid transparent;
+  transition: background .13s, color .13s; }
+.seg button:hover { background: #2B3438; color: var(--bench-ink); }
+.seg button[aria-pressed="true"] { background: var(--heia); color: var(--heia-deep); font-weight: 800; }
+.seg button:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.swatches { display: flex; gap: 8px; padding-bottom: 17px; }
+.swatch { width: 40px; height: 40px; border-radius: 11px; cursor: pointer; position: relative;
+  border: 2px solid transparent; padding: 0; transition: transform .13s; }
+.swatch:hover { transform: translateY(-2px); }
+.swatch[aria-pressed="true"] { border-color: var(--bench-ink); box-shadow: 0 0 0 3px rgba(255,255,255,.09); }
+.swatch:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.swatch span { position: absolute; inset: auto 0 -16px; font-size: 9.5px; text-align: center; color: var(--bench-faint); }
+.readout { display: flex; flex-direction: column; gap: 4px; }
+.readout-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px;
+  padding: 5px 8px; border-radius: 7px; background: #1E2528; font-variant-numeric: tabular-nums; }
+.readout-row b { font-family: var(--display); font-weight: 800; }
+.readout-row .lbl { color: var(--bench-dim); }
+.pass { color: var(--heia); } .fail { color: var(--live); }
+.note { font-size: 11px; line-height: 1.5; margin: 0; border-radius: 8px; padding: 7px 9px; }
+.note.warn { color: var(--gold); background: rgba(255,197,61,.09); border: 1px solid rgba(255,197,61,.22); }
+.note.info { color: var(--bench-dim); background: #1E2528; border: 1px solid var(--bench-line); }
+.note[hidden] { display: none; }
+.toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.toggle span { font-size: 12.5px; }
+.switch { width: 42px; height: 25px; border-radius: 99px; border: none; cursor: pointer;
+  background: #333D42; position: relative; padding: 0; flex: 0 0 auto; transition: background .16s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px;
+  border-radius: 50%; background: #8FA39A; transition: transform .16s, background .16s; }
+.switch[aria-pressed="true"] { background: var(--heia); }
+.switch[aria-pressed="true"]::after { transform: translateX(17px); background: var(--heia-deep); }
+.switch:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.act { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.act button { font: inherit; font-size: 12px; font-weight: 650; padding: 9px 8px; border-radius: 9px;
+  cursor: pointer; background: #232B2F; color: var(--bench-ink); border: 1px solid var(--bench-line);
+  transition: background .13s, transform .1s; }
+.act button:hover { background: #2E383C; } .act button:active { transform: scale(.97); }
+.act button:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.act .wide { grid-column: 1 / -1; }
+.act .hot { background: var(--heia); color: var(--heia-deep); border-color: var(--heia); font-weight: 800; }
+.act button:disabled { opacity: .32; cursor: not-allowed; }
+.aria { font-size: 11px; line-height: 1.5; color: var(--bench-dim); background: #1E2528;
+  border-radius: 7px; padding: 8px 9px; font-family: ui-monospace, Menlo, monospace; }
+.aria b { color: var(--heia); font-weight: 700; }
+
+/* ===================== TELEFONEN ===================== */
+.stage { display: flex; flex-direction: column; align-items: center; }
+.phone { width: 430px; height: 932px; flex: 0 0 auto; border-radius: 56px; padding: 12px;
+  background: linear-gradient(155deg, #3A4448, #1A2023 55%, #2C3437);
+  box-shadow: 0 44px 90px -28px rgba(0,0,0,.85), 0 0 0 1px rgba(255,255,255,.07); position: relative; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 45px; overflow: hidden;
+  background: var(--stadium); isolation: isolate; }
+.notch { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 122px;
+  height: 33px; border-radius: 99px; background: #05090A; z-index: 90; }
+.statusbar { position: absolute; top: 0; left: 0; right: 0; height: 54px; z-index: 86;
+  display: flex; align-items: center; justify-content: space-between; padding: 16px 32px 0;
+  pointer-events: none; font-size: 14.5px; font-weight: 650; color: var(--stadium-text);
+  font-variant-numeric: tabular-nums; }
+.screen.lightworld .statusbar { color: var(--text-primary); }
+.sb-right { display: flex; align-items: center; gap: 5px; }
+.sb-bar { width: 17px; height: 11px; border: 1.4px solid currentColor; border-radius: 3px; position: relative; }
+.sb-bar::after { content: ""; position: absolute; inset: 1.6px; background: currentColor; border-radius: 1px; }
+
+/* ==========================================================================
+   BANEN — kampverdenens grunn. Fast Heia-grønn, edge-to-edge.
+   ========================================================================== */
+.ground { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+.ground > * { position: absolute; inset: 0; pointer-events: none; }
+.g-base { background: linear-gradient(172deg, var(--g-top) 0%, var(--g-mid) 46%, var(--g-low) 100%); }
+.g-heia { background: radial-gradient(122% 62% at 80% -8%, var(--heia) 0%, rgba(0,0,0,0) 54%); opacity: .2; }
+.g-warm { background: radial-gradient(108% 56% at 12% -12%, var(--gold) 0%, rgba(0,0,0,0) 50%); opacity: .12; }
+.g-team { background: radial-gradient(54% 26% at 14% 22%, var(--team) 0%, rgba(0,0,0,0) 62%); opacity: .34; }
+.g-opp { background: radial-gradient(48% 24% at 87% 22%, var(--opp) 0%, rgba(0,0,0,0) 62%); opacity: .24; }
+.g-grass { background: radial-gradient(150% 52% at 50% 114%, rgba(2,255,171,.18) 0%, rgba(0,0,0,0) 60%); }
+/* Feltlinjene — Heias banebuer, gjennomgående i hele verdenen */
+.g-arc1 { inset: auto -80px -140px auto; width: 380px; height: 380px; border-radius: 50%;
+  border: 1.5px solid rgba(2,255,171,.10); }
+.g-arc2 { inset: auto -30px -84px auto; width: 254px; height: 254px; border-radius: 50%;
+  border: 1.5px solid rgba(2,255,171,.07); }
+.g-halfline { inset: 250px auto auto -70px; width: 580px; height: 1px;
+  background: linear-gradient(90deg, rgba(2,255,171,0), rgba(2,255,171,.13) 44%, rgba(2,255,171,0)); }
+.g-pulse-a, .g-pulse-b { opacity: 0; }
+.g-pulse-a { background: radial-gradient(110% 60% at 50% 4%, var(--heia) 0%, rgba(0,0,0,0) 58%); }
+.g-pulse-b { background: radial-gradient(132% 78% at 50% 24%, #1E7A46 0%, rgba(0,0,0,0) 56%); }
+body:not(.rm) .live .g-pulse-a { animation: pA 3.1s ease-in-out infinite; }
+body:not(.rm) .live .g-pulse-b { animation: pB 3.1s ease-in-out infinite; }
+body:not(.rm) .pre .g-pulse-a { animation: pA 5.6s ease-in-out infinite; }
+@keyframes pA { 0%,100% { opacity:.09 } 50% { opacity:.20 } }
+@keyframes pB { 0%,100% { opacity:.16 } 50% { opacity:.05 } }
+body.rm .live .g-pulse-a { opacity: .15; } body.rm .pre .g-pulse-a { opacity: .09; }
+.g-wave { background: radial-gradient(62% 44% at 50% 104%, var(--heia) 0%, rgba(0,0,0,0) 66%);
+  opacity: 0; transform: scale(.55); transform-origin: 50% 100%; }
+.g-wave.go { animation: wv .64s cubic-bezier(.2,.75,.3,1) forwards; }
+@keyframes wv { 0%{opacity:0;transform:scale(.5)} 22%{opacity:.6;transform:scale(.92)} 100%{opacity:0;transform:scale(1.55)} }
+body.rm .g-wave.go { animation: wvR .4s ease-out forwards; }
+@keyframes wvR { 0%{opacity:0} 35%{opacity:.3} 100%{opacity:0} }
+.g-flood { background: radial-gradient(122% 88% at 50% 38%, var(--team) 0%, rgba(0,0,0,0) 74%),
+  linear-gradient(180deg, var(--team) 0%, rgba(0,0,0,0) 88%); opacity: 0; }
+.g-flood.go { animation: fl 1.15s cubic-bezier(.15,.8,.3,1) forwards; }
+@keyframes fl { 0%{opacity:0} 10%{opacity:var(--flood-peak)} 32%{opacity:calc(var(--flood-peak)*.7)} 100%{opacity:0} }
+body.rm .g-flood.go { animation: flR 1s steps(1,end) forwards; }
+@keyframes flR { 0%,74%{opacity:calc(var(--flood-peak)*.55)} 100%{opacity:0} }
+.g-flood.them { background: linear-gradient(180deg, rgba(198,212,220,.6) 0%, rgba(0,0,0,0) 56%); }
+.g-flood.them.go { animation: flT .66s ease-out forwards; }
+@keyframes flT { 0%{opacity:0} 18%{opacity:.17} 100%{opacity:0} }
+.half .g-heia { opacity: .09 } .half .g-grass { opacity: .5 }
+.half .g-team, .half .g-opp { opacity: .13 }
+.cancelled .g-heia { opacity: .04 } .cancelled .g-grass { opacity: .26 }
+.cancelled .g-team, .cancelled .g-opp { opacity: .07 }
+.cancelled .g-base { filter: saturate(.5); }
+.g-aurora { background: radial-gradient(88% 50% at 20% -6%, var(--gold) 0%, rgba(0,0,0,0) 52%),
+  radial-gradient(84% 46% at 82% 2%, var(--heia) 0%, rgba(0,0,0,0) 48%); opacity: 0; transition: opacity .5s; }
+.done.win .g-aurora { opacity: .3; }
+
+.scroll { position: absolute; inset: 0; z-index: 10; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.scroll::-webkit-scrollbar { display: none; }
+.scroll-inner { padding: 54px 0 128px; min-height: 100%; }
+body.repopen .scroll-inner { padding-bottom: 300px; }
+
+.navbar { display: flex; align-items: center; gap: 4px; padding: 6px 12px 0; height: 44px; }
+.icon-btn { width: 36px; height: 36px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255,255,255,.08); color: var(--stadium-text); display: grid; place-items: center;
+  padding: 0; transition: background .13s; }
+.icon-btn:hover { background: rgba(255,255,255,.16); }
+.icon-btn:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.navtitle { flex: 1; font-size: 16.5px; font-weight: 700; color: var(--stadium-text); margin-left: 2px; }
+.lightworld .navtitle { color: var(--text-primary); }
+.lightworld .icon-btn { background: rgba(17,36,27,.06); color: var(--text-primary); }
+
+/* ==========================================================================
+   FLATE 1 — ARENA. Ikke et kort: et platå i samme verden, med buet underkant.
+   ========================================================================== */
+.arena { position: relative; margin: 4px 10px 0; padding: 14px 20px 34px;
+  border-radius: 30px 30px 46% 46% / 30px 30px 40px 40px; overflow: hidden;
+  box-shadow: inset 0 -1px 0 rgba(234,255,246,.22), 0 16px 38px -26px rgba(2,255,171,.26); }
+.arena::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(168deg, var(--arena-a) 0%, var(--arena-b) 100%); }
+.arena::after { content: ""; position: absolute; inset: 0;
+  background:
+    radial-gradient(66% 46% at 16% 34%, var(--team) 0%, rgba(0,0,0,0) 66%),
+    radial-gradient(52% 38% at 86% 34%, var(--opp) 0%, rgba(0,0,0,0) 64%),
+    radial-gradient(90% 60% at 50% 116%, rgba(2,255,171,.2) 0%, rgba(0,0,0,0) 60%);
+  opacity: .62; }
+.arena > * { position: relative; }
+/* Feltbuene INNE i arenaen — samme signatur, mindre skala */
+.a-ring { position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%);
+  width: 210px; height: 210px; border-radius: 50%; border: 1.5px solid rgba(234,255,246,.09); }
+.a-ring2 { width: 132px; height: 132px; border-color: rgba(234,255,246,.06); }
+.a-line { position: absolute; left: -20px; right: -20px; top: 46%; height: 1px;
+  background: linear-gradient(90deg, rgba(234,255,246,0), rgba(234,255,246,.1), rgba(234,255,246,0)); }
+
+.a-top { display: flex; align-items: center; justify-content: space-between; min-height: 26px; }
+.livepill { display: inline-flex; align-items: center; gap: 7px; background: var(--live); color: #fff;
+  font-size: 11px; font-weight: 800; letter-spacing: .1em; padding: 5px 11px 5px 9px; border-radius: 99px;
+  box-shadow: 0 4px 14px -4px rgba(255,90,95,.7); }
+.livepill .dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; }
+body:not(.rm) .livepill:not(.paused) .dot { animation: bl 1.5s ease-in-out infinite; }
+@keyframes bl { 0%,100%{opacity:1} 50%{opacity:.3} }
+.livepill.paused { background: var(--gold); color: var(--gold-ink); box-shadow: none; }
+.livepill.flat { background: rgba(255,255,255,.13); color: var(--stadium-text); box-shadow: none; }
+.a-clock { font-family: var(--display); font-weight: 800; font-size: 13px; color: var(--stadium-text);
+  letter-spacing: .08em; text-transform: uppercase; font-variant-numeric: tabular-nums; opacity: .9; }
+
+.a-teams { display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 6px; margin-top: 16px; }
+.a-col { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.crest-plate { width: 64px; height: 64px; border-radius: 20px; background: #fff; display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,.55), 0 3px 9px -2px rgba(0,0,0,.5), 0 0 16px -7px var(--team); }
+.crest-fb { width: 60px; height: 60px; border-radius: 19px; background: var(--opp); display: grid;
+  place-items: center; font-family: var(--display); font-weight: 900; font-size: 19px;
+  color: rgba(255,255,255,.94); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.2); margin-top: 2px; }
+.a-name { font-size: 13.5px; font-weight: 700; color: var(--stadium-text); text-align: center;
+  line-height: 1.24; max-width: 116px; }
+.a-rule { width: 30px; height: 3.5px; border-radius: 2px; }
+.a-rule.us { background: var(--team); box-shadow: 0 0 14px var(--team); }
+.a-rule.them { background: var(--opp); }
+.a-score { font-family: var(--display); font-weight: 900; font-size: 78px; line-height: .92;
+  letter-spacing: -.05em; color: var(--heia); font-variant-numeric: tabular-nums;
+  display: flex; align-items: baseline; padding-top: 2px; }
+.live .a-score, .half .a-score { text-shadow: 0 0 34px rgba(2,255,171,.55); }
+.a-score .dash { font-size: 40px; opacity: .42; margin: 0 5px; }
+.a-score.pop { animation: pop .55s cubic-bezier(.2,1.5,.4,1); }
+.a-score.pop.small { animation: popS .5s cubic-bezier(.2,1.3,.4,1); }
+@keyframes pop { 0%{transform:scale(1)} 26%{transform:scale(1.24)} 100%{transform:scale(1)} }
+@keyframes popS { 0%{transform:scale(1)} 26%{transform:scale(1.09)} 100%{transform:scale(1)} }
+body.rm .a-score.pop { animation: none; }
+.a-cd { display: flex; flex-direction: column; align-items: center; gap: 2px; padding-top: 10px; }
+.a-cd b { font-family: var(--display); font-weight: 900; font-size: 40px; color: var(--heia);
+  letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.a-cd span { font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--stadium-dim); }
+
+.a-result { display: flex; justify-content: center; margin-top: 14px; }
+.a-result span { font-family: var(--display); font-weight: 900; font-size: 12.5px; letter-spacing: .17em;
+  padding: 6px 16px; border-radius: 99px; }
+.a-result .seier { background: var(--gold); color: var(--gold-ink); box-shadow: 0 6px 20px -6px rgba(255,197,61,.8); }
+.a-result .flat { background: rgba(255,255,255,.12); color: var(--stadium-text); }
+body:not(.rm) .a-result .seier.enter { animation: pop .6s cubic-bezier(.2,1.5,.4,1) .2s both; }
+
+/* Status og mennesker — TYPE PÅ FLATEN, ingen chips */
+.a-meta { margin-top: 18px; display: flex; align-items: center; justify-content: center; gap: 7px;
+  flex-wrap: wrap; font-size: 12.5px; color: #C8E6D8; }
+.a-meta .sep { opacity: .4; }
+.a-meta button { font: inherit; font-size: 12px; color: var(--stadium-text); background: none;
+  border: none; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: rgba(234,255,246,.3); }
+.a-meta button:focus-visible { outline: 2px solid var(--heia); outline-offset: 3px; }
+.a-meta .who { color: var(--stadium-text); }
+.a-meta .now { color: var(--heia); font-weight: 700; }
+.a-crowd { margin-top: 13px; display: flex; align-items: center; justify-content: center; gap: 9px; }
+.faces { display: flex; }
+.face { width: 27px; height: 27px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 10px; font-weight: 800; border: 2px solid var(--arena-b); margin-left: -9px; }
+.face:first-child { margin-left: 0; }
+.face.more { background: rgba(255,255,255,.2); color: var(--stadium-text); font-size: 9.5px; }
+.a-crowd span { font-size: 12.5px; color: var(--stadium-text); font-weight: 600; }
+.a-crowd b { font-family: var(--display); font-weight: 900; font-size: 14.5px; }
+
+/* --- Sticky --- */
+.stickybar { position: absolute; top: 0; left: 0; right: 0; z-index: 60; height: 96px; padding: 54px 18px 0;
+  display: flex; align-items: center; gap: 10px;
+  background: linear-gradient(180deg, var(--g-top) 62%, rgba(11,25,17,.94) 100%);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  transform: translateY(-100%); opacity: 0;
+  transition: transform .24s cubic-bezier(.3,.8,.4,1), opacity .18s; pointer-events: none; }
+.stickybar.on { transform: translateY(0); opacity: 1; pointer-events: auto; }
+body.rm .stickybar { transition: opacity .1s; transform: none; visibility: hidden; }
+body.rm .stickybar.on { visibility: visible; }
+.sb-back { width: 30px; height: 30px; border-radius: 50%; border: none; padding: 0; cursor: pointer;
+  background: rgba(255,255,255,.09); color: var(--stadium-text); display: grid; place-items: center; flex: 0 0 auto; }
+.sb-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--live); flex: 0 0 auto;
+  box-shadow: 0 0 10px rgba(255,90,95,.9); }
+.sb-dot.paused { background: var(--gold); box-shadow: none; } .sb-dot.off { background: var(--stadium-dim); box-shadow: none; }
+.sb-teams { font-size: 13px; font-weight: 700; color: var(--stadium-text); display: flex;
+  align-items: baseline; gap: 7px; flex: 1; min-width: 0; }
+.sb-score { font-family: var(--display); font-weight: 900; font-size: 19px; color: var(--heia); font-variant-numeric: tabular-nums; }
+.sb-min { font-family: var(--display); font-weight: 800; font-size: 13px; color: var(--stadium-dim);
+  font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+
+/* ==========================================================================
+   KAMPENS PULS — egen, kompakt seksjon under stillingen.
+   Ligger ÅPENT på stadiongrunnen: ingen container, ingen akser, ingen
+   prosenter, ingen påstand om hvem som dominerer. Formen kommer av de
+   faktiske øyeblikkene; HEIA øker GLØDEN, aldri høyden.
+   ========================================================================== */
+.pulse { position: relative; padding: 9px 22px 7px; overflow: hidden; }
+.pulse::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(70% 118% at 50% 62%, rgba(2,255,171,.11) 0%, rgba(2,255,171,0) 72%),
+    linear-gradient(180deg, rgba(26,68,51,0) 0%, #1A4433 18%, #1A4433 82%, rgba(26,68,51,0) 100%); }
+/* Krittmarkeringen som avslutter pulsen og leder blikket videre — kort,
+   venstrestilt, ikke en divider over hele bredden. */
+.pulse::after { content: ""; position: absolute; left: 22px; bottom: 0; width: 54px; height: 1px;
+  background: linear-gradient(90deg, rgba(234,255,246,.24), rgba(234,255,246,0)); }
+.pulse > * { position: relative; }
+.pulse-lab { display: flex; align-items: baseline; justify-content: space-between;
+  font-size: 11px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase;
+  color: #C8E6D8; padding-bottom: 6px; }
+.pulse-lab .min { font-family: var(--display); font-weight: 900; font-size: 12px;
+  letter-spacing: .04em; color: var(--stadium-text); font-variant-numeric: tabular-nums; }
+.pulse svg { display: block; width: 100%; height: 54px; }
+/* Nåpunktet puster. Reduce Motion fjerner bevegelsen, ikke lyset. */
+.pnow { transform-box: fill-box; transform-origin: center; }
+body:not(.rm) .pnow { animation: pnow 3.4s ease-in-out infinite; }
+@keyframes pnow { 0%,100% { opacity: .5; transform: scale(1) } 50% { opacity: .95; transform: scale(1.25) } }
+body.rm .pnow { opacity: .8; }
+/* Kort lyspuls inn i kurven ved mål og HEIA. */
+.pflash { position: absolute; left: 0; right: 0; top: 0; bottom: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(58% 130% at 50% 60%, rgba(2,255,171,.4), rgba(2,255,171,0) 70%); }
+.pflash.go { animation: pflash .72s ease-out forwards; }
+@keyframes pflash { 0% { opacity: 0 } 16% { opacity: 1 } 100% { opacity: 0 } }
+body.rm .pflash.go { animation: pflashRM .5s steps(1,end) forwards; }
+@keyframes pflashRM { 0%,70% { opacity: .8 } 100% { opacity: 0 } }
+
+/* ==========================================================================
+   KAMPTRÅDEN — tynn, levende linje i venstre marg som binder forløpet.
+   Starter UNDER pulsseksjonen, aldri gjennom scorearenaen. 2 px bred,
+   bruker 28 px av margen. Diskret mellom hendelser, våkner i nodene.
+   ========================================================================== */
+.timeline { position: relative; }
+.timeline::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(8,27,19,.5) 0%, rgba(8,27,19,.34) 18%,
+    rgba(8,27,19,.24) 46%, rgba(8,27,19,.2) 100%); }
+.thread { position: absolute; left: 27px; top: 96px; bottom: 6px; width: 1.5px; border-radius: 2px;
+  z-index: 1; pointer-events: none;
+  background: linear-gradient(180deg, rgba(234,255,246,0) 0%, rgba(234,255,246,.22) 4%,
+    rgba(234,255,246,.22) 96%, rgba(234,255,246,0) 100%); }
+/* ==========================================================================
+   HENDELSESGRID — ikonnode → minutt → innhold. Faste kolonner, så man kan
+   sveipe og bare lese 34′ · 31′ · 29′ · 25′. Ikke proporsjonal avstand:
+   tidslinja er kronologisk, ikke en tidsakse.
+   ========================================================================== */
+.moment { padding-left: 82px; }
+.node { position: absolute; left: 26px; width: 27px; height: 27px; border-radius: 50%;
+  transform: translateX(-50%); z-index: 3; display: grid; place-items: center; }
+.node svg { width: 15px; height: 15px; }
+.node .ndot { position: absolute; top: -1px; right: -1px; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--gold); border: 2px solid #123224; }
+/* Semantikken fra MatchEventRow, oversatt til mørk grunn:
+   mål for oss feires (mint + gulldetalj), mål imot er informasjon (skifer). */
+.n-goal-us   { background: var(--heia-tint); color: var(--heia-ink); box-shadow: 0 0 16px 2px rgba(2,255,171,.45); }
+.n-goal-them { background: rgba(143,163,172,.26); color: #C3D4DA; }
+.n-update    { background: var(--gold); color: var(--gold-ink); box-shadow: 0 0 13px 2px rgba(255,197,61,.4); }
+.n-photo     { background: rgba(234,255,246,.92); color: var(--heia-deep); }
+.n-neutral   { background: rgba(234,255,246,.15); color: var(--stadium-text); }
+.n-pause     { background: rgba(255,197,61,.2); color: var(--gold); }
+.n-end       { background: rgba(234,255,246,.14); color: var(--stadium-text); box-shadow: inset 0 0 0 1px rgba(234,255,246,.34); }
+.n-card      { background: rgba(255,197,61,.16); color: var(--gold); }
+/* Minuttet står ALLTID i samme kolonne — aldri over overskriften ett sted
+   og etter navnet et annet. */
+.emin { position: absolute; left: 44px; width: 30px; text-align: right; z-index: 3;
+  font-family: var(--display); font-weight: 900; font-size: 13.5px; color: #C8E6D8;
+  font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+/* Retningsmarkøren: nyeste øverst, bakover i kampen når du blar. */
+.nowmark { position: relative; padding: 2px 22px 10px 82px; }
+.nowmark .nnode { position: absolute; left: 26px; top: 3px; width: 11px; height: 11px; border-radius: 50%;
+  transform: translateX(-50%); background: var(--heia); box-shadow: 0 0 14px 3px rgba(2,255,171,.55); }
+body:not(.rm) .nowmark .nnode { animation: nowpulse 3.4s ease-in-out infinite; }
+@keyframes nowpulse { 0%,100% { opacity: .62; transform: translateX(-50%) scale(1) }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.22) } }
+.nowmark .ntxt { font-family: var(--display); font-weight: 900; font-size: 12.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--heia); font-variant-numeric: tabular-nums; }
+.nowmark .nsub { display: block; margin-top: 3px; font-size: 11px; font-weight: 600;
+  letter-spacing: .02em; text-transform: none; color: var(--stadium-dim); font-family: var(--ui); }
+
+/* HEIA-impulsen langs tråden */
+.spark { position: absolute; left: 27px; z-index: 4; width: 13px; height: 13px; border-radius: 50%;
+  margin-left: -6.5px; margin-top: -6.5px; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle, #fff 0%, var(--heia) 46%, rgba(2,255,171,0) 74%);
+  box-shadow: 0 0 22px 6px rgba(2,255,171,.5); }
+.spark.go { animation: sparkIn .5s ease-out forwards; }
+@keyframes sparkIn { 0% { opacity: 0 } 14% { opacity: 1 } 88% { opacity: 1 } 100% { opacity: 0 } }
+body.rm .spark.go { animation: sparkRM .22s ease-out forwards; }
+@keyframes sparkRM { 0% { opacity: 0 } 50% { opacity: .9 } 100% { opacity: 0 } }
+
+/* ==========================================================================
+   HISTORIEN — full bredde, ingen containere.
+   ========================================================================== */
+.timeline { padding: 6px 0 0; display: flex; flex-direction: column; }
+.eyebrow { position: relative; font-size: 11px; font-weight: 800; letter-spacing: .15em;
+  text-transform: uppercase; color: #C8E6D8; padding: 28px 22px 12px 44px; }
+/* Gullprikken markerer porten mellom pulsen og forløpet — og den er
+   punktet tråden starter fra. */
+.eyebrow::before { content: ""; position: absolute; left: 27px; bottom: 16px;
+  width: 7px; height: 7px; border-radius: 50%; transform: translateX(-50%);
+  background: var(--gold); box-shadow: 0 0 10px 2px rgba(255,197,61,.38); }
+
+/* FLATE 2 — BANEN: rytmemarkør, rett på grunnen */
+.rhythm { position: relative; display: flex; align-items: center; gap: 12px; padding: 15px 22px 15px 82px; color: var(--stadium-dim); }
+.rhythm .ln { flex: 1; height: 1px; background: rgba(234,255,246,.15); }
+.rhythm .lb { font-size: 10px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.rhythm .mn { display: none; }
+
+/* FLATE 3 — SWELL: målet løfter grunnen. Ingen kort, ingen ramme, ingen skygge. */
+.goal { position: relative; padding: 24px 22px 18px 82px; margin: 8px 0; overflow: hidden; }
+.goal .swell { position: absolute; inset: 0;
+  background:
+    linear-gradient(101deg, var(--team) -14%, rgba(0,0,0,0) 56%),
+    radial-gradient(126% 118% at 4% 46%, rgba(2,255,171,.34) 0%, rgba(0,0,0,0) 60%);
+  opacity: var(--swell-peak);
+  border-radius: 46% 46% 0 0 / 34px 34px 0 0; }
+.goal .swell-edge { position: absolute; left: 0; right: 0; top: 0; height: 46px;
+  border-radius: 46% 46% 0 0 / 34px 34px 0 0;
+  border-top: 1px solid rgba(234,255,246,.2); }
+.goal > .gc { position: relative; }
+.g-min { display: none; font-family: var(--display); font-weight: 900; font-size: 15px; letter-spacing: .1em;
+  color: var(--heia); font-variant-numeric: tabular-nums; }
+.g-headline { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 2px; }
+.g-word { font-family: var(--display); font-weight: 900; font-size: 46px; line-height: 1;
+  letter-spacing: -.045em; color: var(--stadium-text); }
+.g-tally { font-family: var(--display); font-weight: 900; font-size: 40px; line-height: 1;
+  letter-spacing: -.05em; color: var(--heia); font-variant-numeric: tabular-nums; }
+.g-who { margin-top: 9px; font-size: 17px; font-weight: 700; color: var(--stadium-text); }
+.g-note { margin-top: 3px; font-size: 14.5px; line-height: 1.45; color: var(--stadium-dim); max-width: 32ch; }
+
+/* FLATE 2b — REPORTERENS STEMME: tekst rett på banen, med en lysende sidelinje */
+.voice { position: relative; padding: 12px 22px 12px 82px; margin: 12px 0; }
+/* To oppdateringer på rad skilles av LUFT, node og minutt — aldri av bokser. */
+.voice + .voice { margin-top: 18px; }
+/* Ekstremt svakt lokalt lys bak teksten, toner helt ut mot høyre. */
+.voice .vglow { position: absolute; left: 70px; right: 0; top: 2px; bottom: 0; pointer-events: none;
+  background: linear-gradient(96deg, rgba(2,255,171,.075) 0%, rgba(2,255,171,.025) 38%, rgba(2,255,171,0) 76%); }
+/* Avataren SITTER på tidslinja — gullringen er noden. */
+.voice .vava { display: inline-flex; vertical-align: middle; }
+.voice .vava .face { margin: 0; width: 22px; height: 22px; font-size: 9px; border-color: transparent;
+  box-shadow: 0 0 0 1.5px rgba(255,197,61,.55); }
+.voice .v-top, .voice .v-text, .voice .eng { position: relative; }
+.v-top { display: flex; align-items: baseline; gap: 7px; }
+.v-name { font-size: 13.5px; font-weight: 800; color: var(--stadium-text); letter-spacing: .01em; }
+.v-sep { font-size: 12px; color: var(--gold); opacity: .8; }
+.v-min { display: none; }
+.v-text { margin-top: 6px; font-size: 16px; line-height: 1.5; color: var(--stadium-text); max-width: 33ch; }
+
+/* FLATE 4 — FOTO: bildet ER flaten, kant til kant */
+.shot { position: relative; margin: 8px 0; }
+.shot .img { display: block; width: 100%; height: 320px; background-size: cover; background-position: center;
+  border: none; padding: 0; cursor: pointer; }
+.shot .scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 74%; pointer-events: none;
+  background: linear-gradient(180deg, rgba(8,20,14,0) 0%, rgba(8,20,14,.5) 46%, rgba(8,20,14,.92) 100%); }
+.shot .top { position: absolute; left: 0; right: 0; top: 0; height: 90px; pointer-events: none;
+  background: linear-gradient(180deg, rgba(8,20,14,.55), rgba(8,20,14,0)); }
+.shot .s-min { display: none; position: absolute; top: 14px; left: 44px; font-family: var(--display); font-weight: 900;
+  font-size: 14px; color: var(--stadium-text); letter-spacing: .1em; font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+.shot .s-body { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 22px 12px 82px; }
+.s-cap { font-size: 16.5px; line-height: 1.4; font-weight: 600; color: #fff;
+  text-shadow: 0 1px 10px rgba(0,0,0,.5); max-width: 30ch; }
+.s-by { margin-top: 5px; font-size: 12px; font-weight: 700; color: rgba(255,255,255,.78); }
+
+/* FLATE 2c — MÅL IMOT: dempet skiferstripe, ingen feiring */
+.against { position: relative; padding: 15px 22px 15px 82px; margin: 4px 0; display: flex; align-items: center; gap: 12px; }
+.against::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(70,82,92,.42), rgba(70,82,92,0) 72%); }
+.against > * { position: relative; }
+.ag-min { display: none; font-family: var(--display); font-weight: 900; font-size: 15px; color: #C8E6D8;
+  font-variant-numeric: tabular-nums; min-width: 34px; }
+.ag-text { flex: 1; font-size: 14.5px; font-weight: 700; color: var(--stadium-dim); }
+.ag-tally { font-family: var(--display); font-weight: 900; font-size: 17px; color: var(--stadium-text);
+  font-variant-numeric: tabular-nums; opacity: .8; }
+
+/* ENGASJEMENT — ingen pills. Ikon + tall, rett på flaten. */
+.eng { display: flex; align-items: center; gap: 20px; margin-top: 14px; }
+.shot .eng { margin-top: 10px; }
+.eng button { display: inline-flex; align-items: center; gap: 7px; font: inherit; font-size: 13.5px;
+  font-weight: 700; background: none; border: none; padding: 4px 0; cursor: pointer;
+  color: var(--stadium-dim); transition: color .13s, transform .08s; }
+.eng button:hover { color: var(--stadium-text); }
+.eng button:active { transform: scale(.94); }
+.eng button:focus-visible { outline: 2px solid var(--heia); outline-offset: 3px; border-radius: 4px; }
+.eng button b { font-family: var(--display); font-weight: 900; font-size: 15px; font-variant-numeric: tabular-nums; }
+.eng button.on { color: var(--heia); }
+.goal .eng button { color: rgba(234,255,246,.72); }
+.goal .eng button:hover { color: #fff; }
+.goal .eng button.on { color: var(--heia); }
+.shot .eng button { color: rgba(255,255,255,.8); }
+.shot .eng button.on { color: var(--heia); }
+.eng button.bump { animation: bump .38s cubic-bezier(.2,1.6,.4,1); }
+@keyframes bump { 0%{transform:scale(1)} 35%{transform:scale(1.16)} 100%{transform:scale(1)} }
+body.rm .eng button.bump { animation: none; }
+.moment.enter { animation: mIn .46s cubic-bezier(.2,.85,.3,1); }
+@keyframes mIn { 0%{opacity:0;transform:translateY(-18px)} 100%{opacity:1;transform:none} }
+body.rm .moment.enter { animation: fIn .2s ease-out; }
+@keyframes fIn { 0%{opacity:0} 100%{opacity:1} }
+
+/* ==========================================================================
+   DEN LYSE VERDENEN — Hjem-preview og Kalender-referanse
+   Samme system, motsatt lys. HeroSurface-gradienten er Heias egen.
+   ========================================================================== */
+.lightworldview { position: absolute; inset: 0; z-index: 12; background: var(--background);
+  overflow-y: auto; scrollbar-width: none; }
+.lightworldview::-webkit-scrollbar { display: none; }
+.lw-inner { padding: 54px 0 124px; }
+.lw-head { padding: 4px 22px 10px; }
+.lw-title { font-family: var(--display); font-weight: 900; font-size: 30px; color: var(--text-primary); letter-spacing: -.03em; }
+.lw-sub { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+.lw-eyebrow { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--text-tertiary); padding: 18px 22px 6px; }
+
+/* Redaksjonell tekstflate — HeroSurface, ikke et hvitt kort */
+.hero-surface { position: relative; margin: 6px 12px; border-radius: 26px; overflow: hidden;
+  padding: 18px 20px 16px; }
+.hero-surface::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(138deg, #DFFBEA 0%, #F4F9E6 68%, #FAF4DC 100%); }
+.hero-surface > * { position: relative; }
+.hs-ring { position: absolute; right: -50px; top: -58px; width: 150px; height: 150px; border-radius: 50%;
+  border: 1.5px solid rgba(8,57,46,.08); }
+.hs-ring2 { right: -26px; top: -34px; width: 104px; height: 104px; border-color: rgba(8,57,46,.06); }
+.p-author { display: flex; align-items: center; gap: 10px; }
+.p-name { font-size: 14px; font-weight: 800; color: var(--text-primary); }
+.p-when { font-size: 12px; color: var(--text-secondary); }
+.p-text { margin-top: 10px; font-size: 17px; line-height: 1.45; color: var(--text-primary); max-width: 30ch; }
+.p-eng { display: flex; gap: 20px; margin-top: 14px; }
+.p-eng span { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 700; color: var(--text-secondary); }
+.p-eng b { font-family: var(--display); font-weight: 900; font-size: 15px; }
+
+/* Viktig innlegg — solskinnsflaten med gullbånd */
+.sun-surface { position: relative; margin: 6px 12px; border-radius: 26px; overflow: hidden; padding: 18px 20px 16px; }
+.sun-surface::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(138deg, #FFF6D8 0%, #FFF9E7 62%, #FFFDF4 100%); }
+.sun-surface > * { position: relative; }
+.sun-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+  background: linear-gradient(180deg, var(--gold), #F2B705); }
+.sun-tag { font-size: 10px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; color: var(--gold-ink); }
+
+/* Kampresultat i feeden — kompakt arena, samme språk som kampskjermen */
+.mini-arena { position: relative; margin: 6px 12px; border-radius: 26px; overflow: hidden; padding: 16px 18px 18px; }
+.mini-arena::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(168deg, var(--arena-a), var(--arena-b)); }
+.mini-arena::after { content: ""; position: absolute; inset: 0;
+  background: radial-gradient(70% 60% at 14% 40%, var(--team) 0%, rgba(0,0,0,0) 66%),
+    radial-gradient(80% 60% at 50% 120%, rgba(2,255,171,.22), rgba(0,0,0,0) 60%); opacity: .6; }
+.mini-arena > * { position: relative; }
+.ma-ring { position: absolute; right: -44px; bottom: -60px; width: 180px; height: 180px;
+  border-radius: 50%; border: 1.5px solid rgba(2,255,171,.1); }
+.ma-tag { font-size: 10px; font-weight: 900; letter-spacing: .15em; text-transform: uppercase; color: var(--heia); }
+.ma-row { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.ma-t { flex: 1; font-size: 15px; font-weight: 700; color: var(--stadium-text); line-height: 1.3; }
+.ma-s { font-family: var(--display); font-weight: 900; font-size: 34px; color: var(--heia);
+  letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.ma-meta { margin-top: 8px; font-size: 12px; color: var(--stadium-dim); }
+
+/* Bildeinnlegg i feeden — photo first, samme som kampens */
+.lw-shot { position: relative; margin: 6px 0; }
+.lw-shot .img { display: block; width: 100%; height: 300px; background-size: cover; background-position: center; }
+.lw-shot .scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 70%;
+  background: linear-gradient(180deg, rgba(8,20,14,0), rgba(8,20,14,.88)); }
+.lw-shot .body { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 22px 14px; }
+
+/* Kalender-referanse: dagens faktiske kort */
+.cal-day { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--text-tertiary); padding: 16px 22px 4px; }
+.cal-card { position: relative; margin: 5px 12px; border-radius: 24px; overflow: hidden; padding: 15px 17px; }
+.cal-card.lightc::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(140deg, #DFFBEA 0%, #F4F9E6 70%, #FAF4DC 100%); }
+.cal-card.darkc::before { content: ""; position: absolute; inset: 0;
+  background: linear-gradient(168deg, #0B1912, #143126); }
+.cal-card > * { position: relative; }
+.cal-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; }
+.cal-t { margin-top: 9px; font-size: 17px; font-weight: 800; letter-spacing: -.02em; }
+.cal-m { margin-top: 4px; font-size: 13px; }
+.cal-time { position: absolute; right: 17px; top: 15px; font-family: var(--display); font-weight: 900;
+  font-size: 22px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+/* ==================== TAB-BAR + KAMPKNAPP ==================== */
+.tabbar { position: absolute; bottom: 0; left: 0; right: 0; height: 84px; z-index: 72;
+  background: rgba(237,250,243,.93); backdrop-filter: blur(24px) saturate(1.6);
+  border-top: 1px solid rgba(2,255,171,.24);
+  display: grid; grid-template-columns: 1fr 1fr 1.4fr 1fr 1fr; align-items: start; padding-top: 9px; }
+.tab { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10.5px;
+  font-weight: 650; color: var(--text-tertiary); background: none; border: none; cursor: pointer;
+  font-family: inherit; padding: 0; }
+.tab.active { color: var(--heia-ink); font-weight: 800; }
+.tab-icon { position: relative; height: 24px; display: grid; place-items: center; }
+.tab .badge { position: absolute; margin: -4px 0 0 15px; background: var(--live); color: #fff;
+  font-size: 9.5px; font-weight: 800; min-width: 16px; height: 16px; border-radius: 99px;
+  display: grid; place-items: center; padding: 0 4px; }
+.mbw { display: flex; flex-direction: column; align-items: center; gap: 3px; margin-top: -12px; }
+.matchbtn { display: inline-flex; align-items: center; gap: 7px; border: none; cursor: pointer;
+  font-family: var(--display); font-weight: 900; font-size: 13.5px; letter-spacing: .07em;
+  padding: 11px 16px; border-radius: 99px; white-space: nowrap; position: relative;
+  transition: background .18s, color .18s, box-shadow .18s, transform .1s; }
+.matchbtn:active { transform: scale(.95); }
+.matchbtn:focus-visible { outline: 3px solid var(--heia-ink); outline-offset: 3px; }
+.matchbtn .m-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.matchbtn.idle { background: var(--heia-deep); color: var(--heia); box-shadow: 0 6px 18px -8px rgba(8,57,46,.9); }
+.matchbtn.tolive { background: var(--live); color: #fff; box-shadow: 0 8px 22px -8px rgba(255,90,95,.9); }
+.matchbtn.tolive .m-dot { background: #fff; }
+body:not(.rm) .matchbtn.tolive .m-dot { animation: bl 1.5s ease-in-out infinite; }
+.matchbtn.paused { background: var(--gold); color: var(--gold-ink); }
+.matchbtn.paused .m-dot { background: var(--gold-ink); }
+.matchbtn.heia { background: var(--heia); color: var(--heia-deep); box-shadow: 0 8px 24px -6px rgba(2,255,171,.8); }
+.matchbtn.heia.did { background: var(--heia-tint); color: var(--heia-deep); box-shadow: none; }
+.matchbtn.report { background: var(--heia-deep); color: var(--heia); box-shadow: 0 8px 22px -8px rgba(8,57,46,.9); }
+.matchbtn.report.open { background: var(--heia); color: var(--heia-deep); }
+.mbl { font-size: 9.5px; font-weight: 700; letter-spacing: .06em; color: var(--text-tertiary); }
+.matchbtn.nudge { animation: nudge .5s cubic-bezier(.2,1.5,.4,1); }
+@keyframes nudge { 0%{transform:scale(1)} 30%{transform:scale(1.13)} 100%{transform:scale(1)} }
+body.rm .matchbtn.nudge { animation: none; }
+.newdot { position: absolute; top: -3px; right: -1px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--gold); border: 2px solid var(--background); }
+
+/* ==================== REPORTERPANEL ==================== */
+.repdock { position: absolute; left: 10px; right: 10px; bottom: 92px; z-index: 71;
+  background: rgba(16,37,29,.9); backdrop-filter: blur(24px); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 24px; padding: 11px; display: flex; flex-direction: column; gap: 8px;
+  box-shadow: 0 -12px 44px -14px rgba(0,0,0,.85);
+  transform: translateY(calc(100% + 110px)); transition: transform .28s cubic-bezier(.25,.9,.3,1); }
+.repdock.on { transform: translateY(0); }
+body.rm .repdock { transition: none; }
+.rep-goals { display: flex; gap: 8px; }
+.rep-goal { flex: 1; font: inherit; font-size: 15px; font-weight: 800; padding: 15px 10px; border-radius: 16px;
+  cursor: pointer; border: 1px solid transparent; display: flex; align-items: center; justify-content: center;
+  gap: 8px; transition: transform .08s; }
+.rep-goal:active { transform: scale(.97); }
+.rep-goal:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.rep-goal.us { background: var(--heia); color: var(--heia-deep); box-shadow: 0 8px 22px -8px rgba(2,255,171,.75); }
+.rep-goal.them { background: rgba(255,255,255,.1); color: var(--stadium-text); border-color: rgba(255,255,255,.17); }
+.rep-small { display: flex; gap: 7px; }
+.rep-small button { flex: 1; font: inherit; font-size: 12px; font-weight: 700; padding: 11px 5px;
+  border-radius: 14px; cursor: pointer; background: rgba(255,255,255,.08); color: var(--stadium-text);
+  border: 1px solid rgba(255,255,255,.13); transition: background .13s, transform .08s; }
+.rep-small button:hover { background: rgba(255,255,255,.16); }
+.rep-small button:active { transform: scale(.97); }
+.rep-small button:focus-visible { outline: 2px solid var(--heia); outline-offset: 2px; }
+.undo { display: flex; align-items: center; gap: 10px; background: var(--gold); color: var(--gold-ink);
+  border-radius: 16px; padding: 10px 12px; font-size: 13px; font-weight: 700; }
+.undo .u-text { flex: 1; }
+.undo .u-timer { font-family: var(--display); font-weight: 900; font-variant-numeric: tabular-nums; }
+.undo button { font: inherit; font-size: 12.5px; font-weight: 900; letter-spacing: .04em;
+  background: var(--gold-ink); color: var(--gold); border: none; border-radius: 11px; padding: 8px 14px; cursor: pointer; }
+
+/* ==================== ARK ==================== */
+.scrim2 { position: absolute; inset: 0; z-index: 95; background: rgba(5,13,9,.62); opacity: 0;
+  pointer-events: none; transition: opacity .26s ease; }
+.scrim2.on { opacity: 1; pointer-events: auto; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 96; background: var(--background);
+  border-radius: 26px 26px 0 0; transform: translateY(101%);
+  transition: transform .3s cubic-bezier(.25,.9,.3,1); display: flex; flex-direction: column;
+  box-shadow: 0 -20px 60px -20px rgba(0,0,0,.6); }
+.sheet.on { transform: translateY(0); }
+body.rm .sheet { transition: transform .12s ease-out; }
+#sheet { height: 78%; } #picker { height: auto; padding-bottom: 22px; }
+.grab { width: 38px; height: 5px; border-radius: 99px; background: var(--border); margin: 9px auto 0; flex: 0 0 auto; }
+.sh-head { padding: 13px 20px 12px; border-bottom: 1px solid var(--border-subtle); display: flex;
+  align-items: flex-start; gap: 11px; flex: 0 0 auto; }
+.sh-head .b { flex: 1; min-width: 0; }
+.sh-title { font-size: 16.5px; font-weight: 800; color: var(--text-primary); letter-spacing: -.02em; }
+.sh-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 2px; }
+.sh-close { width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--surface-muted); color: var(--text-secondary); display: grid; place-items: center; padding: 0; }
+.sh-close:focus-visible { outline: 2px solid var(--heia-ink); outline-offset: 2px; }
+.sh-canon { margin: 12px 20px 0; padding: 9px 12px; border-radius: 12px; background: var(--sun);
+  border: 1px solid var(--sun-border); font-size: 11.5px; color: var(--gold-ink); line-height: 1.5; flex: 0 0 auto; }
+.sh-list { flex: 1; overflow-y: auto; padding: 14px 20px 18px; display: flex; flex-direction: column;
+  gap: 15px; scrollbar-width: none; }
+.sh-list::-webkit-scrollbar { display: none; }
+.cmt { display: flex; gap: 11px; }
+.cmt .face { border-color: var(--background); margin: 0; flex: 0 0 auto; }
+.cb { flex: 1; min-width: 0; }
+.c-top { display: flex; align-items: baseline; gap: 8px; }
+.c-name { font-size: 13.5px; font-weight: 800; color: var(--text-primary); }
+.c-time { font-size: 11.5px; color: var(--text-tertiary); }
+.c-text { font-size: 14.5px; color: var(--text-primary); line-height: 1.45; margin-top: 2px; }
+.sh-input { flex: 0 0 auto; padding: 12px 16px 16px; border-top: 1px solid var(--border-subtle);
+  background: var(--surface); display: flex; align-items: center; gap: 10px; }
+.sh-input input { flex: 1; font: inherit; font-size: 15px; padding: 12px 15px; border-radius: 99px;
+  border: 1px solid var(--border); background: var(--background); color: var(--text-primary); }
+.sh-input input:focus { outline: 2px solid var(--heia-ink); border-color: transparent; }
+.sh-send { width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--heia); color: var(--heia-deep); display: grid; place-items: center; flex: 0 0 auto; }
+.pick-row { display: flex; align-items: center; gap: 13px; padding: 14px 18px; cursor: pointer;
+  background: none; border: none; width: 100%; text-align: left; font-family: inherit;
+  border-bottom: 1px solid var(--border-subtle); }
+.pick-row:hover { background: var(--surface-muted); }
+.pick-row:focus-visible { outline: 2px solid var(--heia-ink); outline-offset: -2px; }
+.pk-crest { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+  font-family: var(--display); font-weight: 900; font-size: 14px; color: #fff; flex: 0 0 auto; }
+.pk-t { flex: 1; min-width: 0; }
+.pk-team { font-size: 14.5px; font-weight: 800; color: var(--text-primary); }
+.pk-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+.pk-meta .d { width: 6px; height: 6px; border-radius: 50%; background: var(--live); }
+.pk-meta .d.p { background: var(--gold); }
+.pk-score { font-family: var(--display); font-weight: 900; font-size: 20px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+
+.toast { position: absolute; left: 50%; bottom: 108px; transform: translate(-50%,10px); z-index: 99;
+  background: rgba(12,30,22,.95); backdrop-filter: blur(10px); color: var(--stadium-text);
+  font-size: 12.5px; font-weight: 650; padding: 10px 16px; border-radius: 99px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  border: 1px solid rgba(255,255,255,.14); max-width: 90%; }
+.toast.on { opacity: 1; transform: translate(-50%,0); }
+.toast .h { color: var(--heia); font-weight: 800; }
+.phone.haptic { animation: hp .22s ease-out; }
+@keyframes hp { 0%{transform:translate(0,0)} 25%{transform:translate(-1.5px,1px)} 55%{transform:translate(1.5px,-1px)} 100%{transform:translate(0,0)} }
+body.rm .phone.haptic { animation: none; }
+
+/* ==========================================================================
+   STOR TEKST (Dynamic Type XXL)
+   Prøven på «ingen kort»: flatene har ingen fast høyde, så de VOKSER med
+   innholdet. Det store tallet vokser mindre enn brødteksten — en score på
+   96 px sprenger tre kolonner, og tallet er allerede stort nok.
+   ========================================================================== */
+body.dt .v-text, body.dt .g-note, body.dt .s-cap, body.dt .p-text { font-size: 21px; line-height: 1.5; }
+body.dt .g-who { font-size: 21px; }
+body.dt .a-name, body.dt .v-name, body.dt .p-name { font-size: 16px; }
+body.dt .ag-text { font-size: 17px; }
+body.dt .eng button, body.dt .p-eng span { font-size: 16px; }
+body.dt .eng button b { font-size: 18px; }
+body.dt .a-meta, body.dt .a-meta button { font-size: 14.5px; }
+body.dt .a-crowd span { font-size: 15px; }
+body.dt .rhythm .lb { font-size: 12px; }
+body.dt .emin { font-size: 16px; }
+body.dt .nowmark .ntxt { font-size: 14.5px; }
+body.dt .nowmark .nsub { font-size: 13px; }
+body.dt .pulse-lab { font-size: 13px; }
+body.dt .eyebrow { font-size: 13px; }
+body.dt .v-name { font-size: 16px; }
+body.dt .g-word { font-size: 52px; }
+body.dt .a-score { font-size: 84px; }
+body.dt .s-by, body.dt .v-min, body.dt .p-when { font-size: 14px; }
+/* Lagnavnene får bryte fritt — tre kolonner skal ikke tvinge trunkering */
+body.dt .a-name { max-width: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@media (max-width: 1180px) { body { flex-direction: column-reverse; align-items: center; }
+  .bench { width: min(430px,100%); flex: 0 0 auto; } }
+</style>
+
+<div class="bench">
+  <div>
+    <div class="bench-mark">Heia · runde 3</div>
+    <h1 class="bench-title">Levende flater</h1>
+    <p class="bench-sub"><b>Innholdet former flaten.</b> Fire flater i kampverdenen — Arena, Bane, Swell og Foto. Ingen av dem har ramme, skygge eller kortradius. Skillet kommer av lys og luft.</p>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Flate</p>
+    <div class="seg" id="segWorld">
+      <button data-world="match" aria-pressed="true">Kamp</button>
+      <button data-world="home">Hjem-preview</button>
+      <button data-world="cal">Kalender</button>
+      <button data-world="season">Sesongen</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Kampens tilstand</p>
+    <div class="seg" id="segPhase">
+      <button data-phase="pre">Før kamp</button>
+      <button data-phase="live" aria-pressed="true">Live</button>
+      <button data-phase="half">Pause</button>
+      <button data-phase="done">Ferdig</button>
+      <button data-phase="cancelled">Avlyst</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Rolle · livekamper</p>
+    <div class="seg" id="segRole">
+      <button data-role="audience" aria-pressed="true">Publikum</button>
+      <button data-role="reporter">Kampreporter</button>
+    </div>
+    <div class="seg" id="segLive">
+      <button data-live="1" aria-pressed="true">1 live</button>
+      <button data-live="2">2 live (forberedt)</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Kampknappen nå</p>
+    <div class="aria" id="ariaOut">—</div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Lagfarge — lys, swell og flod</p>
+    <div class="swatches" id="segTeam">
+      <button class="swatch" data-team="green" style="background:#1E7A46" aria-pressed="true"><span>Grønn</span></button>
+      <button class="swatch" data-team="red" style="background:#D92B2B"><span>Rød</span></button>
+      <button class="swatch" data-team="blue" style="background:#1D4ED8"><span>Blå</span></button>
+      <button class="swatch" data-team="yellow" style="background:#FFC53D"><span>Gul</span></button>
+    </div>
+    <div class="readout">
+      <div class="readout-row"><span class="lbl">Swell (tekst rett på)</span><b id="rSwell">—</b></div>
+      <div class="readout-row"><span class="lbl">Lys tekst på swell</span><b id="rSwellTxt">—</b></div>
+      <div class="readout-row"><span class="lbl">Målflod, maks</span><b id="rFlood">—</b></div>
+    </div>
+    <p class="note warn" id="capNote" hidden></p>
+    <p class="note info">Uten kort å gjemme seg bak må teksten stå direkte på det lagfargede lyset. Vakten bestemmer hvor sterkt lyset får bli.</p>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Tilgjengelighet</p>
+    <div class="toggle"><span>Reduce Motion</span><button class="switch" id="rmSwitch" aria-pressed="false" aria-label="Reduce Motion"></button></div>
+    <div class="toggle"><span>Stor tekst (Dynamic Type)</span><button class="switch" id="dtSwitch" aria-pressed="false" aria-label="Stor tekst"></button></div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-label">Prøv opplevelsen</p>
+    <div class="act">
+      <button class="hot wide" id="btnGoalUs">⚽ Simuler mål for oss</button>
+      <button id="btnGoalThem">Mål imot</button>
+      <button id="btnUpdate">Oppdatering</button>
+      <button class="wide" id="btnPhoto">Nytt kampbilde</button>
+      <button class="wide" id="btnTop">Rull til topp</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="phone" id="phone">
+    <div class="screen" id="screen">
+      <div class="notch"></div>
+      <div class="statusbar"><span>18:52</span><span class="sb-right">
+        <svg width="18" height="12" viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1" opacity=".4"/></svg>
+        <svg width="15" height="11" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M1 4.2a10 10 0 0 1 14 0"/><path d="M3.6 7a6.4 6.4 0 0 1 8.8 0"/><circle cx="8" cy="10.2" r="1.1" fill="currentColor" stroke="none"/></svg>
+        <span class="sb-bar"></span></span></div>
+
+      <div class="ground">
+        <div class="g-base"></div><div class="g-warm"></div><div class="g-heia"></div>
+        <div class="g-team"></div><div class="g-opp"></div><div class="g-grass"></div>
+        <div class="g-pulse-a"></div><div class="g-pulse-b"></div><div class="g-aurora"></div>
+        <div class="g-halfline"></div><div class="g-arc1"></div><div class="g-arc2"></div>
+        <div class="g-wave" id="wave"></div><div class="g-flood" id="flood"></div>
+      </div>
+
+      <div class="stickybar" id="sticky">
+        <button class="sb-back" aria-label="Tilbake"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+        <span class="sb-dot" id="sbDot"></span>
+        <span class="sb-teams"><span>HAM-KAM</span><span class="sb-score" id="sbScore">2–1</span><span>RIDABU</span></span>
+        <span class="sb-min" id="sbMin">36′</span>
+      </div>
+
+      <div class="scroll" id="scroll">
+        <div class="scroll-inner">
+          <div class="navbar">
+            <button class="icon-btn" aria-label="Tilbake"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <span class="navtitle">Kampen</span>
+            <button class="icon-btn" aria-label="Mer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg></button>
+          </div>
+          <div id="arenaSlot"></div>
+          <div id="extra"></div>
+          <div class="timeline" id="timeline"></div>
+        </div>
+      </div>
+
+      <div class="lightworldview" id="lwv" hidden></div>
+      <div class="repdock" id="repdock"></div>
+
+      <div class="tabbar">
+        <button class="tab" data-tab="home"><span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/></svg></span>Hjem</button>
+        <button class="tab" data-tab="cal"><span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span>Kalender</button>
+        <span class="mbw" id="mbWrap"></span>
+        <button class="tab"><span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5z"/><path d="M13.7 20a2 2 0 0 1-3.4 0"/></svg><span class="badge">3</span></span>Varsler</button>
+        <button class="tab"><span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c1.3-4 4-6 7.5-6s6.2 2 7.5 6"/></svg></span>Profil</button>
+      </div>
+
+      <div class="scrim2" id="scrim"></div>
+
+      <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Samtalen">
+        <div class="grab"></div>
+        <div class="sh-head"><div class="b"><div class="sh-title" id="shTitle">Mål for oss · 34′</div>
+          <div class="sh-sub" id="shSub">Erlend Hagen · 2–1</div></div>
+          <button class="sh-close" id="shClose" aria-label="Lukk"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <p class="sh-canon">Dette er den samme samtalen som ligger på posten i lagets feed. Skriver du her, står den der.</p>
+        <div class="sh-list" id="shList"></div>
+        <div class="sh-input"><input type="text" id="cmtInput" placeholder="Skriv en kommentar…" aria-label="Skriv en kommentar">
+          <button class="sh-send" id="cmtSend" aria-label="Send"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button></div>
+      </div>
+
+      <div class="sheet" id="picker" role="dialog" aria-modal="true" aria-label="Velg kamp">
+        <div class="grab"></div>
+        <div class="sh-head"><div class="b"><div class="sh-title">To kamper pågår</div>
+          <div class="sh-sub">Velg hvilken du vil følge</div></div>
+          <button class="sh-close" id="pkClose" aria-label="Lukk"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+        <div id="pkList"></div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =====================================================================
+     FARGEMATEMATIKK
+     Uten kort å gjemme seg bak står teksten RETT PÅ det lagfargede lyset.
+     Det gjør vakten viktigere, ikke mindre viktig.
+     ===================================================================== */
+  var G_MID = "#14382A", TXT = "#EAFFF6", MINT = "#02FFAB";
+  var SWELL_WANT = 0.60, FLOOD_WANT = 0.78;
+
+  function h2r(h){ return [parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]; }
+  function ch(c){ c/=255; return c<=0.03928?c/12.92:Math.pow((c+0.055)/1.055,2.4); }
+  function lum(r){ return 0.2126*ch(r[0])+0.7152*ch(r[1])+0.0722*ch(r[2]); }
+  function con(a,b){ var x=lum(a),y=lum(b); return (Math.max(x,y)+0.05)/(Math.min(x,y)+0.05); }
+  function bl(bg,fg,a){ return [bg[0]+(fg[0]-bg[0])*a, bg[1]+(fg[1]-bg[1])*a, bg[2]+(fg[2]-bg[2])*a]; }
+
+  // Swell: BÅDE lys tekst (7:1) og mint-tallet (4.5:1) står på flaten.
+  function swellCap(team) {
+    var g=h2r(G_MID), t=h2r(team), x=h2r(TXT), m=h2r(MINT);
+    for (var a=SWELL_WANT; a>=0.02; a-=0.01) {
+      var b=bl(g,t,a);
+      if (con(x,b)>=7 && con(m,b)>=4.5)
+        return { peak:a, txt:con(x,b), mint:con(m,b), capped:a<SWELL_WANT-0.001 };
+    }
+    return { peak:0.02, txt:0, mint:0, capped:true };
+  }
+  // Målflod: scoren er 78 px → stor tekst, 3:1.
+  function floodCap(team) {
+    var g=h2r(G_MID), t=h2r(team), m=h2r(MINT);
+    for (var a=FLOOD_WANT; a>=0.05; a-=0.01) {
+      var c=con(m,bl(g,t,a));
+      if (c>=3) return { peak:a, ratio:c, capped:a<FLOOD_WANT-0.001, atFull:con(m,bl(g,t,FLOOD_WANT)) };
+    }
+    return { peak:0.05, ratio:0, capped:true, atFull:con(m,bl(g,t,FLOOD_WANT)) };
+  }
+
+  /* ===================== DATA ===================== */
+  var TEAMS = { green:{hex:"#1E7A46",name:"Skoggrønn"}, red:{hex:"#D92B2B",name:"Rød"},
+                blue:{hex:"#1D4ED8",name:"Blå"}, yellow:{hex:"#FFC53D",name:"Gul"} };
+  var PEOPLE = [
+    {n:"Kari Nordbø",c:"#E8590C"}, {n:"Jarle Vestli",c:"#1E7A46"}, {n:"Silje Aas",c:"#1D4ED8"},
+    {n:"Anders Rud",c:"#7A1F3D"}, {n:"Marit Bakken",c:"#0F766E"}, {n:"Tom Erik Sand",c:"#6366F1"},
+    {n:"Ingrid Holm",c:"#DB2777"}, {n:"Håvard Lie",c:"#2D9CDB"}, {n:"Lene Myhre",c:"#FFC53D"},
+    {n:"Ola Grøtte",c:"#D92B2B"}, {n:"Bente Sveen",c:"#12315E"}, {n:"Per Ivar Moen",c:"#1E7A46"} ];
+
+  function ini(n){ var p=n.trim().split(/\s+/); return (p.length>1?p[0][0]+p[1][0]:p[0].slice(0,2)).toUpperCase(); }
+  function inkOn(h){ return lum(h2r(h))>0.45 ? "#11241B" : "#FFFFFF"; }
+  function face(p,edge){ return '<span class="face" style="background:'+p.c+";color:"+inkOn(p.c)+
+    (edge?";margin:0;border-color:"+edge:"")+'">'+ini(p.n)+"</span>"; }
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+  function crest(team){
+    return '<svg width="44" height="44" viewBox="0 0 48 48" aria-hidden="true">' +
+      '<path d="M24 3l17 5v16c0 10-7 18-17 21C14 42 7 34 7 24V8z" fill="'+team+'"/>' +
+      '<path d="M24 3l17 5v16c0 10-7 18-17 21C14 42 7 34 7 24V8z" fill="none" stroke="#11241B" stroke-opacity=".2" stroke-width="1.4"/>' +
+      '<path d="M7 21h34" stroke="#fff" stroke-opacity=".85" stroke-width="3.4"/>' +
+      '<circle cx="24" cy="21" r="5.6" fill="#fff"/><circle cx="24" cy="21" r="5.6" fill="none" stroke="'+team+'" stroke-width="1.6"/>' +
+      '<text x="24" y="35.5" text-anchor="middle" font-family="Nunito,sans-serif" font-weight="900" font-size="10.5" fill="#fff">HK</text></svg>';
+  }
+
+  function shot(seed){
+    var sky = seed===1 ? ["#1B3A5C","#3E6E7E"] : seed===2 ? ["#2A1E48","#7A4A5E"] : ["#0F3A4A","#2E7E6E"];
+    return "data:image/svg+xml;utf8,"+encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 320">' +
+      '<defs><linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="'+sky[0]+'"/><stop offset="1" stop-color="'+sky[1]+'"/></linearGradient>' +
+      '<linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#31734A"/><stop offset="1" stop-color="#123A22"/></linearGradient>' +
+      '<radialGradient id="f" cx="0.5" cy="0.02" r="0.8"><stop offset="0" stop-color="#FFF3C4" stop-opacity="0.5"/><stop offset="1" stop-color="#FFF3C4" stop-opacity="0"/></radialGradient></defs>' +
+      '<rect width="400" height="320" fill="url(#s)"/><rect width="400" height="320" fill="url(#f)"/>' +
+      '<rect y="132" width="400" height="188" fill="url(#g)"/>' +
+      '<g stroke="#fff" stroke-opacity="0.19" stroke-width="2.5" fill="none">' +
+      '<rect x="'+(seed===1?252:22)+'" y="106" width="128" height="52" rx="1"/><circle cx="200" cy="250" r="66"/><path d="M0 132h400"/></g>' +
+      '<g><ellipse cx="144" cy="278" rx="24" ry="6" fill="#000" opacity="0.26"/>' +
+      '<path d="M144 278 L135 236 L142 200 L153 202 L160 240 Z" fill="#0E1A14"/><circle cx="146" cy="190" r="11" fill="#0E1A14"/>' +
+      '<ellipse cx="244" cy="272" rx="22" ry="5.5" fill="#000" opacity="0.24"/>' +
+      '<path d="M244 272 L235 234 L244 199 L254 201 L260 238 Z" fill="#13251C"/><circle cx="246" cy="189" r="10" fill="#13251C"/>' +
+      '<circle cx="196" cy="262" r="11" fill="#F6F8F0"/></g></svg>');
+  }
+
+  var S = { world:"match", phase:"live", role:"audience", team:"green", liveCount:1,
+    rm:false, dt:false, home:2, away:1, minute:36, period:2, crowd:12,
+    openId:null, repOpen:false, undoTimer:null, undoLeft:0, seq:100, justHeiaed:false, newSince:false };
+
+  function base(){ return [
+    {id:1,kind:"rhythm",label:"Avspark",minute:0},
+    {id:2,kind:"goal",side:"us",minute:12,who:"Erlend Hagen",note:"",score:"1–0",heia:21,mine:false,
+      comments:[{p:0,t:"13′",x:"Endelig!! Han har jobbet for den hele omgangen 🙌"},
+                {p:4,t:"13′",x:"Så bra plassert. Godt jobba, gutter."}]},
+    {id:3,kind:"photo",minute:19,by:1,seed:1,caption:"Full fyr på sidelinja i dag. Regnet stoppet akkurat i tide.",
+      heia:14,mine:false,comments:[{p:6,t:"21′",x:"Herlig bilde! Send flere 😍"}]},
+    {id:4,kind:"goal",side:"them",minute:23,score:"1–1",heia:0,mine:false,
+      comments:[{p:3,t:"24′",x:"Litt uheldig der. Opp igjen!"}]},
+    {id:5,kind:"rhythm",label:"Pause",minute:25,sub:"1–1"},
+    {id:6,kind:"rhythm",label:"2. omgang",minute:25},
+    {id:13,kind:"update",minute:29,by:1,text:"Vi er i gang igjen. Ridabu byttet keeper i pausen.",
+      heia:4,mine:false,comments:[]},
+    {id:7,kind:"update",minute:31,by:1,text:"Vi presser høyt nå. Erlend har fått mer plass mellom leddene.",
+      heia:9,mine:false,comments:[{p:8,t:"32′",x:"Takk for oppdateringene, Jarle. Sitter på jobb og følger med 🙏"},
+                                  {p:2,t:"33′",x:"Stå på!! Heia Ham-Kam!"}]},
+    {id:8,kind:"goal",side:"us",minute:34,who:"Erlend Hagen",note:"Frispark fra 18 meter, rett i krysset.",
+      score:"2–1",heia:34,mine:false,comments:[
+        {p:5,t:"34′",x:"For en scoring!! 🔥🔥"},{p:7,t:"34′",x:"To på én kamp. Han er i form."},
+        {p:9,t:"35′",x:"HEIA!!!"},{p:2,t:"35′",x:"Så du oppspillet fra Sondre? Helt rått."},
+        {p:11,t:"35′",x:"Sitter på Gardermoen og følger med. Verdt forsinkelsen 😄"},
+        {p:4,t:"36′",x:"Gratulerer, gutter! Nå holder vi den."}]}
+  ]; }
+  function finished(){
+    var m = base();
+    m.push({id:9,kind:"goal",side:"them",minute:44,score:"2–2",heia:0,mine:false,comments:[]});
+    m.push({id:10,kind:"goal",side:"us",minute:48,who:"Mathias Berg",note:"",score:"3–2",heia:27,mine:false,
+      comments:[{p:0,t:"I går 19:41",x:"SEIER!!! For en avslutning på kampen 🎉"},
+                {p:10,t:"I går 19:44",x:"Beste kampen i år. Så gøy å se."}]});
+    m.push({id:11,kind:"photo",minute:50,by:1,seed:2,caption:"Full jubel etter kampslutt. Godt jobba, alle sammen!",
+      heia:31,mine:false,comments:[{p:6,t:"I går 20:02",x:"Dette bildet skal rammes inn ❤️"}]});
+    m.push({id:12,kind:"rhythm",label:"Slutt",minute:50,sub:"3–2"});
+    return m;
+  }
+  var moments = base();
+
+  var $ = function(i){ return document.getElementById(i); };
+  var screen=$("screen"), arenaSlot=$("arenaSlot"), extra=$("extra"), timeline=$("timeline"),
+      scroll=$("scroll"), sticky=$("sticky"), lwv=$("lwv"), repdock=$("repdock"), mbWrap=$("mbWrap"),
+      sheet=$("sheet"), picker=$("picker"), scrim=$("scrim"), shList=$("shList"),
+      toast=$("toast"), phone=$("phone"), wave=$("wave"), flood=$("flood");
+
+  var HEART = '<svg width="15" height="15" viewBox="0 0 24 24" fill="CURRENTFILL" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.5a2 2 0 1 1 4 0v6M15 6.5a2 2 0 1 1 4 0V14a6 6 0 0 1-6 6h-1.6a5 5 0 0 1-3.9-1.9l-3-3.8a2 2 0 0 1 3-2.6L11 14V4.5"/></svg>';
+  var BUBBLE = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5a7.5 7.5 0 0 1-10.6 6.8L4 20l1.7-5.4A7.5 7.5 0 1 1 20.5 11.5z"/></svg>';
+  function heart(f){ return HEART.replace("CURRENTFILL", f ? "currentColor" : "none"); }
+
+  /* ===================== FARGER ===================== */
+  function applyColors(){
+    var t = TEAMS[S.team].hex, sw = swellCap(t), fc = floodCap(t), r = document.documentElement;
+    r.style.setProperty("--team", t);
+    r.style.setProperty("--swell-peak", sw.peak.toFixed(2));
+    r.style.setProperty("--flood-peak", fc.peak.toFixed(2));
+    $("rSwell").textContent = Math.round(sw.peak*100)+" %";
+    $("rSwell").className = sw.capped ? "fail" : "pass";
+    $("rSwellTxt").textContent = sw.txt.toFixed(1)+":1";
+    $("rSwellTxt").className = "pass";
+    $("rFlood").textContent = Math.round(fc.peak*100)+" %";
+    $("rFlood").className = fc.capped ? "fail" : "pass";
+    var n = $("capNote");
+    if (sw.capped || fc.capped) {
+      n.hidden = false;
+      n.textContent = TEAMS[S.team].name + " er klemt: swell "+Math.round(sw.peak*100)+" % (av 60), flod "+
+        Math.round(fc.peak*100)+" % (av 78). Ved full flod ville mint-scoren målt "+fc.atFull.toFixed(1)+
+        ":1 — uleselig i akkurat det sekundet den betyr mest.";
+    } else { n.hidden = true; }
+  }
+
+  /* ===================== KAMPKNAPPEN ===================== */
+  var I_MATCH='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3.5l2-5 3.5 10 3-7 2 2H21"/></svg>';
+  var I_HEIA='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.5a2 2 0 1 1 4 0v6M15 6.5a2 2 0 1 1 4 0V14a6 6 0 0 1-6 6h-1.6a5 5 0 0 1-3.9-1.9l-3-3.8a2 2 0 0 1 3-2.6L11 14V4.5"/></svg>';
+  var I_CHK='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
+  var I_REP='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M12 3l7 3-7 3"/><circle cx="7" cy="19" r="2.5"/><path d="M9.5 19H19"/></svg>';
+
+  function active(){ return S.phase==="live" || S.phase==="half"; }
+  function inMatch(){ return S.world==="match"; }
+
+  function btnState(){
+    if (inMatch() && active()) {
+      if (S.role==="reporter")
+        return {k:"report",c:"report"+(S.repOpen?" open":""),i:I_REP,t:S.repOpen?"LUKK":"RAPPORTER",l:"Kamp",
+          a:S.repOpen?"Lukk rapporteringsverktøyet":"Åpne rapportering for kampen mot Ridabu"};
+      if (S.justHeiaed) return {k:"did",c:"heia did",i:I_CHK,t:"HEIET",l:"Kamp",a:"Du har heiet på dette øyeblikket"};
+      var id=newestHeiable(), m=id?byId(id):null;
+      var w=!m?"kampen":m.kind==="goal"?"målet på "+m.minute+" minutter":
+        m.kind==="photo"?"bildet fra "+m.minute+" minutter":"oppdateringen fra "+m.minute+" minutter";
+      return {k:"heia",c:"heia",i:I_HEIA,t:"HEIA!",l:"Kamp",a:"Heia på "+w};
+    }
+    if (S.liveCount>=2 && active())
+      return {k:"many",c:"tolive",i:'<span class="m-dot"></span>',t:S.liveCount+" LIVE",l:"Kamp",
+        a:S.liveCount+" kamper pågår. Velg hvilken du vil følge"};
+    if (S.phase==="live")
+      return {k:"tolive",c:"tolive",i:'<span class="m-dot"></span>',t:S.home+"–"+S.away,l:"Kamp",
+        a:"Live: Ham-Kam "+S.home+"–"+S.away+" Ridabu. Åpne kampen"};
+    if (S.phase==="half")
+      return {k:"tolive",c:"paused",i:'<span class="m-dot"></span>',t:"PAUSE "+S.home+"–"+S.away,l:"Kamp",
+        a:"Pause: Ham-Kam "+S.home+"–"+S.away+" Ridabu. Åpne kampen"};
+    return {k:"idle",c:"idle",i:I_MATCH,t:"KAMP",l:"Sesongen",a:"Kamp. Åpner Sesongen"};
+  }
+
+  function renderBtn(nudge){
+    var b=btnState();
+    mbWrap.innerHTML='<button class="matchbtn '+b.c+(nudge?" nudge":"")+'" id="matchBtn" aria-label="'+esc(b.a)+'">'+
+      b.i+"<span>"+esc(b.t)+"</span>"+(S.newSince&&!inMatch()?'<span class="newdot"></span>':"")+
+      "</button><span class=\"mbl\">"+b.l+"</span>";
+    $("matchBtn").addEventListener("click", onBtn);
+    $("ariaOut").innerHTML="tilstand: <b>"+b.k+"</b><br>tekst: "+esc(b.t)+"<br>aria-label:<br>"+esc(b.a);
+  }
+  function onBtn(){
+    var b=btnState();
+    if (b.k==="heia"){ var t=newestHeiable(); if(t) doHeia(t,true); return; }
+    if (b.k==="did"){ showToast("Du har allerede heiet på dette øyeblikket"); return; }
+    if (b.k==="report"){ S.repOpen=!S.repOpen; renderRep(); renderBtn(); return; }
+    if (b.k==="many"){ openPicker(); return; }
+    if (b.k==="tolive"){ S.newSince=false; setWorld("match"); showToast("Åpnet kampen — ingen HEIA registrert"); return; }
+    setWorld("season");
+  }
+
+  /* ===================== KAMPVERDENEN ===================== */
+  function byId(id){ for(var i=0;i<moments.length;i++) if(moments[i].id===id) return moments[i]; return null; }
+  function heiable(m){ return m.kind==="photo"||m.kind==="update"||(m.kind==="goal"&&m.side==="us"); }
+  function newestHeiable(){ for(var i=moments.length-1;i>=0;i--) if(heiable(moments[i])) return moments[i].id; return null; }
+
+  /* ── Hendelsesikonene, videreført fra appens MatchEventRow/icons.tsx ──
+     Ball-geometrien er kopiert eksakt (sirkel r=8.5, femkant, sømmer), og
+     regelen «ballen betyr MÅL og ingenting annet» står. Resten er Lucide-
+     familien appen allerede bruker. Ingen emoji, ingen nye former. */
+  function icoBall(c,sw){ sw=sw||1.8;
+    return '<circle cx="12" cy="12" r="8.5"/>'+
+      '<path d="M12 8.4 8.8 10.7l1.2 3.8h4l1.2-3.8z"/>'+
+      '<path d="M12 3.5v4.9M4 9.8l4.8 1M20 9.8l-4.8 1M7.2 19.2l2.8-3.4M16.8 19.2l-2.8-3.4"/>'; }
+  function icoPlay(){ return '<path d="M7 4.2 19 12 7 19.8z" fill="currentColor" stroke="none"/>'; }
+  function icoPause(){ return '<rect x="6.5" y="4.5" width="3.6" height="15" rx="1.2" fill="currentColor" stroke="none"/>'+
+      '<rect x="13.9" y="4.5" width="3.6" height="15" rx="1.2" fill="currentColor" stroke="none"/>'; }
+  function icoFlag(){ return '<path d="M4.6 15s1-1 4-1 5 2 8 2 4-1 4-1V3.4s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4.6 21.4v-6.6"/>'; }
+  function icoMsg(){ return '<path d="M20.5 11.5a7.5 7.5 0 0 1-10.6 6.8L4 20l1.7-5.4A7.5 7.5 0 1 1 20.5 11.5z"/>'; }
+  function icoCam(){ return '<path d="M14.6 4.4h-5.2L7 7.4H4.2a2.2 2.2 0 0 0-2.2 2.2v8.2a2.2 2.2 0 0 0 2.2 2.2h15.6a2.2 2.2 0 0 0 2.2-2.2V9.6a2.2 2.2 0 0 0-2.2-2.2H17z"/><circle cx="12" cy="13.4" r="3.2"/>'; }
+  function icoSwap(){ return '<path d="M8 3.4 4 7.4l4 4M4 7.4h16M16 20.6l4-4-4-4M20 16.6H4"/>'; }
+  function icoCard(){ return '<rect x="7.6" y="4.8" width="9.2" height="14.4" rx="2" fill="#FFC53D" stroke="#5C4A00" stroke-width="1" transform="rotate(8 12 12)"/>'; }
+
+  /* Node = HVA som skjedde. Avataren = HVEM som rapporterte. */
+  function nodeFor(kind,side){
+    var s={goalUs:{cls:"n-goal-us",ico:icoBall(),sw:1.9,dot:true},
+           goalThem:{cls:"n-goal-them",ico:icoBall(),sw:1.9},
+           update:{cls:"n-update",ico:icoMsg(),sw:2},
+           photo:{cls:"n-photo",ico:icoCam(),sw:1.9},
+           kick:{cls:"n-neutral",ico:icoPlay()},
+           pause:{cls:"n-pause",ico:icoPause()},
+           end:{cls:"n-end",ico:icoFlag(),sw:1.9},
+           swap:{cls:"n-neutral",ico:icoSwap(),sw:2},
+           card:{cls:"n-card",ico:icoCard()}}[kind]||{cls:"n-neutral",ico:icoPlay()};
+    return '<span class="node '+s.cls+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+      'stroke-width="'+(s.sw||1.8)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+
+      s.ico+'</svg>'+(s.dot?'<i class="ndot"></i>':"")+"</span>";
+  }
+  function gateKind(label){
+    if (/pause/i.test(label)) return "pause";
+    if (/slutt/i.test(label)) return "end";
+    return "kick";
+  }
+
+  function engRow(m){
+    var c=m.heia+(m.mine?1:0);
+    var h='<div class="eng">';
+    if (heiable(m)) h+='<button class="'+(m.mine?"on":"")+'" data-heia="'+m.id+'" aria-label="Heia på øyeblikket">'+
+      heart(m.mine)+"<b>"+c+"</b> HEIA</button>";
+    h+='<button data-cmt="'+m.id+'" aria-label="Åpne samtalen">'+BUBBLE+"<b>"+m.comments.length+"</b></button></div>";
+    return h;
+  }
+
+  function momentHtml(m){
+    if (m.kind==="rhythm")
+      return '<div class="rhythm moment">'+nodeFor(gateKind(m.label))+
+        '<span class="emin">'+m.minute+"′</span>"+
+        '<span class="ln"></span><span class="lb">'+esc(m.label)+(m.sub?" · "+esc(m.sub):"")+
+        '</span><span class="ln"></span></div>';
+
+    if (m.kind==="goal" && m.side==="us")
+      return '<section class="goal moment" data-id="'+m.id+'">'+nodeFor("goalUs")+
+        '<span class="emin">'+m.minute+"′</span>"+
+        '<div class="swell"></div><div class="swell-edge"></div>'+
+        '<div class="gc"><div class="g-min">'+m.minute+"′</div>"+
+        '<div class="g-headline"><span class="g-word">MÅL!</span><span class="g-tally">'+m.score+"</span></div>"+
+        (m.who?'<div class="g-who">'+esc(m.who)+"</div>":"")+
+        (m.note?'<div class="g-note">'+esc(m.note)+"</div>":"")+ engRow(m)+"</div></section>";
+
+    if (m.kind==="goal")
+      return '<section class="against moment" data-id="'+m.id+'">'+nodeFor("goalThem")+
+        '<span class="emin">'+m.minute+"′</span>"+
+        '<span class="ag-text">Mål til Ridabu</span><span class="ag-tally">'+m.score+"</span></section>";
+
+    if (m.kind==="update"){
+      var a=PEOPLE[m.by];
+      return '<section class="voice moment" data-id="'+m.id+'">'+nodeFor("update")+
+        '<span class="emin">'+m.minute+"′</span>"+
+        '<span class="vglow"></span>'+
+        '<div class="v-top"><span class="vava">'+face(a)+"</span>"+
+        '<span class="v-name">'+esc(a.n.split(" ")[0])+" oppdaterer</span></div>"+
+        '<div class="v-text">'+esc(m.text)+"</div>"+engRow(m)+"</section>";
+    }
+
+    var au=PEOPLE[m.by];
+    return '<section class="shot moment" data-id="'+m.id+'">'+nodeFor("photo")+
+      '<span class="emin">'+m.minute+"′</span>"+
+      '<button class="img" style="background-image:url('+shot(m.seed)+')" aria-label="Åpne bildet"></button>'+
+      '<div class="top"></div><div class="scrim"></div><span class="s-min">'+m.minute+"′</span>"+
+      '<div class="s-body"><div class="s-cap">'+esc(m.caption)+"</div>"+
+      '<div class="s-by">'+esc(au.n)+"</div>"+engRow(m)+"</div></section>";
+  }
+
+  function renderArena(){
+    if (S.world!=="match"){ arenaSlot.innerHTML=""; return; }
+    var topL, topR;
+    if (S.phase==="live"){ topL='<span class="livepill"><span class="dot"></span>LIVE</span>';
+      topR='<span class="a-clock">'+S.period+". omgang · "+S.minute+"′</span>"; }
+    else if (S.phase==="half"){ topL='<span class="livepill paused"><span class="dot"></span>PAUSE</span>';
+      topR='<span class="a-clock">Etter 1. omgang · 25′</span>'; }
+    else if (S.phase==="pre"){ topL='<span class="livepill flat">KAMPDAG</span>';
+      topR='<span class="a-clock">Lørdag 22. aug</span>'; }
+    else if (S.phase==="done"){ topL='<span class="livepill flat">SLUTT</span>';
+      topR='<span class="a-clock">Serie · 2×25</span>'; }
+    else { topL='<span class="livepill flat">AVLYST</span>'; topR='<span class="a-clock">Lørdag 22. aug</span>'; }
+
+    var mid;
+    if (S.phase==="pre") mid='<div class="a-cd"><b>2t 15m</b><span>til avspark</span></div>';
+    else if (S.phase==="cancelled") mid='<div class="a-cd"><b style="font-size:28px;color:var(--stadium-dim)">Avlyst</b><span>ingen kamp</span></div>';
+    else { var sc=S.phase==="done"?[3,2]:[S.home,S.away];
+      mid='<div class="a-score" id="scoreEl"><span>'+sc[0]+'</span><span class="dash">–</span><span>'+sc[1]+"</span></div>"; }
+
+    var h='<section class="arena"><div class="a-ring"></div><div class="a-ring a-ring2"></div><div class="a-line"></div>'+
+      '<div class="a-top">'+topL+topR+"</div>"+
+      '<div class="a-teams"><div class="a-col"><div class="crest-plate">'+crest(TEAMS[S.team].hex)+"</div>"+
+      '<div class="a-name">Ham-Kam G14</div><div class="a-rule us"></div></div>'+mid+
+      '<div class="a-col"><div class="crest-fb">RI</div><div class="a-name">Ridabu G14</div><div class="a-rule them"></div></div></div>';
+
+    if (S.phase==="done") h+='<div class="a-result"><span class="seier enter">SEIER</span></div>';
+    if (S.phase==="cancelled") h+='<div class="a-result"><span class="flat">RIDABU MELDTE FORFALL</span></div>';
+
+    h+='<div class="a-meta"><button id="mapChip">Briskeby kunstgress 2</button>';
+    if (active()) h+='<span class="sep">·</span><span class="who">Jarle rapporterer</span><span class="sep">·</span><span class="now">nå</span>';
+    else if (S.phase==="pre") h+='<span class="sep">·</span><span class="who">Avspark 18:00</span><span class="sep">·</span><span class="who">Jarle er reporter</span>';
+    else if (S.phase==="done") h+='<span class="sep">·</span><span class="who">Lørdag 22. aug · 18:00</span>';
+    else h+='<span class="sep">·</span><span class="who">Skulle vært 18:00</span>';
+    h+="</div>";
+
+    if (S.crowd>0){
+      var act={}; moments.forEach(function(m){ if(m.comments) m.comments.forEach(function(c){ act[c.p]=true; }); });
+      var sh=Object.keys(act).map(Number).slice(0,5);
+      while(sh.length<5) sh.push((sh.length*3+1)%PEOPLE.length);
+      var n=S.crowd+(moments.some(function(m){return m.mine;})?1:0);
+      h+='<div class="a-crowd"><span class="faces">'+sh.map(function(i){return face(PEOPLE[i]);}).join("")+
+        (n>5?'<span class="face more">+'+(n-5)+"</span>":"")+"</span><span><b>"+n+"</b> "+
+        (S.phase==="done"?"var med gjennom kampen":"har vært med")+"</span></div>";
+    }
+    h+="</section>";
+    h+=pulseHtml();
+    arenaSlot.innerHTML=h;
+  }
+
+  /* Pulsen: formen kommer av ØYEBLIKKENE, ikke av en energimodell.
+     Mål for oss = minttopp, mål imot = søkk, bilde = lys markør,
+     oppdatering = gullmarkør. HEIA endrer bare gløden rundt punktet. */
+  function pulseHtml(){
+    if (S.phase==="pre" || S.phase==="cancelled") return "";
+    var list = moments.slice().sort(function(a,b){ return a.minute-b.minute; });
+    var pts=[{m:0,e:26}], e=26;
+    list.forEach(function(mo){
+      e = Math.max(18, e-4);
+      if (mo.kind==="goal" && mo.side==="us") e += 46;
+      else if (mo.kind==="goal") e = Math.max(10, e-18);
+      else if (mo.kind==="photo") e += 20;
+      else if (mo.kind==="update") e += 15;
+      else e += 4;
+      e = Math.min(100, e);
+      pts.push({m:mo.minute, e:e, kind:mo.kind, side:mo.side, heia:(mo.heia||0)+(mo.mine?1:0)});
+      if (mo.kind==="goal" && mo.side==="us"){ e = Math.max(24, e*0.55); pts.push({m:mo.minute+1.4, e:e}); }
+    });
+    pts.push({m: Math.max(S.minute, pts[pts.length-1].m+2), e: Math.max(20, e*0.85)});
+
+    var W=430, H=54, PAD=22;
+    var maxM = Math.max(1, pts[pts.length-1].m);
+    var xs=function(m){ return PAD+(m/maxM)*(W-PAD*2); };
+    var ys=function(v){ return H-8-(v/100)*(H-17); };
+    var d="", i;
+    for (i=0;i<pts.length;i++){
+      var x=xs(pts[i].m), y=ys(pts[i].e);
+      if (i===0) d="M"+x.toFixed(1)+" "+y.toFixed(1);
+      else { var px=xs(pts[i-1].m), py=ys(pts[i-1].e), cx=(px+x)/2;
+        d+=" C"+cx.toFixed(1)+" "+py.toFixed(1)+" "+cx.toFixed(1)+" "+y.toFixed(1)+" "+x.toFixed(1)+" "+y.toFixed(1); }
+    }
+    var area = d+" L"+xs(maxM).toFixed(1)+" "+H+" L"+PAD+" "+H+" Z";
+
+    var marks="";
+    pts.forEach(function(p){
+      if (!p.kind || p.kind==="rhythm") return;
+      var x=xs(p.m).toFixed(1), y=ys(p.e).toFixed(1);
+      var g = 5 + Math.min(9, (p.heia||0)*0.25);
+      if (p.kind==="goal" && p.side==="us")
+        marks += '<circle cx="'+x+'" cy="'+y+'" r="'+g.toFixed(1)+'" fill="#02FFAB" opacity=".3"/>'+
+                 '<circle cx="'+x+'" cy="'+y+'" r="3.8" fill="#02FFAB"/>';
+      else if (p.kind==="goal")
+        marks += '<circle cx="'+x+'" cy="'+y+'" r="2.9" fill="#8FA3AC"/>';
+      else if (p.kind==="photo")
+        marks += '<circle cx="'+x+'" cy="'+y+'" r="'+(g*0.6).toFixed(1)+'" fill="#C6FFE9" opacity=".22"/>'+
+                 '<circle cx="'+x+'" cy="'+y+'" r="2.9" fill="#C6FFE9"/>';
+      else
+        marks += '<circle cx="'+x+'" cy="'+y+'" r="'+(g*0.6).toFixed(1)+'" fill="#FFC53D" opacity=".34"/>'+
+                 '<circle cx="'+x+'" cy="'+y+'" r="3" fill="#FFC53D"/>';
+    });
+
+    var last = pts[pts.length-1];
+    var nowMark = (S.phase==="live"||S.phase==="half")
+      ? '<circle class="pnow" cx="'+xs(last.m).toFixed(1)+'" cy="'+ys(last.e).toFixed(1)+
+        '" r="4.2" fill="#EAFFF6"/>' : "";
+
+    var right = S.phase==="done" ? "Slutt"
+      : S.phase==="half" ? "Pause · 25′"
+      : "Nå " + S.minute + "′";
+    return '<section class="pulse"><span class="pflash" id="pflash"></span>'+
+      '<div class="pulse-lab"><span>Kampens puls</span>'+
+      '<span class="min" id="pulseMin">'+right+'</span></div>'+
+      '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img" '+
+      'aria-label="Kampens puls, formet av øyeblikkene i kampen">'+
+      '<defs><linearGradient id="pfill" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0" stop-color="#02FFAB" stop-opacity=".26"/>'+
+      '<stop offset="1" stop-color="#02FFAB" stop-opacity="0"/></linearGradient></defs>'+
+      '<path d="'+area+'" fill="url(#pfill)"/>'+
+      '<path d="'+d+'" fill="none" stroke="#02FFAB" stroke-opacity=".16" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '<path d="'+d+'" fill="none" stroke="#02FFAB" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '<path d="'+d+'" fill="none" stroke="#EAFFF6" stroke-opacity=".72" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/>'+
+      marks+nowMark+'</svg></section>';
+  }
+
+  function renderExtra(){
+    if (S.world!=="match" || S.phase!=="pre"){ extra.innerHTML=""; return; }
+    extra.innerHTML='<div class="voice" style="padding-top:22px"><div class="vc">'+
+      '<div class="v-name" style="font-size:15px">13 av 18 kommer</div>'+
+      '<div class="v-text" style="font-size:14.5px;color:var(--stadium-dim)">2 kan ikke · 3 har ikke svart</div>'+
+      '<div class="eng" style="gap:10px;margin-top:12px">'+
+      '<button class="on" style="color:var(--heia)">Du kommer!</button>'+
+      '<button>Kan ikke</button></div></div></div>';
+  }
+
+  function renderTimeline(){
+    if (S.world!=="match" || S.phase==="pre" || S.phase==="cancelled"){ timeline.innerHTML=""; return; }
+    var l=moments.slice(); if (S.phase!=="done") l.reverse();
+    var dir;
+    if (S.phase==="done")
+      dir='<div class="nowmark"><span class="nnode" style="animation:none;opacity:.5"></span>'+
+        '<span class="ntxt">Slutt<span class="nsub">Kampen leses forfra</span></span></div>';
+    else
+      dir='<div class="nowmark"><span class="nnode"></span><span class="ntxt">Nå · '+
+        (S.phase==="half"?"25′":S.minute+"′")+
+        '<span class="nsub">Nyeste øverst — bla nedover i kampen</span></span></div>';
+    timeline.innerHTML='<div class="thread"></div><div class="eyebrow">'+
+      (S.phase==="done"?"Kampens historie":"Det som skjer")+"</div>"+ dir +
+      l.map(momentHtml).join("");
+  }
+
+  function renderSticky(){
+    $("sbScore").textContent = S.phase==="done"?"3–2":S.home+"–"+S.away;
+    $("sbMin").textContent = S.phase==="live"?S.minute+"′":S.phase==="half"?"PAUSE":
+      S.phase==="done"?"SLUTT":S.phase==="pre"?"18:00":"AVLYST";
+    $("sbDot").className="sb-dot"+(S.phase==="half"?" paused":S.phase==="live"?"":" off");
+  }
+
+  function renderRep(){
+    var open = S.repOpen && S.role==="reporter" && active() && inMatch();
+    var h="";
+    if (S.undoLeft>0) h+='<div class="undo"><span class="u-text">Mål registrert. Feil?</span>'+
+      '<span class="u-timer">'+S.undoLeft+'</span><button id="undoBtn">ANGRE</button></div>';
+    h+='<div class="rep-goals"><button class="rep-goal us" id="repUs">'+
+      '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="12" cy="12" r="9"/><path d="M12 7.5l3.4 2.5-1.3 4h-4.2l-1.3-4z" fill="currentColor" stroke="none"/></svg>Mål oss</button>'+
+      '<button class="rep-goal them" id="repThem">Mål dem</button></div>'+
+      '<div class="rep-small"><button id="repUpdate">✎ Oppdatering</button><button id="repPhoto">◉ Bilde</button>'+
+      '<button id="repPause">'+(S.phase==="half"?"▶ Fortsett":"❚❚ Pause")+'</button><button id="repEnd">⚑ Slutt</button></div>';
+    repdock.innerHTML=h;
+    repdock.classList.toggle("on", open);
+    document.body.classList.toggle("repopen", open);
+    if (open){
+      var b;
+      if ((b=$("repUs"))) b.onclick=function(){ addGoal("us"); };
+      if ((b=$("repThem"))) b.onclick=function(){ addGoal("them"); };
+      if ((b=$("repUpdate"))) b.onclick=addUpdate;
+      if ((b=$("repPhoto"))) b.onclick=addPhoto;
+      if ((b=$("repPause"))) b.onclick=function(){ setPhase(S.phase==="half"?"live":"half"); };
+      if ((b=$("repEnd"))) b.onclick=function(){ setPhase("done"); };
+      if ((b=$("undoBtn"))) b.onclick=undoGoal;
+    }
+  }
+
+  /* ===================== DEN LYSE VERDENEN ===================== */
+  function ringPair(){ return '<div class="hs-ring"></div><div class="hs-ring hs-ring2"></div>'; }
+
+  function renderLight(){
+    if (S.world==="match"){ lwv.hidden=true; return; }
+    lwv.hidden=false;
+    if (S.world==="home") lwv.innerHTML=homeHtml();
+    else if (S.world==="cal") lwv.innerHTML=calHtml();
+    else lwv.innerHTML=seasonHtml();
+    var o;
+    if ((o=$("lcOpen"))) o.onclick=function(){ S.newSince=false; setWorld("match"); };
+    if ((o=$("lcOpen2"))) o.onclick=function(){ showToast("Ham-Kam J12 ligger i et annet lagrom — appen må bytte lag først",2800); };
+  }
+
+  function liveStrip(){
+    if (!active()) return "";
+    var h='<button class="mini-arena" id="lcOpen" style="width:calc(100% - 24px);border:none;text-align:left;cursor:pointer;display:block">'+
+      '<div class="ma-ring"></div><div class="ma-tag">'+(S.phase==="half"?"● PAUSE NÅ":"● LIVE NÅ")+"</div>"+
+      '<div class="ma-row"><span class="ma-t">Ham-Kam G14<br>mot Ridabu G14</span>'+
+      '<span class="ma-s">'+S.home+"–"+S.away+"</span></div>"+
+      '<div class="ma-meta">'+(S.phase==="half"?"Pause":S.period+". omgang · "+S.minute+"′")+" · Briskeby 2</div></button>";
+    if (S.liveCount>=2) h+='<button class="mini-arena" id="lcOpen2" style="width:calc(100% - 24px);border:none;text-align:left;cursor:pointer;display:block">'+
+      '<div class="ma-ring"></div><div class="ma-tag">● LIVE NÅ</div>'+
+      '<div class="ma-row"><span class="ma-t">Ham-Kam J12<br>mot Vang</span><span class="ma-s">0–0</span></div>'+
+      '<div class="ma-meta">1. omgang · 8′ · Vang stadion</div></button>';
+    return h;
+  }
+
+  function homeHtml(){
+    var k=PEOPLE[0], j=PEOPLE[1], m=PEOPLE[4];
+    return '<div class="lw-inner"><div class="lw-head"><div class="lw-title">Ham-Kam G14</div>'+
+      '<div class="lw-sub">Lagets feed · høst 2026</div></div>'+
+      liveStrip()+
+      '<div class="lw-eyebrow">I dag</div>'+
+
+      /* 1 — kampresultat som kompakt arena, samme språk som kampskjermen */
+      (!active()? '<section class="mini-arena"><div class="ma-ring"></div><div class="ma-tag">SLUTTRESULTAT</div>'+
+        '<div class="ma-row"><span class="ma-t">Ham-Kam G14<br>mot Ridabu G14</span><span class="ma-s">3–2</span></div>'+
+        '<div class="ma-meta">Seier · 9 øyeblikk · 78 heia</div></section>' : "")+
+
+      /* 2 — viktig innlegg: solskinnsflaten med gullbånd */
+      '<section class="sun-surface"><div class="sun-bar"></div>'+
+      '<div class="sun-tag">⚠ Viktig fra treneren</div>'+
+      '<div class="p-text" style="margin-top:8px">Husk at bussen går fra Briskeby kl. 08:15 på lørdag. Vi venter ikke.</div>'+
+      '<div class="p-author" style="margin-top:12px">'+face(j,"#FFF9E7")+'<span class="p-name">Jarle Vestli</span>'+
+      '<span class="p-when">· 2 t siden</span></div>'+
+      '<div class="p-eng"><span>'+heart(false)+"<b>12</b></span><span>"+BUBBLE+"<b>4</b></span></div></section>"+
+
+      /* 3 — bildeinnlegg: photo first, ingen ramme */
+      '<section class="lw-shot"><div class="img" style="background-image:url('+shot(3)+')"></div>'+
+      '<div class="scrim"></div><div class="body">'+
+      '<div class="s-cap">Første treningsøkt etter ferien. Alle 18 møtte opp 💚</div>'+
+      '<div class="s-by">Marit Bakken · i går</div>'+
+      '<div class="eng"><button>'+heart(false)+"<b>23</b> HEIA</button><button>"+BUBBLE+"<b>7</b></button></div></div></section>"+
+
+      /* 4 — vanlig tekstinnlegg: HeroSurface, varm og redaksjonell */
+      '<section class="hero-surface">'+ringPair()+
+      '<div class="p-author">'+face(k,"#DFFBEA")+'<span class="p-name">Kari Nordbø</span><span class="p-when">· i går</span></div>'+
+      '<div class="p-text">Noen som har en ekstra keeperhanske i str. 6? Sigurd glemte sine på Briskeby.</div>'+
+      '<div class="p-eng"><span>'+heart(false)+"<b>3</b></span><span>"+BUBBLE+"<b>9</b></span></div></section>"+
+
+      /* 5 — Lagkassa som kvalitetsreferanse (uendret språk fra appen) */
+      '<div class="lw-eyebrow">Laget</div>'+
+      '<section class="hero-surface">'+ringPair()+
+      '<div class="sun-tag" style="color:var(--heia-ink)">💚 LAGKASSA</div>'+
+      '<div style="font-family:var(--display);font-weight:900;font-size:34px;color:var(--text-primary);letter-spacing:-.03em;margin-top:6px">1 240 kr</div>'+
+      '<div style="font-size:13.5px;color:var(--text-secondary);margin-top:2px">til laget hver måned</div>'+
+      '<div style="font-size:13.5px;color:var(--text-secondary);margin-top:8px">14 støttespillere heier på Ham-Kam G14</div>'+
+      "</section></div>";
+  }
+
+  function calHtml(){
+    return '<div class="lw-inner"><div class="lw-head"><div class="lw-title">Kalender</div>'+
+      '<div class="lw-sub">Dagens faktiske kort — visuell kontroll</div></div>'+
+      '<div class="cal-day">Lørdag 22. august</div>'+
+      '<section class="cal-card darkc"><div class="ma-ring" style="right:-40px;bottom:-56px"></div>'+
+      '<span class="cal-pill" style="background:rgba(255,90,95,.2);color:#FF9B9E">⚽ Kamp</span>'+
+      '<div class="cal-time" style="color:var(--heia)">18:00</div>'+
+      '<div class="cal-t" style="color:var(--stadium-text)">Kamp mot Ridabu G14</div>'+
+      '<div class="cal-m" style="color:var(--stadium-dim)">Briskeby kunstgress 2</div></section>'+
+      '<div class="cal-day">Mandag 24. august</div>'+
+      '<section class="cal-card lightc">'+ringPair()+
+      '<span class="cal-pill" style="background:#EAF1FF;color:#2F66DB">Trening</span>'+
+      '<div class="cal-time" style="color:var(--text-primary)">17:30</div>'+
+      '<div class="cal-t" style="color:var(--text-primary)">Trening</div>'+
+      '<div class="cal-m" style="color:var(--text-secondary)">Briskeby kunstgress 1</div></section>'+
+      '<section class="cal-card lightc">'+ringPair()+
+      '<span class="cal-pill" style="background:#F1EAFE;color:#7A4DE8">Sosialt</span>'+
+      '<div class="cal-time" style="color:var(--text-primary)">19:00</div>'+
+      '<div class="cal-t" style="color:var(--text-primary)">Foreldremøte og pizza</div>'+
+      '<div class="cal-m" style="color:var(--text-secondary)">Klubbhuset</div></section>'+
+      '<p style="padding:18px 22px;font-size:12.5px;line-height:1.55;color:var(--text-secondary)">'+
+      'Kalenderen bruker allerede to Heia-flater: mørk stadion for kamp, mint→krem for resten. '+
+      'Runde 3 utvider nøyaktig dette språket i stedet for å innføre et tredje.</p></div>';
+  }
+
+  function seasonHtml(){
+    return '<div class="lw-inner"><div class="lw-head"><div class="lw-title">Sesongen</div>'+
+      '<div class="lw-sub">Ham-Kam G14 · høst 2026</div></div>'+
+      liveStrip()+
+      (active()?"":'<div class="lw-eyebrow">Neste kamp</div>'+
+      '<section class="hero-surface">'+ringPair()+
+      '<div class="p-name" style="font-size:17px">Ham-Kam G14 mot Storhamar</div>'+
+      '<div class="p-when" style="margin-top:4px">Lørdag 29. aug · 12:00 · Briskeby 2</div>'+
+      '<div style="font-family:var(--display);font-weight:900;font-size:30px;color:var(--heia-ink);margin-top:10px;letter-spacing:-.03em">om 6 dager</div>'+
+      '<div class="p-when" style="margin-top:2px">9 av 18 har svart</div></section>')+
+      '<div class="lw-eyebrow">Sesongen så langt</div>'+
+      '<section class="mini-arena"><div class="ma-ring"></div>'+
+      '<div style="display:flex;gap:10px;text-align:center">'+
+      '<div style="flex:1"><div style="font-family:var(--display);font-weight:900;font-size:28px;color:var(--stadium-text)">7</div><div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--stadium-dim)">Kamper</div></div>'+
+      '<div style="flex:1"><div style="font-family:var(--display);font-weight:900;font-size:28px;color:var(--heia)">4</div><div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--stadium-dim)">Seiere</div></div>'+
+      '<div style="flex:1"><div style="font-family:var(--display);font-weight:900;font-size:28px;color:var(--stadium-text)">19</div><div style="font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--stadium-dim)">Mål</div></div>'+
+      "</div></section>"+
+      '<div class="lw-eyebrow">Kampene</div>'+
+      '<section class="hero-surface">'+ringPair()+
+      '<div style="display:flex;align-items:center;gap:12px"><div style="flex:1">'+
+      '<div class="p-name">Ridabu G14</div><div class="p-when">'+
+      (S.phase==="done"?"I går · Seier":S.phase==="cancelled"?"I dag · Avlyst":"I dag · pågår")+"</div></div>"+
+      '<div style="font-family:var(--display);font-weight:900;font-size:24px;color:var(--text-primary)">'+
+      (S.phase==="done"?"3–2":S.phase==="cancelled"?"—":S.home+"–"+S.away)+"</div></div></section>"+
+      '<section class="hero-surface">'+ringPair()+
+      '<div style="display:flex;align-items:center;gap:12px"><div style="flex:1">'+
+      '<div class="p-name">Brumunddal G14</div><div class="p-when">15. aug · Seier</div></div>'+
+      '<div style="font-family:var(--display);font-weight:900;font-size:24px;color:var(--text-primary)">4–1</div></div></section>'+
+      "</div>";
+  }
+
+  /* ===================== HANDLINGER ===================== */
+  function haptic(){ if(S.rm) return; phone.classList.remove("haptic"); void phone.offsetWidth;
+    phone.classList.add("haptic"); setTimeout(function(){ phone.classList.remove("haptic"); },240); }
+  function showToast(h,ms){ toast.innerHTML=h; toast.classList.add("on"); clearTimeout(showToast._t);
+    showToast._t=setTimeout(function(){ toast.classList.remove("on"); }, ms||2000); }
+  var waveLock=false;
+  function pulseFlash(){
+    var f=document.getElementById("pflash");
+    if(!f) return;
+    f.classList.remove("go"); void f.offsetWidth; f.classList.add("go");
+  }
+
+  function requestWave(){ if(waveLock) return; waveLock=true;
+    wave.classList.remove("go"); void wave.offsetWidth; wave.classList.add("go");
+    setTimeout(function(){ waveLock=false; },400); }
+
+  /* HEIA: en kort lysimpuls vandrer langs tråden til øyeblikket. */
+  function spark(id){
+    if (S.rm && false) return;
+    var el = timeline.querySelector('[data-id="'+id+'"]');
+    if (!el) return;
+    var tr = timeline.getBoundingClientRect(), er = el.getBoundingClientRect();
+    var toY = er.top - tr.top + 26;
+    var d = document.createElement("span");
+    d.className = "spark";
+    d.style.top = "0px";
+    d.style.transform = "translateY("+(timeline.offsetHeight)+"px)";
+    timeline.appendChild(d);
+    void d.offsetWidth;
+    var dur = S.rm ? 140 : 460;
+    d.style.transition = "transform "+dur+"ms cubic-bezier(.3,.7,.3,1)";
+    d.classList.add("go");
+    d.style.transform = "translateY("+toY+"px)";
+    setTimeout(function(){ d.remove(); }, dur+140);
+  }
+
+  function doHeia(id, fromBtn){
+    var m=byId(id); if(!m) return;
+    if (m.mine){ showToast('Du har allerede heiet — <span class="h">én per person</span>',2300); return; }
+    m.mine=true; requestWave(); haptic(); spark(id); pulseFlash();
+    if (fromBtn){ S.justHeiaed=true; setTimeout(function(){ S.justHeiaed=false; renderBtn(); },1800); }
+    renderArena(); renderTimeline(); renderBtn();
+    var b=timeline.querySelector('[data-heia="'+id+'"]');
+    if (b){ b.classList.add("bump"); setTimeout(function(){ b.classList.remove("bump"); },400); }
+  }
+
+  function afterNew(id){
+    renderArena(); renderSticky(); renderTimeline(); renderLight();
+    if (!inMatch()){ S.newSince=true; renderBtn(true); }
+    else { renderBtn(); scroll.scrollTo({top:0,behavior:S.rm?"auto":"smooth"}); }
+    var c=timeline.querySelector('[data-id="'+id+'"]');
+    if (c) c.classList.add("enter");
+  }
+
+  function addGoal(side){
+    if (!active()) setPhase("live");
+    if (side==="us") S.home++; else S.away++;
+    S.minute += Math.floor(Math.random()*3)+1;
+    var id=++S.seq;
+    moments.push({id:id,kind:"goal",side:side,minute:S.minute,who:side==="us"?"Mathias Berg":"",
+      note:"",score:S.home+"–"+S.away,heia:0,mine:false,comments:[]});
+    flood.classList.toggle("them", side!=="us");
+    flood.classList.remove("go"); void flood.offsetWidth; flood.classList.add("go");
+    haptic(); afterNew(id);
+    var s=$("scoreEl");
+    if (s){ s.classList.add("pop"); if(side!=="us") s.classList.add("small");
+      setTimeout(function(){ s.classList.remove("pop","small"); },620); }
+    pulseFlash();
+    if (side==="us") showToast('⚽ <span class="h">MÅL!</span> Ham-Kam '+S.home+"–"+S.away+" Ridabu");
+    if (S.role==="reporter") startUndo();
+  }
+  function addUpdate(){
+    if (!active()) setPhase("live");
+    S.minute+=2;
+    var t=["Ridabu presser nå. Vi ligger litt lavt, men holder godt.",
+      "Bytte hos oss — Mathias inn for Sondre. Han har spilt en kjempekamp.",
+      "Fem minutter igjen. Guttene gir alt.","Dommeren har lagt til to minutter."];
+    var id=++S.seq;
+    moments.push({id:id,kind:"update",minute:S.minute,by:1,text:t[Math.floor(Math.random()*t.length)],
+      heia:0,mine:false,comments:[]});
+    afterNew(id); showToast("Oppdatering lagt ut — den ligger nå i feeden også");
+  }
+  function addPhoto(){
+    if (!active()) setPhase("live");
+    S.minute+=1;
+    var id=++S.seq;
+    moments.push({id:id,kind:"photo",minute:S.minute,by:1,seed:3,
+      caption:"Guttene samlet før innbyttet. For en gjeng.",heia:0,mine:false,comments:[]});
+    afterNew(id); showToast("Bildet ligger i forløpet og i feeden");
+  }
+  function startUndo(){
+    clearInterval(S.undoTimer); S.undoLeft=10; renderRep();
+    S.undoTimer=setInterval(function(){ S.undoLeft--;
+      if (S.undoLeft<=0){ clearInterval(S.undoTimer); S.undoLeft=0; } renderRep(); },1000);
+  }
+  function undoGoal(){
+    clearInterval(S.undoTimer); S.undoLeft=0;
+    for (var i=moments.length-1;i>=0;i--) if (moments[i].kind==="goal"){
+      if (moments[i].side==="us") S.home--; else S.away--;
+      moments.splice(i,1); break;
+    }
+    renderArena(); renderSticky(); renderTimeline(); renderRep(); renderBtn(); renderLight();
+    showToast("Målet er fjernet. Stillingen er regnet om fra hendelsene.",2600);
+  }
+
+  function openSheet(id){
+    var m=byId(id); if(!m) return;
+    S.openId=id;
+    var t,s;
+    if (m.kind==="goal"){ t=(m.side==="us"?"Mål for oss":"Mål til Ridabu")+" · "+m.minute+"′";
+      s=(m.who?m.who+" · ":"")+m.score; }
+    else if (m.kind==="photo"){ t="Kampbilde · "+m.minute+"′"; s=PEOPLE[m.by].n; }
+    else { t="Oppdatering · "+m.minute+"′"; s=PEOPLE[m.by].n; }
+    $("shTitle").textContent=t; $("shSub").textContent=s;
+    shList.innerHTML = m.comments.length ? m.comments.map(function(c){
+      var p=PEOPLE[c.p%PEOPLE.length];
+      return '<div class="cmt">'+face(p,"var(--background)")+'<div class="cb"><div class="c-top">'+
+        '<span class="c-name">'+esc(p.n)+'</span><span class="c-time">'+esc(c.t)+"</span></div>"+
+        '<div class="c-text">'+esc(c.x)+"</div></div></div>";
+    }).join("") : '<p style="color:var(--text-tertiary);font-size:14px;text-align:center;padding:26px 0">Ingen har sagt noe ennå. Vær den første.</p>';
+    sheet.classList.add("on"); scrim.classList.add("on");
+  }
+  function closeSheets(){ sheet.classList.remove("on"); picker.classList.remove("on");
+    scrim.classList.remove("on"); S.openId=null; }
+  function openPicker(){
+    $("pkList").innerHTML='<button class="pick-row" data-pick="1"><span class="pk-crest" style="background:'+
+      TEAMS[S.team].hex+'">HK</span><span class="pk-t"><span class="pk-team">Ham-Kam G14</span>'+
+      '<span class="pk-meta"><span class="d'+(S.phase==="half"?" p":"")+'"></span>'+
+      (S.phase==="half"?"Pause":S.period+". omgang · "+S.minute+"′")+' · mot Ridabu</span></span>'+
+      '<span class="pk-score">'+S.home+"–"+S.away+"</span></button>"+
+      '<button class="pick-row" data-pick="2"><span class="pk-crest" style="background:#12315E">HK</span>'+
+      '<span class="pk-t"><span class="pk-team">Ham-Kam J12</span>'+
+      '<span class="pk-meta"><span class="d"></span>1. omgang · 8′ · mot Vang</span></span>'+
+      '<span class="pk-score">0–0</span></button>';
+    picker.classList.add("on"); scrim.classList.add("on");
+  }
+
+  function setWorld(w){
+    S.world=w;
+    if (w!=="match") S.repOpen=false;
+    screen.classList.toggle("lightworld", w!=="match");
+    closeSheets(); renderArena(); renderExtra(); renderTimeline(); renderLight(); renderRep(); renderBtn();
+    Array.prototype.forEach.call(document.querySelectorAll("#segWorld button"),function(b){
+      b.setAttribute("aria-pressed", b.dataset.world===w?"true":"false"); });
+    Array.prototype.forEach.call(document.querySelectorAll(".tab[data-tab]"),function(b){
+      b.classList.toggle("active", b.dataset.tab===w); });
+    if (w==="match"){ scroll.scrollTop=0; onScroll(); } else { lwv.scrollTop=0; sticky.classList.remove("on"); }
+  }
+
+  function setPhase(p){
+    S.phase=p; clearInterval(S.undoTimer); S.undoLeft=0;
+    if (p==="done"){ moments=finished(); S.home=3; S.away=2; S.minute=50; S.crowd=17; S.repOpen=false; }
+    else if (p==="pre"){ moments=base(); S.home=0; S.away=0; S.minute=0; S.period=1; S.crowd=0; S.repOpen=false; }
+    else if (p==="cancelled"){ moments=[]; S.home=0; S.away=0; S.crowd=0; S.repOpen=false; }
+    else if (p==="half"){ moments=base().slice(0,5); S.home=1; S.away=1; S.minute=25; S.period=1; S.crowd=8; }
+    else { moments=base(); S.home=2; S.away=1; S.minute=36; S.period=2; S.crowd=12; }
+    screen.className="screen "+p+(p==="done"?" win":"")+(S.world!=="match"?" lightworld":"");
+    closeSheets(); renderAll(); scroll.scrollTop=0; onScroll();
+    Array.prototype.forEach.call(document.querySelectorAll("#segPhase button"),function(b){
+      b.setAttribute("aria-pressed", b.dataset.phase===p?"true":"false"); });
+    var off=(p==="cancelled");
+    $("btnGoalUs").disabled=off; $("btnGoalThem").disabled=off; $("btnUpdate").disabled=off; $("btnPhoto").disabled=off;
+  }
+
+  function renderAll(){ applyColors(); renderArena(); renderExtra(); renderTimeline();
+    renderSticky(); renderLight(); renderRep(); renderBtn(); }
+
+  /* ===================== HENDELSER ===================== */
+  timeline.addEventListener("click",function(e){
+    var h=e.target.closest("[data-heia]"); if (h){ doHeia(Number(h.dataset.heia)); return; }
+    var c=e.target.closest("[data-cmt]"); if (c){ openSheet(Number(c.dataset.cmt)); return; }
+    if (e.target.closest(".img")) showToast("Fullskjermgalleri med sveiping");
+  });
+  arenaSlot.addEventListener("click",function(e){
+    if (e.target.closest("#mapChip")) showToast("Åpner Briskeby kunstgress 2 i Kart");
+  });
+  $("pkList").addEventListener("click",function(e){
+    var b=e.target.closest("[data-pick]"); if(!b) return;
+    closeSheets();
+    if (b.dataset.pick==="1"){ S.newSince=false; setWorld("match"); }
+    else showToast("Ham-Kam J12 ligger i et annet lagrom — appen må bytte lag først",2800);
+  });
+  $("shClose").addEventListener("click",closeSheets);
+  $("pkClose").addEventListener("click",closeSheets);
+  scrim.addEventListener("click",closeSheets);
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeSheets(); });
+  $("cmtSend").addEventListener("click",send);
+  $("cmtInput").addEventListener("keydown",function(e){ if(e.key==="Enter") send(); });
+  function send(){
+    var i=$("cmtInput"), t=i.value.trim();
+    if (!t || S.openId===null) return;
+    byId(S.openId).comments.push({p:0,t:"nå",x:t});
+    i.value=""; openSheet(S.openId); shList.scrollTop=shList.scrollHeight;
+    renderArena(); renderTimeline();
+    showToast('Kommentaren står nå <span class="h">både her og i feeden</span>',2400);
+  }
+
+  var stickyOn=false;
+  function onScroll(){
+    var should = inMatch() && scroll.scrollTop>190 && S.phase!=="pre" && S.phase!=="cancelled";
+    if (should!==stickyOn){ stickyOn=should; sticky.classList.toggle("on",should); }
+  }
+  scroll.addEventListener("scroll",onScroll,{passive:true});
+
+  $("segWorld").addEventListener("click",function(e){ var b=e.target.closest("button"); if(b) setWorld(b.dataset.world); });
+  $("segPhase").addEventListener("click",function(e){ var b=e.target.closest("button"); if(b) setPhase(b.dataset.phase); });
+  $("segRole").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    S.role=b.dataset.role; S.repOpen=false;
+    Array.prototype.forEach.call(this.querySelectorAll("button"),function(x){
+      x.setAttribute("aria-pressed", x.dataset.role===S.role?"true":"false"); });
+    clearInterval(S.undoTimer); S.undoLeft=0; renderRep(); renderBtn();
+  });
+  $("segLive").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    S.liveCount=Number(b.dataset.live);
+    Array.prototype.forEach.call(this.querySelectorAll("button"),function(x){
+      x.setAttribute("aria-pressed", Number(x.dataset.live)===S.liveCount?"true":"false"); });
+    renderBtn(); renderLight();
+  });
+  $("segTeam").addEventListener("click",function(e){
+    var b=e.target.closest("button"); if(!b) return;
+    S.team=b.dataset.team;
+    Array.prototype.forEach.call(this.querySelectorAll("button"),function(x){
+      x.setAttribute("aria-pressed", x.dataset.team===S.team?"true":"false"); });
+    renderAll();
+  });
+  $("rmSwitch").addEventListener("click",function(){
+    S.rm=!S.rm; this.setAttribute("aria-pressed",S.rm?"true":"false");
+    document.body.classList.toggle("rm",S.rm);
+    showToast(S.rm?"Reduce Motion PÅ — atmosfæren finnes, bevegelsen ikke":"Reduce Motion AV",2200);
+  });
+  // Stor tekst er den harde prøven på «ingen kort»: en flate uten fast høyde
+  // VOKSER med innholdet i stedet for å klippe det. Bryteren beviser det.
+  $("dtSwitch").addEventListener("click",function(){
+    S.dt=!S.dt; this.setAttribute("aria-pressed",S.dt?"true":"false");
+    document.body.classList.toggle("dt",S.dt);
+    showToast(S.dt?"Stor tekst PÅ — flatene vokser, ingenting klippes":"Stor tekst AV",2400);
+  });
+  document.querySelector('.tab[data-tab="home"]').addEventListener("click",function(){ setWorld("home"); });
+  document.querySelector('.tab[data-tab="cal"]').addEventListener("click",function(){ setWorld("cal"); });
+
+  $("btnGoalUs").addEventListener("click",function(){ addGoal("us"); });
+  $("btnGoalThem").addEventListener("click",function(){ addGoal("them"); });
+  $("btnUpdate").addEventListener("click",addUpdate);
+  $("btnPhoto").addEventListener("click",addPhoto);
+  $("btnTop").addEventListener("click",function(){ scroll.scrollTo({top:0,behavior:S.rm?"auto":"smooth"}); });
+
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    S.rm=true; document.body.classList.add("rm"); $("rmSwitch").setAttribute("aria-pressed","true");
+  }
+  setInterval(function(){
+    if (S.phase!=="live") return;
+    S.minute++;
+    var el=arenaSlot.querySelector(".a-clock");
+    if (el && inMatch()) el.textContent=S.period+". omgang · "+S.minute+"′";
+    var pm=document.getElementById("pulseMin");
+    if (pm && S.phase==="live") pm.textContent="Nå "+S.minute+"′";
+    var nt=timeline.querySelector(".nowmark .ntxt");
+    if (nt && S.phase==="live")
+      nt.innerHTML="Nå · "+S.minute+"′<span class=\"nsub\">Nyeste øverst — bla nedover i kampen</span>";
+    $("sbMin").textContent=S.minute+"′";
+  },12000);
+
+  setPhase("live"); setWorld("match");
+})();
+</script>

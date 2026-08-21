@@ -8,7 +8,8 @@ import {
   mapMatchEventRow,
   MATCH_STATUS_MAP,
 } from '../api/events';
-import {getMatchPhotos} from '../api/feed';
+import {getMatchFeed, getMatchPhotos} from '../api/feed';
+import type {MatchFeedPost} from '../../shared/matchEngagement';
 import type {HeiaEventDetail} from '../../shared/types';
 
 /**
@@ -27,6 +28,9 @@ export function eventDetailKey(eventId: string) {
 }
 export function matchPhotosKey(eventId: string) {
   return queryKeys.matchPhotos(eventId);
+}
+export function matchEngagementKey(eventId: string) {
+  return queryKeys.matchEngagement(eventId);
 }
 
 /** Hendelsen med RSVP, oppmøte og kampforløp. teamSpaceId stemples inn i
@@ -52,6 +56,65 @@ export function useMatchPhotos(eventId: string, enabled: boolean) {
     queryFn: () => getMatchPhotos(eventId),
     enabled,
   });
+}
+
+/**
+ * Kampens engasjement (00071). Fjerde RPC-en på kampskjermen, og det er et
+ * BEVISST valg: koblingen mellom øyeblikket og posten er hele skiva, og den
+ * kan ikke leses ut av `get_event_with_rsvp` uten å utvide en RPC som alle
+ * hendelsestyper deler. Egen sti betyr også at et HEIA aldri koster en
+ * re-lasting av kampforløpet, og at et mål aldri re-laster tellerne.
+ *
+ * `enabled` gates på at hendelsen er en kamp — en trening skal ikke betale.
+ */
+export function useMatchEngagement(eventId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: matchEngagementKey(eventId),
+    queryFn: () => getMatchFeed(eventId),
+    enabled,
+  });
+}
+
+/**
+ * Justerer tellerne på ÉN post i kampens engasjement — optimistisk trykk,
+ * realtime fra andre, og patchene `CommentsScreen` sender tilbake hit.
+ *
+ * Funksjonelt samme mønster som `adjustFeedItemCounts`, og med samme
+ * egenskap: er posten ikke i cachen (kampen er ikke lastet, eller tråden hører
+ * til en helt annen post), er kallet en stille no-op.
+ *
+ * `heia` er en delta, `iReacted` en absolutt tilstand — telleren kan bevege
+ * seg uten at MIN tilstand gjør det (en annen som heier), og min tilstand kan
+ * settes uten å gjette hva telleren står på.
+ */
+export function adjustMatchEngagement(
+  eventId: string | undefined,
+  postId: string,
+  deltas: {heia?: number; comments?: number; iReacted?: boolean},
+): void {
+  if (!eventId) {
+    return;
+  }
+  queryClient.setQueryData<MatchFeedPost[]>(
+    matchEngagementKey(eventId),
+    posts =>
+      posts?.map(post =>
+        post.postId === postId
+          ? {
+              ...post,
+              ...(deltas.heia !== undefined && {
+                heiaCount: Math.max(0, post.heiaCount + deltas.heia),
+              }),
+              ...(deltas.comments !== undefined && {
+                commentCount: Math.max(0, post.commentCount + deltas.comments),
+              }),
+              ...(deltas.iReacted !== undefined && {
+                iReacted: deltas.iReacted,
+              }),
+            }
+          : post,
+      ),
+  );
 }
 
 /**
@@ -103,6 +166,63 @@ export function applyMatchEventInsert(eventId: string, row: any): boolean {
 }
 
 /**
+ * En RETTET kamphendelse fra payload (skive 8). Raden byttes ut PÅ PLASS.
+ *
+ * ⚠️ IKKE `applyMatchEventInsert` med en «finnes den fra før»-sjekk. Den
+ * returnerer `true` og gjør INGENTING når id-en finnes — som er riktig for et
+ * eget ekko, og helt galt for en rettelse: målet ville blitt stående med
+ * gammel side og gammel målscorer til neste refetch.
+ *
+ * Kjenner vi ikke raden (kampen er ikke lastet, eller hendelsen kom mens
+ * skjermen var borte), returneres false og kalleren refetcher.
+ */
+export function applyMatchEventUpdate(eventId: string, row: any): boolean {
+  const detail = queryClient.getQueryData<HeiaEventDetail>(
+    eventDetailKey(eventId),
+  );
+  if (!detail?.matchEvents?.some(e => e.id === row.id)) {
+    return false;
+  }
+  const mapped = mapMatchEventRow(
+    row,
+    detail.matchSessionId ?? row.match_session_id,
+    detail.opponent ?? 'motstanderen',
+  );
+  patchEventDetail(eventId, d => ({
+    ...d,
+    matchEvents: (d.matchEvents ?? []).map(e => (e.id === row.id ? mapped : e)),
+  }));
+  return true;
+}
+
+/**
+ * En ANNULLERT kamphendelse (skive 8) — ut av forløpet.
+ *
+ * Stillingen røres ikke her: korrigeringen skriver `match_sessions` i samme
+ * transaksjon, så den kommer som en egen `session`-payload med den ferdig
+ * omregnede stillingen. To kilder til stillingen er nøyaktig det P2 forbød.
+ */
+export function applyMatchEventDelete(
+  eventId: string,
+  matchEventId: string,
+): boolean {
+  const detail = queryClient.getQueryData<HeiaEventDetail>(
+    eventDetailKey(eventId),
+  );
+  if (!detail) {
+    return false;
+  }
+  if (!detail.matchEvents?.some(e => e.id === matchEventId)) {
+    return true; // alt borte (eget ekko etter refetch)
+  }
+  patchEventDetail(eventId, d => ({
+    ...d,
+    matchEvents: (d.matchEvents ?? []).filter(e => e.id !== matchEventId),
+  }));
+  return true;
+}
+
+/**
  * match_sessions-UPDATE fra payload (B3, P6: «scoreboard fra payload —
  * stillingen ligger komplett i raden»). Patcher stilling, status, reporter
  * og starttid; feltene mappes som i mapEventRow (home = oss, alltid).
@@ -134,6 +254,9 @@ export function invalidateEventDetail(eventId: string): void {
 export function invalidateMatchPhotos(eventId: string): void {
   queryClient.invalidateQueries({queryKey: matchPhotosKey(eventId)});
 }
+export function invalidateMatchEngagement(eventId: string): void {
+  queryClient.invalidateQueries({queryKey: matchEngagementKey(eventId)});
+}
 
 /**
  * Marker stale UTEN å hente (refetchType 'none') — samme bro som
@@ -151,6 +274,12 @@ export function markEventDetailStale(eventId: string): void {
 export function markMatchPhotosStale(eventId: string): void {
   queryClient.invalidateQueries({
     queryKey: matchPhotosKey(eventId),
+    refetchType: 'none',
+  });
+}
+export function markMatchEngagementStale(eventId: string): void {
+  queryClient.invalidateQueries({
+    queryKey: matchEngagementKey(eventId),
     refetchType: 'none',
   });
 }
