@@ -187,7 +187,22 @@ const KORT: MatchEvent[] = [
   rS('sl', 60, 'slutt'),
 ];
 
+// ⚠️ BRAGES EGEN KAMP, 2026-08-21: 8–6 på ti minutter, med pause.
+// Det er DENNE tettheten som fikk markørene til å se ut som klumper.
+const ATTE_SEKS: MatchEvent[] = [
+  rS('k', 0, 'avspark'),
+  gS('a1', 20, true, 'Nora'), gS('a2', 45, false), gS('a3', 70, true, 'Jarle'),
+  gS('a4', 95, true, 'Tuva'), gS('a5', 130, false), gS('a6', 150, true, 'Nora'),
+  gS('a7', 200, false), gS('a8', 230, true, 'Jarle'),
+  rS('p', 260, 'pause'), rS('a', 265, 'andre_omgang'),
+  gS('b1', 330, true, 'Tuva'),
+  gS('b2', 560, false), gS('b3', 575, true, 'Nora'),
+  gS('b4', 590, false), gS('b5', 600, true, 'Jarle'), gS('b6', 605, false),
+];
+
 const SCENES: Scene[] = [
+  {navn: '⭐⭐ BRAGES 8–6 PÅ TI MINUTTER — tettheten som avslørte R=15', events: ATTE_SEKS, now: 10, finished: false,
+   heia: [['a1', 4, 1], ['a3', 2, 0], ['b5', 9, 2], ['b3', 3, 0]]},
   {navn: '⭐ 60-SEKUNDERSKAMP: mål på 5, 14, 23, 31, 44, 56 sek (alle viser 0′)', events: KORT},
   {navn: 'A · DIN KAMP: 10–4, alt i minutt 0', events: DIN, now: 0, finished: false},
   {navn: 'B · Realistisk 60′ med pause og bilder', events: EKTE, photos: [f('p1', 16, 'Nora'), f('p2', 52, 'Tuva')]},

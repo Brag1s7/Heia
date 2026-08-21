@@ -41,8 +41,20 @@ export const PULSE_UP = 38;
 export const PULSE_DOWN = 26;
 export const PULSE_BAND = PULSE_VPAD * 2 + PULSE_UP + PULSE_DOWN;
 export const PULSE_MID = PULSE_VPAD + PULSE_UP;
-/** Markørens radius. 30 pt i diameter — lesbar og trykkbar på telefon. */
-export const PULSE_MARK_R = 15;
+/**
+ * Markørens radius. 22 pt i diameter.
+ *
+ * ⚠️ VAR 15 (30 pt), OG DET VAR FOR STORT. Brage på telefonen 2026-08-21:
+ * «disse ikonene er for store, så ser bare dumt ut». Riggen viste at
+ * problemet var verre enn størrelsen: i en tett kamp (8–6 på ti minutter)
+ * DEKKET markørene kurven fullstendig. Hierarkiet sto på hodet — pulsen er
+ * FORMEN, markørene er merknader PÅ den. Nå ser man svaiene igjen.
+ *
+ * ⚠️ IKKE «trykkbar» — det var aldri markørens jobb. Trykkflaten er
+ * `PULSE_TOUCH_MIN` (44 pt) og er helt uavhengig av hvor stor prikken er.
+ * Det er nettopp derfor denne kunne krympes uten å røre tilgjengeligheten.
+ */
+export const PULSE_MARK_R = 11;
 /** Den lille tidsmarkøren for pause. Sitter PÅ midtlinja, deler ingenting. */
 export const PULSE_TICK_R = 7;
 /**
@@ -53,9 +65,15 @@ export const PULSE_TICK_R = 7;
  * kremmarkørene i en helt vanlig kamp — og da kan man ikke lenger lese om
  * et øyeblikk var et mål, en oppdatering eller et bilde.
  *
- * De får derfor LOV til å overlappe litt (opptil 8 pt), og males i rang:
- * bildet nederst, oppdateringen over, målet øverst. Først når de i praksis
- * dekker hverandre blir de ÉN markør med ×N, og valget forklarer flokken.
+ * De males i rang: bildet nederst, oppdateringen over, målet øverst. Først
+ * når de i praksis dekker hverandre blir de ÉN markør med ×N, og valget
+ * forklarer flokken.
+ *
+ * ⚠️ TERSKELEN ER MED VILJE IKKE ENDRET DA MARKØREN KRYMPET (R 15 → 11).
+ * Med 22 pt diameter og terskel 22 møtes markørene nå akkurat, i stedet for
+ * å overlappe med opptil 8 pt. Det er en gratis forbedring — og viktigere:
+ * klyngene, ×N-tallene og trykkgruppene blir NØYAKTIG som før, så
+ * krympingen er en ren tegneendring uten ny modell å teste.
  */
 const VISUAL_MERGE = 22;
 /**

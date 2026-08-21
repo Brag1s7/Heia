@@ -650,8 +650,14 @@ function Marker({
 }) {
   const skin = SKIN[cluster.kind];
   const count = cluster.moments.length;
-  // 30 pt markør: ikonet skal leses på et halvt sekund, ikke anes.
-  const glyphSize = 16;
+  // ⚠️ IKONET FØLGER MARKØREN. Sto som `16` mot en 30 pt markør; med 22 pt
+  // ville det fylt hele flaten og blitt en klump.
+  //
+  // ⚠️ HVORFOR IKONENE IKKE BLE FJERNET, selv om de er små nå: fargen alene
+  // kan ikke bære betydningen. `photo` (#C6FFE9) og `goalUs` (#02FFAB) er
+  // BEGGE mint, og uten glyfen ville et kampbilde og et mål vært to nesten
+  // like prikker. Siden + farge sier HVEM; bare ikonet sier HVA.
+  const glyphSize = Math.round(PULSE_MARK_R * 1.06);
 
   return (
     <View
@@ -673,7 +679,7 @@ function Marker({
       ) : cluster.kind === 'photo' ? (
         <Camera size={glyphSize} color={skin.ink} strokeWidth={2.2} />
       ) : (
-        <Ball size={glyphSize + 3} color={skin.ink} strokeWidth={1.9} />
+        <Ball size={glyphSize + 2} color={skin.ink} strokeWidth={1.9} />
       )}
 
       {count > 1 && (
@@ -762,14 +768,17 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 4,
   },
+  // ⚠️ MERKET SKALERER MED MARKØREN. Det hadde fast størrelse, og da
+  // markøren krympet fra 30 til 22 pt ble ×N-merket STØRRE enn prikken det
+  // hang på. Tallene under er avledet av `PULSE_MARK_R`, ikke skrevet av.
   badge: {
     position: 'absolute',
     top: -3,
     right: -4,
-    minWidth: 17,
-    height: 17,
+    minWidth: Math.round(PULSE_MARK_R * 1.24),
+    height: Math.round(PULSE_MARK_R * 1.24),
     paddingHorizontal: 3,
-    borderRadius: 8.5,
+    borderRadius: PULSE_MARK_R * 0.62,
     backgroundColor: matchColors.timeline,
     borderWidth: 0.7,
     borderColor: 'rgba(234, 255, 246, 0.35)',
@@ -777,7 +786,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: Math.round(PULSE_MARK_R * 0.72),
     fontWeight: '800',
     color: matchColors.text,
   },
@@ -785,10 +794,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -3,
     left: -4,
-    minWidth: 16,
-    height: 16,
+    minWidth: Math.round(PULSE_MARK_R * 1.16),
+    height: Math.round(PULSE_MARK_R * 1.16),
     paddingHorizontal: 3,
-    borderRadius: 8,
+    borderRadius: PULSE_MARK_R * 0.58,
     backgroundColor: 'rgba(14, 41, 29, 0.94)',
     borderWidth: 0.7,
     borderColor: 'rgba(234, 255, 246, 0.3)',
@@ -796,7 +805,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bubbleText: {
-    fontSize: 9.5,
+    fontSize: Math.round(PULSE_MARK_R * 0.66),
     fontWeight: '800',
     color: matchColors.dim,
   },

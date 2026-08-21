@@ -2074,6 +2074,44 @@ den er ikke en formalitet: det er det eneste stedet modellen møter ekte tid.
 
 </details>
 
+#### 🔎 MARKØRENE KRYMPET: 30 pt → 22 pt (2026-08-21)
+
+**Brage:** «disse ikonene er for store, så ser bare dumt ut. Mulig vi må
+gjøre de mindre, eller fjerne dem.»
+
+**⚠️ RIGGEN VISTE AT PROBLEMET VAR STØRRE ENN STØRRELSEN.** Hans egen kamp
+(8–6 på ti minutter) ble lagt inn som scene i
+`pulseModel.harness.test.ts` — og i den tettheten **dekket markørene kurven
+fullstendig.** Hierarkiet sto på hodet: pulsen er FORMEN, markørene er
+merknader PÅ den. Tre radier ble tegnet og sett på (15 / 11 / 8) før noe ble
+valgt.
+
+- **R=15 (før):** kurven usynlig. ×N-merket nesten like stort som markøren.
+- **R=11 (valgt):** svaiene leses igjen, ikonet er fortsatt tydelig.
+- **R=8:** vakreste kurve, men ikonene ble mos.
+
+**⚠️ IKONENE BLE IKKE FJERNET, og grunnen er en fargekollisjon:**
+`photo` (#C6FFE9) og `goalUs` (#02FFAB) er BEGGE mint. Uten glyfen ville et
+kampbilde og et mål vært to nesten like prikker. **Siden og fargen sier HVEM
+— bare ikonet sier HVA.**
+
+**Tre ting som gjorde dette til en billig endring:**
+1. ⚠️ **`VISUAL_MERGE` ER IKKE RØRT (22).** Med 22 pt diameter møtes
+   markørene nå akkurat, i stedet for å overlappe med opptil 8 pt. Klyngene,
+   ×N-tallene og trykkgruppene blir **nøyaktig som før** — altså en ren
+   tegneendring, uten ny modell å teste.
+2. ⚠️ **TRYKKFLATEN ER URØRT.** `PULSE_TOUCH_MIN` (44 pt) er en egen sak fra
+   markørens radius, og har alltid vært det. Derfor kunne prikken krympe uten
+   å røre tilgjengelighet eller treffsikkerhet.
+3. ⚠️ **MERKET OG BOBLA SKALERER NÅ MED MARKØREN.** De hadde faste tall
+   (r 8.5 / 8), så da prikken krympet ble ×N-merket STØRRE enn prikken det
+   hang på. Alt er nå avledet av `PULSE_MARK_R`.
+
+**Y-klemmen ble bedre på kjøpet:** markørene klemmes mot båndkanten med
+`PULSE_MARK_R + 1`, så en mindre markør følger svaien mer trofast.
+
+**Scenen er sjekket inn** — kjør riggen før du rører markørgeometrien igjen.
+
 #### ⚠️ 00074 — TO AKSER, OG FELLA MELLOM DEM (2026-08-21)
 
 **Brage, rett etter at 00073 var i prod:** «Når man legger til en hendelse så
