@@ -117,7 +117,14 @@ export function NewEventScreen({navigation, route}: Props) {
     : undefined;
 
   const [type, setType] = useState<EventType>(
-    isNewTournament ? 'turnering' : inTournament ? 'kamp' : 'trening',
+    isNewTournament
+      ? 'turnering'
+      : // «Ny kamp» fra Sesongens kampprogram (skive 10.1). Typen er
+        // FORHÅNDSVALGT, ikke låst: inngangen vet hva den lager, men en
+        // trener som ombestemmer seg skal slippe å gå ut og inn igjen.
+        route.params?.presetType === 'kamp' || inTournament
+        ? 'kamp'
+        : 'trening',
   );
   // «Turnering»-feltet på en vanlig kamp: velges kun når det finnes noe å
   // velge i. null = vanlig seriekamp.

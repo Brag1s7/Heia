@@ -4,7 +4,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {matchColors, spacing} from '../../theme';
 import {MatchTimeline} from '../MatchTimeline';
-import {ReporterActions, type ReporterActionType} from '../ReporterActions';
+import type {ReporterActionType} from '../ReporterActions';
 import {ReporterBar} from '../ReporterBar';
 import {useGoalMoment} from '../useGoalMoment';
 import {ArenaSurface} from './ArenaSurface';
@@ -12,6 +12,8 @@ import {MatchArena} from './MatchArena';
 import {MatchGround} from './MatchGround';
 import {MatchPulse} from './MatchPulse';
 import {MatchTopBar, useMatchTopBar} from './MatchTopBar';
+import {ReporterDock, REPORTER_DOCK_HEIGHT} from './ReporterDock';
+import {MatchToast} from './MatchToast';
 import type {MatchPhoto} from '../../lib/api/feed';
 import type {MatchEngagement} from '../../shared/matchEngagement';
 import type {HeiaEventDetail, MatchEvent, User} from '../../shared/types';
@@ -96,6 +98,19 @@ interface LiveMatchProps {
   onReporterAction: (type: ReporterActionType) => void;
   onPickPhoto: () => void;
   onPressPhoto: (photo: MatchPhoto) => void;
+  /**
+   * Reporterdokken er åpen (skive 10). Styres av RAPPORTER-knappen i
+   * tab-baren; tilstanden bor i `EventDetailScreen` som alt annet her.
+   */
+  reporterDockOpen?: boolean;
+  /** Dokken ble dratt ned. */
+  onCloseReporterDock?: () => void;
+  /**
+   * Kvitteringen på reporterens EGEN handling — «Mål registrert» osv.
+   * `null` = ingenting å vise. Se `MatchToast`.
+   */
+  toast?: string | null;
+  onToastHidden?: () => void;
 }
 
 export function LiveMatch({
@@ -116,6 +131,10 @@ export function LiveMatch({
   onReporterAction,
   onPickPhoto,
   onPressPhoto,
+  reporterDockOpen = false,
+  onCloseReporterDock,
+  toast = null,
+  onToastHidden,
 }: LiveMatchProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
@@ -143,6 +162,34 @@ export function LiveMatch({
   // som drifter fra hverandre.
   const {scoreScale, celebrate} = useGoalMoment(home, away);
 
+  /**
+   * ⚠️ KONSTANT. DETTE VAR ÅRSAKEN TIL AT DOKKEN «KOM HAKKETE OPP» OG
+   * «HOPPET STYGT NED» (Brage 2026-08-21, tredje telefonrunde).
+   *
+   * Padding-en var `… + (reporterDockOpen ? DOCK_HEIGHT : 0)` i et INLINE
+   * objekt. Da endret innholdshøyden seg i NØYAKTIG det øyeblikket dokken
+   * animerte: `ScrollView` måtte måle og legge ut hele kampforløpet på nytt
+   * mens en animasjon kjørte på samme skjerm. En layout-pass som slåss med
+   * en animasjon blir hakk — hver gang, uansett hvor pen easing-en er.
+   *
+   * Plassen RESERVERES derfor permanent for reporteren. Hun har dokken
+   * tilgjengelig hele kampen; at forløpet har litt ekstra luft i bunnen når
+   * den er lukket, koster ingenting. Tilskuere får den ikke i det hele tatt.
+   *
+   * At objektet i tillegg er memoisert er den andre halvparten: et nytt
+   * objekt per render ville gitt `ScrollView` en ny `contentContainerStyle`
+   * ved hvert minutt-tick.
+   */
+  const scrollPad = useMemo(
+    () => ({
+      paddingBottom:
+        insets.bottom +
+        spacing['3xl'] +
+        (isReporter ? REPORTER_DOCK_HEIGHT : 0),
+    }),
+    [insets.bottom, isReporter],
+  );
+
   return (
     <MatchGround
       teamColor={teamColor}
@@ -166,7 +213,7 @@ export function LiveMatch({
       />
 
       <Animated.ScrollView
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        contentContainerStyle={scrollPad}
         onScroll={topBar.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}>
@@ -201,20 +248,21 @@ export function LiveMatch({
           />
         </View>
 
-        {isReporter ? (
-          <View style={styles.tools}>
-            <ReporterActions
-              variant="match"
-              onAction={onReporterAction}
-              isPaused={paused}
-              onPhoto={onPickPhoto}
-            />
-          </View>
-        ) : (
-          // ⚠️ VAR ET HVITT KORT. «Du følger kampen direkte» sto som en
-          // administrativ boks midt i kampen. Beskjeden er verdt å beholde —
-          // den forklarer hvorfor det ikke finnes en oppdater-knapp — men
-          // den er en fotnote, ikke et kort. Én dempet linje på grunnen.
+        {/* ⚠️ REPORTERPANELET LIGGER IKKE LENGER HER (skive 10).
+            Det var en fast blokk midt på siden, altså et sted man måtte
+            scrolle for å nå kampens mest tidskritiske handling. Verktøyet bor
+            nå i `ReporterDock`, som RAPPORTER-knappen i tab-baren åpner —
+            der tommelen allerede er.
+
+            Og det står INGENTING her i stedet. Prototypen har ingen
+            hintetekst til reporteren; den sentrale knappen forklarer seg
+            selv. Å skrive «bruk knappen nederst» ville vært å finne opp
+            produktspråk, som er nettopp det autoritetsregelen forbyr.
+
+            Publikums linje står uendret — den forklarer hvorfor det ikke
+            finnes en oppdater-knapp, og den er en godkjent beslutning fra
+            skive 2 (den erstattet et hvitt «du følger kampen»-kort). */}
+        {!isReporter && (
           <Text style={styles.following} maxFontSizeMultiplier={1.5}>
             Stillingen og kampforløpet oppdaterer seg av seg selv.
           </Text>
@@ -251,9 +299,29 @@ export function LiveMatch({
           onPressPhoto={onPressPhoto}
         />
       </Animated.ScrollView>
+
+      {/* Reporterens verktøy, over grunnen og rett under tab-baren.
+          Rendres kun for reporteren — en tilskuer skal ikke ha den i treet
+          i det hele tatt. */}
+      {isReporter && (
+        <ReporterDock
+          open={reporterDockOpen}
+          onAction={onReporterAction}
+          isPaused={paused}
+          onPhoto={onPickPhoto}
+          onClose={onCloseReporterDock ?? noop}
+        />
+      )}
+
+      {/* Kvitteringen ligger OVER dokken: den kommer i det dokken glir ned,
+          og skal ikke ligge bak den i det halve sekundet de overlapper. */}
+      <MatchToast message={toast} onHidden={onToastHidden ?? noop} />
     </MatchGround>
   );
 }
+
+/** Stabil identitet: en fersk pilfunksjon per render ville revet memoene. */
+const noop = () => {};
 
 const styles = StyleSheet.create({
   // Arenaen er et platå i verdenen, ikke et kort i en liste: den ligger tett

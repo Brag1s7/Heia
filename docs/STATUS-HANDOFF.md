@@ -1,6 +1,46 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 8 OG 9 GODKJENT. NESTE: SKIVE 10 (KAMPKNAPPEN))
+## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 10 BYGGET. VENTER PÅ TELEFONKONTROLL)
+
+⏳ **SKIVE 10 — KAMPKNAPPEN — ER BYGGET 2026-08-21. IKKE COMMITTET.
+GJENSTÅR: TELEFONKONTROLLEN.** Ren JS: ingen migrasjon, ingen nye pakker,
+ingen native rebuild. **`npx tsc --noEmit` = 7 feil = baselinen** (alle
+preeksisterende, i `TimeSheet`/`lib/media`/`netMetrics`/`LagkassaScreen`),
+lint på baseline (14 problemer, 1 preeksisterende feil), **750 tester grønne**.
+Telefonsjekklista står i `### ⏳ SKIVE 10 BYGGET`. **Fem telefonrunder er
+kjørt (10.1–10.4); rapporteringen er godkjent 2026-08-21. Navigasjonsregelen
+står i `## 🔒 KILDEBEVARENDE TABMODELL` — den erstatter to tidligere
+beslutninger.**
+
+**Den generiske «+» finnes ikke lenger.** Midtplassen er kampknappen:
+`KAMP` → live-stilling → `HEIA!` / `RAPPORTER`. Forutsetningen fra P4 er
+innfridd først: «Del med laget» og «Ny hendelse» har begge permanente
+innganger.
+
+⚠️ **FIRE RETTELSER BRAGE KREVDE I PLANFASEN, OG SOM ER GRUNNEN TIL AT
+SKIVA IKKE LYVER.** Les dem før du rører sporet — hver av dem var en ekte
+feil i utkastet:
+1. **Tilbake skal bevare fanen.** Første utkast sendte alle til Hjem via
+   `openEvent`. `EventDetail` er nå registrert i **alle fire** fanestackene
+   (`ProfilStack` fikk den + `NewEvent`), og `openMatchInTab` navigerer inn
+   i den fokuserte stacken.
+2. **Reporteren får aldri varsel om sin egen handling** (triggeren hopper
+   over forfatteren, 00023/00051) ⇒ `invalidateLiveMatch` etter start, mål,
+   pause, slutt og korrigering. Uten den sto hennes egen knapp med gammel
+   stilling — og påsto livekamp etter «Slutt».
+3. **`liveNonce` er gatet på brukerens varselinnstillinger**
+   (`inbox_enabled`). Slår noen av kampvarsler, kommer det ALDRI en nonce.
+   `staleTime` løser det ikke — den tillater en refetch, den utløser ingen.
+   Derfor et ekte `refetchInterval` (60 s), AV inne i kampen og AV i
+   bakgrunnen.
+4. **`tabBarItemStyle: {flex}` er forbudt.** Det ville gjort de fire andre
+   fanene smalere. Fanene er like brede som før; pillen får i stedet flyte
+   noen få punkter ut (≤ 6 pt/side, testet som faktisk bredde).
+
+⚠️ **HEIA FRA KNAPPEN ER ADD-ONLY.** `addReaction` (ny) gjør kun INSERT og
+svelger `23505`; `cheerOnMoment` har pending-lås; tilstandsmaskinen gir aldri
+`heia` når du alt har heiet. Et dobbelttrykk kan altså ikke slette din egen
+heia. `toggleReaction` står urørt — i `MatchEngagementRow` ER av/på riktig.
 
 **✅ SKIVE 5 — KAMPENS PULS — ER TELEFONGODKJENT AV BRAGE 2026-08-21:
 «Det er godkjent nå så vi kan gå videre.»**
@@ -1750,7 +1790,7 @@ en REELL begrensning.
 | 7 | **Kampuret** (serverautoritativt) | ⏳ BYGGET — `00073` IKKE PUSHET ⚠️ |
 | 8 | **Korriger mål** (varig) | ✅ LEVERT, VERIFISERT OG TELEFONGODKJENT 2026-08-21. `00075`–`00078` i prod. ⚠️ `00078` fjernet målscorerfeltet ETTER godkjenning — se bolken |
 | 9 | **`get_team_feed`-gaten for mål imot** | ✅ I PROD OG TELEFONGODKJENT 2026-08-21 («Alt på 9 kan godkjennes») |
-| 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
+| 10 | **Kampknappen** | ⏳ BYGGET 2026-08-21, ikke committet. Venter på telefonkontroll — se `### ⏳ SKIVE 10 BYGGET` |
 
 #### ▶️ SKIVE 5 — KAMPENS PULS: HVA SOM ALLEREDE ER AVKLART
 
@@ -2228,6 +2268,449 @@ feilen usynlig).
 
 ⚠️ **`FinishedMatch` sender ikke `nowMs`, og skal ikke:** en ferdig kamp har
 `slutt` som høyre kant, ikke «nå».
+
+### 🔒 KILDEBEVARENDE TABMODELL — LÅST AV BRAGE 2026-08-21
+
+**✅ «Nå fungerer endelig rapporteringen nærmest perfekt!»** (femte
+telefonrunde). Det som gjensto var navigasjonen og én høydefeil.
+
+⚠️ **DENNE MODELLEN ERSTATTER BÅDE PLANFASENS «tilbake bevarer fanen» OG
+10.3s «Kamp-fanen eier alle kamper». Ikke relitigér — les den som fasit.**
+
+| Inngang | Havner i | Valgt fane | Tilbake |
+|---|---|---|---|
+| **Kamp-fanen** | `KampStack` | Kamp | Sesongen |
+| Kamp-fanen, livekamp | `KampStack` → kampen | Kamp | Sesongen |
+| Kamp i **Kalender** | `KalenderStack` | Kalender | Kalender |
+| Kamp i **Varsler** | `InboxStack` | Varsler | Varsler |
+| Kamp i **feeden** | `HomeStack` | Hjem | Hjem |
+| **Push / deep link** (ingen intern kilde) | `KampStack` | Kamp | Sesongen |
+| **«Sesongen»** i laghodet på Hjem | `HomeStack` | Hjem | Hjem |
+
+**Regelen bak tabellen: den valgte fanen skal ALLTID gjenspeile hvor
+brukeren kom fra.** `HEIA!`/`RAPPORTER` er en GLOBAL kamphandling — den
+virker uansett hvilken fane kampen ble åpnet fra, og den flytter deg ikke.
+
+⚠️ **INGEN falsk Kamp-markering.** Et tidligere utkast ga Kamp-etiketten
+aktivt blekk så snart man sto i en kamp — også når kampen var åpnet fra
+Kalender og Kalender var den EKTE valgte fanen. Da lyste to faner samtidig,
+og den ene løy. `isInMatch()` er derfor slettet, ikke bare sluttet brukt.
+Markeringen kommer nå fra ekte fokus, og `__tests__/tabBar.test.tsx` vokter
+at etikettstilen er den samme i alle knappens tilstander.
+
+⚠️ **INGEN `returnTo`, ingen tilbakeknapp som teleporterer mellom faner.**
+Dette er FLERE NAVIGASJONSRUTER til de samme skjermkomponentene — ikke
+duplisert produktlogikk. `SeasonScreen` og `EventDetailScreen` er de samme
+komponentene i alle stackene de er registrert i.
+
+#### ⚠️ SESONGEN BOR TO STEDER, OG BARE DET ENE HAR EN VEI TILBAKE
+
+Som ROT i Kamp-fanen har den ingen `BackBar`: `goBack()` ville bobla opp til
+fanenavigatoren og kastet deg til Hjem («som ikke skal være mulig»). Som
+PUSHET skjerm fra laghodet MÅ den ha en, ellers er snarveien en blindvei.
+
+`navigation.getState().index > 0` er stackens eget svar på «ble jeg pushet
+hit», og det er sannere enn `canGoBack()`, som også teller foreldre-
+navigatoren.
+
+**Toppmargen følger med:** `BackBar` bærer den når den finnes; som fanerot
+må tittelen holde seg klar av statuslinja selv (`insets.top`). Uten det la
+«Sesongen» seg oppå klokka og Dynamic Island — feilen på Brages skjermbilde.
+
+---
+
+### ⏳ SKIVE 10.4 — FJERDE TELEFONRUNDE 2026-08-21 (IKKE COMMITTET)
+
+⚠️⚠️ **FØRST EN INNRØMMELSE SOM MÅ STÅ HER: OPACITY-FIKSEN FRA 10.2 LANDET
+ALDRI.** Jeg rapporterte den som gjort. Prettier hadde slått linja sammen til
+én, python-erstatningen min var uten `assert`, og den traff derfor ingenting —
+stille. `opacity: open ? 1 : 0` sto der i to hele runder mens jeg lette etter
+årsaken andre steder.
+
+**REGEL HERFRA: hver eneste tekst-erstatning i denne kodebasen skal ha en
+`assert count == 1`.** En erstatning som ikke traff er verre enn en som feilet,
+fordi den ser ut som suksess i alt som rapporteres etterpå.
+
+#### ⚠️ STOR FEIL: KNAPPEN BLE IKKE `RAPPORTER` NÅR MAN KOM TILBAKE
+
+Brage: «trykker man ut av kampen og inn igjen så blir ikke knappen omgjort til
+rapporter knapp!»
+
+`useMatchPresence` slapp registreringen ved blur, men meldte seg bare PÅ igjen
+når payload-OBJEKTET endret seg. Kom du tilbake til en kamp der ingenting
+hadde skjedd i mellomtiden, var objektet identisk — det er memoisert med
+vilje — og effekten fyrte aldri. **Nå er FOKUS selve signalet**, samme
+livssyklus som `watchEvent`: på ved fokus, av ved blur. `isFocused`-vakten på
+innholds-effekten hindrer at en kampskjerm som ligger igjen i en annen fanes
+stack overskriver registreringen til kampen du faktisk ser på.
+
+#### «VIL IKKE SE RAPPORTERINGSKJERMEN ETTERPÅ»
+
+Lukkingen lå ETTER `await reportMatchEvent` OG `await refetchEvent()` — altså
+etter to rundturer. Dokken sto åpen i hele det øyeblikket reporteren nettopp
+hadde handlet, og det føltes som om trykket ikke gjorde noe.
+
+**Flaten skal svare på TRYKKET, ikke på serveren.** Dokken lukkes og
+kvitteringen kommer med én gang; feiler skrivingen, fjernes kvitteringen og
+en Alert tar over (ellers ville det stått «Mål registrert» bak en feilmelding
+som sa det motsatte).
+
+#### HAKKET, RUNDE 3 — DENNE GANGEN RE-RENDER, IKKE LAYOUT
+
+10.3 fjernet layout-passet. Det som sto igjen: dokkens av/på bor i
+`EventDetailScreen`, så hvert trykk rendret HELE kampverdenen på nytt —
+inkludert `MatchPulse`, som regner ut og tegner en SVG-kurve, og
+`MatchTimeline`, som fletter forløp og bilder. Midt i animasjonen.
+
+Begge er nå `React.memo`. ⚠️ **Og memo er verdiløs uten stabile props:**
+`onPressPhoto={photo => setGalleryPhotoId(photo.id)}` var et nytt objekt hver
+render. De inline-handlerne er nå `useCallback`.
+
+#### ROUTING: SESONGEN ER EN FANEROT, OG FANERØTTER HAR INGEN «TILBAKE»
+
+Brage: «fra og med der kan jeg også trykke tilbake og kommer da til hjem som
+ikke skal være mulig.»
+
+`SeasonScreen` hadde fortsatt `BackBar` fra den gang den var en pushet skjerm i
+Hjem. På en fanerot bobler `goBack()` opp til fanenavigatoren og kaster deg til
+første fane. **`BackBar` er fjernet.** Fanene er veien videre.
+
+#### «NY KAMP» ER EN EKTE KNAPP
+
+Den lå som en tekstlenke i et seksjonshode. Å sette opp kampen er hele grunnen
+til at en trener åpner sesongsiden før sesongen har startet — da kan
+handlingen ikke være det svakeste elementet på flaten. Nå mint pille med glød
+i sidehodet, 44 pt, admin-gatet.
+
+**774 tester grønne, tsc 7 = baseline, lint 13 (1 preeksisterende feil).**
+
+---
+
+### ⏳ SKIVE 10.3 — KAMP-FANEN + REPORTERFLATEN 2026-08-21 (IKKE COMMITTET)
+
+⚠️⚠️ **TREDJE TELEFONRUNDE. Brage: «Må si jeg er veldig lei av at du ikke
+fikser rapporteringen! … Alt dette er ikke på det nivået vi vil ha!!!»**
+
+#### 🔒 KAMP-FANEN EIER KAMPENE OG SESONGEN — BRAGES BESLUTNING, LÅST
+
+Bunnlinja viste «Profil» som aktiv mens man sto inne i kampen, fordi kampen
+bodde i fanen man tilfeldigvis kom fra. **Dette REVERSERER planfasens
+«tilbake bevarer fanen brukeren kom fra».** Semantikken Brage låste:
+
+- Permanent fanenavn: **Kamp**. Roten i `KampStack`: **Sesongen**.
+- Ingen livekamp ⇒ `KAMP`, åpner Sesongen (eksplisitt `screen: 'Season'` —
+  står en FERDIG kamp igjen på toppen, skal knappen føre til sesongen, ikke
+  tilbake til gårsdagens kamp).
+- Live utenfor ⇒ coral stillingspille. Inne som publikum ⇒ mint `👏 HEIA!`.
+  Inne som reporter ⇒ `RAPPORTER`, mint `LUKK` når dokken er åpen.
+- **Valgt-markeringen er en MINT RING, ikke fyllfarge.** Brage var eksplisitt:
+  live-stillingen skal ikke bli mint bare for å markere selection — coral
+  BETYR live, og å bytte den for å si noe om navigasjon ville gjort
+  fargesemantikken usann. Ringen finnes alltid, gjennomsiktig når fanen ikke
+  er valgt: en kant som kom og gikk ville dyttet teksten 4 pt.
+- `accessibilityState={{selected}}` på pillen.
+- **«Sesongen» øverst til høyre på Hjem består**, men navigerer til
+  `Kamp → Season` og aktiverer fanen. **Ingen Season-rute eid av Hjem** — to
+  ruter med samme skjerm ville gitt to steder å komme tilbake fra.
+- `Lagkassa` er registrert i `KampStack` også (samme mønster som `NewEvent`
+  har i tre stacker), så «tilbake» fra lagkassa fører til Sesongen.
+
+⚠️ **ÉN ÆRLIG ASYMMETRI STÅR IGJEN:** åpner du en live kamp fra FEEDEN eller
+KALENDEREN, havner den fortsatt i den fanens egen stack — da er Kamp ikke
+fokusert, men knappen viser likevel HEIA. `isInMatch()` gir etiketten aktivt
+blekk i det tilfellet. Å flytte også de inngangene til Kamp-fanen er en egen
+beslutning; det ville endret tilbake-oppførselen fra to lister.
+
+#### ⚠️ «HAKKETE OPP» OG «HOPPER STYGT NED» — ÅRSAKEN VAR IKKE ANIMASJONEN
+
+`contentContainerStyle` på kampens scroll var et INLINE objekt med
+`… + (reporterDockOpen ? DOCK_HEIGHT : 0)`. Innholdshøyden endret seg altså i
+NØYAKTIG det øyeblikket dokken animerte: `ScrollView` måtte måle og legge ut
+hele kampforløpet på nytt mens en animasjon kjørte. **En layout-pass som
+slåss med en animasjon blir hakk — hver gang, uansett hvor pen easing-en er.**
+
+Plassen reserveres nå PERMANENT for reporteren (`isReporter`, ikke
+`reporterDockOpen`), og objektet er memoisert. To runder med finpuss på
+easing var behandling av symptomet.
+
+#### REPORTERARKET — «ser så billig ut»
+
+Det var et generisk skjema i kampens verden: hvitt kort, tittel, én etikett,
+en blek gråboks, og en etikett til som sa det samme. Nå kampens egen flate:
+
+- **Mørkt ark** (`matchColors.pulse` + krittkant), som dokken det åpnes fra.
+  `CommentSheet` er lyst med vilje — krem er LESEFLATEN, og en tråd er
+  lesing. Dette er reporterens VERKTØY. Et hvitt kort her var samme brudd som
+  «Du følger kampen direkte» var i skive 2.
+- **Tittelen er øyeblikket**, i displayfonten: `MÅL!` / `MÅL IMOT` /
+  `OPPDATERING`. Mål imot i skifer, aldri mint.
+- **Plassholderen ER etiketten** — én linje, ikke to.
+- Knappene er kampens egne (mint fyll + krittkant), ikke `Button`-varianter
+  som er tegnet for lyse flater.
+
+#### OPPSTARTSHOPPET — BRAGES EGEN LØSNING
+
+«Hva om den først må ha fått på plass knappen før den kan vise appen?» En
+nøytral mellomtilstand gjorde bare hoppet mindre synlig. Nå venter
+`RootNavigator` på `bootReady` fra `MatchButtonContext`. ⚠️ **Taket på
+1500 ms er ikke valgfritt:** uten det ville en treg forbindelse holdt HELE
+appen på oppstartsflaten. En knapp som ikke vet er en liten feil; en app som
+ikke starter er en stor en.
+
+**774 tester grønne, tsc 7 = baseline, lint = baseline.**
+
+⚠️ **BEVEGELSE KAN IKKE BEVISES I JEST.** `react-test-renderer` løser
+Animated-verdier til tall, så opacity-snappet i 10.2 og layout-passet her ser
+identiske ut før og etter i en test. Begge er telefonverifisert, og det står
+skrevet i `reporterDock.test.tsx`. **Neste runde på bevegelse må måles på
+enhet, ikke gjettes i kode.**
+
+---
+
+### ⏳ SKIVE 10.2 — REPORTERFLYTEN, RUNDE 2 2026-08-21 (IKKE COMMITTET)
+
+⚠️⚠️ **BRAGE, ETTER ANDRE TELEFONTEST: «hele denne flyten/prosessen må være
+mye smoothere! dette er kjerne funksjonen i heia!!!»** Fire feil, og den
+verste var min egen.
+
+**1. Dokken kunne IKKE dras ned — og draget rev kampen mot venstre.**
+To ting som hang sammen:
+- Grepet vant aldri responderen. **Nøyaktig lærdommen fra `CommentSheet` 4.3**,
+  som jeg hadde lest og likevel ikke fulgt: et håndtak må ta berøringen
+  ALLEREDE VED START og i **capture-fasen**. En terskel på `onMove` alene gjør
+  gesten upålitelig. Grepet er dessuten **44 pt** nå — det var 28, og en 4 pt
+  strek i et 28 pt felt må man sikte på.
+- Den vannrette komponenten lakk ut til stackens sveip-tilbake
+  (`animationMatchesGesture`). Den slås nå AV mens dokken er åpen
+  (`gestureEnabled` i `EventDetailScreen`). **Et ark som ligger over skjermen
+  skal eie gesten sin, ikke dele den med navigasjonen.**
+
+**2. ⚠️ «rapporter skjermen går stygt ned» — DETTE VAR EN EKTE BUG.**
+`opacity: open ? 1 : 0` var et TALL som snappet til 0 i samme øyeblikk `open`
+ble false, mens `translateY` fortsatt animerte. Dokken forsvant altså med et
+KLIPP i stedet for å gli. Opacity er nå **avledet av den samme animerte
+verdien**, så de to ikke kan komme i utakt. Bevegelsen fikk samtidig
+`Easing.out/in(cubic)` — samme par som `CommentSheet`.
+
+⚠️ **DEN FEILEN LAR SEG IKKE TESTE I JEST**: `react-test-renderer` løser
+Animated-verdier til tall i utdata, så en assert ville sett helt lik ut før og
+etter. Den er telefonverifisert, og det står skrevet i `reporterDock.test.tsx`.
+
+**3. «fader det opp stygt … svart fade over når den dras opp».**
+`ReporterModal` hadde `animationType="slide"` på en `transparent` Modal — da
+flyttes HELE innholdet, inkludert det fullskjerms mørke sløret, så et svart
+rektangel sveipet oppover. Og sløret var `rgba(0,0,0,0.5)`, en svart vask som
+slukket den grønne verdenen — **nøyaktig det `CommentSheet` fikk avvist i 4.2.**
+Nå `animationType="none"` med egen bevegelse: sløret TONER (`#081B13` på 0.32,
+kampens eget), arket GLIR (`Easing.out(cubic)`). To lag, to bevegelser. Og det
+glir UT igjen i stedet for å forsvinne med et klipp.
+
+**4. Knappen sa «KAMP» og hoppet så til stillingen ved oppstart.**
+⚠️ **IKKE EN ANIMASJONSFEIL — FLATEN LØY.** `KAMP` BETYR «ingen kamp pågår»,
+og det er en påstand appen ikke har dekning for før første henting har landet.
+Ny tilstand **`unknown`**: rolig plass, ingen tekst, ingen påstand. Og det
+første svaret **spretter ikke** (`shouldNudge`) — det er ikke en nyhet, det er
+at flaten endelig kan si hva den vet.
+
+**KOREOGRAFIEN ETTER EN HANDLING** er nå en stafett, ikke tre ting som skjedde
+samtidig: arket glir ut (eier sin egen bevegelse) → dokken glir ned (210 ms) →
+kvitteringen stiger opp i plassen dokken forlot (`HANDOFF_MS`). Teksten
+sendes til serveren MED ÉN GANG — bevegelsen er pynt, registreringen er ikke.
+
+**774 tester grønne, tsc 7 = baseline, lint = baseline.**
+
+---
+
+### ⏳ SKIVE 10.1 — SEKS RETTELSER FRA TELEFONEN 2026-08-21 (IKKE COMMITTET)
+
+Brage kjørte skive 10 på telefonen og fant seks ting. Alle er rettet.
+
+**1. «RAPPORT…» — teksten ble klippet.** To årsaker, og begge var mine:
+- Tab-barens globale `tabIconSlot` er **64 pt**, og pillen ble målt mot den.
+  Midtfanen har nå sin egen, bredere `tabBarIconStyle` — en per-rute-option,
+  så de fire andre beholder sin 64 pt-slott og sine posisjoner.
+- Bredde-anslaget var **0.62 em**, hentet fra `matchGridGeometry`. Det tallet
+  er målt på MINUTTER — sifre og små bokstaver. Pillen er VERSALER, som er
+  merkbart bredere. Nå **0.72 em**, pluss `adjustsFontSizeToFit` som
+  sikkerhetsnett: estimatet bestemmer utgangspunktet, native bestemmer fasit.
+
+⚠️ **MED ET ÆRLIG ANSLAG FÅR «RAPPORTER» IKKE PLASS PÅ 320 pt.** En fanecelle
+er da 64 pt. Testen sa fra, og svaret er en **kortform** (`RAPPORT`, og
+`PAUSE 2–1` → `2–1`) som brukes KUN når den fulle ikke får plass — aldri et
+klippet ord. `a11yLabel` er uendret, så VoiceOver hører alltid hele meningen.
+
+⚠️ **GLYFEN BESTEMMES AV TILSTANDEN, IKKE AV ORDLENGDE.** Første utkast
+gjettet «langt ord ⇒ ingen glyf», og trodde da at «RAPPORT» (7 tegn) hadde et
+ikon komponenten aldri tegnet — 20 pt bredde som ikke fantes.
+`matchButtonHasGlyph()` er nå den ene kilden. **Pause mistet prikken sin** i
+samme slag: den kostet 24 pt, og «PAUSE 2–1» fikk da ikke plass på NOEN
+telefon. Den sto dessuten stille i pause (samme regel som `LiveBadge`), så
+gullet og ordet gjør hele jobben. Live beholder sin — der PUSTER den.
+
+**2. «Vises det at man er på den siden?» — ja, nå.** Midtplassen kan aldri BLI
+fokusert (`tabPress` avbrytes), så den var den eneste fanen som ikke sa «du er
+her». Etiketten under pillen får nå samme mørke blekk som de fire andre
+bruker når de er aktive (`isInMatch()`). Ingen mint-pille bak — pillen OVER er
+allerede flatens sterkeste signal, og to markeringer ville kranglet.
+
+**3. «Boksen lastes sakte og stegvis».** `ReporterModal` var en SENTRERT hvit
+boks med `animationType="fade"`, og så skjøv tastaturet den oppover: to
+bevegelser etter hverandre, i to ulike retninger. Den er nå et **bunnark** med
+`animationType="slide"` og håndtak — samme mønster som `GoalCorrectionSheet`
+og `MatchPhotoSheet` alt bruker. Arket og tastaturet møtes i samme retning.
+
+**4. Dokken lukker seg selv + kvitterer.** Etter mål, mål imot, pause, andre
+omgang, slutt, kommentar OG bilde: `setReporterDockOpen(false)` +
+`MatchToast`. Teksten er i **fortid** («Mål registrert»), ikke imperativ — den
+er et SVAR, og en imperativ ville lest som en ny knapp. Uten kvitteringen
+måtte reporteren lete i forløpet for å vite om målet gikk gjennom, og var
+tilbøyelig til å trykke en gang til.
+
+⚠️ `MatchToast` er IKKE `NotificationBanner`. Banneret er nyheter fra ANDRE og
+bor over fanene; dette er kvitteringen på din EGEN handling, den bor i kampens
+verden, og den forsvinner av seg selv.
+
+**5. Dokken kan dras ned** («nesten som et kommentarfelt»). Tersklene og
+driver-valget er **arvet fra `CommentSheet`** — telefontestet gjennom skive
+4.2–4.4 — ikke funnet på nytt: en verdi som følger fingeren må ligge på
+JS-driveren. Draget ligger på **håndtaket, ikke hele dokken**: under
+håndtaket sitter «Mål oss», og et drag som startet der ville stjålet trykket i
+kampens mest tidskritiske øyeblikk. Regelen er `shouldDismissDock()` — ren
+funksjon, fordi `PanResponder` ikke lar seg drive fra en syntetisk hendelse.
+
+**6. Sesongen viste bare ferdigspilte kamper.** `get_season_stats` filtrerer
+på `ms.status = 'ferdig'` i både totalene og lista (00032). Siden kampknappen
+nå fører hit, forventer man dagens kamp.
+
+⚠️ **RPC-EN ER IKKE ENDRET, OG DET ER MED VILJE.** Sesongtallene er historikk
+og skal fortsette å telle bare det som er spilt — «kommende» hører ikke hjemme
+i vunnet/uavgjort/tapt. I stedet en egen, mager spørring
+(`getMatchSchedule`) og en ren prioriteringsregel (`shared/matchSchedule`):
+pågående → i dag → kommende. **Vinduet starter i GÅR:** en kamp som fortsatt
+er live kan ha startet sent i går, og det er nettopp den man leter etter.
+Programmet ligger ØVERST, over sesongtallene. Admin får «Ny kamp» i
+seksjonshodet (`presetType: 'kamp'` — forhåndsvalgt, ikke låst).
+
+**Nye tester:** `matchSchedule.test.ts` (8), dra-reglene i
+`reporterDock.test.tsx`, kortform + glyf i `matchButtonGeometry.test.ts`.
+**768 tester grønne, tsc 7 = baseline, lint = baseline.**
+
+---
+
+### ⏳ SKIVE 10 BYGGET — KAMPKNAPPEN 2026-08-21 (IKKE COMMITTET)
+
+**Ren JS.** Ingen migrasjon, ingen nye pakker, ingen native rebuild.
+`tsc` = 7 (baseline), lint = baseline, 750 tester grønne.
+
+#### DE TO INNGANGENE — FORUTSETNINGEN FRA P4
+
+- **Hjem: ingen ny kode.** Komponisten (avatar + «Del noe med laget …» +
+  kamera) lå ALLEREDE permanent i feedens `ListHeaderComponent`, som tegnes
+  OVER `ListEmptyComponent`. Den finnes altså i fylt og tom feed, for alle
+  roller. Brages beslutning: la den stå. Lagt til
+  `accessibilityLabel="Del med laget"` + to regresjonsvakter i
+  `feedRefetch.test.tsx`.
+- **Kalender: «Ny»-pille i den FESTEDE navigatoren** (`CalendarNav`),
+  admin-only, `hitSlop` gir 48 pt trykkflate. ⚠️ Den gjenbruker `styles.pill`
+  uendret, så **navblokkas høyde står stille** — endres den, flytter
+  festeterskelen og scrollposisjonen seg (`statusRow`-kommentaren).
+  Tomtilstandens knapp BESTÅR: en tom flate skal tilby veien ut av seg selv.
+- **Sesongen er urørt** — den har «+ Ny turnering» fra før.
+
+#### KAMPKNAPPEN — ARKITEKTUREN
+
+**Kampskjermen MELDER SEG PÅ; tab-baren regner ingenting.**
+`useMatchPresence` i `EventDetailScreen` sender `{isReporter, dockOpen,
+heiaTarget, onPress}` til `MatchButtonContext`. All kampkunnskap blir
+liggende der den hører hjemme, og baren er en dum tegner.
+
+- `src/shared/matchButton.ts` — ren tilstandsmaskin, sju tilstander.
+  **Hoveddekningen i test (15 tester).** Fasit: prototypens `btnState()`.
+- `src/shared/matchButtonGeometry.ts` — en TILPASSER, ikke en tabell.
+  Prototypens 13,5 px er målt på 430 pt; «RAPPORTER» i den størrelsen er
+  116 pt bredt mot en fanecelle på 78. Modulen finner største type som får
+  plass, og gir etter i rekkefølgen **luft → ikon → type**.
+- `src/lib/queries/liveMatch.ts` — `getLiveMatch` (den EKSISTERENDE
+  spørringen) lagt i cachen. `TeamHomeScreen`/`InboxScreen` beholder sine
+  egne hentinger: å skrive dem om ville endret to MÅLTE kallbudsjetter.
+- `src/components/match/ReporterDock.tsx` — verktøyet flyttet ut av siden.
+
+⚠️ **HEIA-SYMBOLET ER 👏, IKKE PROTOTYPENS HÅND-SVG.** Skive 4.1 avviste
+nøyaktig det lånet én gang før. `Activity` er det ENESTE nye ikonet, og
+grunnen er ikke «prototypen tegnet det sånn»: `Ball` er reservert for MÅL og
+ingenting annet (skive 1), og Heia manglet en glyf som betyr «kampen».
+
+⚠️ **REPORTERPANELET LIGGER IKKE LENGER FAST I KAMPSKJERMEN**, og det står
+INGENTING i stedet. Prototypens `renderRep()` er hele reporterflaten — den
+har ingen hintetekst, og den sentrale knappen forklarer seg selv. Publikums
+linje («Stillingen og kampforløpet oppdaterer seg av seg selv») er uendret.
+
+**Dokken nullstilles i FIRE tilfeller**, ikke ett: blur, bytte av kamp, tap
+av reporterstatus (en admin kan bytte reporter midt i kampen), og at kampen
+avsluttes/avlyses.
+
+#### ⚠️ INGEN STADIONVARIANT AV BAREN, OG INGEN `tabBarItemStyle`
+
+Brages beslutning: baren står lys (som i dag, og som i prototypen). Kun
+midtknappen endrer seg. **Fanene er like brede som før** — `flex: 1.5` på
+midtfanen ville gjort de fire andre smalere og flyttet dem sidelengs.
+Pillen får i stedet flyte ut av cella si, som i prototypen, med et
+**budsjett på ≤ 6 pt per side** (naboens ikonpille har 11 pt fri marg, så de
+kan aldri møtes). Trykkflaten er faneelementet, ikke pillen.
+
+⚠️ **Den ærlige konsekvensen:** et trykk 10 pt til siden for «RAPPORTER»
+treffer Kalender. Det er stedet en runde 2 mest sannsynlig kommer.
+Designriggen `__tests__/matchButton.harness.test.ts` tegner hele baren i alle
+tilstander på 430/390/320 pt — **kjør den og SE på flaten** før du rører
+geometrien.
+
+#### 📱 TELEFONSJEKKLISTA — SKIVE 10
+
+1. **Hjem:** komponisten står, publisering virker, VoiceOver sier
+   «Del med laget».
+2. **Kalender:** «Ny» finnes i den festede raden **når kalenderen er full** —
+   rull langt ned, pillen er der fortsatt. Trykk ⇒ skjemaet åpner på dagen du
+   så på. Spiller ser den ikke. Tom kalender: begge veier virker.
+3. **Ingen livekamp:** midtknappen sier `KAMP` / `Sesongen`, åpner Sesongen.
+4. **Start en kamp fra telefon 2:** knappen på telefon 1 blir coral med
+   stillingen. Trykk ⇒ kampen åpner, og **ingen HEIA er registrert**.
+5. **⚠️ TILBAKE BEVARER FANEN:** stå i Kalender, trykk kampknappen, trykk
+   tilbake ⇒ du står i **Kalender**. Gjenta fra Varsler, Hjem og **Profil**.
+6. **⚠️ KAMPVARSLER AVSLÅTT** (skru dem av i varselinnstillingene): start en
+   kamp fra telefon 2 ⇒ knappen viser stillingen likevel, senest etter ~60 s.
+7. **Pause:** gull, «PAUSE 2–1», prikken står stille.
+8. **Publikum inne i kampen:** `HEIA!` ⇒ 👏 legger seg på det nyeste
+   øyeblikket, knappen blir `HEIET`. Nytt trykk fjerner den ikke.
+   **Trykk fort tre ganger: telleren skal gå +1, ikke opp og ned.**
+   Rett etter avspark, før noe har skjedd: knappen er dempet og død.
+9. **Reporter inne i kampen:** `RAPPORTER` åpner dokken, `LUKK` lukker den.
+   Rapporter mål, pause, bilde og «Slutt» fra dokken. Ved «Slutt» lukkes
+   dokken og knappen faller tilbake til `KAMP`.
+10. **⚠️ REPORTERENS EGEN KNAPP LYVER IKKE:** rapporter et mål, gå ut av
+    kampen ⇒ knappen viser den nye stillingen. Avslutt kampen, gå ut ⇒ `KAMP`.
+11. **Dokken nullstilles:** åpne den, gå til kommentarene og tilbake ⇒
+    lukket. La en admin på telefon 2 bytte reporter mens dokken står åpen ⇒
+    den lukker seg.
+12. **Reduce Motion:** prikken slutter å puste, dokken glir ikke, spretten
+    uteblir — men alle tilstander leses fortsatt.
+13. **Stor tekst (XXL):** baren er fortsatt 88 pt, «RAPPORTER» kuttes ikke.
+14. **VoiceOver:** sveip til midtfanen i hver tilstand — den sier hva den
+    GJØR («Live: … Åpne kampen»), ikke bare et tall.
+15. **De fire andre fanene:** uendret utseende, badge på Varsler virker.
+
+#### GJENSTÅENDE GJELD ETTER SKIVE 10
+
+- **`CreateSheet.tsx` er død kode** (ingen kaller den lenger), og
+  `CalendarFocusContext` har en skriver uten leser. Begge tas i **samme
+  sluttrydding som `ScoreBoard.tsx`** — Brage ba eksplisitt om at de ikke
+  slettes i denne skiva.
+- **Prototypens «N LIVE»-velger** (flere samtidige livekamper) er utsatt med
+  P4, ikke glemt: `getLiveMatch` kollapser til nyeste avspark, og
+  `matchButton.test.ts` dokumenterer utsettelsen.
+- **Gullprikken** («noe nytt siden sist» på knappen) er ikke bygget.
+- Jeg observerte **én flaky testkjøring av ~10** under tung last (hele
+  suiten, parallelt). Timertesten er hardnet med `advanceTimersByTimeAsync`;
+  suiten har vært grønn 9 kjøringer på rad etterpå.
 
 #### ✅ SKIVE 9 LEVERT OG TELEFONGODKJENT 2026-08-21 — P1 I FEEDEN
 

@@ -245,6 +245,101 @@ export function feedAllowsHeia(item: FeedHeiaSubject): boolean {
   return !isOpponentGoal(item.matchEvent);
 }
 
+/** Ett øyeblikk kampknappen kan heie på. */
+export interface HeiableMoment {
+  /** Den kanoniske posten reaksjonen skal lande på. */
+  postId: string;
+  /** Har JEG alt heiet her? Da er knappen «HEIET», ikke «HEIA!». */
+  iReacted: boolean;
+  /** Hva det er, som setning — til VoiceOver. «målet på 34 minutter». */
+  what: string;
+}
+
+/** Det `newestHeiableMoment` trenger å vite om ett kampøyeblikk. */
+export interface HeiableEvent extends EngagementSubject {
+  id: string;
+  minute: number;
+}
+
+/** Det den trenger å vite om ett kampbilde. `MatchPhoto.id` ER post-id-en. */
+export interface HeiablePhoto {
+  id: string;
+  createdAt: Date;
+}
+
+/**
+ * DET NYESTE ØYEBLIKKET MAN KAN HEIE PÅ — målet for kampknappens `HEIA!`.
+ *
+ * ---------------------------------------------------------------------------
+ * ⚠️ DEN GJENBRUKER `allowsHeia`, OG DET ER HELE POENGET.
+ *
+ * P1 (ingen HEIA på mål imot) er låst, og den finnes allerede som kode fem
+ * linjer opp. Skrev kampknappen sin egen versjon av «hva kan heies på», ville
+ * det vært to formuleringer av den samme beslutningen — og den ene ville
+ * driftet den dagen noen la til en hendelsestype. Knappen spør derfor
+ * NØYAKTIG det samme spørsmålet som engasjementslinja i forløpet.
+ *
+ * Bilder er alltid heia-bare: de er brukerens eget innhold, også når de
+ * henger på et baklengsmål (samme skille `feedAllowsHeia` bygger på).
+ *
+ * ⚠️ TIDEN LESES FRA DEN KANONISKE POSTEN, ikke fra `minute`. `minute` er et
+ * avrundet heltall fra `get_event_with_rsvp`, og i en kamp der fire ting
+ * skjer i samme minutt ville «nyeste» blitt tilfeldig. Postens `createdAt`
+ * er hendelsens tidspunkt på millisekundet (se `MatchEngagement.createdAt`).
+ * Mangler den, faller vi tilbake på rekkefølgen hendelsene kom i — de er
+ * allerede sortert eldst først.
+ */
+export function newestHeiableMoment(input: {
+  matchEvents: readonly HeiableEvent[];
+  photos: readonly HeiablePhoto[];
+  byMatchEvent: Map<string, MatchEngagement>;
+  byPost: Map<string, MatchEngagement>;
+}): HeiableMoment | null {
+  const {matchEvents, photos, byMatchEvent, byPost} = input;
+
+  let best: {at: number; order: number; moment: HeiableMoment} | null = null;
+  const consider = (
+    at: number | undefined,
+    order: number,
+    moment: HeiableMoment,
+  ) => {
+    // Uten tidspunkt brukes rekkefølgen som ankom — aldri 0, som ville
+    // sendt øyeblikket til 1970 og gjort det til det eldste av alle.
+    const t = at ?? Number.NEGATIVE_INFINITY;
+    if (best === null || t > best.at || (t === best.at && order > best.order)) {
+      best = {at: t, order, moment};
+    }
+  };
+
+  matchEvents.forEach((ev, i) => {
+    if (!showsEngagement(ev) || !allowsHeia(ev)) return;
+    const eng = byMatchEvent.get(ev.id);
+    // Ingen kanonisk post ennå (ferskt mål, posten er ikke lest inn):
+    // ingenting å heie på. Knappen skal da si det, ikke feile stille.
+    if (!eng) return;
+    consider(eng.createdAt?.getTime(), i, {
+      postId: eng.postId,
+      iReacted: eng.iReacted,
+      what:
+        ev.type === 'mål'
+          ? `målet på ${ev.minute} minutter`
+          : `oppdateringen fra ${ev.minute} minutter`,
+    });
+  });
+
+  photos.forEach((photo, i) => {
+    const eng = byPost.get(photo.id);
+    if (!eng) return;
+    consider(photo.createdAt.getTime(), matchEvents.length + i, {
+      postId: eng.postId,
+      iReacted: eng.iReacted,
+      what: 'bildet fra kampen',
+    });
+  });
+
+  return best === null ? null : (best as {moment: HeiableMoment}).moment;
+}
+
 /**
  * KAN ØYEBLIKKET KORRIGERES? (skive 8)
  *

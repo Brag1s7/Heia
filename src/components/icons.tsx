@@ -8,6 +8,17 @@ import {colors} from '../theme';
  * til her, ikke i skjermen.
  */
 export {
+  /**
+   * ⚠️ NYTT IKON — og grunnen er IKKE «prototypen tegnet det sånn».
+   *
+   * Kampknappens hviletilstand («KAMP», skive 10) trengte en glyf som betyr
+   * KAMPEN. `Ball` kunne ikke brukes: den er reservert for MÅL og ingenting
+   * annet (skive 1), og en ball på en knapp som bare åpner Sesongen ville
+   * lovet et mål. Heia hadde ingen annen kandidat. `Activity` er samme
+   * Lucide-familie som resten av settet — pulslinja, som er nettopp det
+   * kampen er i Heia.
+   */
+  Activity,
   AlertTriangle,
   ArrowLeftRight,
   Ban,

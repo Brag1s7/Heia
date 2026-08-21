@@ -269,7 +269,7 @@ function PhotoRow({
  * Bilder uten kjent kampstart (skal ikke skje på en startet kamp) legges sist
  * i stedet for å bli borte.
  */
-export function MatchTimeline({
+function MatchTimelineInner({
   matchEvents,
   photos,
   startedAt,
@@ -582,3 +582,10 @@ const styles = StyleSheet.create({
     opacity: 0.85,
   },
 });
+
+/**
+ * ⚠️ MEMOISERT av samme grunn som `MatchPulse` (telefonrunde 2026-08-21):
+ * reporterdokkens av/på skal ikke koste en ny fletting av hele kampforløpet
+ * med bildene, midt i at dokken animerer.
+ */
+export const MatchTimeline = React.memo(MatchTimelineInner);

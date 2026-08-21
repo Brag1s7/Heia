@@ -22,8 +22,17 @@ let pendingNotificationData: Record<string, unknown> | null = null;
 /**
  * Åpner kampen hvis mulig, ellers parkerer den til `flushPendingDeepLink`.
  *
- * `EventDetail` bor i Hjem-stacken, så vi navigerer inn i den — da ligger
- * Hjem-fanen igjen under, og tilbake-knappen fører dit brukeren forventer.
+ * ⚠️ LANDER I KAMP-FANEN (kildebevarende tabmodell, Brage 2026-08-21).
+ *
+ * Et push-varsel eller en e-postlenke har INGEN intern kilde — brukeren kom
+ * ikke fra Hjem, hun kom fra utsiden. Da er `KampStack` det ærlige stedet:
+ * Kamp-fanen blir valgt fordi du faktisk er i kampen, og «tilbake» fører til
+ * Sesongen, som er fanens rot.
+ *
+ * Kamper åpnet INNENFRA beholder derimot kilden sin: en kamp trykket i
+ * Kalender blir i `KalenderStack`, en fra Varsler i `InboxStack`, en fra
+ * feeden i `HomeStack`. Den valgte fanen skal alltid gjenspeile hvor
+ * brukeren kom fra.
  */
 export function openEvent(eventId: string): void {
   if (!eventId) return;
@@ -34,14 +43,14 @@ export function openEvent(eventId: string): void {
   }
 
   try {
-    navigationRef.navigate('HjemStack', {
+    navigationRef.navigate('Kamp', {
       screen: 'EventDetail',
       params: {eventId},
       initial: false,
     });
   } catch {
-    // Skjer når onboarding-stacken står fremme: HjemStack finnes ikke ennå.
-    // Da venter målet til fanene er montert.
+    // Skjer når onboarding-stacken står fremme: fanene finnes ikke ennå.
+    // Da venter målet til de er montert.
     pendingEventId = eventId;
   }
 }
@@ -166,8 +175,8 @@ export function openNotificationTarget(data: Record<string, unknown>): void {
           screen === 'club_payments'
             ? 'ClubPayments'
             : screen === 'team_members'
-              ? 'TeamMembers'
-              : 'SupportSetup',
+            ? 'TeamMembers'
+            : 'SupportSetup',
         ),
       );
     } catch {
