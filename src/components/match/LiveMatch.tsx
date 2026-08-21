@@ -1,12 +1,5 @@
-import React, {useCallback, useMemo, useRef} from 'react';
-import {
-  Animated,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import React, {useMemo} from 'react';
+import {Animated, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {matchColors, spacing} from '../../theme';
@@ -14,7 +7,6 @@ import {MatchTimeline} from '../MatchTimeline';
 import {ReporterActions, type ReporterActionType} from '../ReporterActions';
 import {ReporterBar} from '../ReporterBar';
 import {useGoalMoment} from '../useGoalMoment';
-import {useReducedMotion} from '../useReducedMotion';
 import {ArenaSurface} from './ArenaSurface';
 import {MatchArena} from './MatchArena';
 import {MatchGround} from './MatchGround';
@@ -128,30 +120,6 @@ export function LiveMatch({
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
 
-  // ⚠️ «VIS I HISTORIEN» — pulsens synlige handling. Radene MÅLER seg selv
-  // (`onRowLayout`) i stedet for at noen regner ut høyden deres: en målrad
-  // med bilde er tre ganger så høy som en uten, og det var nettopp den
-  // antakelsen som brakk i 3.1. Reduce Motion hopper i stedet for å rulle.
-  const scrollRef = useRef<ScrollView>(null);
-  const timelineY = useRef(0);
-  const rowY = useRef(new Map<string, number>());
-  const reducedMotion = useReducedMotion();
-  const handleRowLayout = useCallback((key: string, y: number) => {
-    rowY.current.set(key, y);
-  }, []);
-  const showInHistory = useCallback(
-    ({eventId, photoId}: {eventId?: string; photoId?: string}) => {
-      const key = eventId ?? photoId;
-      const y = key ? rowY.current.get(key) : undefined;
-      if (y === undefined) return;
-      scrollRef.current?.scrollTo({
-        y: Math.max(0, timelineY.current + y - 90),
-        animated: !reducedMotion,
-      });
-    },
-    [reducedMotion],
-  );
-
   const paused = event.matchStatus === 'halfTime';
   const home = event.score?.home ?? 0;
   const away = event.score?.away ?? 0;
@@ -198,7 +166,6 @@ export function LiveMatch({
       />
 
       <Animated.ScrollView
-        ref={scrollRef}
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
         onScroll={topBar.onScroll}
         scrollEventThrottle={16}
@@ -266,27 +233,23 @@ export function LiveMatch({
           minute={minute}
           nowMs={nowMs}
           authorFor={authorFor}
-          onShowInHistory={showInHistory}
         />
 
         {/* Kampforløpet — bildene ligger i forløpet, ikke i en egen seksjon.
             Under kampen skal ingenting konkurrere med stillingen.
             `ground` tegner det fjerde rommet; den lokale mørke flaten fra
             skive 1 er borte. */}
-        <View onLayout={e => (timelineY.current = e.nativeEvent.layout.y)}>
-          <MatchTimeline
-            ground
-            matchEvents={matchEvents}
-            photos={photos}
-            startedAt={event.startedAt}
-            newestFirst
-            nowMinute={minute}
-            authorFor={authorFor}
-            renderEngagement={renderEngagement}
-            onRowLayout={handleRowLayout}
-            onPressPhoto={onPressPhoto}
-          />
-        </View>
+        <MatchTimeline
+          ground
+          matchEvents={matchEvents}
+          photos={photos}
+          startedAt={event.startedAt}
+          newestFirst
+          nowMinute={minute}
+          authorFor={authorFor}
+          renderEngagement={renderEngagement}
+          onPressPhoto={onPressPhoto}
+        />
       </Animated.ScrollView>
     </MatchGround>
   );

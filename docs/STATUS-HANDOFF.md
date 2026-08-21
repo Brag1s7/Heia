@@ -23,6 +23,13 @@ verdt å lese før neste flate bygges:
 lese den. **`__tests__/pulseModel.harness.test.ts` er designriggen** —
 kjør den og SE på flaten før du leverer noe som tegner (se `### ⏳ SKIVE 5.1`).
 
+🔶 **PULSENS UTTRYKK STÅR ÅPENT — PARKERT AV BRAGE 2026-08-21.**
+«Jeg er ikke overbevist over den pulsen enda, du klarte det i html men ikke
+her... Den tar vi senere så husk det.» **Mekanikken er godkjent og skal ikke
+relitigeres** (se `#### 🧹 PULSEN FORENKLET`); det er UTSEENDET som gjenstår,
+og neste runde skal sammenligne mot `docs/prototypes/kampskjerm/index.html`
+side ved side. **Ikke start på den uten at Brage ber om det.**
+
 ✅ **`00072`, `00073` OG `00074` ER I PROD** (pushet 2026-08-21, bekreftet i
 `supabase migration list --linked`). Kampuret er telefontestet av Brage:
 «Tiden funker riktig på alle tre flatene.»
@@ -1711,8 +1718,8 @@ en REELL begrensning.
 | 5 | **Kampens puls** (`MatchPulse`) | ✅ LEVERT OG TELEFONGODKJENT — 4 runder. Modellen: `docs/KAMPENS-PULS-MODELL.md` |
 | 6 | **Sticky-bar + Reduce Motion** | ⏳ RUNDE 2 — bevegelsen godkjent, resten venter |
 | 7 | **Kampuret** (serverautoritativt) | ⏳ BYGGET — `00073` IKKE PUSHET ⚠️ |
-| 8 | **Angre mål** (10 s) | se P3 |
-| 9 | **`get_team_feed`-gaten for mål imot** | ⏳ BYGGET — `00072` IKKE PUSHET |
+| 8 | **Angre mål** (10 s) | ⏭️ NESTE — se P3 |
+| 9 | **`get_team_feed`-gaten for mål imot** | 🟡 I PROD — mangler KUN telefonkontroll |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
 
 #### ▶️ SKIVE 5 — KAMPENS PULS: HVA SOM ALLEREDE ER AVKLART
@@ -2111,6 +2118,39 @@ kampbilde og et mål vært to nesten like prikker. **Siden og fargen sier HVEM
 `PULSE_MARK_R + 1`, så en mindre markør følger svaien mer trofast.
 
 **Scenen er sjekket inn** — kjør riggen før du rører markørgeometrien igjen.
+
+#### 🧹 PULSEN FORENKLET — NAVIGATORLAGET FJERNET (2026-08-21)
+
+**Brage:** «Telefonen viser at den er blitt en parallell hendelsesnavigator
+og dupliserer kamphistorien.»
+
+**⚠️ FJERNET, OG SKAL IKKE TILBAKE:** Ball/Camera/MessageCircle-ikoner på
+kurven · stablede ikonmarkører · ×N-merker og kommentarbobler ·
+‹ 3/11 ›-stepperen · valgt-hendelse-panelet · «Vis i historien» · alle
+individuelle trykkflater · `accessibilityRole="adjustable"` med sveip mellom
+øyeblikkene. **Pulsen er ikke trykkbar i det hele tatt.**
+
+Stillaset som bare betjente den forsvant med: `PulseTouchGroup`,
+`PULSE_TOUCH_MIN`, tre tekstfunksjoner i `matchCopy`, og radmålingen
+(`onRowLayout`) i begge kampskjermene. −1033 linjer, +543.
+
+**⚠️ BEREGNINGSMODELLEN ER URØRT.** `docs/KAMPENS-PULS-MODELL.md` gjelder
+ordrett; den har fått en toppbolk som skiller modell fra det fjernede
+markørlaget.
+
+**To ting riggen fant, som ikke sto i bestillingen:**
+1. ⚠️ **PAUSESTREKEN BLE EN SKILLELINJE.** Første forsøk var en krittstrek
+   gjennom hele båndet — og den gjør nøyaktig det den FULLHØYE streken ble
+   avvist for i skive 5: deler kampen i to, selv på 15 % kritt. Den er nå
+   kort (14 pt opp, 10 ned), så kurven KRYSSER den.
+2. ⚠️ **HALO BARE DER NOEN HAR SVART.** `glowFor` gir basisradius selv på
+   null heier, så en naiv port ville gitt HVERT øyeblikk en glødeprikk —
+   altså en rad med markører igjen, bare uskarpe.
+
+**Noden er nå r=6.** Historikken er 15 → 11 → 6, og hvert steg kom fra
+telefonen. Ved 11 var den fortsatt dimensjonert for et ikon som ikke finnes.
+
+🔶 **UTTRYKKET ER IKKE GODKJENT.** Se toppbolken.
 
 #### ⚠️ 00074 — TO AKSER, OG FELLA MELLOM DEM (2026-08-21)
 

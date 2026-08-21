@@ -131,23 +131,6 @@ function pressables(tree: ReactTestRenderer.ReactTestRenderer) {
   });
 }
 
-/** Trykkflatene i båndet — de har en målt bredde. */
-function touchTargets(tree: ReactTestRenderer.ReactTestRenderer) {
-  const {StyleSheet} = require('react-native');
-  return pressables(tree)
-    .map(p => StyleSheet.flatten(p.props.style))
-    .filter(
-      s => s && typeof s.left === 'number' && typeof s.width === 'number',
-    );
-}
-
-function root(tree: ReactTestRenderer.ReactTestRenderer) {
-  const RNView = require('react-native').View;
-  return tree.root
-    .findAllByType(RNView)
-    .find(v => v.props.accessibilityRole === 'adjustable')!;
-}
-
 describe('pulsen på grunnen', () => {
   it('tegner først etter måling — og da i punkter, aldri prosent', () => {
     let tree!: ReactTestRenderer.ReactTestRenderer;
@@ -248,177 +231,6 @@ describe('pulsen på grunnen', () => {
   });
 });
 
-describe('trykkflatene', () => {
-  it('overlapper aldri, og er minst 44 pt brede', () => {
-    const flater = touchTargets(render()).sort((a, b) => a.left - b.left);
-    expect(flater.length).toBeGreaterThan(0);
-    for (let i = 0; i < flater.length; i++) {
-      expect(flater[i].width).toBeGreaterThanOrEqual(44);
-      if (i > 0) {
-        expect(flater[i].left).toBeGreaterThanOrEqual(
-          flater[i - 1].left + flater[i - 1].width,
-        );
-      }
-    }
-  });
-
-  it('DIN 10–4 i minutt 0 gir ÉN flate, ikke fjorten', () => {
-    const alt: MatchEvent[] = [
-      {id: 'k', matchId: 'm', type: 'avspark', minute: 0, description: ''},
-      ...Array.from({length: 14}, (_, i) => ({
-        id: `g${i}`,
-        matchId: 'm',
-        type: 'mål' as const,
-        minute: 0,
-        description: '',
-        teamSide: (i < 10 ? 'home' : 'away') as 'home' | 'away',
-      })),
-    ];
-    expect(touchTargets(render({matchEvents: alt, minute: 0}))).toHaveLength(1);
-  });
-});
-
-describe('valget og «Vis i historien»', () => {
-  it('et trykk velger øyeblikket og viser det som tekst', () => {
-    const tree = render();
-    act(() => pressables(tree)[0].props.onPress());
-    expect(
-      texts(tree).some(t => t.startsWith('12′ · Mål — Jarle Vestli')),
-    ).toBe(true);
-    expect(texts(tree)).toContain('Ingen heier eller kommentarer ennå');
-    // ⚠️ SYNLIG HANDLING, ikke en skjult «trykk en gang til».
-    expect(texts(tree)).toContain('Vis i historien');
-  });
-
-  it('«Vis i historien» melder fra om riktig hendelse', () => {
-    const onShowInHistory = jest.fn();
-    const tree = render({onShowInHistory});
-    const {Text} = require('react-native');
-    act(() => pressables(tree)[0].props.onPress());
-    const knapp = pressables(tree).find(p =>
-      p.findAllByType(Text).some(t => t.props.children === 'Vis i historien'),
-    )!;
-    act(() => knapp.props.onPress());
-    expect(onShowInHistory).toHaveBeenCalledWith({
-      eventId: 'e2',
-      photoId: undefined,
-    });
-  });
-
-  it('uten valg står fasene der i stedet — og de er aldri «press»', () => {
-    const travel: MatchEvent[] = [
-      {
-        id: 'a',
-        matchId: 'm',
-        type: 'mål',
-        minute: 2,
-        description: '',
-        teamSide: 'home',
-      },
-      {
-        id: 'b',
-        matchId: 'm',
-        type: 'mål',
-        minute: 4,
-        description: '',
-        teamSide: 'home',
-      },
-      {
-        id: 'c',
-        matchId: 'm',
-        type: 'mål',
-        minute: 6,
-        description: '',
-        teamSide: 'home',
-      },
-      {
-        id: 'd',
-        matchId: 'm',
-        type: 'mål',
-        minute: 48,
-        description: '',
-        teamSide: 'away',
-      },
-      {id: 'e', matchId: 'm', type: 'slutt', minute: 60, description: ''},
-    ];
-    const t = texts(render({matchEvents: travel, phase: 'finished'}));
-    expect(t.some(x => x.startsWith('MEST LIV · '))).toBe(true);
-    expect(t.some(x => x.startsWith('ROLIG · '))).toBe(true);
-    expect(t.join(' ')).not.toMatch(/press|dominans/i);
-  });
-});
-
-describe('ÉN justerbar enhet, ikke et dusin stopp', () => {
-  it('hele pulsen er ett element med rolle «adjustable»', () => {
-    const tree = render();
-    const RNView = require('react-native').View;
-    const adjustable = tree.root
-      .findAllByType(RNView)
-      .filter(v => v.props.accessibilityRole === 'adjustable');
-    expect(adjustable).toHaveLength(1);
-    expect(adjustable[0].props.accessible).toBe(true);
-    // ⚠️ Markørene skal ALDRI bli parallelle stopp foran tidslinjen.
-    expect(
-      tree.root
-        .findAllByType(RNView)
-        .filter(v => v.props.accessibilityRole === 'button'),
-    ).toHaveLength(0);
-  });
-
-  it('labelen oppsummerer kampen og periodene', () => {
-    const label = root(render()).props.accessibilityLabel as string;
-    expect(label).toContain('Kampens puls');
-    expect(label).toContain('40 minutter spilt');
-    expect(label).toContain('3 øyeblikk');
-    expect(label).toContain('Sveip opp eller ned');
-  });
-
-  it('sveip opp/ned blar mellom øyeblikkene, og verdien leser det valgte', () => {
-    const tree = render();
-    const fyr = (actionName: string) =>
-      act(() =>
-        root(tree).props.onAccessibilityAction({nativeEvent: {actionName}}),
-      );
-
-    expect(root(tree).props.accessibilityValue).toBeUndefined();
-
-    fyr('increment');
-    expect(root(tree).props.accessibilityValue.text).toContain('1 av 3');
-    expect(root(tree).props.accessibilityValue.text).toContain('Mål for oss');
-    expect(root(tree).props.accessibilityValue.text).toContain('Jarle Vestli');
-
-    fyr('increment');
-    expect(root(tree).props.accessibilityValue.text).toContain('2 av 3');
-    expect(root(tree).props.accessibilityValue.text).toContain('Mål imot');
-
-    fyr('decrement');
-    expect(root(tree).props.accessibilityValue.text).toContain('1 av 3');
-  });
-
-  it('aktivering viser det valgte i historien', () => {
-    const onShowInHistory = jest.fn();
-    const tree = render({onShowInHistory});
-    const fyr = (actionName: string) =>
-      act(() =>
-        root(tree).props.onAccessibilityAction({nativeEvent: {actionName}}),
-      );
-    fyr('increment');
-    fyr('activate');
-    expect(onShowInHistory).toHaveBeenCalledWith({
-      eventId: 'e2',
-      photoId: undefined,
-    });
-  });
-
-  it('en kamp uten øyeblikk sier det, og tilbyr ingen blaing', () => {
-    const tom = render({matchEvents: [], minute: 8});
-    expect(root(tom).props.accessibilityLabel).toContain(
-      'Ingen rapporterte øyeblikk ennå',
-    );
-    expect(root(tom).props.accessibilityActions).toBeUndefined();
-  });
-});
-
 describe('bevegelse', () => {
   it('tidsaksens omkvantisering er en MILD overgang, ikke et hopp', () => {
     const tree = render({minute: 31});
@@ -454,5 +266,62 @@ describe('midtlinja', () => {
     for (const m of kurve.matchAll(/[\d.]+ ([\d.]+)/g)) {
       expect(Number(m[1])).toBeCloseTo(PULSE_MID, 5);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FORENKLINGEN 2026-08-21 — pulsen skal IKKE konkurrere med kamphistorien
+// ---------------------------------------------------------------------------
+
+describe('⭐ pulsen er en oppsummering, ikke en navigator', () => {
+  /**
+   * ⚠️ HELE POENGET MED DENNE BOLKEN. Brage, etter telefontesten: pulsen var
+   * blitt «en parallell hendelsesnavigator» som dupliserte kamphistorien rett
+   * under — samme hendelser, to ganger, med hvert sitt sett trykkflater og
+   * VoiceOver-stopp. Modellen vet fortsatt alt; flaten sier det bare én gang.
+   */
+  it('har INGEN trykkflater — ingenting i pulsen er trykkbart', () => {
+    const tree = render();
+    expect(pressables(tree)).toHaveLength(0);
+  });
+
+  it('har INGEN ikoner på kurven', () => {
+    // Ikonene mockes til host-komponenten `icon` (__mocks__/lucide-…).
+    const tree = render();
+    const ikoner = tree.root.findAll(
+      n => typeof n.type === 'string' && n.type === 'icon',
+      {deep: false},
+    );
+    expect(ikoner).toHaveLength(0);
+  });
+
+  it('har INGEN antallsbobler eller ×N-merker', () => {
+    // Alt som het «2» eller «3/11» er borte; det eneste tallet som står
+    // igjen er klokka.
+    const tekst = texts(render()).join(' ');
+    expect(tekst).not.toMatch(/\d+\/\d+/);
+    expect(tekst).not.toContain('Vis i historien');
+  });
+
+  it('er ETT tilgjengelighetsstopp UTEN rolle og uten blaing', () => {
+    const tree = render();
+    const RNView = require('react-native').View;
+    const stopp = tree.root
+      .findAllByType(RNView)
+      .filter(v => v.props.accessible === true);
+
+    expect(stopp).toHaveLength(1);
+    // Ikke lenger «adjustable»: det var sveip opp/ned gjennom nøyaktig de
+    // samme hendelsene kampforløpet leser opp rett etterpå.
+    expect(stopp[0].props.accessibilityRole).toBeUndefined();
+    expect(stopp[0].props.accessibilityActions).toBeUndefined();
+    expect(stopp[0].props.accessibilityValue).toBeUndefined();
+    // Men den sier fortsatt hva kampen har vært.
+    expect(stopp[0].props.accessibilityLabel).toContain('Kampens puls');
+  });
+
+  it('tegner fortsatt kurven, midtlinja og båndet', () => {
+    // Forenklingen fjernet navigasjonen, ikke pulsen.
+    expect(paths(render()).length).toBeGreaterThanOrEqual(3);
   });
 });

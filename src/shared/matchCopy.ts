@@ -307,65 +307,15 @@ export function matchPulseClock(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// PULSENS ØYEBLIKK SOM TEKST
+// PULSENS FASER SOM TEKST
 //
-// ⚠️ ÉN KILDE TIL BÅDE DET SYNLIGE OG DET LESTE. Valgpanelet viser
-// «20′ · Mål — Jarle · 3–1»; VoiceOver leser den samme opplysningen som en
-// setning. To formuleringer ville drevet fra hverandre.
-//
-// ⚠️ STILLINGEN ER DEN SAMME SOM I KAMPFORLØPET. Begge regnes av
-// `buildPulseMoments`/`MatchTimeline` med samme regel, så det samme målet
-// aldri kan stå med to ulike stillinger på én skjerm.
+// ⚠️ HER STO ØYEBLIKKENES TEKSTER (`matchPulseMomentText`,
+// `matchPulseResponseText`, `matchPulseValueA11y`, `PulseMomentText`).
+// De betjente pulsens valgpanel og dens `accessibilityValue` — altså
+// navigatoren som ble fjernet 2026-08-21 fordi den dupliserte
+// kamphistorien rett under. Setningene finnes fortsatt der de hører
+// hjemme: `matchEventLine`/`matchEventA11yLabel` for kampforløpet.
 // ---------------------------------------------------------------------------
-
-/** Det pulsteksten trenger å vite om et øyeblikk. */
-export interface PulseMomentText {
-  minute: number;
-  kind: 'goalUs' | 'goalThem' | 'update' | 'photo';
-  actor?: string;
-  score?: string;
-  heia: number;
-  comments: number;
-}
-
-function kindWord(kind: PulseMomentText['kind']): string {
-  switch (kind) {
-    case 'goalUs':
-      return 'Mål';
-    case 'goalThem':
-      return 'Mål imot';
-    case 'update':
-      return 'Oppdatering';
-    case 'photo':
-      return 'Bilde';
-  }
-}
-
-/** «20′ · Mål — Jarle · 3–1» */
-export function matchPulseMomentText(m: PulseMomentText): string {
-  const deler = [`${m.minute}′`, kindWord(m.kind)];
-  if (m.actor) {
-    deler[1] = `${deler[1]} — ${m.actor}`;
-  }
-  if (m.score) {
-    deler.push(m.score);
-  }
-  return deler.join(' · ');
-}
-
-/** «2 heier · 1 kommentar» — eller en ærlig tomhet. */
-export function matchPulseResponseText(m: {
-  heia: number;
-  comments: number;
-}): string {
-  if (m.heia === 0 && m.comments === 0) {
-    return 'Ingen heier eller kommentarer ennå';
-  }
-  return [
-    countPhrase(m.heia, 'heia', 'heier'),
-    countPhrase(m.comments, 'kommentar', 'kommentarer'),
-  ].join(' · ');
-}
 
 /** «MEST LIV · 34′–41′» / «ROLIG · 18′–31′» */
 export function matchPulsePhaseText(p: {
@@ -407,31 +357,4 @@ export function matchPulseSummaryA11y(opts: {
     deler.push('Sveip opp eller ned for å bla mellom øyeblikkene');
   }
   return sentence(deler);
-}
-
-/** `accessibilityValue` — det valgte øyeblikket, lest som en setning. */
-export function matchPulseValueA11y(
-  m: PulseMomentText,
-  position: {index: number; total: number},
-): string {
-  const hva =
-    m.kind === 'goalUs'
-      ? `Mål for oss${m.actor ? `, ${m.actor}` : ''}`
-      : m.kind === 'goalThem'
-      ? 'Mål imot'
-      : m.kind === 'update'
-      ? `Oppdatering${m.actor ? ` fra ${m.actor}` : ''}`
-      : `Bilde${m.actor ? ` av ${m.actor}` : ''}`;
-  return sentence([
-    `${position.index} av ${position.total}`,
-    minuteSpoken(m.minute),
-    hva,
-    m.score ? `Stillingen ${m.score.replace('–', ' ')}` : undefined,
-    m.heia > 0 || m.comments > 0
-      ? [
-          countPhrase(m.heia, 'heia', 'heier'),
-          countPhrase(m.comments, 'kommentar', 'kommentarer'),
-        ].join(', ')
-      : 'Ingen heier eller kommentarer',
-  ]);
 }

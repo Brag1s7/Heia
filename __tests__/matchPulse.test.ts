@@ -18,7 +18,6 @@ import {
   pulseSignature,
   PULSE_BAND,
   PULSE_MID,
-  PULSE_TOUCH_MIN,
   type PulseInput,
   type PulseMoment,
 } from '../src/shared/matchPulse';
@@ -135,13 +134,12 @@ const xs = (line: string) =>
 // ---------------------------------------------------------------------------
 
 describe('1 · ingen hendelser → helt rolig puls', () => {
-  it('kurven ligger på midtlinja hele veien, uten markører', () => {
+  it('kurven ligger på midtlinja hele veien, uten noder', () => {
     const m = model([rytme('k', 0, 'avspark')], {now: 12, finished: false});
     for (const y of ys(m.line)) {
       expect(y).toBeCloseTo(PULSE_MID, 5);
     }
     expect(m.clusters).toHaveLength(0);
-    expect(m.touch).toHaveLength(0);
   });
 
   it('grunnlinjebølgen er BORTE — en rett strek betyr nå «ingenting rapportert»', () => {
@@ -488,15 +486,6 @@ describe('⭐ 60-SEKUNDERSKAMPEN — Brages testkamp', () => {
       expect(m.clusters[i].x - m.clusters[i - 1].x).toBeGreaterThan(30);
     }
   });
-
-  it('trykkflatene grupperer kun der 44 pt faktisk kolliderer', () => {
-    for (let i = 1; i < m.touch.length; i++) {
-      expect(m.touch[i].left).toBeGreaterThanOrEqual(
-        m.touch[i - 1].left + m.touch[i - 1].width,
-      );
-    }
-    expect(m.touch.length).toBeGreaterThan(1);
-  });
 });
 
 describe('PAUSE er én liten markør på en sammenhengende linje', () => {
@@ -606,80 +595,6 @@ describe('KORREKSJON 1 · MEST LIV og ROLIG skal faktisk finnes', () => {
         expect(a.to <= b.from || b.to <= a.from).toBe(true);
       }
     }
-  });
-});
-
-describe('KORREKSJON 2 · trykkflater kan ikke overlappe', () => {
-  const overlapper = (m: ReturnType<typeof model>) => {
-    const sortert = [...m.touch].sort((a, b) => a.left - b.left);
-    for (let i = 1; i < sortert.length; i++) {
-      if (sortert[i].left < sortert[i - 1].left + sortert[i - 1].width) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  it('DIN 10–4: fjorten hendelser i minutt 0 gir ÉN trykkflate, ikke fjorten', () => {
-    const m = model(
-      [
-        rytme('k', 0, 'avspark'),
-        ...Array.from({length: 10}, (_, i) => mål(`h${i}`, 0, 'home')),
-        ...Array.from({length: 4}, (_, i) => mål(`b${i}`, 0, 'away')),
-      ],
-      {now: 0, finished: false},
-    );
-    expect(m.touch).toHaveLength(1);
-    expect(m.touch[0].moments).toHaveLength(14);
-    expect(m.touch[0].width).toBeGreaterThanOrEqual(PULSE_TOUCH_MIN);
-  });
-
-  it('flere ULIKE hendelsestyper i samme minutt samles i samme trykkflate', () => {
-    const m = model(
-      [mål('a', 25, 'home'), melding('b', 25), rytme('s', 50, 'slutt')],
-      {photos: [bilde('p', 25)]},
-    );
-    // Tre markører kan stå der visuelt — men bare én kan tas imot trykk.
-    expect(m.touch).toHaveLength(1);
-    expect(m.touch[0].moments.map(x => x.key).sort()).toEqual(['a', 'b', 'p']);
-  });
-
-  it('mål for og mål imot i samme minutt deler flate (stepperen blar)', () => {
-    const m = model([
-      mål('a', 30, 'home'),
-      mål('b', 30, 'away'),
-      rytme('s', 60, 'slutt'),
-    ]);
-    expect(m.clusters).toHaveLength(2); // to markører, over og under
-    expect(m.touch).toHaveLength(1); // én flate
-    expect(m.touch[0].moments).toHaveLength(2);
-  });
-
-  it('INGEN flater overlapper, i noe scenario', () => {
-    const scenarier = [
-      [mål('a', 30, 'home')],
-      [mål('a', 1, 'home'), mål('b', 2, 'home'), mål('c', 3, 'away')],
-      Array.from({length: 20}, (_, i) =>
-        mål(`g${i}`, i * 3, i % 3 ? 'home' : 'away'),
-      ),
-      Array.from({length: 30}, (_, i) => mål(`g${i}`, 20 + (i % 4), 'home')),
-    ];
-    for (const events of scenarier) {
-      const m = model([...events, rytme('s', 60, 'slutt')]);
-      expect(overlapper(m)).toBe(false);
-      for (const t of m.touch) {
-        expect(t.width).toBeGreaterThanOrEqual(PULSE_TOUCH_MIN);
-      }
-    }
-  });
-
-  it('hver flate peker på minst ett øyeblikk, og ingen øyeblikk mistes', () => {
-    const events = Array.from({length: 12}, (_, i) =>
-      mål(`g${i}`, i * 5, i % 4 === 0 ? 'away' : 'home'),
-    );
-    const m = model([...events, rytme('s', 60, 'slutt')]);
-    const iFlater = m.touch.flatMap(t => t.moments.map(x => x.key)).sort();
-    expect(iFlater).toEqual(m.moments.map(x => x.key).sort());
   });
 });
 

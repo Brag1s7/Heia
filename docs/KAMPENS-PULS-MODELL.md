@@ -1,3 +1,33 @@
+> # ⚠️ FORENKLET 2026-08-21 — LES DETTE FØRST
+>
+> **Brage, etter telefontesten:** «pulsen er blitt en parallell
+> hendelsesnavigator og dupliserer kamphistorien.»
+>
+> **BEREGNINGSMODELLEN I DETTE DOKUMENTET GJELDER FORTSATT, ORDRETT.** Ekte
+> tidsakse i sekunder, hele bredden fra avspark til slutt/NÅ, våre mål opp og
+> mål imot ned, høyere aktivitet ved tette rapporteringer, flatere linje i
+> rolige perioder, HEIA som glød, faser som tier når datagrunnlaget ikke
+> bærer dem — alt står.
+>
+> **DET SOM ER FJERNET ER MARKØR- OG NAVIGASJONSLAGET:**
+> · Ball/Camera/MessageCircle-ikoner på kurven
+> · stablede ikonmarkører, ×N-merker og kommentarbobler
+> · valgt-hendelse-panelet, ‹ 3/11 ›-stepperen og «Vis i historien»
+> · individuelle trykkflater — **pulsen er ikke trykkbar i det hele tatt**
+> · `accessibilityRole="adjustable"` med sveip mellom øyeblikkene
+>
+> **NÅ:** én sammenhengende kurve. Node bare på MÅL (vår: litt større mint
+> over linja; motstanderens: dempet skifer under). Oppdateringer og bilder
+> FORMER kurven, men får ingen node. HEIA/kommentarer er varme uten badges —
+> halo tegnes kun der noen faktisk har svart. Pause er én kort krittstrek
+> som krysser kurven. Maks to faseetiketter. **Ett** VoiceOver-stopp med
+> **én** samlet setning, uten rolle og uten blaing.
+>
+> Kamphistorien rett under er detaljvisningen. Pulsen skal ikke konkurrere
+> med den. Avsnittene under om markørikoner, valgpanel og justerbar
+> tilgjengelighet er derfor HISTORIKK — de forklarer hvorfor modellen ser ut
+> som den gjør, ikke hva flaten viser.
+
 # Kampens puls — datamapping og visuell modell
 
 **Status: ✅ TELEFONGODKJENT AV BRAGE 2026-08-21 — «Det er godkjent nå så vi

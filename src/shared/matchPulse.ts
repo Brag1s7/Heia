@@ -42,19 +42,21 @@ export const PULSE_DOWN = 26;
 export const PULSE_BAND = PULSE_VPAD * 2 + PULSE_UP + PULSE_DOWN;
 export const PULSE_MID = PULSE_VPAD + PULSE_UP;
 /**
- * Markørens radius. 22 pt i diameter.
+ * NODENS radius — den lille prikken som markerer et MÅL på kurven.
  *
- * ⚠️ VAR 15 (30 pt), OG DET VAR FOR STORT. Brage på telefonen 2026-08-21:
- * «disse ikonene er for store, så ser bare dumt ut». Riggen viste at
- * problemet var verre enn størrelsen: i en tett kamp (8–6 på ti minutter)
- * DEKKET markørene kurven fullstendig. Hierarkiet sto på hodet — pulsen er
- * FORMEN, markørene er merknader PÅ den. Nå ser man svaiene igjen.
+ * ⚠️ HISTORIKKEN ER VERDT Å KJENNE. Dette var 15 (en 30 pt ikonmarkør), så
+ * 11, og nå 6. Hvert steg kom fra telefonen, og de peker samme vei: pulsen
+ * er FORMEN, ikke en rad med knapper. Ved 15 dekket markørene kurven
+ * fullstendig i en tett kamp; ved 11 kunne man se svaiene, men flaten var
+ * fortsatt en navigator. Forenklingen 2026-08-21 fjernet ikonene helt, og da
+ * er det ingenting igjen som trenger plass — bare et punkt som sier «her sto
+ * det et mål».
  *
- * ⚠️ IKKE «trykkbar» — det var aldri markørens jobb. Trykkflaten er
- * `PULSE_TOUCH_MIN` (44 pt) og er helt uavhengig av hvor stor prikken er.
- * Det er nettopp derfor denne kunne krympes uten å røre tilgjengeligheten.
+ * ⚠️ DEN KLEMMER OGSÅ NODEN INN I BÅNDET (`PULSE_MARK_R + 1`). En STOR
+ * radius dyttet noden vekk fra kurvetoppen den skulle sitte på; med 6 følger
+ * den svaien.
  */
-export const PULSE_MARK_R = 11;
+export const PULSE_MARK_R = 6;
 /** Den lille tidsmarkøren for pause. Sitter PÅ midtlinja, deler ingenting. */
 export const PULSE_TICK_R = 7;
 /**
@@ -76,13 +78,6 @@ export const PULSE_TICK_R = 7;
  * krympingen er en ren tegneendring uten ny modell å teste.
  */
 const VISUAL_MERGE = 22;
-/**
- * ⚠️ MINSTE TRYKKFLATE. Egen sak fra `VISUAL_MERGE`, og det er hele poenget:
- * to markører kan gjerne stå 12 pt fra hverandre visuelt, men da kan de ikke
- * ha hvert sitt trykkmål. Hendelser som ikke får en reell egen flate samles
- * i ÉN 44 pt gruppe, og panelet blar mellom dem.
- */
-export const PULSE_TOUCH_MIN = 44;
 /** Hvor mange punkter kurven tegnes av. */
 const SAMPLES = 140;
 
@@ -148,17 +143,19 @@ const SPEC: Record<
 };
 
 /**
- * Rang: målet representerer flokken, og males øverst når markører overlapper.
- * Eksportert fordi FLATEN må male i samme rekkefølge — ellers kan et bilde
- * legge seg oppå et mål.
+ * Hvilken type som LEDER en flokk når flere øyeblikk smelter sammen.
+ *
+ * ⚠️ VAR EKSPORTERT (`PULSE_RANK`) fordi komponenten malte markørene i denne
+ * rekkefølgen — målet øverst, aldri under et bilde. Markørene er borte
+ * (forenklingen 2026-08-21), men rangen betyr fortsatt noe i MODELLEN: den
+ * avgjør om flokken regnes som et mål, og dermed om den får en node.
  */
-export const PULSE_RANK: Record<PulseKind, number> = {
+const RANK: Record<PulseKind, number> = {
   goalUs: 3,
   goalThem: 3,
   update: 2,
   photo: 1,
 };
-const RANK = PULSE_RANK;
 
 /** Typegruppe. Et mål og en oppdatering slås ALDRI sammen visuelt. */
 const GROUP: Record<PulseKind, string> = {
@@ -481,14 +478,6 @@ export interface PulseCluster {
   iReacted: boolean;
 }
 
-export interface PulseTouchGroup {
-  key: string;
-  left: number;
-  width: number;
-  /** Øyeblikkene gruppen dekker, i tidsrekkefølge. */
-  moments: PulseMoment[];
-}
-
 export interface PulsePhase {
   kind: 'busiest' | 'quiet';
   from: number;
@@ -506,7 +495,6 @@ export interface PulseModel {
   /** Pausemarkøren(e): små punkter PÅ midtlinja, aldri delestreker. */
   ticks: {x: number; kind: 'pause'}[];
   clusters: PulseCluster[];
-  touch: PulseTouchGroup[];
   phases: PulsePhase[];
   /** Alle øyeblikk i tidsrekkefølge — VoiceOver blar gjennom denne. */
   moments: PulseMoment[];
@@ -655,28 +643,10 @@ export function buildPulseModel(
   }));
   clusters.sort((a, b) => a.x - b.x || b.side - a.side);
 
-  // --- 4. Trykkflatene -----------------------------------------------------
-  // ⚠️ EGET NIVÅ. Markørene kan stå 32 pt fra hverandre og leses hver for
-  // seg; en 44 pt Pressable kan ikke. Flatene legges ut sekvensielt, så de
-  // er ikke-overlappende ved konstruksjon, og alt som ikke får sin egen
-  // flate havner i den forrige — stepperen i panelet blar mellom dem.
-  const touch: PulseTouchGroup[] = [];
-  for (const c of clusters) {
-    const open = touch[touch.length - 1];
-    if (open && c.x - (open.left + PULSE_TOUCH_MIN / 2) < PULSE_TOUCH_MIN) {
-      open.moments.push(...c.moments);
-    } else {
-      touch.push({
-        key: c.key,
-        left: c.x - PULSE_TOUCH_MIN / 2,
-        width: PULSE_TOUCH_MIN,
-        moments: [...c.moments],
-      });
-    }
-  }
-  for (const t of touch) {
-    t.moments.sort((a, b) => a.seconds - b.seconds || a.sequence - b.sequence);
-  }
+  // ⚠️ TRYKKFLATENE ER BORTE (forenklingen 2026-08-21). Pulsen var blitt en
+  // PARALLELL HENDELSESNAVIGATOR som duplisert kamphistorien rett under.
+  // Modellen vet fortsatt alt den visste — `clusters` bærer type, side, HEIA
+  // og kommentarer — men ingenting av det er lenger en knapp.
 
   return {
     span: timeline.span,
@@ -685,7 +655,6 @@ export function buildPulseModel(
     ribbon,
     ticks: ticks.map(t => ({x: xOf(t.seconds), kind: t.kind})),
     clusters,
-    touch,
     // Fasene er MINUTT-språk («MEST LIV · 34′–41′»), så de får kampens
     // lengde i minutter. En kamp på 60 sekunder har ingen faser, og det er
     // riktig: det finnes ikke en «rolig periode» i en kamp som varte ett minutt.

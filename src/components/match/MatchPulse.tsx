@@ -1,11 +1,9 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   Animated,
-  Pressable,
   StyleSheet,
   Text,
   View,
-  type AccessibilityActionEvent,
   type LayoutChangeEvent,
 } from 'react-native';
 import Svg, {
@@ -18,23 +16,12 @@ import Svg, {
   Rect,
   Stop,
 } from 'react-native-svg';
-import {colors, fonts, matchColors, radius, spacing} from '../../theme';
-import {
-  Ball,
-  Camera,
-  ChevronLeft,
-  ChevronRight,
-  MessageCircle,
-  PauseSolid,
-} from '../icons';
+import {colors, fonts, matchColors, spacing} from '../../theme';
 import {useReducedMotion} from '../useReducedMotion';
 import {
   matchPulseClock,
-  matchPulseMomentText,
   matchPulsePhaseText,
-  matchPulseResponseText,
   matchPulseSummaryA11y,
-  matchPulseValueA11y,
 } from '../../shared/matchCopy';
 import {
   buildPulseModel,
@@ -43,12 +30,7 @@ import {
   matchPulseTimeline,
   pulseSignature,
   PULSE_BAND,
-  PULSE_MARK_R,
   PULSE_MID,
-  PULSE_RANK,
-  PULSE_TICK_R,
-  type PulseCluster,
-  type PulseKind,
   type PulsePhoto,
 } from '../../shared/matchPulse';
 import type {MatchEngagement} from '../../shared/matchEngagement';
@@ -103,6 +85,31 @@ const CURVE_PAD = 10;
 /** Krittstreken som leder blikket videre ned i kampen. */
 const CHALK_W = 54;
 const NOW_R = 4;
+/** Vårt mål: en litt større mintnode OVER linja. */
+const NODE_US_R = 5;
+/** Motstanderens: dempet skifer UNDER linja. Mindre, men ekte. */
+const NODE_THEM_R = 4;
+/**
+ * Pausestrekens lengde over og under midtlinja.
+ *
+ * ⚠️ KORT MED VILJE. En FULLHØY strek ble avvist i skive 5 fordi den delte
+ * kampen i to — og riggen viste at den gjør nøyaktig det samme nå, selv på
+ * 15 % krittfarge. Den skal krysse kurven, ikke dele den: så lang at man ser
+ * at noe skjedde, så kort at blikket ikke stopper.
+ */
+const TICK_UP = 14;
+const TICK_DOWN = 10;
+
+/**
+ * Har noen faktisk svart på dette øyeblikket?
+ *
+ * ⚠️ VAKTEN SOM HOLDER FLATEN REN. `glowFor` gir en basisradius selv på
+ * null heier, så uten denne ville HVERT øyeblikk fått en glødeprikk — og da
+ * er vi tilbake til en rad med markører, bare uskarpe.
+ */
+function engasjert(c: {comments: number; moments: {heia: number}[]}): boolean {
+  return c.comments > 0 || c.moments.some(m => m.heia > 0);
+}
 
 interface MatchPulseProps {
   matchEvents: MatchEvent[];
@@ -138,7 +145,6 @@ interface MatchPulseProps {
   nowMs?: number;
   authorFor?: (userId: string) => {name: string} | undefined;
   /** «Vis i historien» — ruller til øyeblikkets rad i kampforløpet. */
-  onShowInHistory?: (target: {eventId?: string; photoId?: string}) => void;
 }
 
 export function MatchPulse({
@@ -150,7 +156,6 @@ export function MatchPulse({
   minute,
   nowMs,
   authorFor,
-  onShowInHistory,
 }: MatchPulseProps) {
   const [box, setBox] = useState<{w: number; h: number} | null>(null);
   const onLayout = (e: LayoutChangeEvent) => {
@@ -214,14 +219,7 @@ export function MatchPulse({
     [signature, box?.w],
   );
 
-  // Valget bæres av NØKKELEN, ikke av en indeks: kommer det en ny hendelse
-  // midt i kampen, skal markøren du valgte fortsatt være den samme — og
-  // forsvinner den (angret mål), skal valget forsvinne med den.
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const moments = model?.moments ?? [];
-  const selectedIndex = moments.findIndex(m => m.key === selectedKey);
-  const selected = selectedIndex >= 0 ? moments[selectedIndex] : undefined;
-
   const clock = matchPulseClock({phase, minute});
   const reducedMotion = useReducedMotion();
 
@@ -247,29 +245,6 @@ export function MatchPulse({
     return () => anim.stop();
   }, [timeline.span, fade, reducedMotion]);
 
-  const step = (delta: number) => {
-    if (moments.length === 0) return;
-    const next =
-      selectedIndex < 0
-        ? delta > 0
-          ? 0
-          : moments.length - 1
-        : Math.max(0, Math.min(moments.length - 1, selectedIndex + delta));
-    setSelectedKey(moments[next].key);
-  };
-
-  const showSelected = () => {
-    if (!selected) return;
-    onShowInHistory?.({eventId: selected.eventId, photoId: selected.photoId});
-  };
-
-  const onAccessibilityAction = (e: AccessibilityActionEvent) => {
-    const name = e.nativeEvent.actionName;
-    if (name === 'increment') step(1);
-    else if (name === 'decrement') step(-1);
-    else if (name === 'activate') showSelected();
-  };
-
   const inner = box ? box.w - PAD_H * 2 : 0;
   // NÅ-markøren flyttes for seg, oppå den memoiserte kurven.
   // ⚠️ KLOKKETID, ikke `minute`. Se `nowMs` i propsene.
@@ -286,36 +261,18 @@ export function MatchPulse({
     <View
       style={styles.section}
       onLayout={onLayout}
-      // ⚠️ HELE PULSEN ER ÉTT ELEMENT. `accessible` her svelger både
-      // overskriften, markørene og trykkflatene — som er nøyaktig poenget:
-      // ingen parallelle stopp foran den samme tidslinjen.
+      // ⚠️ ÉTT STOPP, ÉN SETNING, INGEN ROLLE.
+      // Pulsen var `accessibilityRole="adjustable"` med sveip opp/ned mellom
+      // øyeblikkene og «Vis i historien» på dobbelttrykk. Det var en
+      // PARALLELL NAVIGASJON gjennom nøyaktig de samme hendelsene som
+      // kampforløpet rett under leser opp — én gang for mye. Nå er pulsen en
+      // oppsummering man hører, og historien er stedet man går til.
       accessible
-      accessibilityRole="adjustable"
       accessibilityLabel={matchPulseSummaryA11y({
         clock: clock.a11y,
         count: moments.length,
         phases: model?.phases ?? [],
-      })}
-      accessibilityValue={
-        selected
-          ? {
-              text: matchPulseValueA11y(selected, {
-                index: selectedIndex + 1,
-                total: moments.length,
-              }),
-            }
-          : undefined
-      }
-      accessibilityActions={
-        moments.length
-          ? [
-              {name: 'increment'},
-              {name: 'decrement'},
-              {name: 'activate', label: 'Vis i historien'},
-            ]
-          : undefined
-      }
-      onAccessibilityAction={onAccessibilityAction}>
+      })}>
       {/* DET TREDJE ROMMET. Ingen flate med egen bakgrunnsfarge — en tone
           som toner inn og ut, så seksjonen aldri får en kant. */}
       {box && (
@@ -453,6 +410,22 @@ export function MatchPulse({
               fill="rgba(234, 255, 246, 0.2)"
             />
 
+            {/* ⚠️ PAUSE ER ÉN TYNN KRITTSTREK GJENNOM KURVEN.
+                Den har vært tre ting: en fullhøy delestrek (avvist — den
+                delte kampen i to), et lite pauseikon PÅ midtlinja (avvist
+                med ikonene), og nå en krittstrek. Den nullstiller ingen tid
+                og deler ingenting: kurven krysser den. */}
+            {model.ticks.map((t, i) => (
+              <Rect
+                key={`tick${i}`}
+                x={t.x - 0.5}
+                y={PULSE_MID - TICK_UP}
+                width={1}
+                height={TICK_UP + TICK_DOWN}
+                fill={matchColors.chalkFaint}
+              />
+            ))}
+
             {/* Båndet: halvbredden følger tettheten — tykkere lys der det
                 skjedde mye, tynnest i det stille. */}
             <Path d={model.ribbon} fill={colors.heia} opacity={0.22} />
@@ -466,17 +439,52 @@ export function MatchPulse({
               strokeLinejoin="round"
             />
 
-            {model.clusters.map(c => (
-              <Circle
-                key={`halo${c.key}`}
-                cx={c.x}
-                cy={c.y}
-                r={c.glow}
-                fill={
-                  c.side === 1 ? 'url(#pulseHaloUs)' : 'url(#pulseHaloThem)'
-                }
-              />
-            ))}
+            {/* ⚠️ HEIA OG KOMMENTARER ER VARME, IKKE MERKER.
+                Halo tegnes KUN der noen faktisk har svart — ellers ville
+                hvert øyeblikk fått en prikk, og da er vi tilbake til en rad
+                med markører. Radien er HEIA og ingenting annet (`glowFor`);
+                kurvens høyde rører den aldri, så pulsen kan ikke bli en
+                påstand om hvem som presser. */}
+            {model.clusters
+              .filter(c => engasjert(c))
+              .map(c => (
+                <Circle
+                  key={`halo${c.key}`}
+                  cx={c.x}
+                  cy={c.y}
+                  r={c.glow}
+                  fill={
+                    c.side === 1 ? 'url(#pulseHaloUs)' : 'url(#pulseHaloThem)'
+                  }
+                />
+              ))}
+
+            {/* ⚠️ NODER BARE PÅ MÅL. Oppdateringer og bilder FORMER kurven —
+                svaien er der — men de får ikke sitt eget punkt. Vårt mål er
+                en litt større mintnode over linja; motstanderens er dempet
+                skifer under den. Retningen sier hvem, uten et eneste ikon. */}
+            {model.clusters
+              .filter(c => c.kind === 'goalUs' || c.kind === 'goalThem')
+              .map(c =>
+                c.kind === 'goalUs' ? (
+                  <Circle
+                    key={`node${c.key}`}
+                    cx={c.x}
+                    cy={c.y}
+                    r={NODE_US_R}
+                    fill={colors.heia}
+                  />
+                ) : (
+                  <Circle
+                    key={`node${c.key}`}
+                    cx={c.x}
+                    cy={c.y}
+                    r={NODE_THEM_R}
+                    fill={matchColors.opponentInk}
+                    fillOpacity={0.55}
+                  />
+                ),
+              )}
 
             {!finished && (
               <>
@@ -497,219 +505,28 @@ export function MatchPulse({
             )}
           </Svg>
         )}
-
-        {/* ⚠️ PAUSE ER ÉN LITEN MARKØR PÅ EN SAMMENHENGENDE LINJE. Den var
-            en fullhøy strek som delte kurven i to; nå sitter den PÅ
-            midtlinja, deler ingenting og nullstiller ingen tid. */}
-        {model?.ticks.map((t, i) => (
-          <View
-            key={`tick${i}`}
-            pointerEvents="none"
-            style={[
-              styles.tick,
-              {left: t.x - PULSE_TICK_R, top: PULSE_MID - PULSE_TICK_R},
-            ]}>
-            <PauseSolid size={7} color={matchColors.dim} />
-          </View>
-        ))}
-
-        {/* Markørene ligger oppå lerretet og tar ikke imot trykk selv —
-            trykkflatene under er grovere og garantert uten overlapp. */}
-        {/* ⚠️ MALT I RANG, IKKE I X. Markørene får overlappe litt for at
-            typene skal kunne leses i en tett kamp — og da må målet ligge
-            øverst, aldri under et bilde. */}
-        {model &&
-          [...model.clusters]
-            .sort((a, b) => PULSE_RANK[a.kind] - PULSE_RANK[b.kind])
-            .map(c => (
-              <Marker
-                key={c.key}
-                cluster={c}
-                selected={
-                  !!selected && c.moments.some(m => m.key === selected.key)
-                }
-              />
-            ))}
-
-        {model?.touch.map(t => (
-          <Pressable
-            key={t.key}
-            onPress={() => setSelectedKey(t.moments[0].key)}
-            style={[styles.touch, {left: t.left, width: t.width}]}
-          />
-        ))}
       </Animated.View>
 
+      {/* ⚠️ MAKS TO ETIKETTER, OG BARE NÅR DATAGRUNNLAGET BÆRER DEM.
+          `pulsePhases` tier i en kort kamp med få hendelser — en «rolig
+          periode» i en kamp som varte ett minutt er ikke en observasjon,
+          det er støy. Her sto det før et helt valgpanel med stepper og
+          «Vis i historien»; det duplisert kamphistorien rett under. */}
       <View style={styles.footer}>
-        {selected ? (
-          <>
-            <View style={styles.footerRow}>
-              <Text
-                style={styles.selection}
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}>
-                {matchPulseMomentText(selected)}
-              </Text>
-              {/* ⚠️ NAVIGASJONEN SKAL VÆRE TYDELIG OG TRYKKBAR (Brage). To
-                  ekte knapper med krittkant og 46 pt treffflate, ikke to
-                  små tegn man må sikte på. */}
-              {moments.length > 1 && (
-                <View style={styles.stepper}>
-                  <Pressable
-                    onPress={() => step(-1)}
-                    hitSlop={8}
-                    disabled={selectedIndex <= 0}
-                    style={({pressed}) => [
-                      styles.stepButton,
-                      selectedIndex <= 0 && styles.stepDisabled,
-                      pressed && styles.stepPressed,
-                    ]}>
-                    <ChevronLeft
-                      size={16}
-                      color={matchColors.text}
-                      strokeWidth={2.6}
-                    />
-                  </Pressable>
-                  <Text style={styles.stepCount} maxFontSizeMultiplier={1.2}>
-                    {selectedIndex + 1}/{moments.length}
-                  </Text>
-                  <Pressable
-                    onPress={() => step(1)}
-                    hitSlop={8}
-                    disabled={selectedIndex >= moments.length - 1}
-                    style={({pressed}) => [
-                      styles.stepButton,
-                      selectedIndex >= moments.length - 1 &&
-                        styles.stepDisabled,
-                      pressed && styles.stepPressed,
-                    ]}>
-                    <ChevronRight
-                      size={16}
-                      color={matchColors.text}
-                      strokeWidth={2.6}
-                    />
-                  </Pressable>
-                </View>
-              )}
-            </View>
-            <View style={styles.footerRow}>
-              <Text
-                style={styles.response}
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.3}>
-                {matchPulseResponseText(selected)}
-              </Text>
-              {/* ⚠️ SYNLIG HANDLING, IKKE EN SKJULT «TRYKK EN GANG TIL».
-                  Brukeren skal ikke gjette at et nytt trykk gjør noe annet
-                  enn det første. */}
-              <Pressable
-                onPress={showSelected}
-                hitSlop={12}
-                style={styles.showRow}>
-                <Text style={styles.show} maxFontSizeMultiplier={1.3}>
-                  Vis i historien
-                </Text>
-                <ChevronRight size={13} color={colors.heia} strokeWidth={2.4} />
-              </Pressable>
-            </View>
-          </>
-        ) : (
-          <View style={styles.footerRow}>
-            {(model?.phases ?? []).map(p => (
-              <Text
-                key={p.kind}
-                style={[styles.phase, p.kind === 'quiet' && styles.phaseQuiet]}
-                maxFontSizeMultiplier={1.3}>
-                {matchPulsePhaseText(p)}
-              </Text>
-            ))}
-          </View>
-        )}
+        <View style={styles.footerRow}>
+          {(model?.phases ?? []).slice(0, 2).map(p => (
+            <Text
+              key={p.kind}
+              style={[styles.phase, p.kind === 'quiet' && styles.phaseQuiet]}
+              maxFontSizeMultiplier={1.3}>
+              {matchPulsePhaseText(p)}
+            </Text>
+          ))}
+        </View>
       </View>
     </View>
   );
 }
-
-/**
- * ÉN MARKØR.
- *
- * Semantikken er forløpets, ikke en ny: ballen betyr mål og ingenting annet,
- * reporterens stemme er gull, bildet er krem. Retningen og fargen sier hvem
- * målet tilhørte; ikonet sier hva slags øyeblikk det var.
- *
- * ⚠️ Målnoden i `EventNode` er lys mint med mørkt blekk fordi den står i en
- * 32 pt sirkel ved siden av tekst. Her er den 15 pt og skal leses på et
- * halvt sekund — derfor full mint. Samme semantikk, annen skala.
- */
-function Marker({
-  cluster,
-  selected,
-}: {
-  cluster: PulseCluster;
-  selected: boolean;
-}) {
-  const skin = SKIN[cluster.kind];
-  const count = cluster.moments.length;
-  // ⚠️ IKONET FØLGER MARKØREN. Sto som `16` mot en 30 pt markør; med 22 pt
-  // ville det fylt hele flaten og blitt en klump.
-  //
-  // ⚠️ HVORFOR IKONENE IKKE BLE FJERNET, selv om de er små nå: fargen alene
-  // kan ikke bære betydningen. `photo` (#C6FFE9) og `goalUs` (#02FFAB) er
-  // BEGGE mint, og uten glyfen ville et kampbilde og et mål vært to nesten
-  // like prikker. Siden + farge sier HVEM; bare ikonet sier HVA.
-  const glyphSize = Math.round(PULSE_MARK_R * 1.06);
-
-  return (
-    <View
-      pointerEvents="none"
-      style={[
-        styles.mark,
-        {
-          left: cluster.x - PULSE_MARK_R,
-          top: cluster.y - PULSE_MARK_R,
-          backgroundColor: skin.bg,
-        },
-        skin.border ? styles.markBordered : null,
-        skin.border ? {borderColor: skin.border} : null,
-        selected && styles.markSelected,
-        cluster.iReacted && styles.markReacted,
-      ]}>
-      {cluster.kind === 'update' ? (
-        <MessageCircle size={glyphSize} color={skin.ink} strokeWidth={2.4} />
-      ) : cluster.kind === 'photo' ? (
-        <Camera size={glyphSize} color={skin.ink} strokeWidth={2.2} />
-      ) : (
-        <Ball size={glyphSize + 2} color={skin.ink} strokeWidth={1.9} />
-      )}
-
-      {count > 1 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText} maxFontSizeMultiplier={1}>
-            {count}
-          </Text>
-        </View>
-      )}
-      {cluster.comments > 0 && (
-        <View style={styles.bubble}>
-          <Text style={styles.bubbleText} maxFontSizeMultiplier={1}>
-            {cluster.comments}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-const SKIN: Record<PulseKind, {bg: string; ink: string; border?: string}> = {
-  goalUs: {bg: colors.heia, ink: colors.heiaDeep},
-  goalThem: {
-    bg: matchColors.opponentNode,
-    ink: matchColors.opponentInk,
-    border: 'rgba(195, 212, 218, 0.5)',
-  },
-  update: {bg: colors.gold, ink: colors.goldInk},
-  photo: {bg: colors.heiaTint, ink: colors.heiaDeep},
-};
 
 const styles = StyleSheet.create({
   // ~176 pt. Pulsen fortjener plassen når den faktisk formidler kampen.
@@ -745,152 +562,19 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: PULSE_BAND,
   },
-  mark: {
-    position: 'absolute',
-    width: PULSE_MARK_R * 2,
-    height: PULSE_MARK_R * 2,
-    borderRadius: PULSE_MARK_R,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markBordered: {
-    borderWidth: 1,
-  },
-  markSelected: {
-    borderWidth: 1.6,
-    borderColor: matchColors.text,
-  },
-  // Du har heiet: markøren bærer det, ikke teksten.
-  markReacted: {
-    shadowColor: colors.heia,
-    shadowOffset: {width: 0, height: 0},
-    shadowOpacity: 0.9,
-    shadowRadius: 5,
-    elevation: 4,
-  },
-  // ⚠️ MERKET SKALERER MED MARKØREN. Det hadde fast størrelse, og da
-  // markøren krympet fra 30 til 22 pt ble ×N-merket STØRRE enn prikken det
-  // hang på. Tallene under er avledet av `PULSE_MARK_R`, ikke skrevet av.
-  badge: {
-    position: 'absolute',
-    top: -3,
-    right: -4,
-    minWidth: Math.round(PULSE_MARK_R * 1.24),
-    height: Math.round(PULSE_MARK_R * 1.24),
-    paddingHorizontal: 3,
-    borderRadius: PULSE_MARK_R * 0.62,
-    backgroundColor: matchColors.timeline,
-    borderWidth: 0.7,
-    borderColor: 'rgba(234, 255, 246, 0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    fontSize: Math.round(PULSE_MARK_R * 0.72),
-    fontWeight: '800',
-    color: matchColors.text,
-  },
-  bubble: {
-    position: 'absolute',
-    bottom: -3,
-    left: -4,
-    minWidth: Math.round(PULSE_MARK_R * 1.16),
-    height: Math.round(PULSE_MARK_R * 1.16),
-    paddingHorizontal: 3,
-    borderRadius: PULSE_MARK_R * 0.58,
-    backgroundColor: 'rgba(14, 41, 29, 0.94)',
-    borderWidth: 0.7,
-    borderColor: 'rgba(234, 255, 246, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bubbleText: {
-    fontSize: Math.round(PULSE_MARK_R * 0.66),
-    fontWeight: '800',
-    color: matchColors.dim,
-  },
-  // Trykkflatene er FULLHØYDE og garantert uten overlapp — se `buildPulseModel`.
-  touch: {
-    position: 'absolute',
-    top: 0,
-    height: PULSE_BAND,
-  },
-  // Pausen: liten, rund, PÅ midtlinja. Deler ingenting.
-  tick: {
-    position: 'absolute',
-    width: PULSE_TICK_R * 2,
-    height: PULSE_TICK_R * 2,
-    borderRadius: PULSE_TICK_R,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: matchColors.timeline,
-    borderWidth: 1,
-    borderColor: matchColors.chalk,
-  },
   // Fast høyde uansett tilstand: valget skal ikke dytte kampforløpet nedover.
+  // ⚠️ VAR 48 pt — plass til valgpanelets TO rader (øyeblikk + stepper,
+  // respons + «Vis i historien»). Med bare faseetikettene igjen sto det et
+  // tomt felt under kurven og gjorde seksjonen luftig på feil måte.
   footer: {
-    height: 48,
+    height: 20,
     justifyContent: 'center',
-    gap: 3,
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-  },
-  selection: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: matchColors.text,
-  },
-  response: {
-    flex: 1,
-    fontSize: 11,
-    color: matchColors.dim,
-  },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  // Krittkant, aldri hvit — samme språk som reporterknappene. 30 pt synlig
-  // + 8 pt hitSlop = 46 pt treffflate.
-  stepButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: matchColors.chalk,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepPressed: {
-    backgroundColor: 'rgba(234, 255, 246, 0.12)',
-    borderColor: matchColors.chalkStrong,
-  },
-  stepDisabled: {
-    opacity: 0.35,
-  },
-  stepCount: {
-    fontFamily: fonts.display,
-    fontSize: 12,
-    minWidth: 30,
-    textAlign: 'center',
-    color: matchColors.dim,
-  },
-  showRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    borderRadius: radius.sm,
-  },
-  show: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-    color: colors.heia,
   },
   phase: {
     fontSize: 9.5,
