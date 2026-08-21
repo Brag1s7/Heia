@@ -59,6 +59,18 @@ export interface MatchEvent {
    * Se `mapMatchEventRow`.
    */
   note?: string;
+  /**
+   * ⚠️ `match_events.description` RÅ — den ENESTE riktige kilden når feltet
+   * skal REDIGERES, og den er en annen enn både `description` og `note`.
+   *
+   *   · `description` er SYNTETISK på mål («Mål for oss»), ikke kolonnen.
+   *   · `note` er kolonnen, men KUN når den er noe annet enn målscoreren —
+   *     riktig for visning, feil for redigering: på et mål der reporteren
+   *     skrev fritekst ved rapportering ligger teksten i `description` og
+   *     `note` er `undefined`. Prefylte korrigeringsarket fra `note`, ville
+   *     feltet stått tomt, og et lagre hadde SLETTET teksten.
+   */
+  descriptionRaw?: string;
   /** `home` = oss, `away` = motstander. Satt for mål. */
   teamSide?: 'home' | 'away';
   reportedBy?: string;

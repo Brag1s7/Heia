@@ -41,6 +41,17 @@ import type {MatchEvent} from '../../shared/types';
  * `ListRow` + valgradene fra bildearket.
  *
  * ---------------------------------------------------------------------------
+ * ---------------------------------------------------------------------------
+ * ⚠️ INGEN MÅLSCORER HER (Brage 2026-08-21).
+ *
+ * Arket endrer SIDE, BESKRIVELSE eller annullerer. Målscorer er utsatt til
+ * det kan gjøres konsekvent i begge ender: `report_match_event` har i dag
+ * ETT fritekstfelt som havner i `description`, så et eget målscorerfelt bare
+ * her ville laget to ulike sannheter om hva en målscorer er. **Ikke bygg en
+ * «Legg til målscorer»-CTA i mellomtiden** — en halv inngang er verre enn
+ * ingen. RPC-en beholder parameteren, men klienten sender alltid null, og
+ * `00078` gjør at NULL betyr «ikke rør».
+ *
  * ⚠️ ARKET EIER INGEN SANNHET. Stillingen regnes ut på serveren
  * (`correct_match_goal` teller målhistorikken opp på nytt), og arket viser
  * den ikke engang. Å vise «2–1 blir 1–1» her ville vært en gjetning som kan
@@ -56,7 +67,6 @@ interface GoalCorrectionSheetProps {
   saving?: boolean;
   onSave: (input: {
     teamSide: 'home' | 'away';
-    playerName: string;
     description: string;
   }) => void;
   /** Bekreftelsen ligger HER, ikke i skjermen — se `confirmCancel`. */
@@ -79,8 +89,11 @@ export function GoalCorrectionSheet({
   const [side, setSide] = useState<'home' | 'away'>(
     event.teamSide === 'away' ? 'away' : 'home',
   );
-  const [player, setPlayer] = useState(event.player ?? '');
-  const [note, setNote] = useState(event.note ?? '');
+  // ⚠️ `descriptionRaw`, IKKE `note`. `note` er satt bare når den er noe
+  // ANNET enn målscoreren; på et mål der reporteren skrev fritekst ved
+  // rapportering er den `undefined`, og feltet ville stått tomt — et lagre
+  // hadde da slettet teksten. Se `MatchEvent.descriptionRaw`.
+  const [note, setNote] = useState(event.descriptionRaw ?? '');
 
   const confirmCancel = () => {
     Alert.alert(
@@ -147,17 +160,6 @@ export function GoalCorrectionSheet({
                 );
               })}
 
-              <Text style={styles.label}>Målscorer</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Navn (valgfritt)"
-                placeholderTextColor={colors.textTertiary}
-                value={player}
-                onChangeText={setPlayer}
-                accessibilityLabel="Målscorer"
-                returnKeyType="next"
-              />
-
               <Text style={styles.label}>Beskrivelse</Text>
               <TextInput
                 style={[styles.input, styles.inputMultiline]}
@@ -183,11 +185,7 @@ export function GoalCorrectionSheet({
                 title={saving ? 'Lagrer…' : 'Lagre rettelsen'}
                 variant="primary"
                 onPress={() =>
-                  onSave({
-                    teamSide: side,
-                    playerName: player.trim(),
-                    description: note.trim(),
-                  })
+                  onSave({teamSide: side, description: note.trim()})
                 }
                 disabled={saving}
                 style={styles.action}

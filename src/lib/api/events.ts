@@ -655,10 +655,21 @@ export interface CorrectMatchGoalInput {
   action: 'edit' | 'cancel';
   /** `home` = oss, `away` = motstander. Kun ved `edit`. */
   teamSide?: 'home' | 'away';
-  /** Målscorer → `match_events.player_name`. Tom tekst blir NULL. */
-  playerName?: string;
   /** Fri beskrivelse → `match_events.description`. Tom tekst blir NULL. */
   description?: string;
+  /**
+   * ⚠️ MÅLSCORER ER BEVISST IKKE MED (Brage 2026-08-21).
+   *
+   * RPC-en har fortsatt parameteren `p_player_name` for kompatibilitet, men
+   * KLIENTEN SKAL IKKE EKSPONERE DEN: `report_match_event` har i dag ett
+   * fritekstfelt som havner i `description`, så et eget målscorerfelt bare i
+   * korrigeringen ville gitt to ulike sannheter om hva en målscorer er.
+   * Utsatt til det kan gjøres konsekvent i opprettelse, redigering, feed og
+   * historikk.
+   *
+   * Vi sender derfor alltid `null`, og `00078` gjør at NULL betyr «ikke rør»
+   * — en importert målscorer overlever en korrigering.
+   */
 }
 
 /**
@@ -684,7 +695,9 @@ export async function correctMatchGoal(
     p_match_event_id: matchEventId,
     p_action: input.action,
     p_team_side: input.teamSide ?? null,
-    p_player_name: input.playerName ?? null,
+    // ⚠️ ALLTID null — se `CorrectMatchGoalInput`. `00078` tolker NULL som
+    // «ikke rør», så en eksisterende målscorer blir stående.
+    p_player_name: null,
     p_description: input.description ?? null,
   });
 
@@ -1006,6 +1019,9 @@ export function mapMatchEventRow(
     // scoreren i `description`, og den er alt vist som `player` over —
     // uten dette vilkåret ville navnet stått to ganger på raden.
     note: me.player_name ? (me.description ?? undefined) : undefined,
+    // Kolonnen rå — se `MatchEvent.descriptionRaw` for hvorfor den ikke er
+    // den samme som `note`.
+    descriptionRaw: me.description ?? undefined,
     description,
     teamSide,
     reportedBy: me.reported_by ?? undefined,

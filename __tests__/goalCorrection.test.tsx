@@ -176,6 +176,7 @@ describe('korrigeringsarket', () => {
     minute: 34,
     player: 'Ada',
     note: 'Fra corner',
+    descriptionRaw: 'Fra corner',
     description: 'Mål for oss',
     teamSide: 'home' as const,
   };
@@ -236,6 +237,44 @@ describe('korrigeringsarket', () => {
     expect(t).not.toContain('Rediger innlegget');
   });
 
+  it('⭐ har INGEN målscorer — den er utsatt (Brage 2026-08-21)', () => {
+    // Arket skal endre side, beskrivelse eller annullere. Ingenting annet.
+    // ⚠️ Og det skal HELLER IKKE stå en «Legg til målscorer»-CTA her: en halv
+    // inngang til noe `report_match_event` ikke kan lage, er verre enn ingen.
+    const t = texts(sheet());
+    expect(t).not.toContain('Målscorer');
+    expect(t).not.toContain('målscorer');
+    expect(t).toContain('Beskrivelse');
+  });
+
+  it('⭐ sender ALDRI playerName videre — feltet finnes ikke i inputen', () => {
+    let got: Record<string, unknown> | undefined;
+    const tree = sheet({
+      onSave: (input: Record<string, unknown>) => {
+        got = input;
+      },
+    });
+    act(() => byTitle(tree, 'Lagre rettelsen').props.onPress());
+    expect(got).toEqual({teamSide: 'home', description: 'Fra corner'});
+    expect(Object.keys(got!)).not.toContain('playerName');
+  });
+
+  it('⚠️ beskrivelsen prefylles fra descriptionRaw, ikke fra note', () => {
+    // På et mål der reporteren skrev fritekst ved RAPPORTERING ligger
+    // teksten i `description`, og `note` er undefined (den settes bare når
+    // den er noe annet enn målscoreren). Prefylte arket fra `note`, ville
+    // feltet stått tomt — og et lagre hadde SLETTET teksten.
+    let got: Record<string, unknown> | undefined;
+    const tree = sheet({
+      event: {...GOAL, note: undefined, descriptionRaw: 'Ada'},
+      onSave: (input: Record<string, unknown>) => {
+        got = input;
+      },
+    });
+    act(() => byTitle(tree, 'Lagre rettelsen').props.onPress());
+    expect(got).toEqual({teamSide: 'home', description: 'Ada'});
+  });
+
   it('viser hvilket mål man står i, og begge sidene ved navn', () => {
     const t = texts(sheet());
     // Teksten er delt over to noder ({minute}′ i kampen), så begge delene
@@ -261,18 +300,24 @@ describe('korrigeringsarket', () => {
     spy.mockRestore();
   });
 
-  it('sender de tre feltene videre, trimmet', () => {
+  it('sender ny side videre når den byttes', () => {
     let got: unknown;
     const tree = sheet({
       onSave: (input: unknown) => {
         got = input;
       },
     });
+    // Valgradene er Pressables uten `title`. Finn den som IKKE er valgt —
+    // `findAll` gir både Pressable-elementet og vert-viewen det rendrer, så
+    // et rått indeksoppslag treffer feil node.
+    const away = tree.root.findAll(
+      n =>
+        n.props?.accessibilityRole === 'radio' &&
+        typeof n.props?.onPress === 'function' &&
+        n.props?.accessibilityState?.checked === false,
+    )[0];
+    act(() => away.props.onPress());
     act(() => byTitle(tree, 'Lagre rettelsen').props.onPress());
-    expect(got).toEqual({
-      teamSide: 'home',
-      playerName: 'Ada',
-      description: 'Fra corner',
-    });
+    expect(got).toEqual({teamSide: 'away', description: 'Fra corner'});
   });
 });
