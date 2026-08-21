@@ -1,9 +1,23 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 10 BYGGET. VENTER PÅ TELEFONKONTROLL)
+## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 10 GODKJENT OG PUSHET. NESTE: DESIGNGJENNOMGANG)
 
-⏳ **SKIVE 10 — KAMPKNAPPEN — ER BYGGET 2026-08-21. IKKE COMMITTET.
-GJENSTÅR: TELEFONKONTROLLEN.** Ren JS: ingen migrasjon, ingen nye pakker,
+✅ **SKIVE 10 — KAMPKNAPPEN — ER TELEFONGODKJENT OG PUSHET 2026-08-21**
+(`366dc10` på `Brage`). Brage: «Nå fungerer endelig rapporteringen nærmest
+perfekt!» og «Alt ser veldig bra ut!». **PR mot main er IKKE opprettet — be
+om det eksplisitt.**
+
+▶️ **NESTE SAMTALE: FABLE GÅR GJENNOM HELE DESIGNET.** Les
+`## ⚖️⚖️ AUTORITETSREGELEN` først. To ting står ÅPNE fra før og hører
+naturlig hjemme i den runden: **pulsens uttrykk** (mekanikken er godkjent,
+utseendet ikke — parkert av Brage, se toppen) og **Stadium Light** (lysere
+palett, vurderes etter alle skivene). Kampknappens pille, reporterdokken og
+det nye reporterarket er aldri sett av et designblikk — kun av telefonen.
+
+**Historikken under (10.1–10.4) er BEVART MED VILJE:** fem telefonrunder på
+kjernefunksjonen, og de tre dyreste funnene er feilklasser som vil komme
+igjen — en layout-pass som slåss med en animasjon, en påmelding som bare
+fyrte på objektendring, og en tekst-erstatning som bommet stille. Ren JS: ingen migrasjon, ingen nye pakker,
 ingen native rebuild. **`npx tsc --noEmit` = 7 feil = baselinen** (alle
 preeksisterende, i `TimeSheet`/`lib/media`/`netMetrics`/`LagkassaScreen`),
 lint på baseline (14 problemer, 1 preeksisterende feil), **750 tester grønne**.
@@ -1790,7 +1804,7 @@ en REELL begrensning.
 | 7 | **Kampuret** (serverautoritativt) | ⏳ BYGGET — `00073` IKKE PUSHET ⚠️ |
 | 8 | **Korriger mål** (varig) | ✅ LEVERT, VERIFISERT OG TELEFONGODKJENT 2026-08-21. `00075`–`00078` i prod. ⚠️ `00078` fjernet målscorerfeltet ETTER godkjenning — se bolken |
 | 9 | **`get_team_feed`-gaten for mål imot** | ✅ I PROD OG TELEFONGODKJENT 2026-08-21 («Alt på 9 kan godkjennes») |
-| 10 | **Kampknappen** | ⏳ BYGGET 2026-08-21, ikke committet. Venter på telefonkontroll — se `### ⏳ SKIVE 10 BYGGET` |
+| 10 | **Kampknappen** | ✅ LEVERT, TELEFONGODKJENT OG PUSHET 2026-08-21 (`366dc10`). Fem runder — se `### ⏳ SKIVE 10 BYGGET` og 10.1–10.4 |
 
 #### ▶️ SKIVE 5 — KAMPENS PULS: HVA SOM ALLEREDE ER AVKLART
 
@@ -2319,7 +2333,7 @@ må tittelen holde seg klar av statuslinja selv (`insets.top`). Uten det la
 
 ---
 
-### ⏳ SKIVE 10.4 — FJERDE TELEFONRUNDE 2026-08-21 (IKKE COMMITTET)
+### ✅ SKIVE 10.4 — FJERDE TELEFONRUNDE 2026-08-21 (I `366dc10`)
 
 ⚠️⚠️ **FØRST EN INNRØMMELSE SOM MÅ STÅ HER: OPACITY-FIKSEN FRA 10.2 LANDET
 ALDRI.** Jeg rapporterte den som gjort. Prettier hadde slått linja sammen til
@@ -2386,7 +2400,7 @@ i sidehodet, 44 pt, admin-gatet.
 
 ---
 
-### ⏳ SKIVE 10.3 — KAMP-FANEN + REPORTERFLATEN 2026-08-21 (IKKE COMMITTET)
+### ✅ SKIVE 10.3 — KAMP-FANEN + REPORTERFLATEN 2026-08-21 (I `366dc10`)
 
 ⚠️⚠️ **TREDJE TELEFONRUNDE. Brage: «Må si jeg er veldig lei av at du ikke
 fikser rapporteringen! … Alt dette er ikke på det nivået vi vil ha!!!»**
@@ -2467,7 +2481,7 @@ enhet, ikke gjettes i kode.**
 
 ---
 
-### ⏳ SKIVE 10.2 — REPORTERFLYTEN, RUNDE 2 2026-08-21 (IKKE COMMITTET)
+### ✅ SKIVE 10.2 — REPORTERFLYTEN, RUNDE 2 2026-08-21 (I `366dc10`)
 
 ⚠️⚠️ **BRAGE, ETTER ANDRE TELEFONTEST: «hele denne flyten/prosessen må være
 mye smoothere! dette er kjerne funksjonen i heia!!!»** Fire feil, og den
@@ -2521,7 +2535,7 @@ sendes til serveren MED ÉN GANG — bevegelsen er pynt, registreringen er ikke.
 
 ---
 
-### ⏳ SKIVE 10.1 — SEKS RETTELSER FRA TELEFONEN 2026-08-21 (IKKE COMMITTET)
+### ✅ SKIVE 10.1 — SEKS RETTELSER FRA TELEFONEN 2026-08-21 (I `366dc10`)
 
 Brage kjørte skive 10 på telefonen og fant seks ting. Alle er rettet.
 
@@ -2597,7 +2611,7 @@ seksjonshodet (`presetType: 'kamp'` — forhåndsvalgt, ikke låst).
 
 ---
 
-### ⏳ SKIVE 10 BYGGET — KAMPKNAPPEN 2026-08-21 (IKKE COMMITTET)
+### ✅ SKIVE 10 — KAMPKNAPPEN 2026-08-21 (I `366dc10`)
 
 **Ren JS.** Ingen migrasjon, ingen nye pakker, ingen native rebuild.
 `tsc` = 7 (baseline), lint = baseline, 750 tester grønne.
