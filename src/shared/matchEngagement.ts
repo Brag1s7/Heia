@@ -38,6 +38,22 @@ export interface MatchEngagement {
   heiaCount: number;
   commentCount: number;
   iReacted: boolean;
+  /**
+   * ⚠️ ØYEBLIKKETS FAKTISKE TIDSPUNKT — og den eneste kilden vi har til det.
+   *
+   * `get_event_with_rsvp` (00020:289-303) returnerer bare `minute`, altså et
+   * avrundet heltall. En kamp som varer under ett minutt får da ALLE
+   * hendelsene sine i «0′», og pulsen kollapser til venstre kant.
+   *
+   * Den kanoniske feed-posten skrives i SAMME TRANSAKSJON som hendelsen
+   * (`report_match_event` 00021:150-153, `start_match` 00020:83), så
+   * `created_at` her ER hendelsens tidspunkt på millisekundet.
+   *
+   * ⚠️ Den riktige langsiktige løsningen er `created_at` ut av
+   * `get_event_with_rsvp` — da slipper pulsen å avhenge av feed-spørringen.
+   * Det er en DROP+CREATE med 00061-fella, altså en egen liten sak.
+   */
+  createdAt?: Date;
 }
 
 /** Eldst først, med id som tie-break så to poster i samme millisekund aldri
@@ -119,6 +135,7 @@ function toEngagement(post: MatchFeedPost): MatchEngagement {
     heiaCount: post.heiaCount,
     commentCount: post.commentCount,
     iReacted: post.iReacted,
+    createdAt: post.createdAt,
   };
 }
 

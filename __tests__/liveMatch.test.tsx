@@ -74,6 +74,9 @@ const EVENT = {
 
 const REPORTER = {id: 'u-jarle', name: 'Jarle Vestli', avatarColor: '#1E7A46'};
 
+/** Pulsen (skive 5) leser HEIA herfra. Tom = ingen glød, ingen kurveendring. */
+const NO_ENGAGEMENT = {byMatchEvent: new Map(), byPost: new Map()};
+
 const mounted: ReactTestRenderer.ReactTestRenderer[] = [];
 afterEach(() => {
   act(() => {
@@ -96,6 +99,7 @@ function render(props: Partial<React.ComponentProps<typeof LiveMatch>> = {}) {
         isReporter={false}
         photos={[]}
         authorFor={id => (id === 'u-jarle' ? REPORTER : undefined)}
+        engagement={NO_ENGAGEMENT}
         onChangeReporter={jest.fn()}
         onReporterAction={jest.fn()}
         onPickPhoto={jest.fn()}

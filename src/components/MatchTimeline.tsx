@@ -11,6 +11,7 @@ import {
   type MatchGrid,
 } from '../shared/matchGridGeometry';
 import {matchPhotoA11yLabel} from '../shared/matchCopy';
+import {matchPhotoMinute} from '../shared/matchPulse';
 import type {MatchPhoto} from '../lib/api/feed';
 import type {MatchEvent, User} from '../shared/types';
 
@@ -40,6 +41,14 @@ interface MatchTimelineProps {
   }) => React.ReactNode;
   onPressPhoto?: (photo: MatchPhoto) => void;
   /**
+   * Hver rad melder fra hvor den ligger, målt fra forløpets egen topp.
+   *
+   * ⚠️ MÅLT, IKKE REGNET. Radhøyden varierer med bilde, tekstlengde og
+   * tekststørrelse — samme grunn som 3.1 måtte måle radhøyden i stedet for
+   * å gjette den. Pulsens «Vis i historien» ruller hit.
+   */
+  onRowLayout?: (key: string, y: number) => void;
+  /**
    * Forløpet ligger rett på kampens grunn (skive 2), ikke på en egen mørk
    * flate. Da må det FJERDE ROMMET tegnes her: et scrim som senker grunnen
    * fra ~L*26 til L*18.5. Uten det er «kampforløp» og «puls» samme tone, og
@@ -58,19 +67,6 @@ type Entry =
       score?: string;
     }
   | {kind: 'photo'; key: string; photo: MatchPhoto; minute: number};
-
-/**
- * Samme regnestykke som serveren bruker i `report_match_event`
- * (`FLOOR(EXTRACT(EPOCH FROM (now() - started_at)) / 60)`), så bilder og
- * hendelser havner på én og samme minuttskala.
- */
-function minuteOf(photo: MatchPhoto, startedAt?: Date): number {
-  if (!startedAt) return Number.MAX_SAFE_INTEGER;
-  return Math.max(
-    0,
-    Math.floor((photo.createdAt.getTime() - startedAt.getTime()) / 60_000),
-  );
-}
 
 /**
  * KRITTLINJA — én sammenhengende strek gjennom hele forløpet.
@@ -282,6 +278,7 @@ export function MatchTimeline({
   authorFor,
   renderEngagement,
   onPressPhoto,
+  onRowLayout,
   ground = false,
 }: MatchTimelineProps) {
   const grid = useMatchGrid();
@@ -341,7 +338,7 @@ export function MatchTimeline({
     }));
 
     const photoEntries = general.map((photo, index) => {
-      const minute = minuteOf(photo, startedAt);
+      const minute = matchPhotoMinute(photo, startedAt);
       return {
         sortMinute: minute,
         sortRank: 1,
@@ -423,35 +420,41 @@ export function MatchTimeline({
           nowMinute={nowMinute}
         />
 
-        {entries.map(entry =>
-          entry.kind === 'event' ? (
-            <MatchEventRow
-              key={entry.key}
-              event={entry.event}
-              grid={grid}
-              photos={entry.photos}
-              score={entry.score}
-              author={
-                entry.event.reportedBy
-                  ? authorFor?.(entry.event.reportedBy)
-                  : undefined
-              }
-              engagement={renderEngagement?.({event: entry.event})}
-              onPressPhoto={onPressPhoto}
-            />
-          ) : (
-            <PhotoRow
-              key={entry.key}
-              photo={entry.photo}
-              minute={entry.minute}
-              grid={grid}
-              engagement={renderEngagement?.({photo: entry.photo})}
-              onPress={
-                onPressPhoto ? () => onPressPhoto(entry.photo) : undefined
-              }
-            />
-          ),
-        )}
+        {entries.map(entry => (
+          <View
+            key={entry.key}
+            onLayout={
+              onRowLayout
+                ? e => onRowLayout(entry.key, e.nativeEvent.layout.y)
+                : undefined
+            }>
+            {entry.kind === 'event' ? (
+              <MatchEventRow
+                event={entry.event}
+                grid={grid}
+                photos={entry.photos}
+                score={entry.score}
+                author={
+                  entry.event.reportedBy
+                    ? authorFor?.(entry.event.reportedBy)
+                    : undefined
+                }
+                engagement={renderEngagement?.({event: entry.event})}
+                onPressPhoto={onPressPhoto}
+              />
+            ) : (
+              <PhotoRow
+                photo={entry.photo}
+                minute={entry.minute}
+                grid={grid}
+                engagement={renderEngagement?.({photo: entry.photo})}
+                onPress={
+                  onPressPhoto ? () => onPressPhoto(entry.photo) : undefined
+                }
+              />
+            )}
+          </View>
+        ))}
       </View>
     </View>
   );

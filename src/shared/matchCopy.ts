@@ -272,3 +272,166 @@ export function matchCommentA11yLabel(opts: {
   }`;
   return sentence([where, countPhrase(opts.count, 'kommentar', 'kommentarer')]);
 }
+
+// ---------------------------------------------------------------------------
+// KAMPENS PULS (skive 5)
+//
+// ⚠️ ÉN KILDE TIL DET SOM STÅR TIL HØYRE I PULSEN — synlig OG lest. Samme
+// lærdom som arenaens klokkeslott: deles de i to, drifter de fra hverandre,
+// og det var nettopp prototypens ene ekte bug (hodet på 40′, pulsen på 37′).
+//
+// ⚠️ ALDRI ET NAKENT MINUTT (frosset retning): «NÅ 40′», ikke «40′».
+//
+// ⚠️ INGEN MINUTT I PAUSE. Arenaen 90 px lenger opp skjuler tallet med
+// vilje — klokka i appen teller fortsatt under pause til kampuret blir
+// serverautoritativt (P2, skive 7). Et tall her ville motsagt hodet rett
+// over seg. «PAUSE» er sant uansett.
+// ---------------------------------------------------------------------------
+
+/** Pulsens høyre side: det synlige tallet og setningen som leses. */
+export function matchPulseClock(opts: {
+  phase: 'live' | 'paused' | 'finished';
+  minute?: number;
+}): {text: string; a11y: string} {
+  if (opts.phase === 'finished') {
+    return {text: 'SLUTT', a11y: 'Kampen er slutt.'};
+  }
+  if (opts.phase === 'paused') {
+    return {text: 'PAUSE', a11y: 'Pause i kampen.'};
+  }
+  const minute = opts.minute ?? 0;
+  return {
+    text: `NÅ ${minute}′`,
+    a11y: `${minuteSpoken(minute)} spilt.`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// PULSENS ØYEBLIKK SOM TEKST
+//
+// ⚠️ ÉN KILDE TIL BÅDE DET SYNLIGE OG DET LESTE. Valgpanelet viser
+// «20′ · Mål — Jarle · 3–1»; VoiceOver leser den samme opplysningen som en
+// setning. To formuleringer ville drevet fra hverandre.
+//
+// ⚠️ STILLINGEN ER DEN SAMME SOM I KAMPFORLØPET. Begge regnes av
+// `buildPulseMoments`/`MatchTimeline` med samme regel, så det samme målet
+// aldri kan stå med to ulike stillinger på én skjerm.
+// ---------------------------------------------------------------------------
+
+/** Det pulsteksten trenger å vite om et øyeblikk. */
+export interface PulseMomentText {
+  minute: number;
+  kind: 'goalUs' | 'goalThem' | 'update' | 'photo';
+  actor?: string;
+  score?: string;
+  heia: number;
+  comments: number;
+}
+
+function kindWord(kind: PulseMomentText['kind']): string {
+  switch (kind) {
+    case 'goalUs':
+      return 'Mål';
+    case 'goalThem':
+      return 'Mål imot';
+    case 'update':
+      return 'Oppdatering';
+    case 'photo':
+      return 'Bilde';
+  }
+}
+
+/** «20′ · Mål — Jarle · 3–1» */
+export function matchPulseMomentText(m: PulseMomentText): string {
+  const deler = [`${m.minute}′`, kindWord(m.kind)];
+  if (m.actor) {
+    deler[1] = `${deler[1]} — ${m.actor}`;
+  }
+  if (m.score) {
+    deler.push(m.score);
+  }
+  return deler.join(' · ');
+}
+
+/** «2 heier · 1 kommentar» — eller en ærlig tomhet. */
+export function matchPulseResponseText(m: {
+  heia: number;
+  comments: number;
+}): string {
+  if (m.heia === 0 && m.comments === 0) {
+    return 'Ingen heier eller kommentarer ennå';
+  }
+  return [
+    countPhrase(m.heia, 'heia', 'heier'),
+    countPhrase(m.comments, 'kommentar', 'kommentarer'),
+  ].join(' · ');
+}
+
+/** «MEST LIV · 34′–41′» / «ROLIG · 18′–31′» */
+export function matchPulsePhaseText(p: {
+  kind: 'busiest' | 'quiet';
+  from: number;
+  to: number;
+}): string {
+  const navn = p.kind === 'busiest' ? 'MEST LIV' : 'ROLIG';
+  return `${navn} · ${p.from}′–${p.to}′`;
+}
+
+/**
+ * PULSENS FØRSTE LABEL — hele kampen i én setning.
+ *
+ * ⚠️ PULSEN ER ÉTT JUSTERBART ELEMENT, IKKE ET DUSIN STOPP (Brage). De
+ * visuelle markørene skal ALDRI bli parallelle VoiceOver-stopp rett før den
+ * samme tidslinjen. Denne setningen er inngangen; `accessibilityValue`
+ * bærer det valgte øyeblikket.
+ */
+export function matchPulseSummaryA11y(opts: {
+  clock: string;
+  count: number;
+  phases: {kind: 'busiest' | 'quiet'; from: number; to: number}[];
+}): string {
+  const deler: string[] = ['Kampens puls', opts.clock];
+  deler.push(
+    opts.count === 0
+      ? 'Ingen rapporterte øyeblikk ennå'
+      : countPhrase(opts.count, 'øyeblikk', 'øyeblikk'),
+  );
+  for (const p of opts.phases) {
+    deler.push(
+      p.kind === 'busiest'
+        ? `Mest liv fra ${p.from} til ${minuteSpoken(p.to)}`
+        : `Roligst fra ${p.from} til ${minuteSpoken(p.to)}`,
+    );
+  }
+  if (opts.count > 0) {
+    deler.push('Sveip opp eller ned for å bla mellom øyeblikkene');
+  }
+  return sentence(deler);
+}
+
+/** `accessibilityValue` — det valgte øyeblikket, lest som en setning. */
+export function matchPulseValueA11y(
+  m: PulseMomentText,
+  position: {index: number; total: number},
+): string {
+  const hva =
+    m.kind === 'goalUs'
+      ? `Mål for oss${m.actor ? `, ${m.actor}` : ''}`
+      : m.kind === 'goalThem'
+      ? 'Mål imot'
+      : m.kind === 'update'
+      ? `Oppdatering${m.actor ? ` fra ${m.actor}` : ''}`
+      : `Bilde${m.actor ? ` av ${m.actor}` : ''}`;
+  return sentence([
+    `${position.index} av ${position.total}`,
+    minuteSpoken(m.minute),
+    hva,
+    m.score ? `Stillingen ${m.score.replace('–', ' ')}` : undefined,
+    m.heia > 0 || m.comments > 0
+      ? [
+          countPhrase(m.heia, 'heia', 'heier'),
+          countPhrase(m.comments, 'kommentar', 'kommentarer'),
+        ].join(', ')
+      : 'Ingen heier eller kommentarer',
+  ]);
+}

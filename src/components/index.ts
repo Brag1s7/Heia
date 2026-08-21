@@ -52,6 +52,9 @@ export {MatchTimeline} from './MatchTimeline';
 export {MatchGround} from './match/MatchGround';
 export {ArenaSurface} from './match/ArenaSurface';
 export {MatchArena} from './match/MatchArena';
+// ⚠️ Kampens PULSKURVE (skive 5). Ikke `MatchPulseCard`, som er «lagets
+// puls» i varslene og ikke har noe med kampen å gjøre.
+export {MatchPulse} from './match/MatchPulse';
 export {LiveMatch} from './match/LiveMatch';
 export {
   Skeleton,

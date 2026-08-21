@@ -980,6 +980,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           isReporter={isCurrentUserReporter}
           photos={matchPhotos}
           authorFor={authorFor}
+          engagement={engagement}
           renderEngagement={renderEngagement}
           onChangeReporter={() => setReporterSheetVisible(true)}
           onReporterAction={handleReporterAction}
@@ -1049,6 +1050,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           reporter={reporter}
           isAdmin={isCurrentUserAdmin}
           authorFor={authorFor}
+          engagement={engagement}
           renderEngagement={renderEngagement}
           onPressPhoto={photo => setGalleryPhotoId(photo.id)}
           onEdit={() => navigation.navigate('NewEvent', {eventId})}

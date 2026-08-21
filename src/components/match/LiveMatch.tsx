@@ -1,4 +1,4 @@
-import React, {useMemo} from 'react';
+import React, {useCallback, useMemo, useRef} from 'react';
 import {ScrollView, StatusBar, StyleSheet, Text, View} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
@@ -8,10 +8,13 @@ import {MatchTimeline} from '../MatchTimeline';
 import {ReporterActions, type ReporterActionType} from '../ReporterActions';
 import {ReporterBar} from '../ReporterBar';
 import {useGoalMoment} from '../useGoalMoment';
+import {useReducedMotion} from '../useReducedMotion';
 import {ArenaSurface} from './ArenaSurface';
 import {MatchArena} from './MatchArena';
 import {MatchGround} from './MatchGround';
+import {MatchPulse} from './MatchPulse';
 import type {MatchPhoto} from '../../lib/api/feed';
+import type {MatchEngagement} from '../../shared/matchEngagement';
 import type {HeiaEventDetail, MatchEvent, User} from '../../shared/types';
 
 /**
@@ -65,6 +68,17 @@ interface LiveMatchProps {
   matchEvents: MatchEvent[];
   photos: MatchPhoto[];
   authorFor: (userId: string) => User | undefined;
+  /**
+   * HEIA + kommentarer per øyeblikk (skive 4), som oppslag.
+   *
+   * Pulsen leser HEIA-summene HERFRA i stedet for å hente dem på nytt — det
+   * er de samme tallene engasjementslinjene i forløpet viser, og to kilder
+   * kunne vist ulikt antall heier på det samme målet i samme scroll.
+   */
+  engagement: {
+    byMatchEvent: Map<string, MatchEngagement>;
+    byPost: Map<string, MatchEngagement>;
+  };
   /** HEIA + kommentarer per øyeblikk (skive 4) — se `MatchTimeline`. */
   renderEngagement?: (entry: {
     event?: MatchEvent;
@@ -87,6 +101,7 @@ export function LiveMatch({
   isReporter,
   photos,
   authorFor,
+  engagement,
   renderEngagement,
   onChangeReporter,
   onReporterAction,
@@ -95,6 +110,30 @@ export function LiveMatch({
 }: LiveMatchProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+
+  // ⚠️ «VIS I HISTORIEN» — pulsens synlige handling. Radene MÅLER seg selv
+  // (`onRowLayout`) i stedet for at noen regner ut høyden deres: en målrad
+  // med bilde er tre ganger så høy som en uten, og det var nettopp den
+  // antakelsen som brakk i 3.1. Reduce Motion hopper i stedet for å rulle.
+  const scrollRef = useRef<ScrollView>(null);
+  const timelineY = useRef(0);
+  const rowY = useRef(new Map<string, number>());
+  const reducedMotion = useReducedMotion();
+  const handleRowLayout = useCallback((key: string, y: number) => {
+    rowY.current.set(key, y);
+  }, []);
+  const showInHistory = useCallback(
+    ({eventId, photoId}: {eventId?: string; photoId?: string}) => {
+      const key = eventId ?? photoId;
+      const y = key ? rowY.current.get(key) : undefined;
+      if (y === undefined) return;
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, timelineY.current + y - 90),
+        animated: !reducedMotion,
+      });
+    },
+    [reducedMotion],
+  );
 
   const paused = event.matchStatus === 'halfTime';
   const home = event.score?.home ?? 0;
@@ -126,6 +165,7 @@ export function LiveMatch({
       <BackBar title="Kampen" variant="match" />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
         showsVerticalScrollIndicator={false}>
         <ArenaSurface teamColor={teamColor} style={styles.arena}>
@@ -173,21 +213,39 @@ export function LiveMatch({
           </Text>
         )}
 
+        {/* KAMPENS PULS — det tredje rommet, rett over forløpet. Den ligger
+            her og ikke rett under arenaen fordi den er PORTEN inn i kampens
+            historie: gullprikken i forløpets eyebrow markerer nettopp det
+            skiftet, og krittstreken nederst i pulsen leder blikket dit. */}
+        <MatchPulse
+          matchEvents={matchEvents}
+          photos={photos}
+          startedAt={event.startedAt}
+          engagement={engagement}
+          phase={paused ? 'paused' : 'live'}
+          minute={minute}
+          authorFor={authorFor}
+          onShowInHistory={showInHistory}
+        />
+
         {/* Kampforløpet — bildene ligger i forløpet, ikke i en egen seksjon.
             Under kampen skal ingenting konkurrere med stillingen.
             `ground` tegner det fjerde rommet; den lokale mørke flaten fra
             skive 1 er borte. */}
-        <MatchTimeline
-          ground
-          matchEvents={matchEvents}
-          photos={photos}
-          startedAt={event.startedAt}
-          newestFirst
-          nowMinute={minute}
-          authorFor={authorFor}
-          renderEngagement={renderEngagement}
-          onPressPhoto={onPressPhoto}
-        />
+        <View onLayout={e => (timelineY.current = e.nativeEvent.layout.y)}>
+          <MatchTimeline
+            ground
+            matchEvents={matchEvents}
+            photos={photos}
+            startedAt={event.startedAt}
+            newestFirst
+            nowMinute={minute}
+            authorFor={authorFor}
+            renderEngagement={renderEngagement}
+            onRowLayout={handleRowLayout}
+            onPressPhoto={onPressPhoto}
+          />
+        </View>
       </ScrollView>
     </MatchGround>
   );

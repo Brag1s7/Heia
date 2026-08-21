@@ -1,6 +1,30 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 4 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 5)
+## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 5 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 6)
+
+**✅ SKIVE 5 — KAMPENS PULS — ER TELEFONGODKJENT AV BRAGE 2026-08-21:
+«Det er godkjent nå så vi kan gå videre.»**
+
+⚠️⚠️ **GODKJENNINGEN KOM ETTER FIRE RUNDER, OG BARE ÉN AV DEM VAR EN
+VANLIG BUG.** Dette er den dyreste skiva i sporet så langt, og grunnene er
+verdt å lese før neste flate bygges:
+
+1. **Runde 1** — kurven gikk fram og tilbake over seg selv. x var lineær
+   klokketid, og alt var rapportert i minutt 0.
+2. **Runde 2** — teknisk grønn, og **avvist likevel**: «ikke en tilfeldig
+   bølge basert på antall hendelser». En flate kan bestå alle testene sine
+   og fortsatt være feil produkt.
+3. **Runde 3** — modellen (`docs/KAMPENS-PULS-MODELL.md`), bestilt og
+   godkjent av Brage FØR bygging.
+4. **Runde 4** — sekundakse. Modellen brukte avrundet `minute` med et gulv
+   på fem minutter; en kamp på under ett minutt kollapset til venstre kant.
+
+**➡️ `docs/KAMPENS-PULS-MODELL.md` ER KONTRAKTEN.** Rør ikke pulsen uten å
+lese den. **`__tests__/pulseModel.harness.test.ts` er designriggen** —
+kjør den og SE på flaten før du leverer noe som tegner (se `### ⏳ SKIVE 5.1`).
+
+**Skive 1–5 er levert og telefongodkjent.** Neste er **SKIVE 6 —
+STICKY-BAR + REDUCE MOTION**.
 
 **✅ SKIVE 4 ER TELEFONGODKJENT AV BRAGE 2026-08-21: «Godkjent nå!»**
 Kanonisk kobling + HEIA/kommentarer, `00071_kampfeed.sql` **ER I PROD**
@@ -44,12 +68,15 @@ variabel høyde.**
 6. `### ⏳ SKIVE 4 BYGGET` — kanonisk kobling, HEIA/kommentarer,
    `00071_kampfeed.sql`, det ene stedet der P1 og fasiten var uenige, og
    **4.1–4.4: prototype-lånene som ble rettet, og kommentararket.**
-7. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1–4s
-   flater; skive 5 skjuler pulskurven.
-8. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 5 er neste).
-9. `### 🕯 STADIUM LIGHT` — Brage vurderer en LYSERE palett, **etter alle
+7. `### ⏳ SKIVE 5 BYGGET` — kampens puls: hvorfor x-aksen er ØYEBLIKKENE og
+   ikke klokka, hvorfor pausen ikke viser et minutt, og hvordan
+   memoiseringsnøkkelen faktisk ble bygget.
+8. `### ♿ TILGJENGELIGHET` — akseptansekriteriet. Oppfylt for skive 1–5s
+   flater; pulskurven er skjult, overskriften og minuttet leses.
+9. `### ▶️▶️ NESTE SAMTALE: SKIVE 2` — skivetabellen (skive 6 er neste).
+10. `### 🕯 STADIUM LIGHT` — Brage vurderer en LYSERE palett, **etter alle
    skivene**. Påvirker hvordan tester skrives NÅ: vokt struktur, ikke farge.
-10. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
+11. `### ▶️▶️ KAMPSKJERMEN — DESIGNRETNING FROSSET` — selve retningen.
    Prototypen `docs/prototypes/kampskjerm/index.html` er fasit og ligger i
    repoet.
 
@@ -1465,6 +1492,198 @@ nede, og gikk dermed halvparten så fort som fingeren.
 
 ---
 
+### ⏳ SKIVE 5 BYGGET 2026-08-21 — KAMPENS PULS (VENTER PÅ TELEFONKONTROLL)
+
+⚠️ **RUNDE 1 BLE AVVIST PÅ TELEFONEN: «fungerer ikke i det hele tatt».**
+Se `#### ⏳ SKIVE 5.1` nederst i bolken — den er den viktigste delen av
+denne skiva, og den handler om noe større enn pulsen.
+
+**Ren JS**, ingen nye pakker, ingen native endringer, ingen migrasjon.
+427 tester / 31 suiter grønt (+37 nye). Lint 12 kjente, uendret.
+
+**Nye filer**
+- **`src/shared/matchPulse.ts`** — formen som ren regning, testbar uten
+  skjerm. Samme begrunnelse som `matchEngagement.ts`: reglene her er
+  PRODUKT, ikke tegning.
+- **`src/components/match/MatchPulse.tsx`** — ~90 pt, åpent på grunnen,
+  ingen container. «KAMPENS PULS» til venstre, `NÅ 40′` til høyre.
+- **`__tests__/matchPulse.test.ts`** (25) + **`matchPulseSection.test.tsx`** (9).
+
+**Tre beslutninger som ble tatt underveis, og som er verdt å kjenne:**
+
+1. ⚠️ **X-AKSEN ER ØYEBLIKKENE, IKKE KLOKKA — og det er det som gjør
+   memoiseringsregelen fysisk umulig å bryte.** Prototypen skalerer kurvens
+   siste punkt til `S.minute`; da regnes HELE formen om hvert minutt, altså
+   nøyaktig det P-bolken forbyr. Her ender kurven i en FAST utklingning etter
+   siste øyeblikk, og nå-prikken sitter i kurvens ende. `pulseShape(moments,
+   box)` tar ikke imot et minutt i det hele tatt, så tallet kan ikke snike
+   seg inn i en avhengighet senere heller. Voktet med `toHaveLength(2)` på
+   selve signaturen.
+2. **I PAUSE STÅR DET «PAUSE», IKKE «PAUSE · 25′».** Arenaen 90 pt lenger opp
+   skjuler minuttet med vilje (klokka teller fortsatt i pause til kampuret
+   blir serverautoritativt, P2/skive 7). Et tall i pulsen ville motsagt hodet
+   rett over seg. Ferdig kamp: «SLUTT». Både det synlige og det leste
+   kommer fra ÉN kilde, `matchPulseClock` i `matchCopy` — samme lærdom som
+   arenaens klokkeslott.
+3. **INGEN `pflash`.** Prototypen blinker i pulsen ved mål og HEIA;
+   `useGoalMoment` flommer allerede hele verdenen ved mål, og to feiringer på
+   samme hendelse drifter fra hverandre. Bare nå-prikken puster — og den har
+   `useReducedMotion` fra første linje (voktet: `Animated.loop` skal ikke
+   kalles med Reduce Motion på, og prikken skal fortsatt være der).
+
+**Memoiseringsnøkkelen (LÅST) er bygget i to trinn, med vilje:** signaturen
+regnes på REFERANSENE (billig, og bare når en query har levert nye objekter),
+formen på SIGNATUREN. Nøkkelen dekker event-id, type, side, minutt, sekvens,
+HEIA-sum og `startedAt`. **Sletting fanges av at id-en forsvinner** —
+`MatchEvent` har ingen slettestatus, hendelsen ER borte. **Kommentartallet er
+bevisst UTE:** det tegner ingenting, og med det i nøkkelen ville en samtale i
+forløpet tegnet pulsen på nytt. Ni tester vokter nøkkelen, og alle unntatt to
+holder ANTALLET konstant — det er hele poenget med at `length` ikke holder.
+
+**HEIA endrer gløderadien, aldri høyden.** Bevist tegn for tegn: samme
+øyeblikk med og uten heier gir IDENTISK `line` og `area`, og markørene ligger
+på nøyaktig samme punkt — bare `glow` vokser, klemt så 4000 heier ikke fyller
+rommet. Mål imot gløder aldri, og det følger av P1 uten en egen regel: det
+finnes ikke HEIA på mål imot, så det finnes ingen glød å vokse.
+
+**Autoritetsregelen anvendt** (dette er første skive etter at den ble skrevet):
+krittfargene, `colors.heiaTint` (som ER prototypens #C6FFE9), `colors.gold`,
+`matchColors.opponentInk`, eyebrow-typografien fra `MatchTimeline` og
+`fonts.display` på minuttet. Ingen nye farger, ingen ny font, ingen nytt
+ikon. A11y-teksten ligger i `matchCopy.ts`, ikke i komponenten.
+
+**Andre ting som ble gjort, og hvorfor:**
+- **`minuteOf` flyttet ut av `MatchTimeline`** til `matchPhotoMinute` i
+  `shared/matchPulse`. Pulsen og forløpet ligger rett over hverandre; to
+  kopier av det regnestykket kunne satt det samme bildet på to ulike
+  minutter i samme scroll.
+- **Rapporten har pulsen også** — samme verden, og pulsen er det ene bildet
+  av hele kampen som får plass på én linje. Den står og faller med forløpet.
+- **Ingen prosenter i svg (3.1).** Seksjonen måles, alt tegnes i punkter.
+  Voktet: ingen `width`/`height` i treet inneholder «%».
+- **Nå-prikken er en vanlig `View` oppå lerretet**, ikke et svg-element — da
+  går pusten på native driver, og gløden er den samme skyggen
+  retningsmarkørens prikk har. Prisen er to koordinatsystemer som må stemme;
+  de gjorde det ikke i første utkast (seksjonens luft ble lagt til én gang
+  for mye), så det er nå en egen test.
+
+
+#### ⏳ SKIVE 5.1 — RUNDE 1 BLE AVVIST PÅ TELEFONEN 2026-08-21
+
+**Brage: «den puls funksjonen fungerer ikke i det hele tatt! Og jeg som
+syntes den så dårlig ut i HTML!!! der fungerte den hvert fall.»**
+
+På skjermbildet gikk kurven fram og tilbake over seg selv i venstre kant.
+
+**ÅRSAK 1 — x VAR LINEÆR KLOKKETID, OG DEN KOLLAPSER.**
+Brages kamp sto 4–1 med **alt rapportert i minutt 0**. Da fikk alle fem
+markørene `x = 10` — samme punkt — mens utklingningspunktet etter hvert mål
+lå 1,4 minutt SENERE og ble kastet 40 % ut til høyre. Kurven gikk
+`10 → 147 → 10 → 147 → …`. **Prototypens demodata var håndlaget og spredt
+over 40 minutter, så feilen KUNNE ikke oppstå der.** En reporter rapporterer
+i serier; flere øyeblikk i samme minutt er normalen, ikke unntaket.
+
+**ÅRSAK 2 — FORMEN VAR EN KUMULATIV VANDRING, IKKE UTSLAG.**
+Denne var verre, fordi den ville sett «riktig» ut i alle testene mine.
+Energien ble akkumulert fra punkt til punkt, så kurven RAMPET mellom to
+øyeblikk i stedet for å svaie rundt dem. Med ett mål — det vanligste i en
+ungdomskamp — ble hele pulsen én doven skråning. **Det er dette Brage så i
+HTML-en og ikke likte;** jeg oversatte det trofast i stedet for å se på det.
+Og den kunne stige på et tap: 0–3 endte høyere enn den startet, fordi
+utklingningen hadde sitt eget gulv.
+
+**NÅ: EN ROLIG GRUNNLINJE MED ETT LOKALT UTSLAG PER ØYEBLIKK.**
+Kurven samples over bredden (110 punkter), og hvert øyeblikk legger en kort
+svai rundt sitt eget punkt — rask oppgang, langsommere utklingning. Tre ting
+gjelder nå av seg selv, ikke fordi noen husket dem:
+- **x er strengt økende.** Kurven KAN ikke folde seg over seg selv. x er
+  øyeblikkenes REKKEFØLGE med et drag (35 %) av klokka: rekkefølgen
+  garanterer spredning, minuttene skyver punktene mot der de hørte hjemme.
+  Klokkeleddet holdes ikke-synkende med et løpende maks, så invarianten er
+  en egenskap ved funksjonen — ikke en antakelse om at kalleren sorterte.
+- **Ett mål gir ett tydelig utslag; tolv gir tolv.** Formen skalerer.
+- **Grunnlinja ligger midt i rommet (38 av 100), ikke nær bunnen.** Første
+  forsøk la den på 24, og da hadde et søkk bare 24 å falle på: 0–3 ble en
+  flat strek, altså det samme som en kamp der ingenting hadde skjedd.
+  Utslagene er ASYMMETRISKE med vilje (+50 for oss, −30 imot): Heia feirer
+  OSS, men søkket må være ekte.
+
+**⚠️ ARBEIDSMÅTEN SOM FANT DETTE, OG SOM SKAL BRUKES IGJEN:**
+**jeg bygget et riggverk og SÅ på kurven før jeg leverte.** En midlertidig
+jest-test skriver en HTML-side med den ekte `pulseShape`-utskriften mot
+kampverdenens farger; headless Chrome tar skjermbilde
+(`--force-device-scale-factor=2`); jeg leser PNG-en. Tretten scenarier ble
+kjørt gjennom: Brages egen kamp, en realistisk 88-minutters, avspark uten
+hendelser, 0–3, ett mål, 30 øyeblikk, bare oppdateringer, bare bilder, tre
+mål på fire minutter, 12–0, og to med HEIA. **Fire feil ble funnet og rettet
+UTEN å gå via telefonen:**
+1. søkkene forsvant i gulvet (0–3 så ut som ingenting)
+2. HEIA-gløden var en flat skive på 30 % — den leste som et klistremerke
+   limt oppå kurven. Nå en radialgradient (som regnes mot elementets egen
+   bounding box, så én def gjelder alle radier)
+3. tre mål på fire minutter smeltet til ÉN bred platå — svaiene var for
+   brede i forhold til avstanden mellom dem
+4. grunnlinja var en helt rett strek, som leste som en skillelinje
+
+**Siste steg lukket sløyfa:** riggen ble kjørt på **komponentens egen
+utskrift** (montert i jest, `onLayout` fyrt, `Path`/`Circle`-propene hentet
+ut og tegnet), ikke bare på den rene modulen. Da er det bevist at det jeg så
+på er det RN faktisk får.
+
+**Riggen er IKKE sjekket inn** (den var fire midlertidige `zz_*.test.ts`),
+men oppskriften står her, og den er verdt å gjenta for alt som TEGNER noe:
+kritt, swell, grunn, nodene. **Å levere en flate jeg aldri har sett er å
+bruke telefonrunden som første kontroll — og det er Brages tid, ikke min.**
+
+**⚠️ EN TING BRAGE MÅ SI JA ELLER NEI TIL:** grunnlinja har en svak,
+fast bølge (±6 av 100, ca. ±2 pt) når ingenting har skjedd. Uten den er en
+0–0-kamp en helt rett strek som leser som en DIVIDER, ikke som en puls. Den
+har ingen tall og ingen markører — samme kategori som stadionlyset i
+grunnen. **Men den er ikke data, og hvis den føles som juks, fjernes den ved
+å sette `ambient()` til 0.**
+
+<details><summary>📱 TELEFONSJEKKLISTA FOR SKIVE 5</summary>
+
+Åpne en LIVE kamp med minst ett mål for oss, ett mål imot og en oppdatering:
+
+1. **Leser pulsen som atmosfære eller som en graf?** Ser du deg selv lete
+   etter tall og akser — da er den feil, uansett hvor pen den er.
+2. **Er det tre rom nedover?** Arena (lysest) → puls → forløp (mørkest), uten
+   en eneste synlig kant mellom dem.
+3. **Kjenner du igjen kampen i formen?** Toppen skal ligge der DU husker at
+   målet kom.
+4. **`NÅ 40′` til høyre** — står det samme minutt som i arenaen og i
+   retningsmarkøren, i samme øyeblikk? (Det var prototypens ene ekte bug.)
+5. **Vent 60–90 sekunder uten at noe skjer.** Kurven skal stå BOM STILLE
+   mens minuttet teller. Rykker den, er memoiseringen brutt.
+6. **Heia på et mål** — vokser gløden rundt punktet, mens kurven står stille?
+7. **Sett kampen i PAUSE:** står det «PAUSE», og ikke et minutt?
+8. **Rapporter et nytt mål:** kommer toppen, og henger nå-prikken med ut?
+9. **Ferdig kamp:** står det «SLUTT», og er nå-prikken borte?
+10. **Reduce Motion på** (Innstillinger → Tilgjengelighet → Bevegelse):
+    prikken skal slutte å puste, men fortsatt lyse.
+11. **Stor tekst (XXL):** holder seksjonen seg rundt 90 pt, eller sprenger
+    label-raden?
+12. **VoiceOver:** sveip fra arenaen — pulsen er ÉTT stopp («Kampens puls.
+    40 minutter spilt.»), og kurven finnes ikke for skjermleseren.
+13. **En kamp der ingenting har skjedd ennå** (rett etter avspark): rolig
+    linje, ikke et hull eller en rar strek. **Si fra om den svake bølgen i
+    grunnlinja føles riktig eller som juks — se 5.1.**
+14. **En turneringskamp** og **et lag med lys farge** — samme verden?
+
+**⚠️ DE FIRE FRA 5.1 — DE MÅ MED I DENNE RUNDEN:**
+15. **Rapporter 4–5 hendelser rett etter hverandre** (som du gjorde sist):
+    ligger markørene spredt over hele bredden, eller klumper de seg?
+16. **Tre mål tett i tid:** ser du TRE topper, eller én bred platå?
+17. **En kamp du LIGGER UNDER i:** synker kurven, eller ser den ut som en
+    kamp der ingenting har skjedd?
+18. **Heia mye på ett mål:** blir gløden rundt punktet et LYS, eller en
+    flat skive limt oppå?
+
+</details>
+
+---
+
 ### ▶️▶️ NESTE SAMTALE: SKIVE 2 — GRUNNEN OG ARENAEN
 
 **Skiverekkefølgen er godkjent av Brage.** Skive 1 er levert. Neste er
@@ -1477,8 +1696,8 @@ en REELL begrensning.
 | 2 | **Grunnen og arenaen** (live) + uttrekk av kampen til egen komponent | ✅ LEVERT OG TELEFONGODKJENT `23df9ed` (+2.1 +2.2) |
 | 3 | **Kamprapporten på samme grunn** | ✅ LEVERT OG TELEFONGODKJENT `1b0390d` + 3.1 `95c092f` |
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ✅ LEVERT OG TELEFONGODKJENT + 4.1–4.4. Migrasjon I PROD |
-| 5 | **Kampens puls** (`PulseCurve`) | ⏭️ NESTE — se memoiseringsregelen |
-| 6 | **Sticky-bar + Reduce Motion** | |
+| 5 | **Kampens puls** (`MatchPulse`) | ✅ LEVERT OG TELEFONGODKJENT — 4 runder. Modellen: `docs/KAMPENS-PULS-MODELL.md` |
+| 6 | **Sticky-bar + Reduce Motion** | ⏭️ NESTE |
 | 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
 | 8 | **Angre mål** (10 s) | se P3 |
 | 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
@@ -1539,6 +1758,96 @@ med én gang.** Å bygge regresjonen med vilje er ikke et alternativ.
 **Ryddejobb som ligger og venter (egen liten sak, ikke skive 5):**
 `ScoreBoard.tsx` har ingen kallesteder igjen i det hele tatt — kun
 `components/index.ts` eksporterer den. Kan trolig slettes.
+
+
+#### ⏳ SKIVE 5 RUNDE 3 — MODELLEN BYGGET 2026-08-21
+
+**Runde 2 var teknisk grønn og ble avvist likevel.** Det er den viktigste
+lærdommen i hele skiva: en flate kan bestå alle testene sine og fortsatt
+være feil produkt. Brage bestilte en modell i stedet for en kurve, og den
+er nå kontrakten i `docs/KAMPENS-PULS-MODELL.md`.
+
+**Hva pulsen er nå:** ekte tidsakse (en hendelse i 10′ ligger en firedel inn
+i en 40-minutters kamp), midtlinje der OPP = oss og NED = motstanderen,
+markører med appens egne ikoner, HEIA som halo og kommentarer som boble —
+aldri egne punkter i tid — og to avledede faser, `MEST LIV` og `ROLIG`.
+
+**Nye/endrede filer:** `src/shared/matchPulse.ts` (modellen som ren
+regning), `src/components/match/MatchPulse.tsx` (flaten),
+`matchCopy.ts` (+5 tekstfunksjoner), `MatchTimeline.tsx` (`onRowLayout`),
+`LiveMatch`/`FinishedMatch` (`ScrollView`-ref + «Vis i historien»),
+`__tests__/matchPulse.test.ts` (44), `matchPulseSection.test.tsx` (17),
+`__tests__/pulseModel.harness.test.ts` (designriggen, hoppes over).
+
+**Fem ting som er verdt å kjenne før noen rører dette:**
+
+1. ⚠️ **TO NIVÅER AV KOLLISJON, OG DE ER IKKE DET SAMME.** Visuell
+   sammenslåing skjer på 12 pt. Trykkflater kan ikke: en 44 pt Pressable
+   overlapper naboen sin for lengst da. Trykkgruppene legges ut sekvensielt,
+   og alt som ikke får sin egen flate havner i den forrige — panelet blar
+   mellom øyeblikkene. **Din 10–4 i minutt 0 gir ÉN trykkflate, ikke
+   fjorten**, og det er voktet.
+2. ⚠️ **TIDSAKSEN ER KVANTISERT TIL FEM MINUTTER**, og det er den ENESTE
+   grunnen til at «ekte tid» og «tickeren regenererer ikke kurven» kan være
+   sanne samtidig. `span` er i memo-nøkkelen; `nowMinute` er det aldri.
+   Reposisjoneringen får en 220 ms opacity-overgang, Reduce Motion bytter
+   direkte.
+3. ⚠️ **PULSEN ER ÉN JUSTERBAR TILGJENGELIGHETSENHET.** Markørene skal
+   ALDRI bli et dusin VoiceOver-stopp rett før den samme tidslinjen. Rolle
+   `adjustable`, sveip opp/ned blar, `accessibilityValue` leser det valgte,
+   aktivering viser det i historien. Voktet: null `button`-roller inne i
+   pulsen.
+4. ⚠️ **MARKØRENE ER VIEWS, IKKE SVG-ELEMENTER.** Lucide-ikoner rendrer sin
+   egen `<Svg>`, og svg-i-svg er ikke pålitelig i RN. Kurve, midtlinje,
+   halo og rytmestreker er svg; markørene ligger oppå.
+5. ⚠️ **`MatchTimeline` MÅLER RADENE SINE** (`onRowLayout`) i stedet for at
+   noen regner ut høyden. Samme regel som 3.1: en målrad med bilde er tre
+   ganger så høy som en uten.
+
+**Designriggen fant ni feil i modellen før telefonen fikk se den** — se
+`### ⏳ SKIVE 5.1` for oppskriften. Den er nå sjekket inn og bruker den
+EKTE modulen, så neste runde kan starte med å se på flaten:
+
+```
+PULSE_OUT=/tmp/p.html npx jest __tests__/pulseModel.harness.test.ts
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
+  --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+  --screenshot=/tmp/p.png --window-size=393,1560 file:///tmp/p.html
+```
+
+<details><summary>📱 TELEFONSJEKKLISTA FOR RUNDE 3</summary>
+
+1. **Forstår du kampen på tre sekunder?** Når skjedde det mye, når var det
+   stille, hvem scoret — uten å lese et eneste tall.
+2. **Ligger hendelsene der de faktisk skjedde?** Et mål i 10′ av en
+   40-minutters kamp skal ligge en firedel inn.
+3. **Er en stille periode faktisk lang?** Eller føles den komprimert?
+4. **Rapporter 4–5 hendelser rett etter hverandre:** samler de seg ved
+   starten (som er sant), eller sprer de seg utover kampen (som er løgn)?
+5. **Trykk på en markør.** Treffer du den du sikter på — også med tommelen
+   i fart, også når to står tett?
+6. **Valgpanelet:** står det «20′ · Mål — Jarle · 3–1» og heier/kommentarer
+   under? Stemmer stillingen med den i kampforløpet?
+7. **«Vis i historien»** — ruller den til RIKTIG rad, og lander den et sted
+   du kan lese?
+8. **Stepperen `‹ 3/11 ›`** når flere hendelser deler flate.
+9. **En kamp du ligger under i:** synker kurven under midtlinja?
+10. **Heia mye på ett mål:** blir gløden et LYS rundt markøren — og står
+    kurven helt stille mens den vokser?
+11. **MEST LIV / ROLIG:** kjenner du deg igjen? Og TIER de i en kamp med få
+    hendelser?
+12. **Vent 5–6 minutter i en live kamp:** reposisjonerer tidsaksen seg mildt,
+    eller rykker den?
+13. **Reduce Motion:** bytter den direkte, uten fade?
+14. **LITEN IPHONE (SE/mini)** og **STOR TEKST (XXL)**: holder de to
+    tekstlinjene i panelet, eller klippes de?
+15. **VoiceOver:** er pulsen ÉTT stopp? Sier labelen hva kampen har vært?
+    Blar sveip opp/ned mellom øyeblikkene? Leser den valgte hendelsen
+    minutt, type, aktør, stilling, heier og kommentarer? Viser
+    dobbelttrykk den i historien? **Og kommer du IKKE gjennom et dusin
+    markørstopp før kampforløpet?**
+
+</details>
 
 #### ▶️ SKIVE 4 — HVA SOM VAR AVKLART FØR BYGGING (historikk)
 

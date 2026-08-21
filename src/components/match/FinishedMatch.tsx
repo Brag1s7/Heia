@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useCallback, useRef} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -17,8 +17,11 @@ import {ArenaSurface} from './ArenaSurface';
 import {MatchArena} from './MatchArena';
 import {MatchAttendance} from './MatchAttendance';
 import {MatchGround} from './MatchGround';
+import {MatchPulse} from './MatchPulse';
+import {useReducedMotion} from '../useReducedMotion';
 import {MONTHS_SHORT} from '../../shared/calendar';
 import type {MatchPhoto} from '../../lib/api/feed';
+import type {MatchEngagement} from '../../shared/matchEngagement';
 import type {HeiaEventDetail, MatchEvent, User} from '../../shared/types';
 
 /**
@@ -76,6 +79,12 @@ interface FinishedMatchProps {
   reporter?: User;
   isAdmin: boolean;
   authorFor: (userId: string) => User | undefined;
+  /** HEIA per øyeblikk som oppslag — pulsens gløderadius leses herfra, ikke
+   *  hentet på nytt. Se `LiveMatch`. */
+  engagement: {
+    byMatchEvent: Map<string, MatchEngagement>;
+    byPost: Map<string, MatchEngagement>;
+  };
   /** HEIA + kommentarer per øyeblikk (skive 4). Rapporten har den av samme
    *  grunn som bildestripa: etterpå er det HER samtalen om kampen bor. */
   renderEngagement?: (entry: {
@@ -95,12 +104,37 @@ export function FinishedMatch({
   reporter,
   isAdmin,
   authorFor,
+  engagement,
   renderEngagement,
   onPressPhoto,
   onEdit,
 }: FinishedMatchProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
+
+  // ⚠️ «VIS I HISTORIEN» — pulsens synlige handling. Radene MÅLER seg selv
+  // (`onRowLayout`) i stedet for at noen regner ut høyden deres: en målrad
+  // med bilde er tre ganger så høy som en uten, og det var nettopp den
+  // antakelsen som brakk i 3.1. Reduce Motion hopper i stedet for å rulle.
+  const scrollRef = useRef<ScrollView>(null);
+  const timelineY = useRef(0);
+  const rowY = useRef(new Map<string, number>());
+  const reducedMotion = useReducedMotion();
+  const handleRowLayout = useCallback((key: string, y: number) => {
+    rowY.current.set(key, y);
+  }, []);
+  const showInHistory = useCallback(
+    ({eventId, photoId}: {eventId?: string; photoId?: string}) => {
+      const key = eventId ?? photoId;
+      const y = key ? rowY.current.get(key) : undefined;
+      if (y === undefined) return;
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, timelineY.current + y - 90),
+        animated: !reducedMotion,
+      });
+    },
+    [reducedMotion],
+  );
 
   const home = event.score?.home ?? 0;
   const away = event.score?.away ?? 0;
@@ -121,6 +155,7 @@ export function FinishedMatch({
       <BackBar title="Kampen" variant="match" />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
         showsVerticalScrollIndicator={false}>
         <ArenaSurface teamColor={teamColor} style={styles.arena}>
@@ -163,18 +198,38 @@ export function FinishedMatch({
           onPressPhoto={onPressPhoto}
         />
 
+        {/* PULSEN ER MED I RAPPORTEN OGSÅ. Kampen du fulgte er kampen du
+            kommer tilbake til — og pulsen er det ene bildet av hele kampen
+            som får plass på én linje. Den står og faller med forløpet: uten
+            noe som skjedde er det ingen puls å vise. */}
         {(matchEvents.length > 0 || photos.length > 0) && (
-          // Ingen `newestFirst`: rapporten leses forfra, fra avspark til
-          // slutt. Markøren snur seg selv til «SLUTT» av samme grunn.
-          <MatchTimeline
-            ground
-            matchEvents={matchEvents}
-            photos={photos}
-            startedAt={event.startedAt}
-            authorFor={authorFor}
-            renderEngagement={renderEngagement}
-            onPressPhoto={onPressPhoto}
-          />
+          <>
+            <MatchPulse
+              matchEvents={matchEvents}
+              photos={photos}
+              startedAt={event.startedAt}
+              engagement={engagement}
+              phase="finished"
+              authorFor={authorFor}
+              onShowInHistory={showInHistory}
+            />
+
+            {/* Ingen `newestFirst`: rapporten leses forfra, fra avspark til
+                slutt. Markøren snur seg selv til «SLUTT» av samme grunn. */}
+            <View
+              onLayout={e => (timelineY.current = e.nativeEvent.layout.y)}>
+              <MatchTimeline
+                ground
+                matchEvents={matchEvents}
+                photos={photos}
+                startedAt={event.startedAt}
+                authorFor={authorFor}
+                renderEngagement={renderEngagement}
+                onRowLayout={handleRowLayout}
+                onPressPhoto={onPressPhoto}
+              />
+            </View>
+          </>
         )}
 
         <MatchAttendance attendees={event.attendees.coming} />

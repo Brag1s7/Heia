@@ -112,12 +112,21 @@ describe('oppslagene forløpet bruker', () => {
 
   it('gir øyeblikket sin kanoniske post, ikke bildets tall', () => {
     const {byMatchEvent} = buildMatchEngagement(ROWS);
-    expect(byMatchEvent.get('me-1')).toEqual({
+    expect(byMatchEvent.get('me-1')).toMatchObject({
       postId: 'p-goal',
       heiaCount: 12,
       commentCount: 0,
       iReacted: true,
     });
+  });
+
+  it('bærer postens TIDSPUNKT videre — pulsens eneste kilde til sekunder', () => {
+    // `get_event_with_rsvp` gir bare avrundet `minute`. Den kanoniske posten
+    // skrives i samme transaksjon som hendelsen, så `created_at` her ER
+    // hendelsens tidspunkt — og det er dét som gjør at en kamp på under ett
+    // minutt kan spres over hele pulsen.
+    const {byMatchEvent} = buildMatchEngagement(ROWS);
+    expect(byMatchEvent.get('me-1')?.createdAt).toBeInstanceOf(Date);
   });
 
   it('slår opp et frittstående kampbilde på sin EGEN post', () => {

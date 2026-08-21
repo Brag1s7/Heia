@@ -109,6 +109,9 @@ const PHOTOS = [
   },
 ] as unknown as MatchPhoto[];
 
+/** Pulsen (skive 5) leser HEIA herfra. Tom = ingen glød, ingen kurveendring. */
+const NO_ENGAGEMENT = {byMatchEvent: new Map(), byPost: new Map()};
+
 const mounted: ReactTestRenderer.ReactTestRenderer[] = [];
 afterEach(() => {
   act(() => {
@@ -131,6 +134,7 @@ function render(
         reporter={REPORTER}
         isAdmin
         authorFor={id => (id === 'u-jarle' ? REPORTER : undefined)}
+        engagement={NO_ENGAGEMENT}
         onPressPhoto={jest.fn()}
         onEdit={jest.fn()}
         {...props}
