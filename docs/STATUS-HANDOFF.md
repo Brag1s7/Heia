@@ -1704,7 +1704,7 @@ en REELL begrensning.
 | 6 | **Sticky-bar + Reduce Motion** | ⏳ RUNDE 2 — bevegelsen godkjent, resten venter |
 | 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
 | 8 | **Angre mål** (10 s) | se P3 |
-| 9 | **`get_team_feed`-gaten for mål imot** | se P1 — ETTER telefontest |
+| 9 | **`get_team_feed`-gaten for mål imot** | ⏳ BYGGET — `00072` IKKE PUSHET |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
 
 #### ▶️ SKIVE 5 — KAMPENS PULS: HVA SOM ALLEREDE ER AVKLART
@@ -1986,6 +1986,68 @@ funker det veldig bra!»** Resten står igjen.
     Ridabu G14 1. 36 minutter spilt.»), og finnes IKKE når den er borte.
     «Kampen» skal være borte for skjermleseren når den er tonet ut. **Og
     baren skal aldri lese seg selv opp av seg selv når minuttet tikker.**
+
+</details>
+
+#### ⏳ SKIVE 9 BYGGET — P1 I FEEDEN 2026-08-21 (MIGRASJONEN IKKE PUSHET)
+
+⚠️ **DETTE VAR EN LEVENDE FEIL I PROD, ikke bare «neste skive».** P1 er låst
+og gjelder BEGGE flatene fordi det er den SAMME kanoniske posten: fram til
+denne skiva kunne man **heie på et baklengsmål fra Hjem-skjermen**, og heiet
+dukket så opp inne i kampskjermen — på et øyeblikk der knappen bevisst ikke
+finnes siden skive 4.
+
+**Årsaken var lesestien, ikke skrivestien:** `get_team_feed` returnerte bare
+`match_minute/status/home/away` (00070), så et baklengsmål og en beskjed fra
+treneren så identiske ut for klienten.
+
+**Nye/endrede filer:** `supabase/migrations/00072_feedgaten_maal_imot.sql`,
+`matchEngagement.ts` (+`isOpponentGoal`), `types.ts` (`FeedItem.matchEvent`),
+`lib/api/feed.ts`, `FeedCard.tsx`, `__tests__/feedHeiaGate.test.tsx` (14).
+
+⛔ **`00072` ER IKKE PUSHET TIL PROD.** Den venter på deg:
+`supabase db push`, deretter de tre KONTROLL-stegene som står nederst i
+migrasjonsfila (grants uten `anon`, et vanlig medlem ser feeden sin,
+og at et ekte baklengsmål kommer ut som `('mål','away')`).
+
+**Fire ting som er verdt å kjenne:**
+
+1. ⚠️ **INGEN SKJEMAENDRING.** `LEFT JOIN match_events` har stått i
+   funksjonen siden 00029 (den brukes til `me.minute`); vi leser `me.type`
+   og `me.team_side` fra samme rad. Ingen ny join, ingen indeks.
+2. ⚠️ **DROP+CREATE ⇒ 00061-FELLA.** Ny kolonne i `RETURNS TABLE` kan ikke
+   gjøres med `CREATE OR REPLACE`, og da forsvinner grantene med funksjonen.
+   De gjenskapes i fila. Uten dem er feeden borte for alle i samme sekund.
+3. ⚠️ **GATEN ER SMAL MED VILJE, OG DET ER DEN FARLIGSTE DETALJEN HER.**
+   Feedens gate er IKKE kampens. Kampen viser engasjement kun på mål og
+   meldinger; feeden har HEIA på avspark, bilder, resultater og vanlige
+   innlegg — og skal beholde det. Derfor `isOpponentGoal` (delt spørsmål) og
+   ikke `allowsHeia` (kampens strengere politikk). Bruker noen `allowsHeia`
+   her ved et uhell, **forsvinner HEIA fra halve feeden**, og en enkelttest
+   på et mål ville ikke fanget det. Voktet med en `it.each` over
+   rytmemarkørene.
+4. ⚠️ **KLIENTEN GATER, IKKE SKRIVERETTIGHETENE.** En spesiallaget klient kan
+   fortsatt skrive reaksjonen. Det er samme nivå som kampskjermen har i dag,
+   og å legge policy/trigger på `reactions` i en migrasjon som ellers bare
+   leser ville vært feil sted. **➡️ Hører hjemme i SKIVE 8**, som uansett
+   åpner RLS-policyene og stenger «Slett innlegget» for målposter — da
+   gjøres skrivesidens gate ETT sted, med prod-verifisering.
+
+**Appen tåler at migrasjonen ikke er der ennå:** mangler `match_event_type`,
+blir `matchEvent` `undefined`, og feeden oppfører seg nøyaktig som før. Det
+betyr også at **feilen består til du pusher.**
+
+<details><summary>📱 TELEFONSJEKKLISTA FOR SKIVE 9 (etter push)</summary>
+
+1. **Et baklengsmål i feeden:** HEIA-pillen skal være BORTE, ikke avslått.
+   Kommentarpillen står igjen alene.
+2. **Vårt eget mål i feeden:** HEIA er der som før.
+3. **«Kampen er i gang», bilder, resultater og vanlige innlegg:** HEIA er der
+   som før. (Dette er punktet som avslører om gaten ble for bred.)
+4. **Et baklengsmål du HAR heiet på fra før:** pillen forsvinner, men det
+   gamle heiet ligger fortsatt i basen — er det greit, eller skal de ryddes?
+5. **Tom feed = grant-feil, ikke tom database.** Skjer det, se KONTROLL i
+   migrasjonsfila.
 
 </details>
 

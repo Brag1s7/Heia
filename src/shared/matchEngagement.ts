@@ -161,19 +161,36 @@ export function showsEngagement(event: EngagementSubject): boolean {
 }
 
 /**
+ * ER DETTE ET MÅL IMOT?
+ *
+ * ⚠️ ÉN KILDE TIL SPØRSMÅLET, TO POLITIKKER BYGGET PÅ DET. Kampen og feeden
+ * gater ikke likt — kampen viser engasjement KUN på mål og meldinger, mens
+ * feeden har HEIA på alt annet også (avspark, bilder, vanlige innlegg) og
+ * skal beholde det. Skrives regelen ut på nytt i feeden, finnes det to
+ * formuleringer av «mål imot» som kan drifte fra hverandre.
+ *
+ * ⚠️ `teamSide` kan mangle (skal ikke skje etter 00020). Da behandles målet
+ * som mål IMOT — samme forsiktighetsregel som `nodeKindFor` bruker: bedre å
+ * underfeire eget mål enn å feire motstanderens.
+ */
+export function isOpponentGoal(event: EngagementSubject): boolean {
+  return event.type === 'mål' && event.teamSide !== 'home';
+}
+
+/**
  * ⚠️ P1, LÅST AV BRAGE 2026-08-20: INGEN HEIA PÅ MÅL IMOT.
  *
  * Verken i kampen eller i feeden — det er samme kanoniske post, så regelen
  * må gjelde begge flatene. Kommentarer er tillatt: et mål imot er noe man
  * snakker om, ikke noe man feirer.
  *
- * ⚠️ `teamSide` kan mangle (skal ikke skje etter 00020). Da behandles målet
- * som mål imot — samme forsiktighetsregel som `nodeKindFor` bruker: bedre å
- * underfeire eget mål enn å feire motstanderens.
+ * ⚠️ DETTE ER KAMPENS gate, og den er STRENGERE enn feedens: her er HEIA
+ * noe bare mål og meldinger har i det hele tatt. Feeden bruker
+ * `isOpponentGoal` direkte — se `FeedCard`.
  */
 export function allowsHeia(event: EngagementSubject): boolean {
   if (event.type === 'mål') {
-    return event.teamSide === 'home';
+    return !isOpponentGoal(event);
   }
   return event.type === 'melding';
 }

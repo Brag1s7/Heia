@@ -11,7 +11,7 @@ import {
 import {uploadFileToBucket} from '../media/upload';
 import type {MediaRef} from '../media/types';
 import type {MatchFeedPost} from '../../shared/matchEngagement';
-import type {FeedItem, UserRole} from '../../shared/types';
+import type {FeedItem, MatchEventType, UserRole} from '../../shared/types';
 
 // Merkevare-reaksjonen: 👏 «Heia». Én emoji nå (utvides senere ved behov).
 export const HEIA_EMOJI = '👏';
@@ -155,6 +155,16 @@ function mapFeedRow(row: any): FeedItem {
           status: MATCH_STATUS_MAP[row.match_status as string] ?? 'upcoming',
           home: Number(row.match_home ?? 0),
           away: Number(row.match_away ?? 0),
+        }
+      : undefined,
+    // P1 (00072): hva øyeblikket er, så feeden kan la være å tegne HEIA på
+    // et mål imot. Mangler feltet, er serveren eldre enn 00072 — og da
+    // oppfører feeden seg nøyaktig som før.
+    matchEvent: row.match_event_type
+      ? {
+          type: row.match_event_type as MatchEventType,
+          teamSide:
+            (row.match_event_side as 'home' | 'away' | null) ?? undefined,
         }
       : undefined,
     eventId: row.event_id ?? undefined,

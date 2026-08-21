@@ -188,6 +188,18 @@ export interface FeedItem {
     home: number;
     away: number;
   };
+  /**
+   * ⚠️ P1: HVA KAMPØYEBLIKKET ER — satt kun når posten ER en kamphendelse
+   * (00072). Feeden kunne før ikke se forskjell på et baklengsmål og en
+   * beskjed fra treneren, og tegnet HEIA på begge.
+   *
+   * `undefined` betyr «vanlig post» ELLER «serveren har ikke 00072 ennå».
+   * Begge skal oppføre seg som før — feeden har HEIA på alt annet.
+   */
+  matchEvent?: {
+    type: MatchEventType;
+    teamSide?: 'home' | 'away';
+  };
   eventId?: string;
   /** «Varsle hele laget» — festet øverst i feeden, varslet alle (00024). */
   isPinned?: boolean;
