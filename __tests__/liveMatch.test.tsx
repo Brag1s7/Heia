@@ -184,7 +184,8 @@ describe('kampen monterer som én grønn verden', () => {
   });
 
   it('gir reporterpanelet kampvarianten, ikke de hvite knappene', () => {
-    const tree = render({isReporter: true});
+    // Panelet bor i dokken fra skive 10 — den må åpnes for å bli tegnet.
+    const tree = render({isReporter: true, reporterDockOpen: true});
     // «Mål oss» beholder mintfyllet med heiaDeep-blekk — mint ER feiringen,
     // og den er lovlig på stadionmørkt. Alt annet er krittkant.
     const used = usedColors(tree);
@@ -210,9 +211,14 @@ describe('kampen monterer som én grønn verden', () => {
     expect(texts).not.toContain('Du følger kampen direkte');
   });
 
-  it('lar reporteren se verktøyene i stedet for følge-linja', () => {
+  /**
+   * ⚠️ ENDRET I SKIVE 10. Verktøyene lå FAST midt på siden; nå bor de i
+   * `ReporterDock`, som RAPPORTER-knappen i tab-baren åpner. Følge-linja er
+   * fortsatt publikums og bare publikums.
+   */
+  it('lar reporteren se verktøyene — nå i dokken — i stedet for følge-linja', () => {
     const {Text} = require('react-native');
-    const texts = render({isReporter: true})
+    const texts = render({isReporter: true, reporterDockOpen: true})
       .root.findAllByType(Text)
       .map(n => {
         const c = n.props.children;

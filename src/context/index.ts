@@ -9,4 +9,9 @@ export {
   CalendarFocusProvider,
   useCalendarFocus,
 } from './CalendarFocusContext';
+export {
+  MatchButtonProvider,
+  useMatchButton,
+  useMatchPresence,
+} from './MatchButtonContext';
 export type {PendingAction} from './OnboardingContext';

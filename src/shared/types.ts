@@ -262,7 +262,16 @@ export type RootTabParamList = {
   // Nested params: etter «Turneringen er opprettet» skal man lande i
   // Kalender PÅ turneringens startdato, ikke på toppen av lista.
   KalenderStack: NavigatorScreenParams<KalenderStackParamList> | undefined;
-  Opprett: undefined;
+  /**
+   * KAMP-FANEN (P4, skive 10.3 — Brages beslutning etter tredje telefonrunde).
+   *
+   * ⚠️ EN EKTE FANE MED EGEN STACK, ikke lenger en knapp som later som.
+   * Sesongen er roten, kampen ligger over. Grunnen: bunnlinja viste
+   * «Profil» som aktiv mens man sto inne i kampen, fordi kampen bodde i
+   * fanen man tilfeldigvis kom fra. Nå er fanen valgt både visuelt og
+   * semantisk — den ER stedet kampen bor.
+   */
+  Kamp: NavigatorScreenParams<KampStackParamList> | undefined;
   InboxStack: NavigatorScreenParams<InboxStackParamList> | undefined;
   // Push og e-postlenker (deepLink.ts) åpner Klubbetalinger/SupportSetup/
   // ops-flatene i Profil-fanen — derfor NavigatorScreenParams her også.
@@ -298,7 +307,13 @@ export type NewEventParams =
       parentFrom?: string;
       parentTo?: string;
       /** 'turnering' = «+ Ny turnering» fra sesongsiden: typen er låst. */
-      presetType?: 'turnering';
+      /**
+       * Låser/forhåndsvelger typen fra en inngang som ALT vet hva den lager.
+       * `'turnering'` fra Sesongens turneringsvelger, `'kamp'` fra
+       * kampprogrammet (skive 10.1) — der er «Ny kamp» hele poenget, og et
+       * skjema som åpner på «Trening» ville vært et ekstra trykk hver gang.
+       */
+      presetType?: 'turnering' | 'kamp';
       /**
        * Datoen skjemaet skal åpne på, som `dayKey` (samme format som
        * `focusDate`, ikke ISO — ISO ville vært UTC og bommet på kvelden).
@@ -322,7 +337,36 @@ export type HomeStackParamList = {
   Lagkassa: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};
+  /**
+   * ⚠️ SAMME SKJERM SOM I `KampStack`, IKKE EN KOPI (kildebevarende
+   * tabmodell, Brage 2026-08-21).
+   *
+   * «Sesongen» øverst til høyre på Hjem er en HJEM-inngang: du kom fra
+   * Hjem, og «tilbake» skal føre til Hjem. Trykker du derimot Kamp-fanen,
+   * er du i `KampStack` og «tilbake» fører til Sesongen der.
+   *
+   * Det er FLERE NAVIGASJONSRUTER til én skjerm — ikke duplisert
+   * produktlogikk. `SeasonScreen` er den samme komponenten begge steder.
+   */
   Season: undefined;
+};
+
+/**
+ * KAMP-FANENS STACK (skive 10.3).
+ *
+ * ⚠️ SESONGEN BOR HER NÅ, ikke i Hjem. «Sesongen»-snarveien øverst til høyre
+ * på Hjem består, men den navigerer HIT og aktiverer Kamp-fanen — det finnes
+ * ikke lenger en egen Season-rute eid av Hjem. To ruter med samme skjerm
+ * ville gitt to steder å komme tilbake til.
+ */
+export type KampStackParamList = {
+  Season: undefined;
+  EventDetail: {eventId: string};
+  NewEvent: NewEventParams;
+  /** Sesongen har lagkassa-kortet nederst. Registrert her av samme grunn
+   *  som `NewEvent` er registrert i tre stacker: «tilbake» skal føre til
+   *  siden du kom fra, ikke kaste deg over i Hjem. */
+  Lagkassa: undefined;
 };
 
 export type OnboardingStackParamList = {

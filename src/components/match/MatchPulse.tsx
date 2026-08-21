@@ -147,7 +147,7 @@ interface MatchPulseProps {
   /** «Vis i historien» — ruller til øyeblikkets rad i kampforløpet. */
 }
 
-export function MatchPulse({
+function MatchPulseInner({
   matchEvents,
   photos,
   startedAt,
@@ -589,3 +589,19 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 });
+
+/**
+ * ⚠️ MEMOISERT — OG DET ER EN YTELSESRETTELSE FRA TELEFONEN.
+ *
+ * Brage 2026-08-21: «hvis man trykker rapporter så kommer skiva opp veldig
+ * hakkete.» Reporterdokkens av/på bor i `EventDetailScreen`, så hvert trykk
+ * rendrer hele kampverdenen på nytt — inkludert denne, som regner ut og
+ * tegner en SVG-kurve. Det skjedde i NØYAKTIG de millisekundene dokken
+ * animerte.
+ *
+ * Pulsen avhenger ikke av dokken i det hele tatt. `React.memo` gjør den
+ * uinteressert i renders den ikke har noe med — memoiseringsnøkkelen INNE i
+ * komponenten (P4: event-ID, type, sekvens, slettestatus, HEIA-sum) står
+ * uendret og gjelder fortsatt for kurvens innhold.
+ */
+export const MatchPulse = React.memo(MatchPulseInner);

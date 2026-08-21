@@ -13,9 +13,12 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
 import {
   BackBar,
+  EventCard,
   HeroSurface,
   ListRowSkeleton,
+  LiveMatchBanner,
   ScoreChip,
+  SectionHeader,
   Skeleton,
   StadiumSurface,
   StatusPill,
@@ -34,9 +37,14 @@ import {
   type TeamSupportSummary,
 } from '../lib/api/payments';
 import {formatKr} from '../lib/money';
-import type {HomeStackParamList} from '../shared/types';
+import {getMatchSchedule} from '../lib/api/events';
+import {buildMatchSchedule} from '../shared/matchSchedule';
+import type {HeiaEvent, KampStackParamList} from '../shared/types';
 
-type Nav = NativeStackNavigationProp<HomeStackParamList, 'Season'>;
+/** Stabil identitet: en fersk tom array per render ville revet memoene. */
+const NO_MATCHES: HeiaEvent[] = [];
+
+type Nav = NativeStackNavigationProp<KampStackParamList, 'Season'>;
 
 const MONTHS = [
   'januar',
@@ -77,7 +85,11 @@ function buildRows(
       match.tournament &&
       match.tournament !== prevTournament
     ) {
-      rows.push({kind: 'tournament', title: match.tournament, key: `t${index}`});
+      rows.push({
+        kind: 'tournament',
+        title: match.tournament,
+        key: `t${index}`,
+      });
     }
     prevTournament = match.tournament;
     rows.push({kind: 'match', match, key: match.eventId});
@@ -100,13 +112,100 @@ function buildRows(
  * Ingen toppscorerliste — LÅST beslutning (bruker, 2026-07-30): ingen
  * spillerstatistikk før laget har en strukturert spillerstall.
  */
+/**
+ * KAMPPROGRAMMET PÅ SESONGSIDEN (skive 10.1).
+ *
+ * ---------------------------------------------------------------------------
+ * ⚠️ TRE NIVÅER, OG BARE ETT AV DEM ER EN LISTE
+ *
+ *   · PÅGÅENDE kampen får `LiveMatchBanner` — den samme stadion-heroen Hjem
+ *     bruker. Ikke en ny variant: dette er nøyaktig samme øyeblikk, sett fra
+ *     en annen inngang, og to tegninger av den ville drevet fra hverandre.
+ *   · DAGENS kamper får full oppmerksomhet med `featured`-kortet.
+ *   · KOMMENDE er en rolig liste.
+ *
+ * Prioriteringsregelen selv bor i `shared/matchSchedule` — den er produkt,
+ * ikke visning, og skal kunne bevises uten å montere en skjerm.
+ */
+function MatchProgramme({
+  matches,
+  loaded,
+  canCreate,
+  onOpenMatch,
+}: {
+  matches: HeiaEvent[];
+  loaded: boolean;
+  /** Kun for tomtilstanden: en trener skal se seksjonen selv når den er tom,
+   *  fordi «Ny kamp» i toppen er handlingen hennes. */
+  canCreate: boolean;
+  onOpenMatch: (eventId: string) => void;
+}) {
+  const {live, today, upcoming} = buildMatchSchedule(matches);
+  const harNoe = live.length + today.length + upcoming.length > 0;
+
+  // Ingenting å vise OG ingen rett til å lage noe: da er seksjonen bare en
+  // tom overskrift, og arkivet under er hele siden.
+  if (loaded && !harNoe && !canCreate) return null;
+
+  return (
+    <View style={styles.programme}>
+      <SectionHeader title={live.length > 0 ? 'Nå' : 'Kampprogram'} />
+
+      {live.map(match => (
+        <View key={match.id} style={styles.programmeItem}>
+          <LiveMatchBanner
+            event={match}
+            onPress={() => onOpenMatch(match.id)}
+          />
+        </View>
+      ))}
+
+      {today.map(match => (
+        <View key={match.id} style={styles.programmeItem}>
+          {/* `featured` er dagens signal — samme kort, mer vekt. */}
+          <EventCard
+            event={match}
+            featured
+            onPress={() => onOpenMatch(match.id)}
+          />
+        </View>
+      ))}
+
+      {upcoming.map(match => (
+        <View key={match.id} style={styles.programmeItem}>
+          <EventCard event={match} onPress={() => onOpenMatch(match.id)} />
+        </View>
+      ))}
+
+      {/* Påstanden om tomhet kommer FØRST når vi faktisk vet. */}
+      {loaded && !harNoe && (
+        <View style={styles.programmeEmpty}>
+          <Text style={styles.programmeEmptyText}>
+            Ingen kamper er satt opp ennå.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export function SeasonScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
   const isAdmin = isTeamAdmin(activeRole);
+  // Pushet fra Hjem (index > 0) eller fanerot (index 0)? Se `BackBar` under.
+  const pushet = navigation.getState().index > 0;
 
   const [stats, setStats] = useState<SeasonStats | null>(null);
+  // Kampprogrammet (skive 10.1) — EGEN henting, ikke en endring av
+  // `get_season_stats`. Sesongtallene er historikk og skal fortsette å telle
+  // bare det som er spilt; «kommende» hører ikke hjemme i vunnet/tapt.
+  const [schedule, setSchedule] = useState<HeiaEvent[]>(NO_MATCHES);
+  // ⚠️ «Ingen kamper er satt opp ennå» er en PÅSTAND, og den skal ikke
+  // stå der mens vi fortsatt henter. Uten dette blinker tomtilstanden inn
+  // på hver åpning, rett før programmet fyller seg.
+  const [scheduleLoaded, setScheduleLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,6 +222,12 @@ export function SeasonScreen() {
     getTeamSupportSummary(activeTeamSpaceId)
       .then(setSupportSummary)
       .catch(() => setSupportSummary(null));
+    // Programmet er også sekundært for sesongTALLENE: feiler det, skal
+    // arkivet fortsatt kunne leses.
+    getMatchSchedule(activeTeamSpaceId)
+      .then(setSchedule)
+      .catch(() => setSchedule(NO_MATCHES))
+      .finally(() => setScheduleLoaded(true));
     try {
       setStats(await getSeasonStats(activeTeamSpaceId, selected ?? undefined));
     } catch {
@@ -154,8 +259,8 @@ export function SeasonScreen() {
     (stats?.tournament
       ? {kind: 'tournament', id: stats.tournament.id}
       : stats?.seasonYear != null && stats.seasonHalf != null
-        ? {kind: 'half', year: stats.seasonYear, half: stats.seasonHalf}
-        : null);
+      ? {kind: 'half', year: stats.seasonYear, half: stats.seasonHalf}
+      : null);
 
   const inTournamentView = activeView?.kind === 'tournament';
   const rows = stats ? buildRows(stats.matches, !inTournamentView) : [];
@@ -178,7 +283,16 @@ export function SeasonScreen() {
 
   return (
     <View style={styles.screen}>
-      <BackBar />
+      {/* ⚠️ SESONGEN BOR TO STEDER, OG BARE DET ENE HAR EN VEI TILBAKE.
+          Som ROT i Kamp-fanen har den ingen — `goBack()` ville bobla opp til
+          fanenavigatoren og kastet deg til Hjem (Brage 2026-08-21: «som ikke
+          skal være mulig»). Som PUSHET skjerm fra laghodet på Hjem MÅ den ha
+          en, ellers er snarveien en blindvei.
+
+          `index > 0` er stackens eget svar på «ble jeg pushet hit», og det
+          er sannere enn `canGoBack()`, som også teller foreldrenavigatoren. */}
+      {pushet && <BackBar />}
+
       <ScrollView
         contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
         refreshControl={
@@ -188,12 +302,54 @@ export function SeasonScreen() {
             tintColor={colors.heia}
           />
         }>
-        <View style={styles.header}>
-          <Text style={styles.title}>Sesongen</Text>
-          {activeTeamSpace ? (
-            <Text style={styles.subtitle}>{activeTeamSpace.displayName}</Text>
-          ) : null}
+        <View
+          style={[
+            styles.header,
+            // Toppmargen bæres av `BackBar` når den finnes. Som fanerot er
+            // det ingenting over tittelen, og da må den holde seg klar av
+            // statuslinja selv — ellers legger den seg oppå klokka.
+            {paddingTop: pushet ? spacing.sm : insets.top + spacing.md},
+          ]}>
+          <View style={styles.headerText}>
+            <Text style={styles.title}>Sesongen</Text>
+            {activeTeamSpace ? (
+              <Text style={styles.subtitle}>{activeTeamSpace.displayName}</Text>
+            ) : null}
+          </View>
+          {/* ⚠️ EN EKTE KNAPP, IKKE EN TEKSTLENKE (Brage: «må det være en
+              bedre knapp for å legge til ny kamp!»). Å sette opp kampen er
+              hele grunnen til at en trener åpner denne siden før sesongen
+              har startet — da kan handlingen ikke være det svakeste
+              elementet på flaten. */}
+          {isAdmin && (
+            <Pressable
+              onPress={() =>
+                navigation.navigate('NewEvent', {presetType: 'kamp'})
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Ny kamp"
+              hitSlop={8}
+              style={({pressed}) => [
+                styles.newMatch,
+                pressed && styles.newMatchPressed,
+              ]}>
+              <Plus size={17} color={colors.heiaDeep} strokeWidth={2.6} />
+              <Text style={styles.newMatchText}>Ny kamp</Text>
+            </Pressable>
+          )}
         </View>
+
+        {/* ⚠️ PROGRAMMET LIGGER ØVERST, OVER SESONGTALLENE (skive 10.1).
+            Fra skive 10 fører kampknappen hit, og da er det DAGENS kamp man
+            leter etter — ikke fjorårets målforskjell. Brage etter
+            telefontesten: «dagens kamp tydelig prioritert». Arkivet under er
+            uendret; det er to ulike spørsmål på samme flate. */}
+        <MatchProgramme
+          matches={schedule}
+          loaded={scheduleLoaded}
+          canCreate={isAdmin}
+          onOpenMatch={id => navigation.navigate('EventDetail', {eventId: id})}
+        />
 
         {loading ? (
           <>
@@ -311,11 +467,7 @@ export function SeasonScreen() {
                       styles.pickerChip,
                       pressed && styles.pickerChipPressed,
                     ]}>
-                    <Plus
-                      size={14}
-                      color={colors.heiaInk}
-                      strokeWidth={2.4}
-                    />
+                    <Plus size={14} color={colors.heiaInk} strokeWidth={2.4} />
                     <Text
                       style={[styles.pickerChipText, styles.newTournamentText]}>
                       Ny turnering
@@ -339,11 +491,7 @@ export function SeasonScreen() {
                 <StadiumSurface style={styles.hero}>
                   <View style={styles.heroLabelRow}>
                     {inTournamentView && (
-                      <Trophy
-                        size={14}
-                        color={colors.gold}
-                        strokeWidth={2.2}
-                      />
+                      <Trophy size={14} color={colors.gold} strokeWidth={2.2} />
                     )}
                     <Text style={styles.heroLabel} numberOfLines={1}>
                       {stats.seasonLabel}
@@ -422,9 +570,7 @@ export function SeasonScreen() {
                               pressed && styles.rowPressed,
                             ]}>
                             <View style={styles.matchInfo}>
-                              <Text
-                                style={styles.matchTitle}
-                                numberOfLines={1}>
+                              <Text style={styles.matchTitle} numberOfLines={1}>
                                 mot {row.match.opponent}
                               </Text>
                               <Text style={styles.matchMeta}>
@@ -490,13 +636,57 @@ export function SeasonScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerText: {
+    flex: 1,
+  },
+  // Mint fyll med heiaDeep blekk — appens hovedhandling, samme par som
+  // «Publiser» og «Mål oss». Den var en tekstlenke i et seksjonshode.
+  newMatch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    backgroundColor: colors.heia,
+    ...shadows.glow,
+  },
+  newMatchPressed: {
+    backgroundColor: colors.heiaPressed,
+  },
+  newMatchText: {
+    ...typography.action,
+    color: colors.heiaDeep,
+  },
+  programme: {
+    paddingTop: spacing.sm,
+  },
+  programmeItem: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  programmeEmpty: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.lg,
+  },
+  programmeEmptyText: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
   screen: {
     flex: 1,
     backgroundColor: colors.background,
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    // ⚠️ `paddingTop` SETTES PÅ KALLSTEDET, med `insets.top`. Da `BackBar`
+    // ble fjernet (Sesongen er en fanerot nå), forsvant også det ENESTE
+    // som holdt innholdet klar av statuslinja — tittelen la seg oppå klokka
+    // og Dynamic Island (Brage 2026-08-21). En konstant her ville vært feil
+    // på hver telefon med et annet toppområde.
     marginBottom: spacing.xl,
   },
   title: {

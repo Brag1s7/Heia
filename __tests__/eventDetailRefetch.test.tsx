@@ -188,6 +188,10 @@ jest.mock('../src/context', () => ({
   useNotifications: () => ({
     watchEvent: () => () => {},
   }),
+  // Kampknappen i tab-baren (skive 10). Skjermen MELDER SEG PÅ her; i denne
+  // testen finnes ingen tab-bar, så påmeldingen er en no-op. Den må likevel
+  // være en funksjon — uten den krasjer skjermen i det den monteres.
+  useMatchPresence: () => {},
 }));
 
 import {QueryClientProvider} from '@tanstack/react-query';

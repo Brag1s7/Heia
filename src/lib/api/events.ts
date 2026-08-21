@@ -329,6 +329,62 @@ export interface CreateEventInput {
  * transaksjon — to klient-inserts kunne etterlatt en kamp uten session.
  * Returnerer id-en til den nye hendelsen.
  */
+/**
+ * KAMPPROGRAMMET — pågående og kommende kamper for laget (skive 10.1).
+ *
+ * ---------------------------------------------------------------------------
+ * ⚠️ HVORFOR DEN FINNES VED SIDEN AV `get_season_stats`
+ *
+ * Sesongsiden viste bare FERDIGSPILTE kamper: RPC-en filtrerer på
+ * `ms.status = 'ferdig'` i både totalene og kamplista (00032). Det var
+ * riktig så lenge siden var et arkiv — men fra skive 10 fører kampknappen
+ * hit, og da forventer man å finne DAGENS kamp (Brage 2026-08-21).
+ *
+ * Løsningen er en egen, mager spørring og IKKE en endring av RPC-en:
+ * sesongtallene er historikk og skal fortsette å telle bare det som er spilt.
+ * Å blande «kommende» inn i «vunnet/uavgjort/tapt» ville gjort tallene
+ * usanne. To spørsmål, to spørringer.
+ *
+ * ⚠️ VINDUET STARTER I GÅR. En kamp som fortsatt er live kan ha startet sent
+ * i går kveld; med `>= i dag` ville nettopp den kampen — den ene man virkelig
+ * leter etter — falt ut.
+ *
+ * Ferdige og avlyste lukes bort klientside i stedet for i spørringen: en
+ * kamp uten `match_sessions`-rad har ingen status å filtrere på, og et
+ * `!inner`-filter ville skjult den helt.
+ */
+export async function getMatchSchedule(
+  teamSpaceId: string,
+  now: Date = new Date(),
+): Promise<HeiaEvent[]> {
+  const from = new Date(now);
+  from.setDate(from.getDate() - 1);
+  from.setHours(0, 0, 0, 0);
+
+  const {data, error} = await supabase
+    .from('events')
+    .select(EVENT_COLUMNS)
+    .eq('team_space_id', teamSpaceId)
+    .eq('type', 'kamp')
+    .is('deleted_at', null)
+    .gte('start_time', from.toISOString())
+    .order('start_time', {ascending: true})
+    // Programmet er «det som kommer», ikke hele sesongen. Taket holder
+    // spørringen mager og URL-en kort (samme grunn som datovinduet i
+    // getTeamEvents).
+    .limit(20);
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data || []) as any[])
+    .map(row => mapEventRow(row, teamSpaceId, emptyRsvp()))
+    .filter(
+      e => e.matchStatus !== 'finished' && e.matchStatus !== 'cancelled',
+    );
+}
+
 export async function createEvent(input: CreateEventInput): Promise<string> {
   const isMatch = input.type === 'kamp';
 

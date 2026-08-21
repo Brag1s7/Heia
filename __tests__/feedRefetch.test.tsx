@@ -496,3 +496,80 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
     renderer?.unmount();
   });
 });
+
+// ---------------------------------------------------------------------------
+// «DEL MED LAGET» ER EN PERMANENT INNGANG (P4, skive 10)
+//
+// ⚠️ Da den generiske «+» ble kampknappen, ble komponisten her den ENESTE
+// veien til å skrive noe til laget. Den ligger i `ListHeaderComponent`, som
+// tegnes OVER `ListEmptyComponent` — altså finnes den både når feeden er full
+// og når den er tom, for alle roller.
+//
+// Testene under er vakten mot at noen senere flytter den inn i en tilstand
+// (f.eks. «vis komponisten bare når feeden er tom»). Skjer det, mister laget
+// muligheten til å publisere i det hele tatt.
+// ---------------------------------------------------------------------------
+
+function komponistFelt(renderer: ReturnType<typeof ReactTestRenderer.create>) {
+  return renderer.root.findAll(
+    n => n.props?.accessibilityLabel === 'Del med laget',
+    {deep: true},
+  );
+}
+
+test('komponisten finnes på en TOM feed — og bærer handlingens navn', async () => {
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+
+  const felt = komponistFelt(renderer!);
+  expect(felt.length).toBeGreaterThan(0);
+  // Placeholder er invitasjonen; a11y-labelen er navnet på handlingen — det
+  // samme ordet valgarket brukte før det ble erstattet.
+  expect(felt[0].props.placeholder).toBe('Del noe med laget …');
+
+  await ReactTestRenderer.act(async () => {
+    renderer!.unmount();
+  });
+});
+
+test('komponisten finnes også når feeden HAR innhold', async () => {
+  const {supabase} = jest.requireMock('../src/lib/supabase');
+  supabase.rpc.mockImplementation((name: string) =>
+    Promise.resolve({
+      data:
+        name === 'get_team_feed'
+          ? [
+              {
+                id: 'p1',
+                team_space_id: 'ts-1',
+                author_id: 'u2',
+                author_name: 'Ola Nordmann',
+                content: 'God trening i dag!',
+                post_type: 'tekst',
+                created_at: new Date().toISOString(),
+                heia_count: 0,
+                comment_count: 0,
+                i_reacted: false,
+              },
+            ]
+          : [],
+      error: null,
+    }),
+  );
+
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+
+  // ⚠️ SELVE PÅSTANDEN i skive 10: den skal finnes når kalenderen — og
+  // feeden — er full, ikke bare i tomtilstanden.
+  expect(komponistFelt(renderer!).length).toBeGreaterThan(0);
+
+  await ReactTestRenderer.act(async () => {
+    renderer!.unmount();
+  });
+  supabase.rpc.mockReset();
+});

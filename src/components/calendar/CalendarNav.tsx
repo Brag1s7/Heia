@@ -1,7 +1,7 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, spacing, radius, fonts} from '../../theme';
-import {Calendar} from '../icons';
+import {Calendar, Plus} from '../icons';
 import {monthTitle} from '../../shared/calendar';
 
 interface CalendarNavProps {
@@ -12,6 +12,18 @@ interface CalendarNavProps {
   onOpenMonth: () => void;
   /** Vi står alt på i dag: knappen blir stille i stedet for å forsvinne. */
   atToday: boolean;
+  /**
+   * «Ny hendelse» — PERMANENT opprettelse for trener/lagleder (P4, skive 10).
+   *
+   * ⚠️ Før skive 10 lå den eneste opprettelsen i Kalender i TOMTILSTANDEN.
+   * Da den generiske «+» forsvant fra tab-baren til fordel for kampknappen,
+   * ville en trener med en FULL kalender stått uten vei til å opprette noe.
+   * Derfor bor den her, i den festede navigatoren: den følger med nedover
+   * uansett hvor langt man har rullet i agendaen.
+   *
+   * `undefined` for vanlige medlemmer — samme regel som RLS på `events`.
+   */
+  onNewEvent?: () => void;
 }
 
 /**
@@ -31,6 +43,7 @@ export function CalendarNav({
   onToday,
   onOpenMonth,
   atToday,
+  onNewEvent,
 }: CalendarNavProps) {
   return (
     <View style={styles.bar}>
@@ -70,6 +83,29 @@ export function CalendarNav({
           Måned
         </Text>
       </Pressable>
+
+      {onNewEvent && (
+        <Pressable
+          onPress={onNewEvent}
+          accessibilityRole="button"
+          accessibilityLabel="Ny hendelse"
+          // ⚠️ TRYKKFLATEN, IKKE HØYDEN. Pillene er 32 pt, og navigatorens
+          // høyde må ALDRI endre seg — endres den, flytter festeterskelen,
+          // alle målte posisjoner og scrollposisjonen seg (se `statusRow` i
+          // KalenderScreen). hitSlop gir 48 pt trykkflate uten å røre
+          // layouten med ett eneste punkt.
+          hitSlop={{top: 8, bottom: 8, left: 6, right: 6}}
+          style={({pressed}) => [
+            styles.pill,
+            styles.pillNew,
+            pressed && styles.pillPressed,
+          ]}>
+          <Plus size={15} color={colors.heiaInk} strokeWidth={2.4} />
+          <Text style={styles.pillText} maxFontSizeMultiplier={1.4}>
+            Ny
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -103,6 +139,14 @@ const styles = StyleSheet.create({
   pillIdle: {
     backgroundColor: 'transparent',
     borderColor: colors.borderSubtle,
+  },
+  // Opprettelsen er den ene HANDLINGEN i raden — «I dag» og «Måned» flytter
+  // bare blikket. Mint-tonen skiller den fra de to uten å gi den en egen
+  // form: samme pille, samme høyde, samme rytme.
+  pillNew: {
+    backgroundColor: colors.heiaTint,
+    borderColor: 'transparent',
+    paddingHorizontal: spacing.sm,
   },
   pillPressed: {
     backgroundColor: colors.surfaceMuted,

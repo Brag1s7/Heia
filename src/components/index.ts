@@ -35,6 +35,8 @@ export {ReporterBar} from './ReporterBar';
 export {ReporterSheet} from './ReporterSheet';
 export {SimulatedPush} from './SimulatedPush';
 export {CreateSheet} from './CreateSheet';
+/** Tab-barens midtplass (P4, skive 10) — den erstattet «+». */
+export {MatchTabButton} from './MatchTabButton';
 export {TeamHeader} from './TeamHeader';
 export {ProfileHeader} from './ProfileHeader';
 export {TeamColorPicker} from './TeamColorPicker';

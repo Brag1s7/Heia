@@ -444,6 +444,41 @@ export function subscribeToFeed(
 }
 
 /**
+ * 👏 «Heia» — KUN LEGG TIL. Aldri fjern.
+ *
+ * ---------------------------------------------------------------------------
+ * ⚠️ HVORFOR DENNE FINNES VED SIDEN AV `toggleReaction`
+ *
+ * `toggleReaction` velger retning ut fra en tilstand kalleren TROR den
+ * kjenner. Det er riktig i feeden og i `MatchEngagementRow`, der knappen ER
+ * en av/på-bryter og brukeren ser sin egen tilstand rett foran seg.
+ *
+ * Kampknappen i tab-baren (skive 10) er noe annet: den er en JUBEL. Et
+ * dobbelttrykk, eller et andre trykk mens det første henger på nettet, ville
+ * med toggle-semantikk SLETTET heiaen brukeren nettopp ga — og hun ville sett
+ * telleren gå opp og så ned igjen. Her finnes det ingen delete-gren å havne
+ * i, uansett hva kalleren tror.
+ *
+ * `23505` (unique-brudd på `UNIQUE (feed_post_id, user_id, emoji)`, 00009)
+ * SVELGES som suksess: raden finnes, som er hele det kalleren ba om.
+ * Funksjonen er dermed idempotent ved konstruksjon, ikke ved forsiktighet.
+ */
+export async function addReaction(postId: string): Promise<void> {
+  const userId = await getUserId();
+
+  const {error} = await supabase.from('reactions').insert({
+    feed_post_id: postId,
+    user_id: userId,
+    emoji: HEIA_EMOJI,
+  });
+
+  // Allerede heiet ⇒ ferdig. Alt annet er en ekte feil.
+  if (error && error.code !== '23505') {
+    throw error;
+  }
+}
+
+/**
  * Toggle 👏 «Heia» på en post. currentlyReacted styrer retningen
  * (kalleren kjenner tilstanden fra feed-dataen), så vi slipper en
  * ekstra rundtur. RLS: insert krever user_id = auth.uid() + medlemskap;

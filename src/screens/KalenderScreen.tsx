@@ -681,6 +681,10 @@ export function KalenderScreen() {
             onToday={goToToday}
             onOpenMonth={() => setMonthOpen(true)}
             atToday={selectedKey === dayKey(today)}
+            // P4/skive 10: den PERMANENTE opprettelsen. `newEvent` sender
+            // `presetDate: selectedKey`, altså dagen brukeren faktisk står
+            // på — samme oppførsel som tomtilstandens knapp.
+            onNewEvent={canCreate ? newEvent : undefined}
           />
           {showSkeleton ? (
             <View style={styles.stripSkeleton}>
@@ -891,9 +895,12 @@ function EmptyCalendar({
         Treninger, kamper og det sosiale dukker opp her når laget planlegger
         noe.
       </Text>
-      {/* Den ENESTE opprettelsesknappen i Kalender. På en kalender med innhold
-          er den grønne «+» i hovednavigasjonen nok — her ville brukeren ellers
-          stått foran en blindvei. */}
+      {/* ⚠️ IKKE LENGER DEN ENESTE. Fram til skive 10 var dette det eneste
+          stedet man kunne opprette noe i Kalender, med den begrunnelsen at
+          den grønne «+» i hovednavigasjonen dekket resten. Plussen er nå
+          kampknappen, og opprettelsen bor permanent i `CalendarNav`.
+          Knappen her består likevel: en tom flate skal tilby veien ut av
+          seg selv, ikke bare peke på en pille i toppen. */}
       {canCreate && (
         <View style={styles.emptyAction}>
           <Button title="Opprett første hendelse" onPress={onCreate} />

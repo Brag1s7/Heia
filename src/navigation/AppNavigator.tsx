@@ -1,5 +1,13 @@
-import React, {useEffect, useState} from 'react';
-import {Alert, Linking, Pressable, Text, StyleSheet, View} from 'react-native';
+import React, {useEffect} from 'react';
+import {
+  Alert,
+  Dimensions,
+  Linking,
+  Pressable,
+  Text,
+  StyleSheet,
+  View,
+} from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
@@ -18,16 +26,17 @@ import {
   useActiveTeam,
   useOnboarding,
   useNotifications,
-  useCalendarFocus,
 } from '../context';
-import {BootScreen, CreateSheet, NotificationBanner} from '../components';
-import {Bell, Calendar, House, Plus, User} from '../components/icons';
+import {useMatchButton} from '../context/MatchButtonContext';
+import {matchButtonHasGlyph} from '../shared/matchButton';
+import {matchButtonGeometry} from '../shared/matchButtonGeometry';
+import {BootScreen, MatchTabButton, NotificationBanner} from '../components';
+import {Bell, Calendar, House, User} from '../components/icons';
 import {
   navigationRef,
   flushPendingDeepLink,
   handleDeepLinkUrl,
 } from './deepLink';
-import {isTeamAdmin} from '../shared/roles';
 import {noteScreen} from '../lib/netMetrics';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
@@ -57,15 +66,16 @@ import type {
   HomeStackParamList,
   OnboardingStackParamList,
   KalenderStackParamList,
+  KampStackParamList,
   InboxStackParamList,
   ProfilStackParamList,
 } from '../shared/types';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
-const OnboardingNav =
-  createNativeStackNavigator<OnboardingStackParamList>();
+const OnboardingNav = createNativeStackNavigator<OnboardingStackParamList>();
 const KalenderNav = createNativeStackNavigator<KalenderStackParamList>();
+const KampNav = createNativeStackNavigator<KampStackParamList>();
 const InboxNav = createNativeStackNavigator<InboxStackParamList>();
 const ProfilNav = createNativeStackNavigator<ProfilStackParamList>();
 
@@ -155,8 +165,37 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="Lagkassa" component={LagkassaScreen} />
       <HomeStack.Screen name="Invite" component={InviteScreen} />
       <HomeStack.Screen name="Comments" component={CommentsScreen} />
+      {/* ⚠️ SAMME KOMPONENT SOM I `KampStack`. «Sesongen»-snarveien i
+          laghodet er en HJEM-inngang: du kom fra Hjem, og «tilbake» skal
+          føre til Hjem. Flere ruter til én skjerm, ikke to sannheter. */}
       <HomeStack.Screen name="Season" component={SeasonScreen} />
     </HomeStack.Navigator>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Kamp stack (skive 10.3) — SESONGEN ER ROTEN, KAMPEN LIGGER OVER
+//
+// ⚠️ Brages beslutning etter tredje telefonrunde: bunnlinja viste «Profil»
+// som aktiv mens man sto inne i kampen, fordi kampen bodde i fanen man
+// tilfeldigvis kom fra. Nå har kampen sitt eget sted, og fanen er valgt
+// både visuelt og semantisk.
+//
+// `NewEvent` er med fordi BÅDE Sesongen («Ny kamp», «Ny turnering») og
+// kampsiden («Rediger», «Ny kamp» på en turnering) navigerer dit.
+// ---------------------------------------------------------------------------
+function KampStackNavigator() {
+  return (
+    <KampNav.Navigator screenOptions={stackScreenOptions}>
+      <KampNav.Screen name="Season" component={SeasonScreen} />
+      <KampNav.Screen name="EventDetail" component={EventDetailScreen} />
+      <KampNav.Screen
+        name="NewEvent"
+        component={NewEventScreen}
+        options={newEventOptions}
+      />
+      <KampNav.Screen name="Lagkassa" component={LagkassaScreen} />
+    </KampNav.Navigator>
   );
 }
 
@@ -253,10 +292,7 @@ function OnboardingStackNavigator() {
         options={{contentStyle: {backgroundColor: colors.stadium}}}
       />
       <OnboardingNav.Screen name="Auth" component={AuthScreen} />
-      <OnboardingNav.Screen
-        name="VerifyEmail"
-        component={VerifyEmailScreen}
-      />
+      <OnboardingNav.Screen name="VerifyEmail" component={VerifyEmailScreen} />
       <OnboardingNav.Screen
         name="JoinTeamCode"
         component={JoinTeamCodeScreen}
@@ -267,23 +303,17 @@ function OnboardingStackNavigator() {
 }
 
 // ---------------------------------------------------------------------------
-// Opprett-tab. Rendres aldri: tabPress avbrytes og åpner CreateSheet i stedet.
-// Bottom-tabs krever likevel en komponent for skjermen.
-// ---------------------------------------------------------------------------
-function OpprettScreen() {
-  return <View style={styles.placeholder} />;
-}
-
-// ---------------------------------------------------------------------------
 // Tab-ikoner — Lucide (stroke 2, som artifacten)
+//
+// `Kamp` står ikke her: midtplassen er ikke et ikon, den er en tilstand
+// (`MatchTabButton`).
 // ---------------------------------------------------------------------------
 const tabIcons: Record<
-  keyof RootTabParamList,
+  Exclude<keyof RootTabParamList, 'Kamp'>,
   React.ComponentType<{size?: number; color?: string; strokeWidth?: number}>
 > = {
   HjemStack: House,
   KalenderStack: Calendar,
-  Opprett: Plus,
   InboxStack: Bell,
   ProfilStack: User,
 };
@@ -291,17 +321,19 @@ const tabIcons: Record<
 // ---------------------------------------------------------------------------
 // Hoved-tabs
 // ---------------------------------------------------------------------------
-function MainTabs() {
+/**
+ * ⚠️ EKSPORTERT FOR TEST. `__tests__/tabBar.test.tsx` monterer baren med
+ * stubbede skjermer og beviser at de fire andre fanene står uendret i ALLE
+ * kampknappens tilstander — påstanden skive 10 hviler på.
+ */
+export function MainTabs() {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
-  const {activeRole} = useActiveTeam();
   const {unreadCount, refreshUnread} = useNotifications();
-  const calendarFocus = useCalendarFocus();
-  // Datoen leses ÉN gang, i det arket åpnes. Den ligger i en ref hos Kalender
-  // nettopp for at scrolling der ikke skal rendre hele fanetreet på nytt.
-  const [sheet, setSheet] = useState<{visible: boolean; day: string | null}>({
-    visible: false,
-    day: null,
-  });
+  const {
+    state: matchButton,
+    press: pressMatch,
+    refreshLiveMatch,
+  } = useMatchButton();
 
   // Et varsel-trykk ved kaldstart kommer mens onboarding/lasting står fremme,
   // og da finnes ikke HjemStack ennå. Fanene er første øyeblikk målet faktisk
@@ -310,124 +342,181 @@ function MainTabs() {
     flushPendingDeepLink();
   }, []);
 
-  const closeSheet = () => setSheet(prev => ({...prev, visible: false}));
+  /**
+   * KAMPKNAPPENS TRYKK (P4, skive 10).
+   *
+   * `from` er fanen brukeren STÅR I. Den kan leses trygt fordi `tabPress`
+   * avbrytes med `preventDefault()` — fokus har ikke rukket å flytte seg.
+   */
+  /**
+   * KAMPKNAPPENS TRYKK (skive 10.3).
+   *
+   * ⚠️ FANEN ER EKTE NÅ, men trykket er fortsatt avbrutt — fordi knappen
+   * betyr fire forskjellige ting. Inne i kampen skal den IKKE navigere noe
+   * sted; da er den en handling, og et fanebytte ville rykket deg vekk fra
+   * kampen du står i.
+   */
+  const handleMatchPress = () => {
+    if (matchButton.disabled) return;
 
-  const handleShare = () => {
-    closeSheet();
-    // Ny nonce hver gang, ellers fokuserer ikke compose-boksen på nytt.
-    navigation.navigate('HjemStack', {
-      screen: 'TeamHome',
-      params: {composeNonce: Date.now()},
-    });
-  };
+    switch (matchButton.kind) {
+      // Inne i kampen: skjermen eier handlingen (HEIA, eller dokken av/på).
+      // Fanen er allerede valgt — ingen navigasjon.
+      case 'heia':
+      case 'heiet':
+      case 'rapporter':
+      case 'lukk':
+        pressMatch();
+        return;
 
-  const handleNewEvent = () => {
-    const day = sheet.day;
-    closeSheet();
-    // Kommer man fra Kalender, åpnes skjemaet I Kalender-stacken med datoen
-    // man ser på — «Avbryt» skal legge deg tilbake der du var, ikke i Hjem.
-    if (day !== null) {
-      navigation.navigate('KalenderStack', {
-        screen: 'NewEvent',
-        params: {presetDate: day},
-        initial: false,
-      });
-      return;
+      // Én livekamp, utenfor den: åpne den i Kamp-fanen, som er der kampen
+      // bor. ⚠️ Registrerer ingen HEIA — a11y-labelen sier «Åpne kampen»,
+      // og den skal være sann.
+      case 'live':
+      case 'pause':
+        if (matchButton.openEventId) {
+          navigation.navigate('Kamp', {
+            screen: 'EventDetail',
+            params: {eventId: matchButton.openEventId},
+            initial: false,
+          });
+        }
+        return;
+
+      // Hvile: KAMP → Sesongen, som ER roten i fanen. Eksplisitt `screen`,
+      // ikke bare et fanebytte: står en FERDIG kamp igjen på toppen av
+      // stacken, skal knappen føre deg til sesongen — ikke tilbake til
+      // gårsdagens kamp.
+      case 'idle':
+      case 'unknown':
+        navigation.navigate('Kamp', {screen: 'Season'});
+        return;
+
+      // 'heia-tom' er `disabled` og fanget over.
+      default:
+        return;
     }
-    navigation.navigate('HjemStack', {screen: 'NewEvent', initial: false});
   };
 
   return (
     <>
-    <Tab.Navigator
-      // `notifications` er ikke i realtime-publiseringen, så badgen hentes på
-      // nytt hver gang man bytter fane (én HEAD-spørring med count).
-      screenListeners={{focus: () => refreshUnread()}}
-      screenOptions={({route}) => ({
-        headerShown: false,
-        // A v2: aktiv fane = mørk tekst + mint-pille bak ikonet.
-        // (#02FFAB som tekstfarge på lyst brøt kontrastkravet.)
-        tabBarActiveTintColor: colors.textPrimary,
-        tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.tabLabel,
-        // Standard-slotten er ~30 px bred og klipper alt bredere — pillen
-        // trenger hele bredden sin, ellers kuttes glyfen til en strimmel.
-        tabBarIconStyle: styles.tabIconSlot,
-        tabBarIcon: ({color, focused}) => {
-          const IconGlyph = tabIcons[route.name];
-          if (route.name === 'Opprett') {
-            return (
-              <View style={styles.createButton}>
-                <Plus size={24} color={colors.heiaDeep} strokeWidth={2.4} />
-              </View>
-            );
-          }
-          return (
-            <View style={[styles.iconWrap, focused && styles.iconWrapOn]}>
-              <IconGlyph
-                size={21}
-                color={focused ? colors.heiaDeep : color}
-                strokeWidth={focused ? 2.2 : 2}
-              />
-            </View>
-          );
-        },
-      })}>
-      <Tab.Screen
-        name="HjemStack"
-        component={HomeStackNavigator}
-        options={{tabBarLabel: 'Hjem'}}
-      />
-      <Tab.Screen
-        name="KalenderStack"
-        component={KalenderStackNavigator}
-        options={{tabBarLabel: 'Kalender'}}
-      />
-      <Tab.Screen
-        name="Opprett"
-        component={OpprettScreen}
-        options={{tabBarLabel: ''}}
-        listeners={{
-          tabPress: e => {
-            e.preventDefault();
-            setSheet({visible: true, day: calendarFocus.read()});
+      <Tab.Navigator
+        // `notifications` er ikke i realtime-publiseringen, så badgen hentes på
+        // nytt ved fanebytte. Live-kampen henger på samme hendelse, og det er
+        // med vilje: den er den SETTINGS-UAVHENGIGE kilden for en bruker som
+        // har slått av kampvarsler (se `useLiveMatch`). `staleTime` hindrer at
+        // raske fanebytter blir en kallstorm.
+        screenListeners={{
+          focus: () => {
+            refreshUnread();
+            refreshLiveMatch();
           },
         }}
-      />
-      <Tab.Screen
-        name="InboxStack"
-        component={InboxStackNavigator}
-        options={{
-          tabBarLabel: 'Varsler',
-          // undefined = ingen badge. 99+ så tallet ikke sprenger prikken.
-          tabBarBadge:
-            unreadCount > 0
-              ? unreadCount > 99
-                ? '99+'
-                : unreadCount
-              : undefined,
-          tabBarBadgeStyle: styles.tabBadge,
-        }}
-      />
-      <Tab.Screen
-        name="ProfilStack"
-        component={ProfilStackNavigator}
-        options={{tabBarLabel: 'Profil'}}
-      />
-    </Tab.Navigator>
+        screenOptions={({route}) => ({
+          headerShown: false,
+          // A v2: aktiv fane = mørk tekst + mint-pille bak ikonet.
+          // (#02FFAB som tekstfarge på lyst brøt kontrastkravet.)
+          tabBarActiveTintColor: colors.textPrimary,
+          tabBarInactiveTintColor: colors.textTertiary,
+          tabBarStyle: styles.tabBar,
+          tabBarLabelStyle: styles.tabLabel,
+          // Standard-slotten er ~30 px bred og klipper alt bredere — pillen
+          // trenger hele bredden sin, ellers kuttes glyfen til en strimmel.
+          tabBarIconStyle: styles.tabIconSlot,
+          tabBarIcon: ({color, focused}) => {
+            // Midtplassen er ikke et ikon, den er en tilstand. Komponenten
+            // leser den selv, så et mål i kampen ikke rendrer hele fanetreet.
+            if (route.name === 'Kamp') {
+              // Fanen er ekte, så `focused` er sann semantikk — knappen tegner
+              // sin egen valgt-markering (mint ring), uten å bytte fyllfarge.
+              return <MatchTabButton focused={focused} />;
+            }
+            const IconGlyph = tabIcons[route.name];
+            return (
+              <View style={[styles.iconWrap, focused && styles.iconWrapOn]}>
+                <IconGlyph
+                  size={21}
+                  color={focused ? colors.heiaDeep : color}
+                  strokeWidth={focused ? 2.2 : 2}
+                />
+              </View>
+            );
+          },
+        })}>
+        <Tab.Screen
+          name="HjemStack"
+          component={HomeStackNavigator}
+          options={{tabBarLabel: 'Hjem'}}
+        />
+        <Tab.Screen
+          name="KalenderStack"
+          component={KalenderStackNavigator}
+          options={{tabBarLabel: 'Kalender'}}
+        />
+        <Tab.Screen
+          name="Kamp"
+          component={KampStackNavigator}
+          options={{
+            // «Sesongen» i hvile, «Kamp» ellers — prototypens sublabel sier
+            // hvor du havner, ikke hva knappen heter.
+            tabBarLabel: matchButton.tabLabel,
+            // ⚠️ INGEN FALSK KAMP-MARKERING (kildebevarende tabmodell).
+            // Et tidligere utkast ga etiketten aktivt blekk så snart man sto
+            // i EN kamp — også når kampen var åpnet fra Kalender og Kalender
+            // var den ekte valgte fanen. Da lyste to faner samtidig, og den
+            // ene løy. Fanen er ekte nå: biblioteket fargelegger etiketten
+            // når den FAKTISK er fokusert, og ikke ellers.
+            tabBarLabelStyle: styles.tabLabel,
+            // ⚠️ Midtplassens ikonslott er BREDERE enn de andres. Den globale
+            // `tabIconSlot` er 64 pt, og en pille med «RAPPORTER» ble klippet
+            // til «RAPPORT…» inni den. Dette er en per-rute-option: de fire
+            // andre fanene har fortsatt sin egen 64 pt-slott, og elementene er
+            // like brede som før.
+            tabBarIconStyle: {
+              width: matchButtonGeometry(
+                Dimensions.get('window').width,
+                1,
+                matchButton.label,
+                matchButton.shortLabel,
+                matchButtonHasGlyph(matchButton.kind),
+              ).maxWidth,
+              height: 32,
+            },
+            // Hele setningen, ikke bare ordet. Uten den ville VoiceOver lest
+            // «2–1» og ingenting om at det er en live kamp du kan åpne.
+            tabBarAccessibilityLabel: matchButton.a11yLabel,
+          }}
+          listeners={{
+            tabPress: e => {
+              e.preventDefault();
+              handleMatchPress();
+            },
+          }}
+        />
+        <Tab.Screen
+          name="InboxStack"
+          component={InboxStackNavigator}
+          options={{
+            tabBarLabel: 'Varsler',
+            // undefined = ingen badge. 99+ så tallet ikke sprenger prikken.
+            tabBarBadge:
+              unreadCount > 0
+                ? unreadCount > 99
+                  ? '99+'
+                  : unreadCount
+                : undefined,
+            tabBarBadgeStyle: styles.tabBadge,
+          }}
+        />
+        <Tab.Screen
+          name="ProfilStack"
+          component={ProfilStackNavigator}
+          options={{tabBarLabel: 'Profil'}}
+        />
+      </Tab.Navigator>
 
-    <CreateSheet
-      visible={sheet.visible}
-      canCreateEvent={isTeamAdmin(activeRole)}
-      calendarDay={sheet.day}
-      onClose={closeSheet}
-      onShare={handleShare}
-      onNewEvent={handleNewEvent}
-    />
-
-    {/* Over fanene, så varselet følger deg gjennom hele appen. */}
-    <NotificationBanner />
+      {/* Over fanene, så varselet følger deg gjennom hele appen. */}
+      <NotificationBanner />
     </>
   );
 }
@@ -440,6 +529,7 @@ function MainTabs() {
 // ---------------------------------------------------------------------------
 export function AppNavigator() {
   const {session, profile, loading} = useAuth();
+  const {bootReady} = useMatchButton();
   const {userMemberships, loading: teamLoading} = useActiveTeam();
   const {pendingAction, lastError, setLastError} = useOnboarding();
 
@@ -473,7 +563,18 @@ export function AppNavigator() {
   }, [lastError, hasTeam, onboarded, setLastError]);
 
   // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
-  if (loading || (session && !profile) || (session && teamLoading)) {
+  // ⚠️ KAMPKNAPPEN MÅ VÆRE PÅ PLASS FØR APPEN VISES (Brage 2026-08-21).
+  // «viser knappen først kamp, deretter hopper den over til stillingen» —
+  // og `KAMP` betyr «ingen kamp pågår». Å gjøre hoppet penere hjalp ikke;
+  // det eneste som fjerner det er å ikke tegne baren før svaret er der.
+  // `bootReady` har sitt eget tak, så en treg forbindelse aldri kan holde
+  // appen igjen (se `MatchButtonContext`).
+  if (
+    loading ||
+    (session && !profile) ||
+    (session && teamLoading) ||
+    (session && profile && !bootReady)
+  ) {
     return <BootScreen />;
   }
 

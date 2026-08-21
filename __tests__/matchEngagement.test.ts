@@ -17,8 +17,10 @@
 import {
   allowsHeia,
   buildMatchEngagement,
+  newestHeiableMoment,
   pickCanonicalPost,
   showsEngagement,
+  type MatchEngagement,
   type MatchFeedPost,
 } from '../src/shared/matchEngagement';
 import {
@@ -218,5 +220,185 @@ describe('handlingene som tale', () => {
     expect(matchCommentA11yLabel({subject: 'photo', count: 2})).toBe(
       'Åpne samtalen om bildet. 2 kommentarer.',
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NYESTE ØYEBLIKK Å HEIE PÅ — målet for kampknappens «HEIA!» (skive 10)
+// ---------------------------------------------------------------------------
+
+function eng(
+  postId: string,
+  over: Partial<MatchEngagement> = {},
+): MatchEngagement {
+  return {
+    postId,
+    heiaCount: 0,
+    commentCount: 0,
+    iReacted: false,
+    ...over,
+  };
+}
+
+function ms(sekunder: number): Date {
+  return new Date(2026, 7, 20, 18, 0, sekunder);
+}
+
+describe('newestHeiableMoment', () => {
+  const tomt = {
+    matchEvents: [],
+    photos: [],
+    byMatchEvent: new Map<string, MatchEngagement>(),
+    byPost: new Map<string, MatchEngagement>(),
+  };
+
+  it('en kamp der ingenting har skjedd gir null — knappen skal si det', () => {
+    expect(newestHeiableMoment(tomt)).toBeNull();
+  });
+
+  it('velger det NYESTE, ikke det første', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [
+        {id: 'a', type: 'mål', teamSide: 'home', minute: 12},
+        {id: 'b', type: 'mål', teamSide: 'home', minute: 34},
+      ],
+      byMatchEvent: new Map([
+        ['a', eng('p-a', {createdAt: ms(10)})],
+        ['b', eng('p-b', {createdAt: ms(40)})],
+      ]),
+    });
+    expect(m?.postId).toBe('p-b');
+    expect(m?.what).toBe('målet på 34 minutter');
+  });
+
+  /**
+   * ⚠️ P1: INGEN HEIA PÅ MÅL IMOT. Regelen gjenbrukes fra `allowsHeia` —
+   * knappen stiller nøyaktig samme spørsmål som engasjementslinja i
+   * forløpet. Hadde den hatt sin egen kopi, kunne de driftet.
+   */
+  it('hopper over mål IMOT, selv når det er det ferskeste', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [
+        {id: 'oss', type: 'mål', teamSide: 'home', minute: 12},
+        {id: 'dem', type: 'mål', teamSide: 'away', minute: 55},
+      ],
+      byMatchEvent: new Map([
+        ['oss', eng('p-oss', {createdAt: ms(10)})],
+        ['dem', eng('p-dem', {createdAt: ms(60)})],
+      ]),
+    });
+    expect(m?.postId).toBe('p-oss');
+  });
+
+  it('kun mål imot ⇒ null, ikke en knapp som skriver til feil post', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [{id: 'dem', type: 'mål', teamSide: 'away', minute: 55}],
+      byMatchEvent: new Map([['dem', eng('p-dem', {createdAt: ms(60)})]]),
+    });
+    expect(m).toBeNull();
+  });
+
+  it('hopper over rytmemarkørene — avspark er en gate, ikke et øyeblikk', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [
+        {id: 'start', type: 'avspark', minute: 0},
+        {id: 'pause', type: 'pause', minute: 25},
+      ],
+      byMatchEvent: new Map([
+        ['start', eng('p-start', {createdAt: ms(0)})],
+        ['pause', eng('p-pause', {createdAt: ms(90)})],
+      ]),
+    });
+    expect(m).toBeNull();
+  });
+
+  it('en oppdatering teller, og sier hva den er', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [{id: 'msg', type: 'melding', minute: 18}],
+      byMatchEvent: new Map([['msg', eng('p-msg', {createdAt: ms(20)})]]),
+    });
+    expect(m?.what).toBe('oppdateringen fra 18 minutter');
+  });
+
+  it('et bilde kan slå et eldre mål', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [{id: 'a', type: 'mål', teamSide: 'home', minute: 12}],
+      photos: [{id: 'foto1', createdAt: ms(80)}],
+      byMatchEvent: new Map([['a', eng('p-a', {createdAt: ms(10)})]]),
+      byPost: new Map([['foto1', eng('foto1', {createdAt: ms(80)})]]),
+    });
+    expect(m?.postId).toBe('foto1');
+    expect(m?.what).toBe('bildet fra kampen');
+  });
+
+  /**
+   * Det korte vinduet mellom at et ferskt mål dukker opp i forløpet og at
+   * den kanoniske posten er lest inn. Da finnes det ingenting å skrive til,
+   * og knappen skal falle tilbake — ikke peke på forrige mål som om det var
+   * det nye.
+   */
+  it('et øyeblikk uten kanonisk post hoppes over', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [
+        {id: 'a', type: 'mål', teamSide: 'home', minute: 12},
+        {id: 'fersk', type: 'mål', teamSide: 'home', minute: 40},
+      ],
+      byMatchEvent: new Map([['a', eng('p-a', {createdAt: ms(10)})]]),
+    });
+    expect(m?.postId).toBe('p-a');
+  });
+
+  it('bærer med seg om JEG har heiet — det er det som gir «HEIET»', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [{id: 'a', type: 'mål', teamSide: 'home', minute: 12}],
+      byMatchEvent: new Map([
+        ['a', eng('p-a', {createdAt: ms(10), iReacted: true})],
+      ]),
+    });
+    expect(m?.iReacted).toBe(true);
+  });
+
+  /**
+   * ⚠️ TIDEN LESES FRA POSTEN, IKKE FRA `minute`. `minute` er avrundet, og i
+   * en kamp der flere ting skjer i samme minutt ville «nyeste» blitt
+   * tilfeldig. Her har begge minutt 34, men postene er sekunder fra
+   * hverandre.
+   */
+  it('to hendelser i samme MINUTT skilles på postens tidspunkt', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [
+        {id: 'a', type: 'mål', teamSide: 'home', minute: 34},
+        {id: 'b', type: 'melding', minute: 34},
+      ],
+      byMatchEvent: new Map([
+        ['a', eng('p-a', {createdAt: ms(10)})],
+        ['b', eng('p-b', {createdAt: ms(50)})],
+      ]),
+    });
+    expect(m?.postId).toBe('p-b');
+  });
+
+  it('uten tidspunkt brukes rekkefølgen — aldri 1970', () => {
+    const m = newestHeiableMoment({
+      ...tomt,
+      matchEvents: [
+        {id: 'a', type: 'mål', teamSide: 'home', minute: 12},
+        {id: 'b', type: 'mål', teamSide: 'home', minute: 34},
+      ],
+      byMatchEvent: new Map([
+        ['a', eng('p-a')],
+        ['b', eng('p-b')],
+      ]),
+    });
+    expect(m?.postId).toBe('p-b');
   });
 });

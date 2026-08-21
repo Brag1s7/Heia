@@ -667,7 +667,14 @@ export function TeamHomeScreen() {
       {/* Feed — hovedinnhold */}
       <SectionHeader title="Siste fra laget" />
 
-      {/* Compose — avsender + rundt felt + bildeknapp (A v2) */}
+      {/* Compose — avsender + rundt felt + bildeknapp (A v2)
+          ⚠️ DETTE ER «DEL MED LAGET»-INNGANGEN, OG DEN ER PERMANENT (P4,
+          skive 10). Den ligger i `ListHeaderComponent`, som tegnes OVER
+          `ListEmptyComponent` — altså finnes den både når feeden er full og
+          når den er tom, for alle roller. Det var nettopp denne
+          permanensen som gjorde det forsvarlig å fjerne den generiske
+          «+»-knappen fra tab-baren til fordel for kampknappen. Flytter du
+          den inn i en tilstand, mister laget sin eneste vei til å skrive. */}
       <View style={styles.composeCard}>
         <View style={styles.composeRow}>
           <Avatar
@@ -686,6 +693,10 @@ export function TeamHomeScreen() {
               placeholderTextColor={colors.textTertiary}
               multiline
               editable={!posting}
+              // Placeholder leses av VoiceOver, men den er en oppfordring —
+              // ikke navnet på handlingen. Labelen gir feltet produktordet,
+              // det samme som valgarket het før det ble erstattet.
+              accessibilityLabel="Del med laget"
             />
           </View>
           <Pressable
@@ -789,6 +800,11 @@ export function TeamHomeScreen() {
         FlatList (B2): kun det synlige vinduet av feeden er montert, og
         onEndReached henter neste side via cursoren. */}
     <View style={styles.screen}>
+      {/* ⚠️ KILDEBEVARENDE (Brage 2026-08-21): snarveien er en HJEM-inngang
+          til den samme `SeasonScreen` som Kamp-fanen har som rot. Du kom fra
+          Hjem, Hjem forblir valgt, og «tilbake» fører til Hjem. Et fanebytte
+          her ville vært en tilbakeknapp som teleporterer — nettopp det
+          modellen forbyr. */}
       <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
       <FlatList
         data={feed}

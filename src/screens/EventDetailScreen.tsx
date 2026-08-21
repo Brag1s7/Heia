@@ -49,7 +49,14 @@ import {GoalCorrectionSheet} from '../components/match/GoalCorrectionSheet';
 import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
-import {useAuth, useActiveTeam, useNotifications} from '../context';
+import {
+  useAuth,
+  useActiveTeam,
+  useMatchPresence,
+  useNotifications,
+} from '../context';
+import {invalidateLiveMatch} from '../lib/queries/liveMatch';
+import {cheerOnMoment} from '../lib/queries/matchHeia';
 import type {TeamAuthor, TeamMember} from '../lib/api/members';
 import {useTeamAuthors, useTeamMembers} from '../lib/queries/members';
 import {
@@ -96,6 +103,7 @@ import {
   allowsHeia,
   buildMatchEngagement,
   canCorrectGoal,
+  newestHeiableMoment,
   showsEngagement,
   type MatchFeedPost,
 } from '../shared/matchEngagement';
@@ -193,6 +201,23 @@ const ACTION_TO_EVENT: Record<ReporterActionType, ReportMatchEventInput> = {
   andre_omgang: {type: 'andre_omgang'},
   slutt: {type: 'slutt'},
   melding: {type: 'melding'},
+};
+
+/**
+ * KVITTERINGEN PÅ EN FULLFØRT HANDLING (skive 10.1).
+ *
+ * ⚠️ FORTID, IKKE IMPERATIV. «Mål registrert», ikke «Registrer mål» — teksten
+ * er et SVAR på noe som er gjort, og en imperativ ville lest som en ny knapp.
+ * Samme skille som `ACTION_A11Y` i `ReporterActions` gjør motsatt vei: der
+ * beskriver den hva knappen SKAL gjøre.
+ */
+const ACTION_DONE: Record<ReporterActionType, string> = {
+  mål_oss: 'Mål registrert',
+  mål_dem: 'Mål imot registrert',
+  pause: 'Kampen er satt i pause',
+  andre_omgang: 'Andre omgang i gang',
+  slutt: 'Kampen er avsluttet',
+  melding: 'Oppdateringen er delt',
 };
 
 
@@ -407,6 +432,42 @@ export function EventDetailScreen({route, navigation}: Props) {
     },
     [eventId, activeTeamSpaceId],
   );
+
+  /**
+   * HEIA FRA KAMPKNAPPEN — LEGG TIL, ALDRI FJERN (skive 10).
+   *
+   * Selve mekanikken (pending-låsen, den idempotente skrivingen og
+   * cache-patchene) bor i `cheerOnMoment`, ikke her: låsen må overleve at
+   * skjermen rendrer på nytt midt i kallet, og den skal kunne bevises uten
+   * å montere en kampskjerm. Se `src/lib/queries/matchHeia.ts`.
+   *
+   * `handleMatchHeia` over står urørt — i `MatchEngagementRow` ER av/på
+   * riktig oppførsel.
+   */
+  const handleTabHeia = useCallback(
+    (postId: string) =>
+      cheerOnMoment({eventId, teamSpaceId: activeTeamSpaceId, postId}),
+    [eventId, activeTeamSpaceId],
+  );
+
+  const closeReporterDock = useCallback(() => setReporterDockOpen(false), []);
+
+  /**
+   * ⚠️ STABILE IDENTITETER, IKKE PYNT. `MatchPulse` og `MatchTimeline` er
+   * memoisert nettopp for at reporterdokkens av/på ikke skal koste en ny
+   * SVG-kurve og en ny bildefletting midt i animasjonen. En inline
+   * `photo => setGalleryPhotoId(photo.id)` er et NYTT objekt hver render, og
+   * ville gjort begge memoene verdiløse.
+   */
+  const openGalleryPhoto = useCallback(
+    (photo: MatchPhoto) => setGalleryPhotoId(photo.id),
+    [],
+  );
+  const openReporterSheet = useCallback(
+    () => setReporterSheetVisible(true),
+    [],
+  );
+  const clearMatchToast = useCallback(() => setMatchToast(null), []);
 
   // ⚠️ ARK, IKKE NAVIGASJON. Fra kampen skal samtalen komme opp FORAN
   // kampen: en pågående kamp er noe du står i, og å bli skjøvet ut av den
@@ -680,6 +741,105 @@ export function EventDetailScreen({route, navigation}: Props) {
     }, [watchedEventId, watchEvent]),
   );
 
+  // -----------------------------------------------------------------------
+  // KAMPKNAPPEN I TAB-BAREN (P4, skive 10)
+  //
+  // Skjermen MELDER SEG PÅ med det bare den vet: om jeg er reporter, om
+  // dokken står åpen, og hva som er det nyeste øyeblikket å heie på. Baren
+  // regner ingenting selv — se `src/context/MatchButtonContext.tsx`.
+  // -----------------------------------------------------------------------
+  const [reporterDockOpen, setReporterDockOpen] = useState(false);
+  // Kvitteringen på reporterens EGEN handling (skive 10.1). Se `MatchToast`.
+  const [matchToast, setMatchToast] = useState<string | null>(null);
+
+  // Hook-trygg utgave: rolleflaggene lenger nede regnes etter early-returnene.
+  const iAmReporter = !!myId && event?.reporterId === myId;
+
+  /**
+   * ⚠️ DOKKEN NULLSTILLES I FIRE TILFELLER, IKKE ETT.
+   *
+   *   · kampen avsluttes eller avlyses  (`isUnderway`)
+   *   · man bytter til en annen kamp    (`eventId`)
+   *   · man MISTER reporterrollen       (`iAmReporter`) — en lagadmin kan
+   *     bytte reporter midt i kampen (`setMatchReporter`, patchet
+   *     optimistisk inn i cachen). Uten dette ville den avsatte reporteren
+   *     sittet igjen med et åpent verktøy til en kamp hun ikke rapporterer.
+   *   · blur — se fokus-effekten under.
+   *
+   * Prototypen gjør det samme: `S.repOpen=false` ved hvert fasebytte.
+   */
+  useEffect(() => {
+    setReporterDockOpen(false);
+  }, [eventId, iAmReporter, isUnderway]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Går du til kommentarene, en annen fane eller ut av appen, skal
+      // verktøyet være lukket når du kommer tilbake.
+      return () => setReporterDockOpen(false);
+    }, []),
+  );
+
+  /**
+   * ⚠️ SVEIP-TILBAKE AV MENS DOKKEN ER ÅPEN (Brage 2026-08-21).
+   *
+   * «hvis man prøver på dette så er det nesten så man drar seg til venstre ut
+   * av kampsiden.» Stacken kjører `animationMatchesGesture`, så den vannrette
+   * komponenten av et drag ned lakk ut til navigasjonen og begynte å dra
+   * kampen av skjermen. Et ark som ligger over skjermen skal EIE gesten sin.
+   */
+  useEffect(() => {
+    navigation.setOptions({gestureEnabled: !reporterDockOpen});
+  }, [navigation, reporterDockOpen]);
+
+  // Nyeste øyeblikk å heie på. Gjenbruker P1-gaten (`allowsHeia`) via
+  // `newestHeiableMoment` — knappen stiller nøyaktig samme spørsmål som
+  // engasjementslinja i forløpet.
+  const heiaTarget = useMemo(() => {
+    if (!isUnderway || iAmReporter) return null;
+    return newestHeiableMoment({
+      matchEvents: event?.matchEvents ?? NO_MATCH_EVENTS,
+      photos: matchPhotos,
+      byMatchEvent: engagement.byMatchEvent,
+      byPost: engagement.byPost,
+    });
+  }, [isUnderway, iAmReporter, event?.matchEvents, matchPhotos, engagement]);
+
+  const matchPresence = useMemo(
+    () =>
+      isUnderway
+        ? {
+            eventId,
+            isReporter: iAmReporter,
+            dockOpen: reporterDockOpen,
+            heiaTarget,
+            onPress: () => {
+              if (iAmReporter) {
+                setReporterDockOpen(v => !v);
+                return;
+              }
+              // ⚠️ ADD-ONLY. `heiaTarget.iReacted` gjør at knappen står i
+              // «HEIET» og ikke kaller noe i det hele tatt — men vakten står
+              // her også, fordi en tilstand og en handling som er uenige er
+              // nettopp det som sletter brukerens egen heia.
+              if (heiaTarget && !heiaTarget.iReacted) {
+                handleTabHeia(heiaTarget.postId);
+              }
+            },
+          }
+        : null,
+    [
+      isUnderway,
+      eventId,
+      iAmReporter,
+      reporterDockOpen,
+      heiaTarget,
+      handleTabHeia,
+    ],
+  );
+
+  useMatchPresence(matchPresence);
+
   if (eventQuery.isLoading) {
     return (
       <View style={styles.screen}>
@@ -881,6 +1041,7 @@ export function EventDetailScreen({route, navigation}: Props) {
       // start_match har ingen invalidering i api-laget — hent selv (refetch
       // hopper over staleTime), så skjermen flipper til live-modus nå.
       await refetchEvent();
+      invalidateLiveMatch(activeTeamSpaceId);
     } catch (e) {
       Alert.alert(
         'Kunne ikke starte kampen',
@@ -905,6 +1066,25 @@ export function EventDetailScreen({route, navigation}: Props) {
     if (savingAction || !sessionId) return;
 
     setSavingAction(true);
+
+    /**
+     * ⚠️ VERKTØYET FORSVINNER MED ÉN GANG — IKKE ETTER NETTVERKET.
+     *
+     * Brage 2026-08-21: «Hvis jeg rapporterer et mål så vil jeg ikke se
+     * rapporteringskjermen etterpå, kun "mål registrert".»
+     *
+     * Lukkingen lå ETTER `await reportMatchEvent` OG `await refetchEvent()`,
+     * altså etter to rundturer. Dokken ble derfor stående åpen i hele det
+     * øyeblikket reporteren nettopp har handlet — det føltes som om trykket
+     * ikke gjorde noe. Trykket ER handlingen; flaten skal svare på trykket,
+     * ikke på serveren.
+     *
+     * Feiler skrivingen, får hun en Alert (under) — og den er et sterkere
+     * signal enn et verktøy som ble stående.
+     */
+    setReporterDockOpen(false);
+    setMatchToast(ACTION_DONE[type]);
+
     try {
       await reportMatchEvent(sessionId, {
         ...ACTION_TO_EVENT[type],
@@ -914,7 +1094,16 @@ export function EventDetailScreen({route, navigation}: Props) {
       // stillingen og kampforløpet oppdatere seg. Varselet går til de andre,
       // via realtime-abonnementet lenger oppe.
       await refetchEvent();
+      // ⚠️ OG DET ER NETTOPP DERFOR DENNE MÅ STÅ HER. Varseltriggeren hopper
+      // over FORFATTEREN (00023/00051), så reporteren får aldri et
+      // `match_live`-varsel om sitt eget mål, sin egen pause eller sin egen
+      // «Slutt». Uten dette ville kampknappen hennes vist gammel stilling —
+      // og etter «Slutt» påstått at det fortsatt er en livekamp.
+      invalidateLiveMatch(activeTeamSpaceId);
     } catch (e) {
+      // Kvitteringen løy: ta den vekk før feilen vises, ellers står det
+      // «Mål registrert» bak en Alert som sier det motsatte.
+      setMatchToast(null);
       Alert.alert(
         'Kunne ikke rapportere',
         matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
@@ -971,6 +1160,9 @@ export function EventDetailScreen({route, navigation}: Props) {
       setCorrectingGoalId(null);
       invalidateMatchEngagement(eventId);
       await refetchEvent();
+      // Stillingen ble regnet om server-side: knappen utenfor kampen må
+      // ikke stå igjen med den gamle.
+      invalidateLiveMatch(activeTeamSpaceId);
     } catch (e) {
       Alert.alert(
         'Kunne ikke korrigere målet',
@@ -1015,6 +1207,10 @@ export function EventDetailScreen({route, navigation}: Props) {
       });
       setPendingPhoto(null);
       await refetchPhotos();
+      // Samme kvittering som de fem andre handlingene (skive 10.1): bildet
+      // gikk gjennom, og verktøyet trenger ikke stå åpent lenger.
+      setReporterDockOpen(false);
+      setMatchToast('Bildet er lagt ut');
     } catch {
       Alert.alert(
         'Kunne ikke legge ut bildet',
@@ -1109,10 +1305,14 @@ export function EventDetailScreen({route, navigation}: Props) {
           authorFor={authorFor}
           engagement={engagement}
           renderEngagement={renderEngagement}
-          onChangeReporter={() => setReporterSheetVisible(true)}
+          onChangeReporter={openReporterSheet}
           onReporterAction={handleReporterAction}
           onPickPhoto={handlePickPhoto}
-          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+          onPressPhoto={openGalleryPhoto}
+          reporterDockOpen={reporterDockOpen}
+          onCloseReporterDock={closeReporterDock}
+          toast={matchToast}
+          onToastHidden={clearMatchToast}
         />
 
         {/* Reporter-modal */}
@@ -1181,7 +1381,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           authorFor={authorFor}
           engagement={engagement}
           renderEngagement={renderEngagement}
-          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+          onPressPhoto={openGalleryPhoto}
           onEdit={() => navigation.navigate('NewEvent', {eventId})}
         />
 
@@ -1404,7 +1604,7 @@ export function EventDetailScreen({route, navigation}: Props) {
             reporter={reporter}
             isAdmin={isCurrentUserAdmin}
             isMe={isCurrentUserReporter}
-            onChangeReporter={() => setReporterSheetVisible(true)}
+            onChangeReporter={openReporterSheet}
           />
           {canStartMatch && (
             <Button
@@ -1423,7 +1623,7 @@ export function EventDetailScreen({route, navigation}: Props) {
       {isFinishedMatch && (
         <MatchPhotoRail
           photos={matchPhotos}
-          onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+          onPressPhoto={openGalleryPhoto}
         />
       )}
 
@@ -1435,7 +1635,7 @@ export function EventDetailScreen({route, navigation}: Props) {
               photos={matchPhotos}
               startedAt={event.startedAt}
               authorFor={authorFor}
-              onPressPhoto={photo => setGalleryPhotoId(photo.id)}
+              onPressPhoto={openGalleryPhoto}
             />
           </View>
         )}
