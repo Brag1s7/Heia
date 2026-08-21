@@ -350,11 +350,23 @@ function stampOf(
   return undefined;
 }
 
+/**
+ * ⚠️ TIDSAKSEN ER KLOKKETID, IKKE SPILT TID — OG DET ER EN RETTELSE.
+ *
+ * Fram til 00074 fikk denne funksjonen `nowMinute`, og regnet høyre kant som
+ * `startedAt + nowMinute * 60_000`. Det var riktig helt til 00073 gjorde
+ * `minute` til FAKTISK SPILT TID: da pekte uttrykket et kvarters pause for
+ * tidlig, mens hendelsene på kurven lå på klokketid fra feed-posten. Nå-
+ * prikken havnet dermed til VENSTRE for den ferskeste hendelsen.
+ *
+ * Regelen er nå: **posisjoner er klokketid, minuttet er en etikett.**
+ * `nowMs` kommer fra skjermens tick, aldri fra `Date.now()` her inne (P2).
+ */
 export function matchPulseTimeline(
   matchEvents: MatchEvent[],
   byMatchEvent: Map<string, MatchEngagement>,
   startedAt: Date | undefined,
-  nowMinute: number | undefined,
+  nowMs: number | undefined,
   finished: boolean,
 ): PulseTimeline {
   const stamps = matchEvents
@@ -376,12 +388,10 @@ export function matchPulseTimeline(
     return {origin, span: Math.max(1, (end - origin) / 1000)};
   }
 
-  // Live: høyre kant er NÅ. Klokka har bare minuttoppløsning, så kurven
-  // kan flytte seg litt hvert minutt — det er den ærlige prisen for ekte
-  // tid i en pågående kamp, og overgangen er myk (se `MatchPulse`).
-  const now = startedAt
-    ? startedAt.getTime() + (nowMinute ?? 0) * 60_000
-    : last;
+  // Live: høyre kant er NÅ — i klokketid, samme akse som hendelsene ligger
+  // på. `Math.max(now, last)` står igjen som vakt: en hendelse rapportert i
+  // sekundet mellom to tick ville ellers falt utenfor bredden.
+  const now = nowMs ?? last;
   return {origin, span: Math.max(1, (Math.max(now, last) - origin) / 1000)};
 }
 

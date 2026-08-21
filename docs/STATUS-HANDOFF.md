@@ -23,11 +23,13 @@ verdt å lese før neste flate bygges:
 lese den. **`__tests__/pulseModel.harness.test.ts` er designriggen** —
 kjør den og SE på flaten før du leverer noe som tegner (se `### ⏳ SKIVE 5.1`).
 
-🛑 **FØR DU KJØRER APPEN MOT PROD: `00073` (kampuret) MÅ PUSHES FØRST.**
-Grenen inneholder skive 7, og `SESSION_COLUMNS` ber om to kolonner som ikke
-finnes i prod ennå — live-banneret og innboksens live-stripe feiler hardt
-uten dem. Se `### ⏳ SKIVE 7 BYGGET`. `00072` (skive 9) er også upushet, men
-den er ufarlig å vente med.
+✅ **`00072`, `00073` OG `00074` ER I PROD** (pushet 2026-08-21, bekreftet i
+`supabase migration list --linked`). Kampuret er telefontestet av Brage:
+«Tiden funker riktig på alle tre flatene.»
+
+⚠️ **`00074` KOM AV EN REGRESJON `00073` INNFØRTE**, og den er verdt å lese
+før noen rører pulsen eller klokka — se `### ⏳ SKIVE 7 BYGGET`, punktet om
+TO AKSER.
 
 **Skive 1–5 er levert og telefongodkjent. SKIVE 6 (sticky-bar + Reduce
 Motion) ER PÅ RUNDE 2** — runde 1 brukte `stickyHeaderIndices` og ble avvist
@@ -2071,6 +2073,53 @@ den er ikke en formalitet: det er det eneste stedet modellen møter ekte tid.
    uendret? (De skal være det — historikk skrives ikke om.)
 
 </details>
+
+#### ⚠️ 00074 — TO AKSER, OG FELLA MELLOM DEM (2026-08-21)
+
+**Brage, rett etter at 00073 var i prod:** «Når man legger til en hendelse så
+vises de først helt til venstre på pulsskiva, deretter hopper den til høyre
+hvor den skal ligge.»
+
+**⚠️ DETTE ER DEN VIKTIGSTE LÆRDOMMEN FRA SKIVE 7, og den gjelder alt som
+skal plassere noe i kampen:**
+
+> **ETTER 00073 FINNES DET TO TIDSAKSER, OG DE ER IKKE LENGER DEN SAMME.**
+> `minute` er FAKTISK SPILT TID — den hopper ikke over pausen.
+> `created_at`/`started_at` er KLOKKETID — den gjør det.
+> **Minuttet er en ETIKETT. Klokketid er en POSISJON.** Blander man dem,
+> havner ting nøyaktig én pauselengde for langt til venstre.
+
+**Hvordan feilen oppsto:** `stampOf` i `matchPulse.ts` har tre kilder til
+hendelsens tidspunkt. Kilde 1 (`event.createdAt`) sto i typen, men ble
+**aldri mappet** — `get_event_with_rsvp` returnerte den ikke. Kilde 2 (den
+kanoniske feed-postens `created_at`) kommer via en EGEN RPC, et par hundre
+millisekunder senere. I det vinduet gjaldt kilde 3:
+`started_at + minute * 60_000` — en gjetning som var riktig helt til 00073
+gjorde `minute` til spilt tid.
+
+**Rettelsen er den kodekommentaren allerede forutså:** «Den dagen
+`created_at` kommer ut av den RPC-en, blir pulsen bedre uten at en linje her
+endres.» `match_events.created_at` har eksistert siden 00009:47 med
+`DEFAULT now()` — den har bare aldri blitt lest ut. Nå gjør den det, og da:
+· ingen vindu — tidspunktet kommer i SAMME svar som hendelsen
+· ingen gjetning — kilde 3 blir uåpnet i praksis
+· ingen blanding av akser
+
+**Samme feil satt i NÅ-PRIKKEN, og den var ikke oppdaget ennå:**
+`matchPulseTimeline` og `MatchPulse` regnet begge høyre kant som
+`startedAt + minute * 60_000`. Etter en pause ville nå-prikken ligget til
+VENSTRE for den ferskeste hendelsen. Begge tar nå `nowMs` — klokketid fra
+skjermens tick, aldri `Date.now()` inne i komponenten (P2).
+
+**Nye/endrede filer:** `00074_hendelsens_tidspunkt.sql`,
+`lib/api/events.ts` (`mapMatchEventRow` → `createdAt`), `matchPulse.ts`
+(`nowMinute` → `nowMs`), `MatchPulse.tsx` (+`nowMs`), `LiveMatch.tsx`,
+`EventDetailScreen.tsx`, `__tests__/matchPulse.test.ts` (+3 regresjonsvakter
+med en fixtur som HAR pause — uten pause i fixturen er de to aksene like og
+feilen usynlig).
+
+⚠️ **`FinishedMatch` sender ikke `nowMs`, og skal ikke:** en ferdig kamp har
+`slutt` som høyre kant, ikke «nå».
 
 #### ⏳ SKIVE 9 BYGGET — P1 I FEEDEN 2026-08-21 (MIGRASJONEN IKKE PUSHET)
 

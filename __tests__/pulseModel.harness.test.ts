@@ -97,7 +97,12 @@ function build(s: Scene): {model: PulseModel; width: number} {
       id, {postId: id, heiaCount: h, commentCount: k ?? 0, iReacted: false},
     ]),
   );
-  const timeline = matchPulseTimeline(s.events, byMatchEvent, S, s.now, s.finished ?? true);
+  const timeline = matchPulseTimeline(
+    s.events, byMatchEvent, S,
+    // 00074: tidslinja tar klokketid. Scenene oppgir minutter.
+    s.now === undefined ? undefined : S.getTime() + s.now * 60_000,
+    s.finished ?? true,
+  );
   const model = buildPulseModel(
     buildPulseMoments({
       matchEvents: s.events, photos: s.photos ?? [], startedAt: S,

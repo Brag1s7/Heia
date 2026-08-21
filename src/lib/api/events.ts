@@ -903,6 +903,11 @@ export function mapMatchEventRow(
     description,
     teamSide,
     reportedBy: me.reported_by ?? undefined,
+    // ⚠️ 00074. Uten denne hadde pulsen aldri hendelsens EGET tidspunkt og
+    // måtte gjette seg til posisjonen fra `minute` — som etter 00073 er
+    // spilt tid, altså en annen akse enn resten av kurven. Se
+    // `stampOf` i src/shared/matchPulse.ts.
+    createdAt: me.created_at ? new Date(me.created_at) : undefined,
   };
 }
 

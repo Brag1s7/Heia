@@ -986,6 +986,7 @@ export function EventDetailScreen({route, navigation}: Props) {
           teamName={teamName}
           teamColor={activeTeamSpace?.color || colors.heiaInk}
           minute={matchMinute}
+          nowMs={nowMs}
           reporter={reporter}
           isAdmin={isCurrentUserAdmin}
           isReporter={isCurrentUserReporter}

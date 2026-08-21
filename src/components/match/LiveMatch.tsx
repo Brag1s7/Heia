@@ -63,6 +63,15 @@ interface LiveMatchProps {
    * kaller `Date.now()`.
    */
   minute?: number;
+  /**
+   * Klokkeslettet NÅ, fra SAMME tick som `minute` (P2).
+   *
+   * ⚠️ TO TALL, TO AKSER, MED VILJE. `minute` er FAKTISK SPILT TID og er en
+   * etikett; `nowMs` er klokketid og er en POSISJON. Etter 00073 hopper ikke
+   * spilt tid over pausen, mens hendelsenes `created_at` gjør det — brukes
+   * `minute` til å plassere noe på pulsen, havner det for langt til venstre.
+   */
+  nowMs?: number;
   reporter?: User;
   isAdmin: boolean;
   isReporter: boolean;
@@ -103,6 +112,7 @@ export function LiveMatch({
   teamName,
   teamColor,
   minute,
+  nowMs,
   reporter,
   isAdmin,
   isReporter,
@@ -254,6 +264,7 @@ export function LiveMatch({
           engagement={engagement}
           phase={paused ? 'paused' : 'live'}
           minute={minute}
+          nowMs={nowMs}
           authorFor={authorFor}
           onShowInHistory={showInHistory}
         />

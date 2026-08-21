@@ -108,11 +108,14 @@ function model(
     byMatchEvent,
     byPost: opts.byPost ?? new Map(),
   });
+  // ⚠️ `now` i testene er MINUTTER etter avspark, mens tidslinja tar
+  // KLOKKETID (00074). Oversettelsen er trygg her fordi ingen fixtur har
+  // pause — i produksjon er de to aksene ikke lenger den samme.
   const timeline = matchPulseTimeline(
     matchEvents,
     byMatchEvent,
     STARTED,
-    opts.now,
+    opts.now === undefined ? undefined : STARTED.getTime() + opts.now * 60_000,
     opts.finished ?? true,
   );
   return buildPulseModel(
@@ -397,7 +400,7 @@ describe('10 · minutt-tickeren og tidsaksen', () => {
 
   it('en FERDIG kamp henter lengden fra sin egen SLUTT', () => {
     const alt = [...events, rytme('s', 47, 'slutt')];
-    const t = matchPulseTimeline(alt, new Map(), STARTED, 999, true);
+    const t = matchPulseTimeline(alt, new Map(), STARTED, undefined, true);
     expect(t.span).toBe(47 * 60);
   });
 
@@ -413,7 +416,7 @@ describe('10 · minutt-tickeren og tidsaksen', () => {
 
   it('INGEN 5-MINUTTERSKVANTISERING — lengden er sekundene, ikke et gulv', () => {
     const kort = [rytmeS('k', 0, 'avspark'), rytmeS('s', 56, 'slutt')];
-    const t = matchPulseTimeline(kort, new Map(), STARTED, 0, true);
+    const t = matchPulseTimeline(kort, new Map(), STARTED, undefined, true);
     expect(t.span).toBe(56);
   });
 
@@ -431,7 +434,13 @@ describe('10 · minutt-tickeren og tidsaksen', () => {
 
   it('tidsstemplene er med i memo-nøkkelen — de ER posisjonen', () => {
     const inn = input({matchEvents: events, byMatchEvent: new Map()});
-    const t = matchPulseTimeline(events, new Map(), STARTED, 40, false);
+    const t = matchPulseTimeline(
+      events,
+      new Map(),
+      STARTED,
+      STARTED.getTime() + 40 * 60_000,
+      false,
+    );
     expect(pulseSignature(inn, t)).toBe(pulseSignature(inn, t));
     expect(pulseSignature(inn, {origin: t.origin, span: t.span + 60})).not.toBe(
       pulseSignature(inn, t),
@@ -808,5 +817,119 @@ describe('memoiseringsnøkkelen — LÅST, og den er ikke `length`', () => {
 
   it('kampstart er med — den avgjør hvilket minutt hvert bilde havner på', () => {
     ulik({startedAt: new Date(STARTED.getTime() + 60_000)});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 00074 — HENDELSEN SKAL LIGGE DER DEN SKJEDDE, MED EN GANG
+// ---------------------------------------------------------------------------
+
+describe('⭐ 00074: pulsens tidsakse er KLOKKETID', () => {
+  /**
+   * ⚠️ FEILEN BRAGE SÅ (2026-08-21): «når man legger til en hendelse så vises
+   * de først helt til venstre på pulsskiva, deretter hopper den til høyre».
+   *
+   * `stampOf` hadde tre kilder, og kilde 1 (`event.createdAt`) ble ALDRI
+   * mappet — så en fersk hendelse falt gjennom til kilde 3,
+   * `startedAt + minute * 60_000`. Det var riktig helt til 00073 gjorde
+   * `minute` til FAKTISK SPILT TID: da peker uttrykket en hel pause for
+   * tidlig, mens resten av kurven ligger på klokketid.
+   *
+   * Fixturen under ER den situasjonen: en kamp med 20 minutters pause.
+   */
+  const KICKOFF = STARTED.getTime();
+  const wall = (min: number): Date => new Date(KICKOFF + min * 60_000);
+
+  // Klokketid: avspark 0′, mål 10′, pause 20′–40′, mål 45′ (= spilt 25′).
+  const medPause: MatchEvent[] = [
+    {
+      id: 'k',
+      matchId: 'm',
+      type: 'avspark',
+      minute: 0,
+      description: '',
+      createdAt: wall(0),
+    },
+    {
+      id: 'g1',
+      matchId: 'm',
+      type: 'mål',
+      minute: 10,
+      description: '',
+      teamSide: 'home',
+      createdAt: wall(10),
+    },
+    {
+      id: 'p',
+      matchId: 'm',
+      type: 'pause',
+      minute: 20,
+      description: '',
+      createdAt: wall(20),
+    },
+    {
+      id: 'a',
+      matchId: 'm',
+      type: 'andre_omgang',
+      minute: 20,
+      description: '',
+      createdAt: wall(40),
+    },
+    // ⚠️ minute = 25 (SPILT tid), createdAt = 45′ (KLOKKETID). Det er hele saken.
+    {
+      id: 'g2',
+      matchId: 'm',
+      type: 'mål',
+      minute: 25,
+      description: '',
+      teamSide: 'home',
+      createdAt: wall(45),
+    },
+  ];
+
+  it('bruker hendelsens eget createdAt, ikke startedAt + minute', () => {
+    const t = matchPulseTimeline(
+      medPause,
+      new Map(),
+      STARTED,
+      KICKOFF + 45 * 60_000,
+      false,
+    );
+    const m = buildPulseMoments(
+      input({
+        matchEvents: medPause,
+        photos: [],
+        byMatchEvent: new Map(),
+        byPost: new Map(),
+      }),
+      t,
+    );
+    const siste = m.find(x => x.key.includes('g2'))!;
+
+    // 45 av 45 minutter = helt til høyre. Gjettingen ville gitt 25/45 = 56 %,
+    // altså midt på skiva — og så et hopp når feed-posten landet.
+    expect(siste.seconds).toBeCloseTo(45 * 60, 3);
+    expect(siste.seconds / t.span).toBeCloseTo(1, 3);
+  });
+
+  it('⚠️ REGRESJONSVAKT: spilt tid ville lagt målet mye lenger til venstre', () => {
+    // Den gamle formelen, skrevet ut. Står den igjen noe sted, er avstanden
+    // her beviset på hvor galt det blir.
+    const gjettet = (25 * 60) / (45 * 60);
+    expect(gjettet).toBeLessThan(0.6);
+  });
+
+  it('nå-kanten er klokketid, så en fersk hendelse aldri faller utenfor', () => {
+    // Nå-tallet er 45′ i klokketid. Hadde tidslinja fått SPILT tid (25′),
+    // ville den ferskeste hendelsen ligget UTENFOR høyre kant.
+    const feil = matchPulseTimeline(
+      medPause,
+      new Map(),
+      STARTED,
+      KICKOFF + 25 * 60_000,
+      false,
+    );
+    // `Math.max(now, last)` redder bredden uansett — vakten er der med vilje.
+    expect(feil.span).toBeCloseTo(45 * 60, 3);
   });
 });

@@ -119,13 +119,23 @@ interface MatchPulseProps {
   };
   phase: 'live' | 'paused' | 'finished';
   /**
-   * Kampminuttet NÅ.
+   * Kampminuttet NÅ — FAKTISK SPILT TID (P2/00073).
    *
-   * ⚠️ PROP, ALDRI EGEN UTREGNING — og den rører aldri hendelsesgeometrien.
-   * Tidsaksens lengde kvantiseres til fem minutter (`matchPulseSpan`), så
-   * tickeren kan ikke regenerere kurven. NÅ-markøren flyttes for seg.
+   * ⚠️ EN ETIKETT, IKKE EN POSISJON. Den skrives ut til høyre («NÅ 40′») og
+   * rører ikke geometrien i det hele tatt. Etter 00073 er den en ANNEN akse
+   * enn kurven: spilt tid hopper ikke over pausen, klokketid gjør det.
+   * Bruker man den til å plassere noe, havner det for langt til venstre.
+   *
+   * ⚠️ PROP, ALDRI EGEN UTREGNING.
    */
   minute?: number;
+  /**
+   * Klokkeslettet NÅ, fra skjermens tick (P2 — aldri `Date.now()` her inne).
+   *
+   * ⚠️ DETTE er tidsaksens høyre kant. Hendelsene ligger på klokketid
+   * (`created_at`), så nå-prikken må gjøre det samme. Se `matchPulseTimeline`.
+   */
+  nowMs?: number;
   authorFor?: (userId: string) => {name: string} | undefined;
   /** «Vis i historien» — ruller til øyeblikkets rad i kampforløpet. */
   onShowInHistory?: (target: {eventId?: string; photoId?: string}) => void;
@@ -138,6 +148,7 @@ export function MatchPulse({
   engagement,
   phase,
   minute,
+  nowMs,
   authorFor,
   onShowInHistory,
 }: MatchPulseProps) {
@@ -160,7 +171,7 @@ export function MatchPulse({
     matchEvents,
     engagement.byMatchEvent,
     startedAt,
-    minute,
+    nowMs,
     finished,
   );
 
@@ -261,9 +272,9 @@ export function MatchPulse({
 
   const inner = box ? box.w - PAD_H * 2 : 0;
   // NÅ-markøren flyttes for seg, oppå den memoiserte kurven.
-  const nowSeconds = startedAt
-    ? (startedAt.getTime() + (minute ?? 0) * 60_000 - timeline.origin) / 1000
-    : timeline.span;
+  // ⚠️ KLOKKETID, ikke `minute`. Se `nowMs` i propsene.
+  const nowSeconds =
+    nowMs !== undefined ? (nowMs - timeline.origin) / 1000 : timeline.span;
   const nowX =
     box && !finished
       ? CURVE_PAD +
