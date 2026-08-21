@@ -23,6 +23,12 @@ verdt å lese før neste flate bygges:
 lese den. **`__tests__/pulseModel.harness.test.ts` er designriggen** —
 kjør den og SE på flaten før du leverer noe som tegner (se `### ⏳ SKIVE 5.1`).
 
+🛑 **FØR DU KJØRER APPEN MOT PROD: `00073` (kampuret) MÅ PUSHES FØRST.**
+Grenen inneholder skive 7, og `SESSION_COLUMNS` ber om to kolonner som ikke
+finnes i prod ennå — live-banneret og innboksens live-stripe feiler hardt
+uten dem. Se `### ⏳ SKIVE 7 BYGGET`. `00072` (skive 9) er også upushet, men
+den er ufarlig å vente med.
+
 **Skive 1–5 er levert og telefongodkjent. SKIVE 6 (sticky-bar + Reduce
 Motion) ER PÅ RUNDE 2** — runde 1 brukte `stickyHeaderIndices` og ble avvist
 på telefonen; bevegelsen er nå muntlig godkjent («Nå funker det veldig
@@ -1702,7 +1708,7 @@ en REELL begrensning.
 | 4 | **Kanonisk kobling + HEIA/kommentarer** (`00071_kampfeed.sql`) | ✅ LEVERT OG TELEFONGODKJENT + 4.1–4.4. Migrasjon I PROD |
 | 5 | **Kampens puls** (`MatchPulse`) | ✅ LEVERT OG TELEFONGODKJENT — 4 runder. Modellen: `docs/KAMPENS-PULS-MODELL.md` |
 | 6 | **Sticky-bar + Reduce Motion** | ⏳ RUNDE 2 — bevegelsen godkjent, resten venter |
-| 7 | **Kampuret** (serverautoritativt) | se P2 — server først, så app |
+| 7 | **Kampuret** (serverautoritativt) | ⏳ BYGGET — `00073` IKKE PUSHET ⚠️ |
 | 8 | **Angre mål** (10 s) | se P3 |
 | 9 | **`get_team_feed`-gaten for mål imot** | ⏳ BYGGET — `00072` IKKE PUSHET |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
@@ -1986,6 +1992,83 @@ funker det veldig bra!»** Resten står igjen.
     Ridabu G14 1. 36 minutter spilt.»), og finnes IKKE når den er borte.
     «Kampen» skal være borte for skjermleseren når den er tonet ut. **Og
     baren skal aldri lese seg selv opp av seg selv når minuttet tikker.**
+
+</details>
+
+#### ⏳ SKIVE 7 BYGGET — KAMPURET 2026-08-21 (MIGRASJONEN IKKE PUSHET)
+
+🛑🛑 **IKKE KJØR APPEN FRA DENNE GRENEN MOT PROD FØR `00073` ER PUSHET.**
+Dette er strengere enn jeg først antok, og det er verdt å forstå hvorfor:
+
+> `get_event_with_rsvp` returnerer **jsonb**, så kampskjermen tåler at
+> nøklene mangler — der er reserven i `matchClock.ts` nok. Men banneret og
+> innboksen går via **PostgREST med en eksplisitt kolonneliste**
+> (`SESSION_COLUMNS`), og en kolonne som ikke finnes gir en HARD FEIL på
+> spørringen. Live-banneret og innboksens live-stripe blir altså BORTE, ikke
+> unøyaktige, mot en prod uten 00073.
+
+Det bryter ikke deployrekkefølgen P2 allerede krever (server først) — men det
+gjør den obligatorisk i stedet for anbefalt.
+
+**Nye/endrede filer:** `supabase/migrations/00073_kampuret.sql`,
+`src/shared/matchClock.ts` (NY — den ene utregningen),
+`lib/api/events.ts` (`SESSION_COLUMNS` + mapping), `types.ts`,
+`EventDetailScreen`, `LiveMatchBanner`, `InboxScreen`,
+`__tests__/matchClock.test.ts` (11).
+
+**MODELLEN:** `played_seconds` (akkumulert spilt tid fram til forrige stopp)
++ `clock_started_at` (når uret sist startet; NULL = det står). Spilt tid nå =
+summen. To tall, ingen historikk å tolke.
+
+**⚠️ HVORFOR IKKE SUMMERE PAUSENE FRA `match_events`:** det ville gjort
+klokka avhengig av at forløpet er komplett og riktig sortert — og **skive 8
+(angre) kommer til å fjerne hendelser fra nettopp det forløpet.**
+
+**Fem ting som er verdt å kjenne:**
+
+1. ⚠️ **`started_at` SKRIVES ALDRI OM.** Den er historikk («når begynte
+   kampen»), ikke klokke. Etter første pause er `started_at` og
+   `clock_started_at` FORSKJELLIGE tall, og det er hele poenget.
+2. ⚠️ **REKKEFØLGEN I `report_match_event` BETYR NÅ NOE.** `v_minute` regnes
+   FØR overgangene. Ellers ville pausehendelsen fått minuttet den fryser på,
+   og «andre_omgang» fått minuttet fra et ur som nettopp ble nullstilt.
+   Rekkefølgen er den samme som 00021 alltid har hatt — men den var tilfeldig
+   riktig før, og er nødvendig nå.
+3. ⚠️ **EN `DO`-BLOKK MED `pg_get_functiondef` BLE PRØVD OG FORKASTET.**
+   `get_event_with_rsvp` er gjengitt ORDRETT (00020:245-393) med nøyaktig to
+   nye nøkler. En run-time omskriving av en SECURITY DEFINER-funksjon kan
+   ikke leses i en diff, og er ikke noe man skal måtte stole på i prod.
+4. ⚠️ **BACKFILLEN ER BESKJEDEN MED VILJE.** Pausene som allerede har vært
+   finnes ikke som varighet noe sted. Målet er kun: vis det SAMME som i dag i
+   det øyeblikket migrasjonen kjører, og la den nye modellen gjelde derfra.
+   En kamp i pause vil altså FRYSE der den står — det er den ønskede
+   endringen, ikke et hopp.
+5. ⚠️ **RESERVEN I `matchClock.ts` GJENSKAPER DAGENS FEIL, DEN RETTER DEN
+   IKKE.** Mangler `playedSeconds`, teller klokka gjennom pausen som før —
+   fordi et 0′ på en kamp som spilles er verre enn et for høyt tall. Den er
+   dokumentert i en egen test, og **kan fjernes når 00073 har stått i prod en
+   stund.**
+
+<details><summary>📱 REKKEFØLGE OG TEST FOR SKIVE 7</summary>
+
+**Steg 1 — SERVER (må gjøres først):** `supabase db push`, deretter
+KONTROLL 1 og 2 nederst i `00073_kampuret.sql`.
+
+**Steg 2 — DEN MANUELLE PAUSE/GJENOPPTA-RUNDEN MOT PROD.** P2 krever den, og
+den er ikke en formalitet: det er det eneste stedet modellen møter ekte tid.
+· start testkamp, vent ~2 min → teller
+· PAUSE, vent ~2 min → **står bom stille**
+· andre omgang, vent ~1 min → fortsetter fra der det sto
+· rapporter et mål → `match_events.minute` skal være SPILT tid
+· `SELECT minute FROM match_events ORDER BY sequence;` → ingen hopp
+
+**Steg 3 — FØRST DA: appen.** På telefonen:
+1. Kampskjermen, live-banneret og innboksens live-stripe viser **samme
+   minutt i samme øyeblikk.** (Var tre uavhengige regnestykker.)
+2. I pause: står minuttet stille alle tre stedene?
+3. Pulsen og sticky-baren arver samme tall som arenaen.
+4. En kamp som ble spilt FØR migrasjonen: er minuttene i kampforløpet
+   uendret? (De skal være det — historikk skrives ikke om.)
 
 </details>
 

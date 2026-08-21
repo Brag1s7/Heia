@@ -123,8 +123,21 @@ export interface HeiaEvent {
   reporterId?: string;
   /** Satt for kamper. Nøkkelen skriving mot match_sessions/match_events går på. */
   matchSessionId?: string;
-  /** Satt når kampen er startet. Kampminuttet regnes ut fra denne. */
+  /**
+   * ⚠️ HISTORIKK, IKKE KLOKKE (P2/00073). Når kampen faktisk begynte.
+   * Skrives ALDRI om. Kampminuttet regnes IKKE av denne lenger — den teller
+   * gjennom pausen. Se `playedSeconds`/`clockStartedAt` og
+   * `src/shared/matchClock.ts`.
+   */
   startedAt?: Date;
+  /**
+   * Akkumulert FAKTISK SPILT TID fram til forrige stopp (00073).
+   * `undefined` = serveren er eldre enn 00073; da faller `matchClock` tilbake
+   * på den gamle oppførselen. Se `matchPlayedSeconds`.
+   */
+  playedSeconds?: number;
+  /** Når kampuret sist ble startet. `undefined` = uret står. (00073) */
+  clockStartedAt?: Date;
   /**
    * Turneringen kampen hører til (00032). En turneringskamp er en HELT
    * VANLIG kamp — samme kampmotor, samme live-rapportering, samme kort —

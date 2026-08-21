@@ -96,6 +96,7 @@ import {
 } from '../shared/matchEngagement';
 import {matchCommentA11yLabel, matchHeiaA11yLabel} from '../shared/matchCopy';
 import {GRID_FONT_CAP} from '../shared/matchGridGeometry';
+import {matchMinute as matchMinute_} from '../shared/matchClock';
 import {dayRangeLabel} from '../shared/calendar';
 import {eventIsUpcoming} from '../shared/eventForm';
 import type {
@@ -701,8 +702,18 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Speiler start_match: admin, eller en reporter som alt er utpekt.
   const canStartMatch = isCurrentUserAdmin || isCurrentUserReporter;
 
+  // ⚠️ P2: FAKTISK SPILT TID, og ÉN utregning for hele appen. Var
+  // `now − startedAt` her, i `LiveMatchBanner` og i `InboxScreen` — tre
+  // kopier som alle telte gjennom pausen. Se `src/shared/matchClock.ts`.
   const matchMinute = event.startedAt
-    ? Math.max(0, Math.floor((nowMs - event.startedAt.getTime()) / 60_000))
+    ? matchMinute_(
+        {
+          playedSeconds: event.playedSeconds,
+          clockStartedAt: event.clockStartedAt,
+          startedAt: event.startedAt,
+        },
+        nowMs,
+      )
     : undefined;
 
   // Rapporten leses som en historie: avspark først, slutt sist. Motsatt av

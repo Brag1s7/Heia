@@ -6,6 +6,7 @@ import {StadiumSurface} from './StadiumSurface';
 import {TeamBadge} from './TeamBadge';
 import {useActiveTeam} from '../context';
 import {useGoalMoment, GOAL_CELEBRATION_TINT} from './useGoalMoment';
+import {matchMinute} from '../shared/matchClock';
 import type {HeiaEvent} from '../shared/types';
 
 interface LiveMatchBannerProps {
@@ -46,9 +47,19 @@ export function LiveMatchBanner({event, onPress}: LiveMatchBannerProps) {
 
   const teamName = activeTeamSpace?.displayName ?? 'Oss';
   const teamColor = activeTeamSpace?.color || colors.info;
+  // ⚠️ P2: samme utregning som kampskjermen og innboksen. Banneret hadde sin
+  // egen kopi som telte gjennom pausen — og siden den brukte `Date.now()`
+  // direkte, kunne den også vise et annet minutt enn skjermen den fører til.
   const minute =
     !isPaused && event.startedAt
-      ? Math.max(0, Math.floor((Date.now() - event.startedAt.getTime()) / 60000))
+      ? matchMinute(
+          {
+            playedSeconds: event.playedSeconds,
+            clockStartedAt: event.clockStartedAt,
+            startedAt: event.startedAt,
+          },
+          Date.now(),
+        )
       : null;
 
   return (

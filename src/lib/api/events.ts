@@ -37,8 +37,15 @@ export const MATCH_STATUS_MAP: Record<string, MatchStatus> = {
   avlyst: 'cancelled',
 };
 
+// ⚠️ EKSPLISITT KOLONNELISTE — en ny kolonne i `match_sessions` når IKKE
+// appen før den står her. `played_seconds`/`clock_started_at` (00073) er
+// kampuret; uten dem i denne strengen ville banneret og innboksen falt
+// tilbake på den gamle klokka som teller gjennom pausen, mens kampskjermen
+// (som går via `get_event_with_rsvp`) viste riktig tid. To flater, to
+// minutter — nøyaktig feilen P2 finnes for å hindre.
 const SESSION_COLUMNS =
-  'id, opponent, home_score, away_score, is_home, status, reporter_id, started_at';
+  'id, opponent, home_score, away_score, is_home, status, reporter_id, ' +
+  'started_at, played_seconds, clock_started_at';
 
 const EVENT_COLUMNS = `
   id, type, title, description, location, start_time, end_time, meeting_time,
@@ -102,6 +109,16 @@ function mapEventRow(
     reporterId: session?.reporter_id ?? undefined,
     matchSessionId: session?.id ?? undefined,
     startedAt: session?.started_at ? new Date(session.started_at) : undefined,
+    // P2/00073: kampuret. To tall, ikke ett — `started_at` teller gjennom
+    // pausen og er historikk, ikke klokke. Mangler de, er serveren eldre enn
+    // 00073, og `matchClock` faller tilbake på den gamle oppførselen.
+    playedSeconds:
+      session?.played_seconds === null || session?.played_seconds === undefined
+        ? undefined
+        : Number(session.played_seconds),
+    clockStartedAt: session?.clock_started_at
+      ? new Date(session.clock_started_at)
+      : undefined,
     parentEventId: row.parent_event_id ?? undefined,
   };
 }
