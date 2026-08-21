@@ -48,6 +48,17 @@ export interface MatchEvent {
   minute: number;
   player?: string;
   description: string;
+  /**
+   * ⚠️ MÅLETS FRIE BESKRIVELSE — og KUN når den er noe annet enn målscoreren.
+   *
+   * `report_match_event` har historisk hatt ÉTT tekstfelt, og det havnet i
+   * `match_events.description` og ble vist som målscorer. «Korriger mål»
+   * (skive 8) skriver de to fra hverandre: scoreren i `player_name`,
+   * beskrivelsen i `description`. `note` settes derfor bare når `player_name`
+   * finnes — ellers ville en gammel målpost vist samme navn to ganger.
+   * Se `mapMatchEventRow`.
+   */
+  note?: string;
   /** `home` = oss, `away` = motstander. Satt for mål. */
   teamSide?: 'home' | 'away';
   reportedBy?: string;
@@ -189,7 +200,6 @@ export interface FeedItem {
   content: string;
   /** Bildet som path + variant (P4) — aldri en ferdig URL. `MediaImage` viser den. */
   media?: MediaRef;
-  matchEvent?: MatchEvent;
   /**
    * Kampkontekst fra `get_team_feed` (00029). Satt på poster som hører til en
    * kamp. `home`/`away` er kampens stilling NÅ (ferdig kamp: sluttresultatet);

@@ -25,6 +25,7 @@ import {
   getFeedPost,
 } from '../lib/api/comments';
 import {toggleReaction, deletePost} from '../lib/api/feed';
+import {feedAllowsHeia, isSystemMatchPost} from '../shared/matchEngagement';
 import {adjustFeedItemCounts} from '../lib/queries/feed';
 import {adjustMatchEngagement} from '../lib/queries/eventDetail';
 import {promptReport} from '../lib/moderation';
@@ -165,7 +166,9 @@ export function CommentThread({
         onPress: () => promptReport('feed_post', post.id),
       });
     }
-    if (own || amAdmin) {
+    // ⚠️ SAMME GATE SOM I FEEDEN (P3, skive 8): systemets kampposter rettes
+    // i kampen, ikke slettes her. Se `TeamHomeScreen`/`soft_delete_post`.
+    if ((own || amAdmin) && !isSystemMatchPost(post.type)) {
       buttons.push({
         text: 'Slett innlegget',
         style: 'destructive',
@@ -321,30 +324,40 @@ export function CommentThread({
               />
             )}
             {/* Du står PÅ innlegget — da skal du også kunne heie på det.
-                Samme pill-språk som FeedCard; aktiv 👏 er et Heia-øyeblikk. */}
-            <View style={styles.reactionRow}>
-              <Pressable
-                onPress={handleHeia}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="Heia"
-                style={({pressed}) => [
-                  styles.reactPill,
-                  post.iReacted && styles.reactPillOn,
-                  pressed && styles.reactPillPressed,
-                ]}>
-                <Text
-                  style={[
-                    styles.reactText,
-                    post.iReacted && styles.reactTextOn,
+                Samme pill-språk som FeedCard; aktiv 👏 er et Heia-øyeblikk.
+
+                ⚠️ P1 GJELDER OGSÅ HER. Tråden nås fra feeden OG fra et varsel,
+                og uten gaten var dette den siste åpne veien til å heie på et
+                baklengsmål — basen ville avvist trykket (00075), altså en død
+                knapp. Samme delte regel som feeden bruker. */}
+            {feedAllowsHeia({
+              postType: post.type,
+              matchEvent: post.matchEvent,
+            }) && (
+              <View style={styles.reactionRow}>
+                <Pressable
+                  onPress={handleHeia}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Heia"
+                  style={({pressed}) => [
+                    styles.reactPill,
+                    post.iReacted && styles.reactPillOn,
+                    pressed && styles.reactPillPressed,
                   ]}>
-                  👏{' '}
-                  {(post.heiaCount ?? 0) > 0
-                    ? `${post.heiaCount} heier`
-                    : 'Heia'}
-                </Text>
-              </Pressable>
-            </View>
+                  <Text
+                    style={[
+                      styles.reactText,
+                      post.iReacted && styles.reactTextOn,
+                    ]}>
+                    👏{' '}
+                    {(post.heiaCount ?? 0) > 0
+                      ? `${post.heiaCount} heier`
+                      : 'Heia'}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         )}
 

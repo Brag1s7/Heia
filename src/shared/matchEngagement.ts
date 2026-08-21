@@ -194,3 +194,68 @@ export function allowsHeia(event: EngagementSubject): boolean {
   }
   return event.type === 'melding';
 }
+
+/**
+ * ER DETTE SYSTEMETS EGEN POST FOR ET KAMPØYEBLIKK?
+ *
+ * ⚠️ SKILLET GÅR PÅ POSTTYPE, IKKE PÅ `matchEventId`. Et kampbilde bærer
+ * SAMME `match_event_id` som øyeblikket det henger på (00028) — men det er
+ * BRUKERENS innhold. Systemets post er den `report_match_event`/`start_match`
+ * skriver i samme transaksjon som hendelsen.
+ *
+ * Skillet avgjør tre ting, og alle tre er farlige å ta feil av:
+ *   · om «Slett innlegget» skal finnes (00075: den skal ikke, på systemposter)
+ *   · om HEIA skal gates bort på et mål imot (bildet skal beholde sin)
+ *   · hvilken post en korrigering rører
+ */
+export function isSystemMatchPost(postType: string): boolean {
+  return (
+    postType === 'match_event' ||
+    postType === 'match_start' ||
+    postType === 'match_end'
+  );
+}
+
+/** Feedens rad, redusert til det HEIA-gaten faktisk spør om. */
+export interface FeedHeiaSubject {
+  /** `feed_posts.type`. */
+  postType: string;
+  /** Kampøyeblikket posten hører til — mangler på alt annet. */
+  matchEvent?: EngagementSubject;
+}
+
+/**
+ * ⚠️ FEEDENS HEIA-GATE (P1, skive 9 — SMALNET I SKIVE 8).
+ *
+ * Feeden har HEIA på avspark, bilder, resultater og vanlige innlegg, og skal
+ * beholde det. Det ENESTE som mister knappen er systemets egen post for et
+ * mål imot.
+ *
+ * ⚠️ `isSystemMatchPost`-leddet er ikke pynt. `get_team_feed` henter
+ * `match_event_type` gjennom `feed_posts.match_event_id`, og et BILDE festet
+ * til et baklengsmål bærer den samme koblingen. Uten leddet forsvant HEIA fra
+ * brukerens eget bilde — og speilbildet i basen (`trg_no_heia_on_opponent_goal`,
+ * 00075) ville avvist skrivingen, så knappen hadde vært død om den ble tegnet.
+ * Klient og base stiller nå NØYAKTIG samme spørsmål.
+ */
+export function feedAllowsHeia(item: FeedHeiaSubject): boolean {
+  if (!item.matchEvent || !isSystemMatchPost(item.postType)) {
+    return true;
+  }
+  return !isOpponentGoal(item.matchEvent);
+}
+
+/**
+ * KAN ØYEBLIKKET KORRIGERES? (skive 8)
+ *
+ * Bare mål. Rytmemarkørene eier kampuret (00073) og kan ikke rettes uten å
+ * reversere tid; en melding er reporterens egne ord og har ingen stilling å
+ * regne om. Serveren håndhever det samme (`correct_match_goal`), så en flate
+ * som tegner knappen på feil rad får en lesbar feil, ikke en stille suksess.
+ *
+ * ⚠️ HVEM som får lov er et ROLLESPØRSMÅL og hører ikke hjemme her — det er
+ * reporteren eller en lagadmin, og kalleren vet hvem den er.
+ */
+export function canCorrectGoal(event: EngagementSubject): boolean {
+  return event.type === 'mål';
+}

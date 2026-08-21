@@ -166,6 +166,63 @@ export function applyMatchEventInsert(eventId: string, row: any): boolean {
 }
 
 /**
+ * En RETTET kamphendelse fra payload (skive 8). Raden byttes ut PÅ PLASS.
+ *
+ * ⚠️ IKKE `applyMatchEventInsert` med en «finnes den fra før»-sjekk. Den
+ * returnerer `true` og gjør INGENTING når id-en finnes — som er riktig for et
+ * eget ekko, og helt galt for en rettelse: målet ville blitt stående med
+ * gammel side og gammel målscorer til neste refetch.
+ *
+ * Kjenner vi ikke raden (kampen er ikke lastet, eller hendelsen kom mens
+ * skjermen var borte), returneres false og kalleren refetcher.
+ */
+export function applyMatchEventUpdate(eventId: string, row: any): boolean {
+  const detail = queryClient.getQueryData<HeiaEventDetail>(
+    eventDetailKey(eventId),
+  );
+  if (!detail?.matchEvents?.some(e => e.id === row.id)) {
+    return false;
+  }
+  const mapped = mapMatchEventRow(
+    row,
+    detail.matchSessionId ?? row.match_session_id,
+    detail.opponent ?? 'motstanderen',
+  );
+  patchEventDetail(eventId, d => ({
+    ...d,
+    matchEvents: (d.matchEvents ?? []).map(e => (e.id === row.id ? mapped : e)),
+  }));
+  return true;
+}
+
+/**
+ * En ANNULLERT kamphendelse (skive 8) — ut av forløpet.
+ *
+ * Stillingen røres ikke her: korrigeringen skriver `match_sessions` i samme
+ * transaksjon, så den kommer som en egen `session`-payload med den ferdig
+ * omregnede stillingen. To kilder til stillingen er nøyaktig det P2 forbød.
+ */
+export function applyMatchEventDelete(
+  eventId: string,
+  matchEventId: string,
+): boolean {
+  const detail = queryClient.getQueryData<HeiaEventDetail>(
+    eventDetailKey(eventId),
+  );
+  if (!detail) {
+    return false;
+  }
+  if (!detail.matchEvents?.some(e => e.id === matchEventId)) {
+    return true; // alt borte (eget ekko etter refetch)
+  }
+  patchEventDetail(eventId, d => ({
+    ...d,
+    matchEvents: (d.matchEvents ?? []).filter(e => e.id !== matchEventId),
+  }));
+  return true;
+}
+
+/**
  * match_sessions-UPDATE fra payload (B3, P6: «scoreboard fra payload —
  * stillingen ligger komplett i raden»). Patcher stilling, status, reporter
  * og starttid; feltene mappes som i mapEventRow (home = oss, alltid).

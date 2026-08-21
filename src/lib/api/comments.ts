@@ -4,7 +4,11 @@ import {fetchTeamAuthorsCached} from '../queries/members';
 import {getUserId} from './authUser';
 import {HEIA_EMOJI} from './feed';
 import {primeMediaUrls} from '../media/resolver';
-import type {FeedComment, FeedItem} from '../../shared/types';
+import type {
+  FeedComment,
+  FeedItem,
+  MatchEventType,
+} from '../../shared/types';
 
 // profiles-RLS lar deg kun lese egen profil, så en direkte comments→profiles
 // join gir ikke lagkameraters navn. Forfatterne hentes via get_team_authors
@@ -43,7 +47,14 @@ export async function getFeedPost(
       getMemberMap(teamSpaceId),
       supabase
         .from('feed_posts')
-        .select('id, author_id, type, content, created_at, event_id, is_pinned')
+        // ⚠️ `match_events(...)` er med for P1-gaten: tråden VISER 👏-pillen,
+        // og uten kampøyeblikket kunne man heie på et baklengsmål her selv om
+        // feeden skjuler knappen — og basen ville avvist skrivingen
+        // (`trg_no_heia_on_opponent_goal`, 00075). Embed via FK-en
+        // `feed_posts.match_event_id`; ingen ekstra rundtur.
+        .select(
+          'id, author_id, type, content, created_at, event_id, is_pinned, match_events(type, team_side)',
+        )
         .eq('id', postId)
         .is('deleted_at', null)
         .maybeSingle(),
@@ -86,6 +97,18 @@ export async function getFeedPost(
     heiaCount: reactions.length,
     iReacted: myId ? reactions.some(r => r.user_id === myId) : false,
   };
+
+  // Samme form som `get_team_feed` gir feeden (00072), så `feedAllowsHeia`
+  // stiller nøyaktig samme spørsmål begge steder.
+  const me = (data as any).match_events as
+    | {type?: string; team_side?: string | null}
+    | null;
+  if (me?.type) {
+    post.matchEvent = {
+      type: me.type as MatchEventType,
+      teamSide: (me.team_side as 'home' | 'away' | null) ?? undefined,
+    };
+  }
 
   const {data: attachments} = await supabase
     .from('media_attachments')

@@ -45,6 +45,7 @@ import {FinishedMatch} from '../components/match/FinishedMatch';
 import {LiveMatch} from '../components/match/LiveMatch';
 import {MatchEngagementRow} from '../components/match/MatchEngagementRow';
 import {CommentSheet} from '../components/match/CommentSheet';
+import {GoalCorrectionSheet} from '../components/match/GoalCorrectionSheet';
 import {MapPin} from '../components/icons';
 import type {PillKind} from '../components/StatusPill';
 import type {ReporterActionType} from '../components/ReporterActions';
@@ -54,6 +55,8 @@ import {useTeamAuthors, useTeamMembers} from '../lib/queries/members';
 import {
   adjustMatchEngagement,
   applyMatchEventInsert,
+  applyMatchEventUpdate,
+  applyMatchEventDelete,
   applyMatchSessionUpdate,
   eventDetailKey,
   invalidateEventDetail,
@@ -79,6 +82,7 @@ import {
   startMatch,
   reportMatchEvent,
   subscribeToMatch,
+  correctMatchGoal,
   type ReportMatchEventInput,
 } from '../lib/api/events';
 import {
@@ -91,10 +95,15 @@ import {isTeamAdmin} from '../shared/roles';
 import {
   allowsHeia,
   buildMatchEngagement,
+  canCorrectGoal,
   showsEngagement,
   type MatchFeedPost,
 } from '../shared/matchEngagement';
-import {matchCommentA11yLabel, matchHeiaA11yLabel} from '../shared/matchCopy';
+import {
+  matchCommentA11yLabel,
+  matchCorrectA11yLabel,
+  matchHeiaA11yLabel,
+} from '../shared/matchCopy';
 import {GRID_FONT_CAP} from '../shared/matchGridGeometry';
 import {matchMinute as matchMinute_} from '../shared/matchClock';
 import {dayRangeLabel} from '../shared/calendar';
@@ -279,6 +288,11 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Samtalen om ett øyeblikk, som bunnark OVER kampen (skive 4.1) — ikke en
   // skjerm man sendes bort til. `null` = arket er lukket.
   const [commentPostId, setCommentPostId] = useState<string | null>(null);
+  // «Korriger mål» (skive 8) — målet som rettes, eller null når arket er
+  // lukket. Arket monteres med `key={id}`, så feltene alltid starter fra den
+  // ferske raden og aldri fra forrige mål man åpnet.
+  const [correctingGoalId, setCorrectingGoalId] = useState<string | null>(null);
+  const [savingCorrection, setSavingCorrection] = useState(false);
 
   // Turnering: kampene lastes for seg og refetches ved fokus — «Ny kamp»
   // lukker modalen tilbake hit, og å komme tilbake fra en kamp skal vise
@@ -404,6 +418,19 @@ export function EventDetailScreen({route, navigation}: Props) {
   }, []);
 
   /**
+   * ⚠️ HVEM SOM KAN KORRIGERE — samme regel som `correct_match_goal` (00075)
+   * håndhever: kampens reporter, eller en lagadmin. Regnes HER, og ikke
+   * sammen med de andre rolleflaggene lenger nede, fordi `renderEngagement`
+   * under trenger den.
+   *
+   * Serveren er fasit; dette avgjør bare om knappen TEGNES. En flate som
+   * viser en handling brukeren ikke har lov til, er en flate som lyver.
+   */
+  const canCorrectGoals =
+    event?.type === 'kamp' &&
+    (event.reporterId === myId || isTeamAdmin(activeRole));
+
+  /**
    * Én engasjementslinje, eller ingenting.
    *
    * ⚠️ TRE REGLER, OG ALLE TRE ER PRODUKT, IKKE VISNING:
@@ -440,10 +467,20 @@ export function EventDetailScreen({route, navigation}: Props) {
         return null;
       }
       const entry = engagement.byMatchEvent.get(ev.id);
+      // ⚠️ KUN MÅL, og kun for den som har lov. `canCorrectGoal` er den samme
+      // regelen serveren håndhever — rytmemarkørene eier kampuret, og en
+      // melding har ingen stilling å regne om.
+      const correctable = canCorrectGoals && canCorrectGoal(ev);
       return (
         <MatchEngagementRow
           engagement={entry}
           canHeia={allowsHeia(ev)}
+          onCorrect={correctable ? () => setCorrectingGoalId(ev.id) : undefined}
+          correctLabel={
+            correctable
+              ? matchCorrectA11yLabel({subject: ev, minute: ev.minute})
+              : undefined
+          }
           heiaLabel={matchHeiaA11yLabel({
             subject: ev,
             minute: ev.minute,
@@ -460,7 +497,7 @@ export function EventDetailScreen({route, navigation}: Props) {
         />
       );
     },
-    [engagement, handleMatchHeia, handleMatchComment],
+    [engagement, handleMatchHeia, handleMatchComment, canCorrectGoals],
   );
 
   // Kampen er i gang (også i pause — da telles minuttene fortsatt).
@@ -538,6 +575,23 @@ export function EventDetailScreen({route, navigation}: Props) {
             if (!applyMatchEventInsert(eventId, evt.row)) {
               scheduleEventRefetch();
             }
+            break;
+          // KORRIGERINGEN (skive 8). Rettelsen byttes ut PÅ PLASS og
+          // annulleringen fjernes; stillingen kommer for seg som `session`,
+          // ferdig omregnet av serveren.
+          case 'matchEventUpdate':
+            if (!applyMatchEventUpdate(eventId, evt.row)) {
+              scheduleEventRefetch();
+            }
+            // Ble målet et mål IMOT, er HEIA-ene slettet i basen (00075).
+            // Tellerne står igjen med gamle tall til engasjementet hentes.
+            scheduleEngagementRefetch();
+            break;
+          case 'matchEventDelete':
+            if (!applyMatchEventDelete(eventId, evt.id)) {
+              scheduleEventRefetch();
+            }
+            scheduleEngagementRefetch();
             break;
           case 'session':
             if (!applyMatchSessionUpdate(eventId, evt.row)) {
@@ -895,6 +949,38 @@ export function EventDetailScreen({route, navigation}: Props) {
     setReporterModalVisible(true);
   };
 
+  /**
+   * KORRIGER ET MÅL (skive 8).
+   *
+   * ⚠️ INGEN LOKAL PATCHING AV STILLINGEN. Den telles opp på nytt fra
+   * målhistorikken server-side, og feedens stillingssnapshots skrives om i
+   * samme transaksjon — det finnes ikke noe å gjette riktig her. Vi
+   * refetcher; de andre telefonene får sitt via realtime.
+   *
+   * Engasjementet invalideres i tillegg: en annullering tar posten med seg,
+   * og en rettelse til «mål imot» sletter HEIA-ene på den.
+   */
+  const submitCorrection = async (
+    matchEventId: string,
+    input: Parameters<typeof correctMatchGoal>[1],
+  ) => {
+    if (savingCorrection) return;
+    setSavingCorrection(true);
+    try {
+      await correctMatchGoal(matchEventId, input);
+      setCorrectingGoalId(null);
+      invalidateMatchEngagement(eventId);
+      await refetchEvent();
+    } catch (e) {
+      Alert.alert(
+        'Kunne ikke korrigere målet',
+        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+      );
+    } finally {
+      setSavingCorrection(false);
+    }
+  };
+
   const handleReportSubmit = (description: string) => {
     setReporterModalVisible(false);
     submitAction(selectedActionType, description);
@@ -969,6 +1055,35 @@ export function EventDetailScreen({route, navigation}: Props) {
     }
   };
 
+  /**
+   * «KORRIGER MÅL»-ARKET (skive 8).
+   *
+   * ⚠️ BOR I BEGGE KAMPGRENENE, og det er hele forskjellen fra et angrevindu:
+   * korrigeringen er VARIG. Et feilregistrert mål oppdages like ofte når
+   * rapporten leses dagen etter som mens kampen går.
+   *
+   * ⚠️ `key` PÅ ØYEBLIKKET. Arket initialiserer feltene sine én gang (se
+   * komponenten); uten nøkkelen ville et nytt mål åpnet arket med forrige
+   * måls målscorer i feltet.
+   */
+  const correctingGoal = correctingGoalId
+    ? (event.matchEvents ?? NO_MATCH_EVENTS).find(e => e.id === correctingGoalId)
+    : undefined;
+  const correctionSheet = correctingGoal ? (
+    <GoalCorrectionSheet
+      key={correctingGoal.id}
+      visible
+      event={correctingGoal}
+      opponent={event.opponent ?? 'motstanderen'}
+      saving={savingCorrection}
+      onSave={input =>
+        submitCorrection(correctingGoal.id, {action: 'edit', ...input})
+      }
+      onCancelGoal={() => submitCorrection(correctingGoal.id, {action: 'cancel'})}
+      onClose={() => setCorrectingGoalId(null)}
+    />
+  ) : null;
+
   // -----------------------------------------------------------------------
   // LIVE KAMP-MODUS
   // -----------------------------------------------------------------------
@@ -1038,6 +1153,8 @@ export function EventDetailScreen({route, navigation}: Props) {
           teamSpaceId={activeTeamSpaceId ?? ''}
           onClose={() => setCommentPostId(null)}
         />
+
+        {correctionSheet}
       </>
     );
   }
@@ -1079,6 +1196,8 @@ export function EventDetailScreen({route, navigation}: Props) {
           teamSpaceId={activeTeamSpaceId ?? ''}
           onClose={() => setCommentPostId(null)}
         />
+
+        {correctionSheet}
       </>
     );
   }

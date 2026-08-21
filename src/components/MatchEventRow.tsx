@@ -451,22 +451,42 @@ export function MatchEventRow({
                   {event.player}
                 </Text>
               )}
-            </>
-          ) : isGoalThem ? (
-            <View style={styles.againstRow}>
-              <Text
-                style={styles.againstText}
-                maxFontSizeMultiplier={grid.fontCap}>
-                {event.description}
-              </Text>
-              {score && (
+              {/* Beskrivelsen finnes kun på et KORRIGERT mål (skive 8), der
+                  målscorer og beskrivelse er skrevet fra hverandre. Den er en
+                  fotnote til øyeblikket — dempet, uten flate, som alt annet
+                  sekundært på grunnen. */}
+              {event.note && (
                 <Text
-                  style={styles.againstTally}
+                  style={[styles.goalNote, {maxWidth: grid.measureMax}]}
                   maxFontSizeMultiplier={grid.fontCap}>
-                  {score}
+                  {event.note}
                 </Text>
               )}
-            </View>
+            </>
+          ) : isGoalThem ? (
+            <>
+              <View style={styles.againstRow}>
+                <Text
+                  style={styles.againstText}
+                  maxFontSizeMultiplier={grid.fontCap}>
+                  {event.description}
+                </Text>
+                {score && (
+                  <Text
+                    style={styles.againstTally}
+                    maxFontSizeMultiplier={grid.fontCap}>
+                    {score}
+                  </Text>
+                )}
+              </View>
+              {event.note && (
+                <Text
+                  style={[styles.goalNote, {maxWidth: grid.measureMax}]}
+                  maxFontSizeMultiplier={grid.fontCap}>
+                  {event.note}
+                </Text>
+              )}
+            </>
           ) : isVoice ? (
             <>
               <View style={styles.voiceTop}>
@@ -652,6 +672,14 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: matchColors.text,
+  },
+  // Fotnoten på et korrigert mål. Samme dempede stemme som bildeteksten —
+  // ingen ny størrelse, ingen ny farge.
+  goalNote: {
+    marginTop: 4,
+    fontSize: 14.5,
+    lineHeight: 21,
+    color: matchColors.dim,
   },
   // --- Mål imot ---
   againstRow: {

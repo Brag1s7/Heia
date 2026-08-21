@@ -7,7 +7,7 @@ import {Avatar} from './Avatar';
 import {avatarRef} from '../lib/media/avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
-import {isOpponentGoal} from '../shared/matchEngagement';
+import {feedAllowsHeia} from '../shared/matchEngagement';
 import type {FeedItem} from '../shared/types';
 
 interface FeedCardProps {
@@ -92,7 +92,7 @@ function Marker({item, onUnpin}: {item: FeedItem; onUnpin?: () => void}) {
     if (item.type === 'match_event') {
       // Minuttet er øyeblikkets identitet; stillingen i øyeblikket bor i
       // teksten. Kampens NÅ-stilling ville motsagt den på historiske mål.
-      const minute = match?.minute ?? item.matchEvent?.minute;
+      const minute = match?.minute;
       return (
         <ScoreChip
           label={minute !== undefined ? `${minute}′` : 'Kamp'}
@@ -140,12 +140,21 @@ export function FeedCard({
   //
   // ⚠️ SMAL MED VILJE. Feedens gate er ikke kampens: kampen viser
   // engasjement kun på mål og meldinger, mens feeden har HEIA på avspark,
-  // bilder og vanlige innlegg — og skal beholde det. Derfor `isOpponentGoal`
-  // og ikke `allowsHeia`; spørsmålet er delt, politikken er det ikke.
+  // bilder og vanlige innlegg — og skal beholde det.
+  //
+  // ⚠️ SMALNET I SKIVE 8. Gaten så før KUN på `matchEvent`, og et BILDE
+  // festet til et baklengsmål bærer den samme koblingen (00028) — så
+  // brukerens eget bilde mistet HEIA-en sin. `feedAllowsHeia` krever i
+  // tillegg at posten er SYSTEMETS egen målpost, som er nøyaktig det
+  // `trg_no_heia_on_opponent_goal` (00075) avviser på skrivesiden. Klient og
+  // base stiller nå samme spørsmål; drifter de, blir knappen død.
   //
   // `matchEvent` mangler på alt som ikke er en kamphendelse, og på servere
   // eldre enn 00072. Begge deler betyr «som før».
-  const canHeia = !(item.matchEvent && isOpponentGoal(item.matchEvent));
+  const canHeia = feedAllowsHeia({
+    postType: item.type,
+    matchEvent: item.matchEvent,
+  });
   const commentCount = item.commentCount ?? 0;
 
   // Heia, Kommenter, forstørr og «løsne» er egne Pressables inne i kortet.

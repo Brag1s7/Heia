@@ -1,7 +1,7 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 import {colors, matchColors, spacing, typography} from '../../theme';
-import {MessageCircle} from '../icons';
+import {MessageCircle, MoreHorizontal} from '../icons';
 import type {MatchEngagement} from '../../shared/matchEngagement';
 
 /**
@@ -54,6 +54,23 @@ interface MatchEngagementRowProps {
   fontCap: number;
   onHeia: (postId: string, currentlyReacted: boolean) => void;
   onComment: (postId: string) => void;
+  /**
+   * ⚠️ MENYEN TIL ØYEBLIKKET (skive 8) — reporterens og lagadmins inngang til
+   * «Korriger mål». `undefined` for alle andre, og da tegnes den ikke.
+   *
+   * Den bor HER, i handlingsraden, og ikke som et nytt lag på selve
+   * målflaten: raden er allerede øyeblikkets handlinger, den er allerede
+   * 44 pt, og den er allerede utenfor radens samlede a11y-label. Et eget
+   * trykkfelt oppå swellen ville konkurrert med målet den ligger på.
+   *
+   * ⚠️ IKKE AVHENGIG AV `engagement`. En korrigering trenger bare
+   * hendelses-id-en, som kalleren har. Var knappen bundet til posten, ville
+   * det ferskeste målet — nettopp det man retter — vært det ene man ikke
+   * kunne rette.
+   */
+  onCorrect?: () => void;
+  /** Hva menyen gjør, som setning. «Meny» alene sier ingenting i VoiceOver. */
+  correctLabel?: string;
 }
 
 export function MatchEngagementRow({
@@ -64,6 +81,8 @@ export function MatchEngagementRow({
   fontCap,
   onHeia,
   onComment,
+  onCorrect,
+  correctLabel,
 }: MatchEngagementRowProps) {
   const ready = engagement !== undefined;
   const mine = engagement?.iReacted ?? false;
@@ -108,6 +127,17 @@ export function MatchEngagementRow({
           {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
         </Text>
       </Pressable>
+
+      {onCorrect && (
+        <Pressable
+          onPress={onCorrect}
+          hitSlop={{top: 6, bottom: 6}}
+          accessibilityRole="button"
+          accessibilityLabel={correctLabel ?? 'Korriger målet'}
+          style={({pressed}) => [styles.button, pressed && styles.pressed]}>
+          <MoreHorizontal size={16} color={matchColors.dim} />
+        </Pressable>
+      )}
     </View>
   );
 }

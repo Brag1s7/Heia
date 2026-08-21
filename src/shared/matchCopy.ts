@@ -273,6 +273,18 @@ export function matchCommentA11yLabel(opts: {
   return sentence([where, countPhrase(opts.count, 'kommentar', 'kommentarer')]);
 }
 
+/** «Korriger målet på 34 minutter.» — reporterens meny (skive 8). */
+export function matchCorrectA11yLabel(opts: {
+  subject: MatchEventA11yInput;
+  minute?: number;
+}): string {
+  return sentence([
+    `Korriger ${momentPhrase(opts.subject)}${
+      opts.minute !== undefined ? ` på ${minuteSpoken(opts.minute)}` : ''
+    }`,
+  ]);
+}
+
 // ---------------------------------------------------------------------------
 // KAMPENS PULS (skive 5)
 //
