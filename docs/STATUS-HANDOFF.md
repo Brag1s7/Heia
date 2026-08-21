@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 5 LEVERT OG TELEFONGODKJENT. NESTE: SKIVE 6)
+## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 8 OG 9 GODKJENT. NESTE: SKIVE 10 (KAMPKNAPPEN))
 
 **✅ SKIVE 5 — KAMPENS PULS — ER TELEFONGODKJENT AV BRAGE 2026-08-21:
 «Det er godkjent nå så vi kan gå videre.»**
@@ -37,6 +37,24 @@ side ved side. **Ikke start på den uten at Brage ber om det.**
 ⚠️ **`00074` KOM AV EN REGRESJON `00073` INNFØRTE**, og den er verdt å lese
 før noen rører pulsen eller klokka — se `### ⏳ SKIVE 7 BYGGET`, punktet om
 TO AKSER.
+
+⏳ **SKIVE 8 — «KORRIGER MÅL» — ER BYGGET, OG `00075` + `00076` ER I PROD
+2026-08-21.** ⚠️ `00076` lukket en åpen dør `00075` etterlot — **les
+`#### 🔒 DØRENE PÅ SKRIVE-RPC-ENE`**, både for regelen (GRANT stenger ingenting,
+REVOKE gjør det) og for de tre eldre RPC-ene som fortsatt står åpne.
+Gjenstår: **`scripts/verify-00075.sql`** i SQL-editoren + telefonkontrollen.
+**Appkoden er ikke committet ennå.** **⚠️ P3 ER ENDRET: 10-sekunders angre er
+forkastet til fordel for en VARIG korrigering** — les tillegget øverst i
+`#### P3` FØR du rører sporet. Skiva lukker samtidig **begge de farlige
+halvveiene**: den frie DELETE-policyen på `match_events` og «Slett innlegget»
+på målposter. Se `### ⏳ SKIVE 8 BYGGET` for telefonsjekklista — punkt 8
+(stillingssnapshotene) og punkt 12 (to telefoner) er de som avslører mest.
+
+✅ **SKIVE 9 ER TELEFONGODKJENT 2026-08-21: «Alt på 9 kan godkjennes.»**
+To ting ble rettet i etterkant, og begge er verdt å lese: en **dobbel
+`matchEvent`-deklarasjon i `FeedItem`** som var tre ekte typefeil, og at
+gaten likevel var **litt for bred på én rad** — et bilde festet til et
+baklengsmål mistet HEIA-en sin. Se bolken.
 
 **Skive 1–5 er levert og telefongodkjent. SKIVE 6 (sticky-bar + Reduce
 Motion) ER PÅ RUNDE 2** — runde 1 brukte `stickyHeaderIndices` og ble avvist
@@ -433,7 +451,19 @@ serveren gjør det heller ikke (`FLOOR((now() - started_at)/60)`, 00021, og
 pause/gjenoppta-runde mot prod, DERETTER app.** Motsatt rekkefølge gir en
 skjerm som viser 25′ over en tidslinje som sier 35′.
 
-#### P3 — ANGRE: 10 sekunder, og da fantes målet aldri
+#### P3 — ANGRE ⇒ ⚠️ ERSTATTET AV «KORRIGER MÅL» (Brage 2026-08-21)
+
+⚠️⚠️ **10-SEKUNDERSVINDUET ER FORKASTET.** Brage: «Vi dropper 10-sekunders
+Angre i skive 8 og bygger i stedet en varig «Korriger mål»-handling for
+reporter og lagadmin.» **Ikke bygg nedtelling, utsatt push eller «må være
+nyeste hendelse».** Et enkelt Angre kan senere komme som en SNARVEI til den
+samme korrigerings-RPC-en — ikke som en egen mekanisme.
+
+**DET SOM FORTSATT GJELDER, ORDRETT:** de to farlige halvveiene under, kravet
+om at intern audit beholdes, og `REPLICA IDENTITY FULL` på `match_events`.
+Alle tre er lukket i `00075` — se `### ⏳ SKIVE 8 BYGGET`.
+
+Resten av bolken står som den var, fordi den er begrunnelsen som ble brukt.
 
 **Angrevinduet er 10 sekunder.** Innenfor vinduet skal målet forsvinne fra
 BRUKERFLATENE som om det aldri skjedde:
@@ -1718,8 +1748,8 @@ en REELL begrensning.
 | 5 | **Kampens puls** (`MatchPulse`) | ✅ LEVERT OG TELEFONGODKJENT — 4 runder. Modellen: `docs/KAMPENS-PULS-MODELL.md` |
 | 6 | **Sticky-bar + Reduce Motion** | ⏳ RUNDE 2 — bevegelsen godkjent, resten venter |
 | 7 | **Kampuret** (serverautoritativt) | ⏳ BYGGET — `00073` IKKE PUSHET ⚠️ |
-| 8 | **Angre mål** (10 s) | ⏭️ NESTE — se P3 |
-| 9 | **`get_team_feed`-gaten for mål imot** | 🟡 I PROD — mangler KUN telefonkontroll |
+| 8 | **Korriger mål** (varig) | ✅ LEVERT, VERIFISERT MOT PROD OG TELEFONGODKJENT 2026-08-21. `00075`+`00076`+`00077` i prod |
+| 9 | **`get_team_feed`-gaten for mål imot** | ✅ I PROD OG TELEFONGODKJENT 2026-08-21 («Alt på 9 kan godkjennes») |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
 
 #### ▶️ SKIVE 5 — KAMPENS PULS: HVA SOM ALLEREDE ER AVKLART
@@ -2199,7 +2229,38 @@ feilen usynlig).
 ⚠️ **`FinishedMatch` sender ikke `nowMs`, og skal ikke:** en ferdig kamp har
 `slutt` som høyre kant, ikke «nå».
 
-#### ⏳ SKIVE 9 BYGGET — P1 I FEEDEN 2026-08-21 (MIGRASJONEN IKKE PUSHET)
+#### ✅ SKIVE 9 LEVERT OG TELEFONGODKJENT 2026-08-21 — P1 I FEEDEN
+
+**✅ GODKJENT AV BRAGE 2026-08-21: «Alt på 9 kan godkjennes.»** Sjekklista
+nederst i bolken er kjørt, inkludert punkt 3 (gaten ble ikke for bred).
+`00072` er i prod. **Gamle heier på baklengsmål ble bevisst IKKE ryddet** —
+de er historiske fakta, usynlige i UI, og en engangsopprydding i prod er
+risiko uten gevinst.
+
+⚠️ **TO TING BLE RETTET I ETTERKANT, I SKIVE 8** — les dem før du rører
+feedens gate igjen:
+
+1. **`FeedItem` hadde `matchEvent` deklarert TO ganger** (`types.ts:192` og
+   `:212`). Skive 9 la til den nye formen uten å fjerne mock-æraens
+   `matchEvent?: MatchEvent` fra `8bf5e1c`. Det var **tre ekte typefeil**
+   (TS2300 ×2 + TS2717), altså en gren som ikke typesjekket, og
+   `FeedCard.tsx:95` leste `item.matchEvent?.minute` — et felt den nye formen
+   ikke har, og som aldri fylles. Begge er borte nå.
+   **Lærdom: en `?`-felt-kollisjon i en stor interface er stille i editoren
+   hvis fila ikke er åpen. Kjør `tsc` når du utvider en delt type.**
+2. ⭐ **GATEN VAR LIKEVEL LITT FOR BRED — på ÉN rad.** Et kampbilde bærer
+   SAMME `match_event_id` som øyeblikket det henger på (00028), så
+   `get_team_feed` gir bildet `match_event_type = ('mål','away')`. Skive 9s
+   `canHeia` så bare på `matchEvent` og tok derfor HEIA fra **brukerens eget
+   bilde** når bildet var festet til et baklengsmål. Rettet i skive 8 med
+   `feedAllowsHeia`, som i tillegg krever at posten er SYSTEMETS egen
+   (`isSystemMatchPost`) — nøyaktig samme spørsmål som basens nye trigger
+   stiller. **Telefonsjekklistas punkt 3 kunne ikke ha fanget den: den ba om
+   et vanlig bilde, ikke et bilde festet til et baklengsmål.**
+
+Bolken under står som den var, fordi den er begrunnelsen som ble brukt.
+
+#### ⏳ SKIVE 9 BYGGET — P1 I FEEDEN 2026-08-21 (historikk)
 
 ⚠️ **DETTE VAR EN LEVENDE FEIL I PROD, ikke bare «neste skive».** P1 er låst
 og gjelder BEGGE flatene fordi det er den SAMME kanoniske posten: fram til
@@ -2260,6 +2321,337 @@ betyr også at **feilen består til du pusher.**
    migrasjonsfila.
 
 </details>
+
+#### ⏳ SKIVE 8 BYGGET — KORRIGER MÅL 2026-08-21 (MIGRASJONEN IKKE PUSHET)
+
+⚠️⚠️ **P3 ER ENDRET AV BRAGE 2026-08-21. 10-SEKUNDERS ANGRE ER FORKASTET.**
+
+> «Vi dropper 10-sekunders Angre i skive 8 og bygger i stedet en varig
+> «Korriger mål»-handling for reporter og lagadmin.»
+
+Det som står igjen av P3 er **de to farlige halvveiene** — de er uendret og
+lukkes her. Det som er BORTE er nedtellingen, den utsatte pushen og «må være
+nyeste hendelse». Et enkelt Angre kan senere komme som en SNARVEI til den
+samme RPC-en; ikke bygg det som en egen mekanisme.
+
+**Hvorfor endringen er riktig, med ett eksempel:** et mål registrert på feil
+lag i 12′ oppdages typisk når rapporten leses etterpå. Et 10-sekundersvindu
+hadde ikke hjulpet der, og den eneste veien ut ville vært den generiske
+«Slett innlegget» — altså nøyaktig løgnen skiva skulle fjerne.
+
+---
+
+##### ✅ SKIVE 8 ER VERIFISERT MOT PROD OG TELEFONGODKJENT 2026-08-21
+
+**`scripts/verify-00075.sql` kjørt uten feil**, og etterkontrollen var ren:
+`klubber_igjen = 0`, `brukere_igjen = 0`, `hendelser_igjen = 0` — riggen er
+revet ned ved konstruksjon, som den skal være.
+
+**✅ TELEFONGODKJENT AV BRAGE 2026-08-21:** «Hele telefonkontrollen av skive 8
+er godkjent. Korrigeringsarket, redigering, annullering, senere
+stillingssnapshots, feeden og Realtime fungerer som ønsket.»
+
+Det betyr at de to punktene jeg var mest spent på begge holdt på ekte enhet:
+**stillingssnapshotene** (den senere målposten skrives om) og **Realtime**
+(annulleringen når den andre telefonen — altså `REPLICA IDENTITY FULL` gjør
+jobben sin).
+
+**`00075`, `00076` og `00077` er alle i prod**, bekreftet i
+`supabase migration list --linked` (local = remote = 00077).
+
+##### `00075_korriger_maal.sql` — pushet 2026-08-21
+
+`supabase db push` kjørt etter en ren `--dry-run` (kun `00075` i køen),
+bekreftet i `supabase migration list --linked`: **local = remote = 00075.**
+Én NOTICE under kjøringen, og den er ufarlig: `DROP TRIGGER IF EXISTS
+trg_no_heia_on_opponent_goal … does not exist, skipping` — triggeren er ny,
+så det er førstegangs-`IF EXISTS` som sier fra.
+
+**Begge halvveiene er dermed lukket i prod.** Gjenstår:
+**`scripts/verify-00075.sql`** i SQL-editoren (selvforsynt, ruller seg selv
+tilbake), de tre KONTROLL-stegene nederst i migrasjonsfila, og
+telefonsjekklista. **Appkoden er BEVISST IKKE COMMITTET ennå.**
+
+⚠️ **BESLUTNING UNDER PUSH (Brage 2026-08-21): HEIA-OPPRYDDINGEN ER SMAL,
+OG DET ER MED VILJE.** Spørsmålet som ble stilt var om RPC-en skulle rydde
+ALLE gamle ugyldige heier på et mål imot, eller bare de som blir ugyldige av
+korrigeringen. Valget falt på det siste:
+
+> «Gamle ugyldige HEIA-rader tilhører bare testlaget og trenger ikke global
+> opprydding.»
+
+Ryddingen er derfor knyttet til HENDELSEN SOM GJØR HEIET UGYLDIG:
+oss/ukjent → imot, og annullering. **En ren navnerettelse på et mål som
+ALLEREDE var imot rydder ingenting** — ellers ville en urelatert handling
+begynt å slette rader stille, og det ville dessuten motsagt beslutningen fra
+skive 9 om å la de gamle heiene ligge. Kommentarene er urørt i alle
+tilfeller; `00075` nevner ikke `public.comments` med ett ord.
+**Ikke «forbedre» dette til en bred opprydding senere uten å spørre.**
+
+##### HVA SERVEREN GJØR (`00075`, ni deler i ett slag)
+
+| # | Hva | Hvorfor |
+|---|---|---|
+| 1 | `REPLICA IDENTITY FULL` på `match_events` | uten den når en annullering ALDRI tilskuerne — payloaden bærer kun PK, filteret matcher ikke, og Realtime kan ikke RLS-sjekke DELETE i det hele tatt. Samme begrunnelse som 00059 ga for `reactions` |
+| 2 | `DROP POLICY "Reporter or admin can delete match events"` | **halvvei 1.** Tabellen har ingen UPDATE-policy fra før, så etter dette er `match_events` lukket for alt annet enn RPC-ene |
+| 3 | `match_event_headline()` | ÉN kilde til feedteksten. `report_match_event` kalles om til å bruke den — ellers drifter en korrigert målpost fra en fersk første gang noen retter et komma |
+| 4 | `rebuild_match_feed_texts()` | ⭐ **stillingssnapshotene.** Ruller øktas hendelser i `sequence`-rekkefølge med løpende stilling og skriver om systempostene som BÆRER en stilling |
+| 5 | `report_match_event()` | ordrett 00073, kun overskriften flyttet til (3) |
+| 6 | `correct_match_goal()` | selve domenehandlingen, `edit` og `cancel` |
+| 7 | `soft_delete_post()` | **halvvei 2**, i RPC-en |
+| 8 | UPDATE-policyene på `feed_posts` | **halvvei 2**, i rettighetene |
+| 9 | `trg_no_heia_on_opponent_goal` | skrivesidens HEIA-gate — gjelden 00072 skrev opp |
+
+##### ⚠️ SEKS TING SOM ER VERDT Å KJENNE
+
+1. ⭐ **STILLINGEN TELLES OPP FRA MÅLHISTORIKKEN, ALDRI JUSTERT MED ÉN.**
+   «Trekk fra én» er riktig nøyaktig så lenge ingenting noen gang har gått
+   galt. Er stillingen alt i utakt — en halvferdig sletting via policyen vi
+   nå fjerner, importerte data, en fremtidig feil — sementerer en justering
+   feilen for alltid. En opptelling gjør korrigeringen til en
+   **SELVREPARASJON**: etter hvert kall er stillingen per definisjon lik
+   målene som finnes. `D2` i bevisfila setter stillingen til 9–9 med vilje og
+   krever at ett korrigeringskall gir 1–1.
+2. ⭐ **SENERE STILLINGSSNAPSHOTS ER DEN IKKE-ÅPENBARE HALVDELEN.** Teksten
+   på en målpost er et snapshot («⚽ MÅL! Heia 2–1 VIF»). Rettes målet fra
+   12′, blir teksten på ALLE senere målposter feil — og en `UPDATE` på den
+   ene raden ville etterlatt en feed som motsier seg selv. `C2` i bevisfila
+   vokter nettopp den senere posten.
+   **`notify_on_feed_post` er AFTER *INSERT* (00022:165-167), så omskrivingen
+   utløser ingen nye varsler.** Det er hele grunnen til at teksten kan rettes
+   uten at telefonen buzzer på nytt.
+3. ⚠️ **BRUKERENS BILDEPOSTER OVERLEVER EN ANNULLERING.** De deler
+   `match_event_id` med øyeblikket (00028), men er brukerens innhold. FK-en er
+   `ON DELETE SET NULL` (00009:63), så de løsner og blir frittstående
+   kampbilder — med bilde, tekst, HEIA og kommentarer i behold. Systemposten
+   soft-slettes; audit-raden bærer `feed_post_id`, siden FK-en river
+   koblingen.
+4. ⚠️ **KOMMENTARENE BEHOLDES VED REDIGERING, HEIA-ENE IKKE.** Blir vårt mål
+   til et mål imot, er HEIA-ene ugyldige (P1) og slettes sammen med
+   `new_reaction`-varslene sine. Samtalen under posten er lagets, ikke
+   systemets — et mål imot er noe man snakker om.
+5. ⚠️ **KORRIGERINGSVARSELET SENDES KUN NÅR STILLINGEN FAKTISK ENDRET SEG.**
+   Rettes bare målscorerens navn, har ingen telefon vist noe galt. Endres
+   stillingen, har den ALLEREDE ligget på en låseskjerm — pushen er ute i
+   samme sekund som målet (00049) og kan ikke trekkes tilbake. Varselet er en
+   ren `notifications`-rad (ikke en feed-post, som ville lagt en systemmelding
+   i lagets feed); pushen følger gratis via `trg_push_on_notifications`.
+   **`match_event_type` utelates bevisst fra `data`**, så `mapMatch` i appen
+   gir undefined og raden tegnes ROLIG — en korrigering er en setning, ikke et
+   målkort. `D1` og `H1` vokter begge halvdelene.
+6. ⚠️ **LÅSEN TAS FØR HENDELSEN LESES.** Leses `match_events`-raden før
+   `match_sessions` er låst, kan en annen reporter rette det SAMME målet i
+   mellomtiden — og «ble dette et mål imot nå?» (som sletter HEIA-ene) svarer
+   feil på en foreldet `team_side`.
+
+##### GATEN ER PÅ POSTTYPE, IKKE PÅ `match_event_id` — TRE STEDER
+
+Dette er skivas farligste detalj, og den samme feilen kan gjøres tre ganger:
+
+- **«Slett innlegget»** stenges for `match_event`/`match_start`/`match_end`
+  MED `match_event_id`. Et kampBILDE er `bilde` og skal fortsatt kunne
+  slettes av den som la det ut.
+- **HEIA-triggeren** avviser kun systemets målpost. Et bilde tatt i det
+  motstanderen scoret er fortsatt brukerens bilde.
+- **Feedens `canHeia`** bruker nå `feedAllowsHeia`, som stiller nøyaktig
+  samme spørsmål som triggeren. **Drifter de to, blir knappen DØD** — tegnet
+  i appen, avvist i basen.
+
+`isSystemMatchPost` i `shared/matchEngagement.ts` er den ene formuleringen.
+
+##### APPEN
+
+**Nye filer:** `src/components/match/GoalCorrectionSheet.tsx`,
+`supabase/migrations/00075_korriger_maal.sql`, `scripts/verify-00075.sql`,
+`__tests__/goalCorrection.test.tsx` (22).
+
+**Endret:** `matchEngagement.ts` (+`isSystemMatchPost`, `feedAllowsHeia`,
+`canCorrectGoal`), `matchCopy.ts` (+`matchCorrectA11yLabel`), `types.ts`
+(+`MatchEvent.note`, − duplikatet), `lib/api/events.ts` (+`correctMatchGoal`,
++ UPDATE/DELETE-abonnement), `lib/queries/eventDetail.ts`
+(+`applyMatchEventUpdate`/`applyMatchEventDelete`), `lib/api/comments.ts`
+(kampkontekst på enkeltposten), `MatchEventRow.tsx` (fotnoten),
+`MatchEngagementRow.tsx` (menyen), `EventDetailScreen.tsx`, `FeedCard.tsx`,
+`TeamHomeScreen.tsx`, `CommentThread.tsx`.
+
+- **Menyen bor i ENGASJEMENTSLINJA**, ikke som et nytt lag på målflaten:
+  raden er allerede øyeblikkets handlinger, allerede 44 pt, og allerede
+  utenfor radens samlede a11y-label. ⚠️ **Den er IKKE bundet til posten** —
+  var den det, ville det NYESTE målet (nettopp det man retter) vært det ene
+  man ikke kunne rette, siden den kanoniske posten kommer et par hundre
+  millisekunder senere.
+- **Arket er LYST**, som `MatchPhotoSheet`. Den frosne retningen forbyr hvite
+  flater i SELVE KAMPEN; et ark legger seg foran den, og bildearket har alt
+  etablert mønsteret fra samme skjerm. Komponentene er Heias egne
+  (`Modal`/`Button`/`ListRow` + bildearkets valgrader).
+- **Annullering ligger UNDER EN STREK**, ikke ved siden av «Lagre». Samme
+  mønster som «Forlat laget» i Profil: egen rad nederst + destruktiv
+  `Alert`-bekreftelse.
+- **`MatchEvent.note`** er beskrivelsen, og settes **kun når `player_name`
+  finnes**. `report_match_event` har historisk hatt ÉTT tekstfelt som havnet
+  i `description` og ble vist som målscorer; uten vilkåret ville en gammel
+  målrad vist samme navn to ganger.
+- **Realtime:** UPDATE bytter raden PÅ PLASS (`applyMatchEventInsert` ville
+  gjort ingenting, siden id-en finnes — målet ville stått med gammel side til
+  neste refetch), DELETE fjerner den. **Stillingen patches ALDRI herfra** —
+  den kommer som `session`, ferdig omregnet.
+- **`useMatchEngagement` invalideres** ved begge, siden HEIA-ene kan være
+  slettet i basen.
+
+##### ⚠️ EN FELLE FUNNET I TESTRIGGEN
+
+`eventDetailRefetch.test.tsx` sin realtime-mock rutet handlere på TABELL
+alene. Det holdt så lenge `match_events` hadde én handler; med tre
+(INSERT/UPDATE/DELETE) fyrte den alle tre på hver payload, og DELETE-handleren
+så en INSERT uten `old` → `fallback` → refetch. **Mocken var ikke lenger en
+modell av Supabase.** Den ruter nå på `payload.eventType` også.
+
+##### GRØNT
+
+Suiten **534 tester, 36 filer** (+`goalCorrection` 22, +1 realtime-test for
+korrigeringen). `tsc --noEmit`: **7 feil, alle fra før** og i urelaterte filer
+(`TimeSheet`, `lib/media`, `netMetrics`, `LagkassaScreen`) — de tre i
+`types.ts` er borte. Lint: **12 kjente**, uendret.
+
+<details><summary>📱 TELEFONSJEKKLISTA FOR SKIVE 8 (etter push)</summary>
+
+**Rediger**
+1. Live kamp, som reporter: registrer et mål for oss. Trykk **⋯** på målraden.
+   Arket åpner med minuttet, «Mål for oss» valgt, og målscoreren i feltet.
+2. Bytt til **Mål for {motstander}** → Lagre. Stillingen i arenaen **og** i
+   toppen skal endre seg, og raden skal bli en dempet skiferstripe.
+3. **HEIA-linja på den raden skal være BORTE**, kommentarlinja står igjen.
+4. Skriv en **Beskrivelse** → den skal vises som en dempet linje under.
+5. Rett bare **målscorerens navn** → ingen ny buzz på den andre telefonen.
+
+**Annuller**
+6. Legg ut et **kampbilde festet til målet** FØR du annullerer.
+   ⭐ Etter annullering: målet er borte fra forløpet, stillingen er riktig —
+   **og bildet ligger fortsatt i feeden med teksten og heiene sine.**
+7. Sjekk **Varsler**: målvarselet er borte, og det ligger ett kort
+   korrigeringsvarsel med riktig stilling.
+
+**⭐ Snapshotene (den viktigste)**
+8. Score **to** mål for oss (1–0, 2–0). Rett så det FØRSTE til mål imot.
+   Gå til **Hjem** og les feeden: den senere målposten skal si **1–1**, ikke
+   2–0.
+
+**Halvveiene**
+9. ⋯-menyen på en **målpost i feeden**: «Slett innlegget» skal ikke finnes.
+10. ⋯-menyen på et **vanlig innlegg** og på et **kampbilde**: «Slett
+    innlegget» skal fortsatt være der.
+11. Åpne kommentartråden på et **baklengsmål**: 👏-pillen skal være borte.
+    På et **bilde festet til baklengsmålet**: 👏 skal være der.
+
+**To telefoner**
+12. Rett og annuller fra reporterens telefon mens en tilskuer står i kampen:
+    ⭐ forløpet og stillingen skal oppdatere seg **uten** at tilskueren gjør
+    noe. Skjer det ikke, er `REPLICA IDENTITY FULL` ikke i prod (KONTROLL 1).
+
+**Rapporten**
+13. Blås av kampen og gjenta punkt 1–3 i kamprapporten. Korrigeringen er
+    VARIG og skal virke der også.
+
+</details>
+
+#### 🔒 DØRENE PÅ SKRIVE-RPC-ENE — `00076` I PROD, OG ET FUNN SOM STÅR ÅPENT
+
+⚠️⚠️ **`00075` GLEMTE `REVOKE`, OG DET ER EN LÆRDOM SOM GJELDER HVER ENESTE
+NYE RPC:**
+
+> **En funksjon FØDES med `EXECUTE` til `PUBLIC`, og `anon` er medlem av
+> PUBLIC. En `GRANT … TO authenticated` legger derfor bare til en rolle som
+> allerede kom inn — den stenger ingenting. Døren lukkes av `REVOKE`.**
+
+Repoet har mønsteret fra før (**58 REVOKE-linjer** i 00038/39/42/46/47/55);
+`00075` fulgte det bare ikke. Målt mot ekte prod med anon-nøkkelen:
+
+| Funksjon | Før `00076` | Etter |
+|---|---|---|
+| `correct_match_goal` | 400 · P0001 «Not authenticated» | **401 · 42501** ✅ |
+| `rebuild_match_feed_texts` | **204 · ⛔ KJØRTE** | **401 · 42501** ✅ |
+| `match_event_headline` | 200 · svarte med teksten | **401 · 42501** ✅ |
+
+⚠️ **`rebuild_match_feed_texts` VAR DEN ALVORLIGE.** SECURITY DEFINER som
+SKRIVER til `feed_posts`, kallbar uautentisert. Den er idempotent — den
+regner ut det SANNE snapshotet fra `match_events`, så ingen data kunne bli
+feil — men hver kjøring fyrer `set_feed_posts_updated_at` og dermed en
+realtime-UPDATE til alle som følger laget.
+
+**⚠️ FORSKJELLEN PÅ 42501 OG P0001 ER IKKE KOSMETIKK.** `P0001` betyr at
+kallet NÅDDE kroppen og ble stoppet av en `IF auth.uid() IS NULL`-linje inne
+i den. Da er selvvakten den ENESTE vakten, og en fremtidig redigering som
+mister den linjen åpner funksjonen for internett uten at noe annet endres.
+`42501` betyr at rettighetssystemet avviste kallet FØR kroppen kjørte.
+
+**Dørene er retestet mot prod etter `00077` og holder: alle fire svarer
+42501.**
+
+**`00076` gjør tre ting** og rører ingen funksjonskropp:
+GRANT+REVOKE på `correct_match_goal` · REVOKE fra alle tre roller på de
+interne hjelperne · `ALTER FUNCTION … SET search_path = public` på alle
+**seks** kroppene 00075 eier.
+
+- **At `authenticated` også mister hjelperne bryter ingenting:**
+  `correct_match_goal` og `report_match_event` er SECURITY DEFINER og kjører
+  som EIEREN, ikke som kalleren. Trigger-funksjonen trenger heller ingen
+  EXECUTE — PostgreSQL sjekker den ikke når en trigger fyrer.
+- **`= public, pg_temp`, ikke `= public, extensions`** som 00062/00064: de
+  trengte `extensions` for pgcrypto (`digest`), ingen av disse gjør det.
+
+⚠️⚠️ **`00076` TOK FEIL OM `pg_temp`, OG `00077` RETTET DET.**
+`00076` satte `= public` og begrunnet det med at «`pg_temp` er bevisst
+utelatt». **Det er motsatt av hvordan PostgreSQL virker:** nevnes `pg_temp`
+ikke, søkes det likevel — og da **implisitt FØRST** (for tabeller og views).
+Å utelate det er altså ikke å fjerne det; det er å plassere det på den ene
+plassen vi ikke vil ha det. Nevnes det eksplisitt, havner det nøyaktig der
+man skriver det. Riktig sti er derfor:
+
+```
+pg_catalog   (alltid implisitt først)
+public       ← det betrodde skjemaet
+pg_temp      ← eksplisitt SIST
+```
+
+**`00076` er IKKE redigert** — den er anvendt i prod, og en anvendt migrasjon
+skrives ikke om; da ville fil og database sagt to forskjellige ting. Den
+feilaktige kommentaren står som historikk, og `00077` er rettelsen.
+`A7` i bevisfila krever nå den EKSAKTE strengen `search_path=public, pg_temp`
+— en test som bare sjekket at stien var «satt», ville godtatt begge.
+
+##### ⚠️ MIN EGEN PROSESSFEIL — VERDT MER ENN FUNNET
+
+**`A2` i `scripts/verify-00075.sql` sjekket allerede `anon`-døren, og ville
+ha feilet.** Bevisfila var riktig; jeg pushet før jeg kjørte den.
+**Kjør bevisfila FØR `db push`, ikke etter.** `has_function_privilege` teller
+PUBLIC-arv, så den fanger nøyaktig denne feilen. `A6` (interne hjelpere) og
+`A7` (search_path) er lagt til i samme fil.
+
+##### 📋 STÅR ÅPENT: TRE ELDRE SKRIVE-RPC-ER HAR SAMME SVAKHET
+
+Samme probe viste at disse svarer **P0001, ikke 42501** — og har gjort det
+siden 00020/00021/00041:
+
+| RPC | Status |
+|---|---|
+| `start_match` | ⛔ anon når kroppen |
+| `report_match_event` | ⛔ anon når kroppen |
+| `soft_delete_post` | ⛔ anon når kroppen |
+
+Lesestien er derimot riktig lukket: `get_team_feed` og `get_event_with_rsvp`
+svarer 42501.
+
+⚠️ **BEVISST IKKE RØRT I `00076`.** `00075` gjorde `CREATE OR REPLACE` på to
+av dem, og `CREATE OR REPLACE` BEHOLDER grants — de står nøyaktig som før
+skive 8. Å endre grants på dem er **en egen hardening-skive med sin egen
+telefonkontroll**: tar man feil av hvilken rolle appen faktisk kaller med,
+slutter mål å kunne rapporteres i prod midt i en kamp. Alle tre er
+selv-gatede i dag, så risikoen er lav — men den er ikke null, og den er
+Brages å prioritere.
+
+**Når skiva tas:** `GRANT … TO authenticated` FØRST, `REVOKE … FROM PUBLIC,
+anon` ETTERPÅ (ulike mottakere, så den siste opphever ikke den første), og
+kjør anon-proben mot prod før og etter. Samme oppskrift som `00076`.
 
 #### ▶️ SKIVE 4 — HVA SOM VAR AVKLART FØR BYGGING (historikk)
 
