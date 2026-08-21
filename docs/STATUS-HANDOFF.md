@@ -1748,7 +1748,7 @@ en REELL begrensning.
 | 5 | **Kampens puls** (`MatchPulse`) | ✅ LEVERT OG TELEFONGODKJENT — 4 runder. Modellen: `docs/KAMPENS-PULS-MODELL.md` |
 | 6 | **Sticky-bar + Reduce Motion** | ⏳ RUNDE 2 — bevegelsen godkjent, resten venter |
 | 7 | **Kampuret** (serverautoritativt) | ⏳ BYGGET — `00073` IKKE PUSHET ⚠️ |
-| 8 | **Korriger mål** (varig) | ✅ LEVERT, VERIFISERT MOT PROD OG TELEFONGODKJENT 2026-08-21. `00075`+`00076`+`00077` i prod |
+| 8 | **Korriger mål** (varig) | ✅ LEVERT, VERIFISERT OG TELEFONGODKJENT 2026-08-21. `00075`–`00078` i prod. ⚠️ `00078` fjernet målscorerfeltet ETTER godkjenning — se bolken |
 | 9 | **`get_team_feed`-gaten for mål imot** | ✅ I PROD OG TELEFONGODKJENT 2026-08-21 («Alt på 9 kan godkjennes») |
 | 10 | **Kampknappen** | se P4 — krever at inngangene finnes først |
 
@@ -2356,8 +2356,13 @@ Det betyr at de to punktene jeg var mest spent på begge holdt på ekte enhet:
 (annulleringen når den andre telefonen — altså `REPLICA IDENTITY FULL` gjør
 jobben sin).
 
-**`00075`, `00076` og `00077` er alle i prod**, bekreftet i
-`supabase migration list --linked` (local = remote = 00077).
+**`00075`, `00076`, `00077` og `00078` er alle i prod**, bekreftet i
+`supabase migration list --linked` (local = remote = 00078).
+
+⚠️ **`00078` KOM ETTER TELEFONGODKJENNINGEN** — målscorerfeltet ble trukket
+ut av arket på Brages bestilling. Se `##### ⚠️ MÅLSCORER ER TRUKKET UT` under.
+Flaten er dermed ENDRET etter godkjenningen: **arket har ett felt mindre**,
+og det bør sees på telefonen igjen selv om resten står.
 
 ##### `00075_korriger_maal.sql` — pushet 2026-08-21
 
@@ -2443,6 +2448,53 @@ tilfeller; `00075` nevner ikke `public.comments` med ett ord.
    `match_sessions` er låst, kan en annen reporter rette det SAMME målet i
    mellomtiden — og «ble dette et mål imot nå?» (som sletter HEIA-ene) svarer
    feil på en foreldet `team_side`.
+
+##### ⚠️ MÅLSCORER ER TRUKKET UT AV ARKET (Brage 2026-08-21) — `00078`
+
+> «Fjern målscorerfeltet fra korrigeringsarket. Ikke bygg CTA-en «Legg til
+> målscorer» nå. Målscorer utsettes til det kan implementeres konsekvent i
+> både opprettelse, redigering, feed og historikk.»
+
+**«Korriger mål» endrer nå KUN side, eksisterende beskrivelse, eller
+annullerer.** Grunnen er reell: `report_match_event` har ÉTT fritekstfelt som
+havner i `description`, så et eget målscorerfelt bare i korrigeringen ville
+laget **to ulike sannheter** om hva en målscorer er. **Ikke bygg en «Legg til
+målscorer»-CTA i mellomtiden** — en halv inngang til noe opprettelsen ikke
+kan lage er verre enn ingen.
+
+⚠️⚠️ **Å BARE FJERNE FELTET I APPEN VILLE VÆRT DATATAP.** `00075` skrev
+`player_name = v_player` UBETINGET. Slutter klienten å sende feltet, er
+`p_player_name` NULL — og hver eneste korrigering ville da **stille slettet**
+en eksisterende eller importert målscorer. «Rett siden på målet» ville blitt
+«rett siden, og mist navnet på den som scoret».
+
+`00078` gjør derfor at **NULL betyr «ikke rør», aldri «tøm»**:
+`player_name = COALESCE(v_player, v_me.player_name)`. `description` er
+derimot fortsatt fullt klientstyrt — den ER feltet brukeren redigerer, og en
+tom tekst DER skal bety «tøm». Parameteren `p_player_name` beholdes for
+kompatibilitet; klienten sender alltid `null`.
+
+⚠️⚠️ **`CREATE OR REPLACE` NULLSTILLER ATTRIBUTTER SOM IKKE GJENTAS.**
+`SECURITY DEFINER` og `SET search_path` arves IKKE fra forrige definisjon.
+Utelates de, blir funksjonen SECURITY INVOKER med ulåst søkesti — altså ville
+`00075` og `00077` vært stille reversert på nettopp denne funksjonen. Begge
+er gjentatt i `00078`, og døren er retestet mot prod etterpå (42501).
+GRANT/REVOKE overlever derimot `CREATE OR REPLACE`.
+
+⚠️ **KROPPEN I `00078` ER BYTE-IDENTISK MED `00075`** bortsett fra tre steder
+(UPDATE-en, audit-raden, attributt-halen). Den ble hentet ut programmatisk,
+ikke skrevet av — en avskrift av 240 linjer plpgsql er ren risiko.
+
+⚠️ **EN TREDJE DATATAPSFELLE, PÅ LESEVEIEN:** arket prefylte «Beskrivelse»
+fra `MatchEvent.note`, som er satt **kun når den er noe annet enn
+målscoreren**. På et mål der reporteren skrev fritekst ved RAPPORTERING
+ligger teksten i `description` og `note` er `undefined` — feltet ville stått
+tomt, og et lagre hadde slettet teksten. Ny `MatchEvent.descriptionRaw`
+bærer kolonnen rå, og arket prefyller fra den. **`note` er for VISNING,
+`descriptionRaw` for REDIGERING — ikke slå dem sammen.**
+
+`B3` i bevisfila er skrevet om fra «målscorer lagres» til ⭐ **«målscorer
+OVERLEVER en korrigering»**, med en importert scorer satt på forhånd.
 
 ##### GATEN ER PÅ POSTTYPE, IKKE PÅ `match_event_id` — TRE STEDER
 
