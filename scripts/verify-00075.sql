@@ -22,7 +22,10 @@
 --      en funksjon fødes med EXECUTE til PUBLIC, så en GRANT alene stenger
 --      ingenting.
 --   B. REDIGERING: eget mål → mål imot. Stillingen regnes om, ugyldige
---      HEIA slettes, KOMMENTARENE BEHOLDES.
+--      HEIA slettes, KOMMENTARENE BEHOLDES — og ⭐ MÅLSCOREREN OVERLEVER.
+--      Klienten sender ikke lenger målscorer (Brage 2026-08-21), så hvert
+--      kall har `p_player_name = NULL`. 00078 gjør at NULL betyr «ikke rør»;
+--      uten den ville hver korrigering stille slettet en importert scorer.
 --   C. ⭐ SNAPSHOTENE: teksten på et SENERE mål skrives om når et
 --      TIDLIGERE mål rettes. Det er hele grunnen til at korrigeringen
 --      ikke kan være en enkel UPDATE.
@@ -238,7 +241,13 @@ BEGIN
       CASE WHEN v_int = 1 THEN '✅' ELSE '❌ fikk ' || v_int END));
 
     -- ══ B. REDIGERING: mål 1 blir et mål IMOT ═════════════════
-    v := public.correct_match_goal(goal1, 'edit', 'away', 'Ukjent', 'Feilregistrert');
+    -- ⚠️ En importert/eksisterende målscorer settes FØRST, så B3 under kan
+    -- bevise at korrigeringen ikke sletter den. Klienten sender aldri feltet
+    -- lenger (Brage 2026-08-21), og da er `p_player_name` NULL i hvert kall.
+    UPDATE public.match_events SET player_name = 'Importert Scorer'
+    WHERE id = goal1;
+
+    v := public.correct_match_goal(goal1, 'edit', 'away', NULL, 'Feilregistrert');
 
     SELECT home_score, away_score INTO v_home, v_away
     FROM public.match_sessions WHERE id = ms_id;
@@ -254,8 +263,16 @@ BEGIN
 
     SELECT player_name INTO v_txt FROM public.match_events WHERE id = goal1;
     r := r || jsonb_build_array(jsonb_build_array(
-      'B3 målscorer lagres i player_name',
-      CASE WHEN v_txt = 'Ukjent' THEN '✅' ELSE '❌ fikk ' || COALESCE(v_txt,'NULL') END));
+      'B3 ⭐ MÅLSCORER OVERLEVER en korrigering (00078)',
+      CASE WHEN v_txt = 'Importert Scorer' THEN '✅'
+           ELSE '❌ fikk ' || COALESCE(v_txt, 'NULL')
+             || ' — NULL betyr «ikke rør», ikke «tøm»' END));
+
+    SELECT description INTO v_txt FROM public.match_events WHERE id = goal1;
+    r := r || jsonb_build_array(jsonb_build_array(
+      'B3b beskrivelsen er derimot klientstyrt og BLE endret',
+      CASE WHEN v_txt = 'Feilregistrert' THEN '✅'
+           ELSE '❌ fikk ' || COALESCE(v_txt, 'NULL') END));
 
     SELECT count(*) INTO v_int FROM public.reactions WHERE feed_post_id = post1;
     r := r || jsonb_build_array(jsonb_build_array(
@@ -337,7 +354,7 @@ BEGIN
     -- Bare målscorerens navn rettes. Ingen telefon har vist noe galt,
     -- og da skal det IKKE komme et varsel. Det er den halvdelen av
     -- regelen som er lett å bygge feil.
-    PERFORM public.correct_match_goal(goal2, 'edit', 'home', 'Bea', NULL);
+    PERFORM public.correct_match_goal(goal2, 'edit', 'home', NULL, 'Klippet inn');
 
     SELECT count(*) INTO v_int FROM public.notifications n
     WHERE n.user_id = u_medlem AND n.data->>'type' = 'match_correction';
@@ -352,7 +369,7 @@ BEGIN
     UPDATE public.match_sessions SET home_score = 9, away_score = 9
     WHERE id = ms_id;
 
-    PERFORM public.correct_match_goal(goal2, 'edit', 'home', 'Bo', NULL);
+    PERFORM public.correct_match_goal(goal2, 'edit', 'home', NULL, NULL);
 
     SELECT home_score, away_score INTO v_home, v_away
     FROM public.match_sessions WHERE id = ms_id;
