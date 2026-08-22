@@ -199,6 +199,13 @@ Syntesen skal hente: komposisjon og levende lys fra Levende flater; lys, fremdri
 
 Verktøykart i sesjonen (kartlagt 2026-08-22): `design` (Claude Design-canvas-forhåndsvisning) · `artifact-design`/`artifact-diagramming` (HTML-artifacts) · Canva MCP (malgenerering/redigering) · Figma MCP (krever auth) · Higgsfield (bilde/video) · headless Chrome-rigg (§11.6). Claude Design på claude.ai/design er ikke tilgjengelig fra Claude Code-forhåndsvisningen.
 
+### Claude Design-prosjektet «Heia» (opprettet 2026-08-22, overført fra Claude Code)
+Brage ba om at arbeidet flyttes til **Claude Design (claude.ai/design)**, ikke til HTML-artifacts, Figma eller skills. Avklart teknisk: fra Claude Code kan `DesignSync`-verktøyet opprette design-system-prosjekter og skrive filer inn i dem, men kan IKKE åpne Claude Designs canvas eller få den til å komponere skjermer — det skjer i claude.ai/design-grensesnittet. Referansebildene som er limt inn i chatten kan ikke lagres som filer derfra.
+
+Derfor ble dette gjort: prosjektet **«Heia»** (projectId `c338569f-0241-4935-8441-2b20a99ee463`, eid av Brage) ble opprettet og fylt med 18 filer: `BRIEF.md` (komplett brief: nordstjerne, målbilde, forbud, referansesettet med hva hver tilfører, Hjem-skjermens låste struktur og innhold, tokens, leveransen = tre reelt forskjellige hi-fi-retninger), `PROMPT.md` (bestillingen som limes inn i Claude Design), `foundations/colors.html` + `type.html` + `background-mesh.html` (designsystem-kort med ekte tokens og Levende flater-meshen verbatim), `reference/levende-flater-paa-neon-runde3.html` + `kampskjerm-frossen-moerk-fasit.html`, Heia-logoene, juli-skjermbildene av Hjem/Kalender, og målfotoet.
+
+**Brages to handlinger:** åpne prosjektet «Heia» i claude.ai/design, legge ved de åtte referansebildene + de fem augustskjermbildene i chatten, og lime inn `PROMPT.md`. Resultatet (tre retninger) vurderes på telefonen; valgt retning presses til referansenivå i Claude Design før noe implementeres.
+
 ### Eksterne skills vurdert (lest, IKKE installert — Brage avgjør)
 Brage ba om at skills som kan hentes («Apple design skill eller hva som helst») vurderes. Ærlig vurdering etter lesing av kildene:
 
