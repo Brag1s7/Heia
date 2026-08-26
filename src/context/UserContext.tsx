@@ -9,6 +9,7 @@ import React, {
 import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {getProfile} from '../lib/api/profile';
+import {refreshSessionContext} from '../lib/queries/sessionContext';
 import {clearLocalCaches} from '../lib/account';
 import {stopPush} from '../lib/push';
 import type {Profile} from '../lib/types';
@@ -67,15 +68,41 @@ export function AuthProvider({children}: PropsWithChildren) {
   // igjen uten at brukeren faktisk er en annen.
   const userId = session?.user?.id;
 
-  // Hent profil når session endres
+  // Hent profil når session endres. S2: profilen ligger i kontekst-svaret,
+  // så vi DELER TeamContexts kall i stedet for å eie et eget getProfile —
+  // maxAgeMs + single-flight i orkestratoren gjør at den av de to som
+  // kommer først starter kallet og den andre blir med, uansett
+  // effektrekkefølge. Fallback (RPC mangler/feiler, eller svaret er en
+  // annen brukers): nøyaktig dagens getProfile-vei.
   useEffect(() => {
-    if (userId) {
-      getProfile(userId)
-        .then(setProfile)
-        .catch(() => setProfile(null));
-    } else {
+    if (!userId) {
       setProfile(null);
+      return;
     }
+    let cancelled = false;
+    refreshSessionContext(undefined, {maxAgeMs: 60_000}).then(ctx => {
+      if (cancelled) {
+        return;
+      }
+      if (ctx?.profile && ctx.profile.id === userId) {
+        setProfile(ctx.profile);
+        return;
+      }
+      getProfile(userId)
+        .then(p => {
+          if (!cancelled) {
+            setProfile(p);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setProfile(null);
+          }
+        });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
 
   // Initial session check + auth state listener

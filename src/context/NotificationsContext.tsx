@@ -14,6 +14,10 @@ import {useActiveTeam} from './TeamContext';
 import {supabase} from '../lib/supabase';
 import {createResyncStatusHandler} from '../lib/realtimeChannels';
 import {
+  peekSessionContext,
+  refreshSessionContext,
+} from '../lib/queries/sessionContext';
+import {
   getUnreadCount,
   markAsRead,
   markAllAsRead,
@@ -135,31 +139,70 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
     }
   }, [refreshUnread]);
 
-  useEffect(() => {
-    refreshUnread();
-  }, [refreshUnread]);
-
-  // Varsler kommer mens appen ligger i bakgrunnen — hent telleren når den
-  // kommer tilbake, ellers ville badgen ligget etter til neste fanebytte.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') {
-        refreshUnread();
-      }
-    });
-    return () => sub.remove();
-  }, [refreshUnread]);
-
-  // Kanalen er BRUKER-scopet, ikke lag-scopet — derfor leses
-  // `activeTeamSpaceId` og `refreshUnread` via refs i callbacken (S1-f).
+  // Kanalen (lenger ned) er BRUKER-scopet, ikke lag-scopet — derfor leses
+  // `activeTeamSpaceId` og `refreshUnread` via refs i callbackene (S1-f).
   // Sto de i effect-deps, ville hvert lagbytte revet og gjenoppbygget
   // WS-kanalen for et abonnement som er identisk uansett lag. Lagbyttets
-  // unread-refresh skjer fortsatt: mount-effekten over fyrer når
+  // unread-refresh skjer fortsatt: mount-effekten under fyrer når
   // `refreshUnread` bytter identitet.
   const activeTeamSpaceIdRef = useRef(activeTeamSpaceId);
   activeTeamSpaceIdRef.current = activeTeamSpaceId;
   const refreshUnreadRef = useRef(refreshUnread);
   refreshUnreadRef.current = refreshUnread;
+
+  // Fyrer ved boot (laget blir valgt) OG ved lagbytte. S2: ved boot ligger
+  // telleren allerede i kontekst-svaret TeamContext hentet — peek er et
+  // rent minneoppslag og koster null HTTP. Ved lagbytte dekker svaret det
+  // GAMLE laget → miss → dagens HEAD-kall. RPC-feil/manglende 00079 gir
+  // også miss → samme HEAD-kall som før S2.
+  useEffect(() => {
+    if (userId && activeTeamSpaceId) {
+      const hit = peekSessionContext(activeTeamSpaceId);
+      if (hit && hit.ctx.unreadCount != null) {
+        unreadFetchedAtRef.current = hit.fetchedAt;
+        setUnreadCount(hit.ctx.unreadCount);
+        return;
+      }
+    }
+    refreshUnread();
+  }, [userId, activeTeamSpaceId, refreshUnread]);
+
+  // Varsler kommer mens appen ligger i bakgrunnen — resync når den kommer
+  // tilbake, ellers ville badgen ligget etter til neste fanebytte. S2:
+  // foreground-resumen DELER kontekst-kallet (TeamContexts og kampknappens
+  // lyttere fyrer i samme tick — single-flight gjør dem til ETT kall).
+  // Uten aktivt lag, eller når svaret ikke dekker laget (feil/lagbytte i
+  // mellomtiden), tas dagens vei: refreshUnread.
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+    const sub = AppState.addEventListener('change', state => {
+      if (state !== 'active') {
+        return;
+      }
+      const ts = activeTeamSpaceIdRef.current;
+      if (!ts) {
+        refreshUnreadRef.current();
+        return;
+      }
+      refreshSessionContext(ts).then(ctx => {
+        const now = activeTeamSpaceIdRef.current;
+        if (
+          ctx &&
+          now &&
+          ctx.coveredTeamSpaceId === now &&
+          ctx.unreadCount != null
+        ) {
+          unreadFetchedAtRef.current = Date.now();
+          setUnreadCount(ctx.unreadCount);
+        } else {
+          refreshUnreadRef.current();
+        }
+      });
+    });
+    return () => sub.remove();
+  }, [userId]);
 
   // Live badge (00025). Uten denne kom varselet først ved fanebytte — mens
   // kampen på Hjem oppdaterte seg selv. Filteret på user_id er ikke bare

@@ -13,6 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from './UserContext';
 import {registerTeamSwitcher} from '../navigation/deepLink';
 import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
+import {refreshSessionContext} from '../lib/queries/sessionContext';
+import {ACTIVE_TEAM_KEY} from '../lib/activeTeamStorage';
 import {pickPrimaryMembership} from '../shared/activeMembership';
 import {purgeMediaCacheByPrefix} from '../lib/media/resolver';
 import type {
@@ -44,17 +46,18 @@ const TeamContext = createContext<TeamContextValue | undefined>(undefined);
 // Sist aktive lag overlever app-omstart (telefonfunn 2026-08-18: bruker med
 // tre lag ble kastet til lag 1 ved hver oppstart). Kun ID-en lagres —
 // gyldigheten avgjøres ALLTID mot ferske memberships før den brukes, så en
-// som er fjernet fra laget faller trygt tilbake til første lag.
-const ACTIVE_TEAM_KEY = 'heia:activeTeamSpace:v1';
+// som er fjernet fra laget faller trygt tilbake til første lag. Nøkkelen
+// bor i lib/activeTeamStorage fra S2: kontekst-RPC-en leser kandidatlaget
+// derfra FØR denne provideren har rukket å velge.
 
 export function TeamProvider({children}: PropsWithChildren) {
   const {session} = useAuth();
   const [activeTeamSpaceId, setActiveTeamSpaceId] = useState<string | null>(
     null,
   );
-  const [userMemberships, setUserMemberships] = useState<
-    EnrichedMembership[]
-  >([]);
+  const [userMemberships, setUserMemberships] = useState<EnrichedMembership[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
 
   // Husket lagvalg fra forrige økt. undefined = ikke lest ennå (auto-valget
@@ -87,6 +90,23 @@ export function TeamProvider({children}: PropsWithChildren) {
     setUserMemberships(list);
   }, []);
 
+  // Kandidatlaget til kontekst-RPC-en leses via ref: sto activeTeamSpaceId
+  // i fetchMemberships-deps, ville hvert lagbytte gitt hele boot-kjeden på
+  // nytt (samme ref-idiom som varselkanalen i NotificationsContext, S1-f).
+  const activeTeamSpaceIdRef = useRef<string | null>(null);
+  activeTeamSpaceIdRef.current = activeTeamSpaceId;
+
+  // Medlemstallet til TeamHeader-underteksten — cachen bor her (over
+  // fetchMemberships, som fyller den fra kontekst-svaret), tegne-effekten
+  // lenger ned. Cachet per lagrom, så et lagbytte viser forrige tall med
+  // én gang mens ferskt hentes.
+  const memberCountCache = useRef<Map<string, number>>(new Map());
+  // Når kontekst-RPC-en nettopp leverte medlemstallet for et lag, skal
+  // telle-effekten under IKKE sende sitt eget HEAD-kall oppå (60 s-regelen).
+  const memberCountFreshRef = useRef<{teamSpaceId: string; at: number} | null>(
+    null,
+  );
+
   const fetchMemberships = useCallback(async () => {
     if (!userId) {
       loadedForRef.current = null;
@@ -98,7 +118,28 @@ export function TeamProvider({children}: PropsWithChildren) {
       setLoading(true);
     }
     try {
-      const memberships = await getUserMemberships(userId);
+      // S2: ETT kontekst-kall bærer memberships + membercount (+ profil,
+      // unread, livekamp, lagkassa til de andre kontekstene — single-flight
+      // i orkestratoren gjør alle konsumentene til dette ene kallet).
+      // Kandidatlag: aktivt lag når det finnes (foreground-resume), ellers
+      // forrige økts lagrede valg (boot — orkestratoren leser lagringen).
+      // Ved boot avfyres feed/events-prefetchen parallelt (§1.4-trioen).
+      const ctx = await refreshSessionContext(activeTeamSpaceIdRef.current, {
+        bootPrefetchUserId: isRefresh ? undefined : userId,
+      });
+      let memberships = ctx?.memberships ?? null;
+      if (ctx?.coveredTeamSpaceId && ctx.memberCount != null) {
+        memberCountCache.current.set(ctx.coveredTeamSpaceId, ctx.memberCount);
+        memberCountFreshRef.current = {
+          teamSpaceId: ctx.coveredTeamSpaceId,
+          at: Date.now(),
+        };
+      }
+      // Fallback (RPC mangler/feiler — f.eks. base uten 00079): nøyaktig
+      // dagens enkeltkall, med nøyaktig dagens feilhåndtering under.
+      if (!memberships) {
+        memberships = await getUserMemberships(userId);
+      }
       loadedForRef.current = userId;
       applyMemberships(memberships);
     } catch {
@@ -199,12 +240,10 @@ export function TeamProvider({children}: PropsWithChildren) {
   const activeTeam = activeMembership?.team ?? null;
   const activeRole = activeMembership?.role ?? null;
 
-  // Medlemstallet til TeamHeader-underteksten. Cachet per lagrom, så et
-  // lagbytte viser forrige tall med én gang mens ferskt hentes. Feiler
-  // hentingen beholdes cache/null — headeren har sport · årsklasse som
-  // fallback. userMemberships er bevisst med i deps: en refresh av
-  // medlemskapene skal også friske opp tallet (head-count er billig).
-  const memberCountCache = useRef<Map<string, number>>(new Map());
+  // Medlemstallet tegnes her. Feiler hentingen beholdes cache/null —
+  // headeren har sport · årsklasse som fallback. userMemberships er bevisst
+  // med i deps: en refresh av medlemskapene skal også friske opp tallet
+  // (head-count er billig).
   const [activeMemberCount, setActiveMemberCount] = useState<number | null>(
     null,
   );
@@ -214,10 +253,23 @@ export function TeamProvider({children}: PropsWithChildren) {
       setActiveMemberCount(null);
       return;
     }
-    setActiveMemberCount(memberCountCache.current.get(activeTeamSpaceId) ?? null);
+    setActiveMemberCount(
+      memberCountCache.current.get(activeTeamSpaceId) ?? null,
+    );
     // RLS teller kun rader man selv ser — uten eget medlemskap ville svaret
     // blitt et falskt 0, så vent til medlemskapet finnes i listen.
     if (!userMemberships.some(m => m.teamSpaceId === activeTeamSpaceId)) {
+      return;
+    }
+    // S2: kontekst-kallet som nettopp trigget denne effekten (ny
+    // memberships-identitet) leverte tallet selv — ikke send et HEAD-kall
+    // oppå et svar som er sekunder gammelt.
+    const fresh = memberCountFreshRef.current;
+    if (
+      fresh &&
+      fresh.teamSpaceId === activeTeamSpaceId &&
+      Date.now() - fresh.at <= 60_000
+    ) {
       return;
     }
     let cancelled = false;

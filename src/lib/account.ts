@@ -7,6 +7,7 @@ import {
 } from './api';
 import {clearMediaUrlCache} from './media/resolver';
 import {queryClient} from './queries/queryClient';
+import {abandonSessionContext} from './queries/sessionContext';
 
 // Skjermnære modul-cacher (f.eks. «Min støtte» i ProfilScreen) registrerer
 // seg her ved modul-last. account.ts kan ikke importere fra screens/ selv —
@@ -40,6 +41,10 @@ export async function clearLocalCaches(): Promise<void> {
   // Query-cachen bærer feed/medlemmer/varsler — personlige data som ikke
   // skal overleve til neste bruker på samme enhet (samme P1-funn som over).
   queryClient.clear();
+  // S2: kontekst-svaret i minnet er like personlig som cachen — og et kall
+  // i FLUKT for den utloggede brukeren skal ikke få seede den tomme cachen
+  // når det lander (generasjonsvernet i modulen).
+  abandonSessionContext();
   await clearMediaUrlCache();
   // B1: expo-images disk-cache er nøklet på storage_path og kan bære
   // barnebilder — den skal ikke overleve brukeren på en delt enhet (P1,

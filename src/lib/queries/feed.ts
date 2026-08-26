@@ -61,6 +61,35 @@ export function useTeamFeed(
 }
 
 /**
+ * Boot-trioen (S2, §1.4): feedens side 1 forhåndshentes PARALLELT med
+ * kontekst-RPC-en, i stedet for å vente på at TeamHome monterer (som igjen
+ * venter på at konteksten har levert memberships). Samme nøkkel, samme
+ * queryFn og samme initialPageParam som `useTeamFeed` — når skjermen
+ * monterer, er dataen fersk (staleTime) og hooken refetcher ikke.
+ *
+ * Kandidatlaget kommer fra forrige økts lagrede valg og kan i sjeldne
+ * tilfeller være foreldet (fjernet fra laget siden sist): da svarer den
+ * RLS-vaktede RPC-en tomt/feil, prefetch svelger det, og cache-posten for
+ * det laget vises aldri (memberships ekskluderer laget).
+ */
+export function prefetchTeamFeedFirstPage(
+  teamSpaceId: string,
+  myUserId: string | undefined,
+): void {
+  queryClient.prefetchInfiniteQuery({
+    queryKey: teamFeedKey(teamSpaceId),
+    queryFn: ({pageParam}) =>
+      getTeamFeed(
+        teamSpaceId,
+        myUserId,
+        FEED_PAGE_SIZE,
+        pageParam ?? undefined,
+      ),
+    initialPageParam: null as string | null,
+  });
+}
+
+/**
  * Optimistisk oppdatering av ÉN post over sidestrukturen (👏-toggle,
  * løsne-markør). Kalleren reverterer ved feil med en ny patch — samme
  * funksjonelle mønster som setFeed-map-en den erstatter.

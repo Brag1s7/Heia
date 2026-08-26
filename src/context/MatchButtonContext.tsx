@@ -13,6 +13,7 @@ import {useFocusEffect, useIsFocused} from '@react-navigation/native';
 import {useActiveTeam} from './TeamContext';
 import {useNotifications} from './NotificationsContext';
 import {invalidateLiveMatch, useLiveMatch} from '../lib/queries/liveMatch';
+import {refreshSessionContext} from '../lib/queries/sessionContext';
 import {
   matchButtonState,
   type MatchButtonState,
@@ -88,8 +89,18 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
       const active = s === 'active';
       setAppActive(active);
       // Hent straks ved retur, i stedet for å vente på neste intervall: en
-      // kamp kan ha startet mens telefonen lå i lomma.
-      if (active) invalidateLiveMatch(activeTeamSpaceId);
+      // kamp kan ha startet mens telefonen lå i lomma. S2: svaret ligger i
+      // kontekst-kallet foreground-lytterne deler (single-flight), som
+      // seeder livekamp-nøkkelen direkte — ingen egen refetch. Dekker
+      // svaret ikke laget (feil/manglende 00079), tas dagens vei:
+      // invalidering, som lar spørringen hente fasit selv.
+      if (active && activeTeamSpaceId) {
+        refreshSessionContext(activeTeamSpaceId).then(ctx => {
+          if (!ctx || ctx.coveredTeamSpaceId !== activeTeamSpaceId) {
+            invalidateLiveMatch(activeTeamSpaceId);
+          }
+        });
+      }
     });
     return () => sub.remove();
   }, [activeTeamSpaceId]);

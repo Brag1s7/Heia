@@ -1,6 +1,96 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-26 — S1 KLIENTLEKKASJENE FERDIG OG GODKJENT. NESTE: S2, KUN ETTER EKSPLISITT GODKJENNING)
+## ▶️▶️ START HER (oppdatert 2026-08-26 — S2 SESSION CONTEXT + RUNTIME-CONFIG FERDIG OG GODKJENT. NESTE: SELEKTIV S7-PERSISTERING, SÅ S3)
+
+✅ **S2 — `get_session_context` + BOOT-TRIO + `runtime_config` — ER
+IMPLEMENTERT, GODKJENT AV BRAGE OG COMMITTET PÅ `Brage` 2026-08-26.**
+Skiva er §1.4 + §1.5 (S2 i §9) i den godkjente skaleringsplanen v2.1
+(`~/.claude/plans/les-f-rst-docs-egress-media-arkitektur-2-cosmic-hickey.md`).
+Ingen Broadcast-endringer, ingen postgres_changes rørt, ingen nye pakker,
+ingen native.
+
+**Hva som ble bygget (8 nye filer + 10 endrede):**
+- **Migrasjon `00079_session_context.sql`**: én-rads `runtime_config`
+  (defaults = dagens atferd: pgc/pgc/pgc, poll 0; RLS på, SELECT kun for
+  authenticated, INGEN skrivepolicy — service/ops bypasser; skrive-
+  privilegier trukket; CHECK-er avviser feilstavet transport/ugyldig poll
+  så en kill-switch-UPDATE med skrivefeil feiler høyt) + RPC
+  **`get_session_context(p_team_space_id default null)`**: SECURITY
+  DEFINER, STABLE, `search_path = public, pg_temp` (00077-formen), GRANT
+  authenticated FØR REVOKE PUBLIC+anon (00076-rekkefølgen, anon skal gi
+  42501). Definer bypasser RLS → hver spørring eksplisitt scopet til
+  `auth.uid()`/`is_team_member`; lagkassa gjenbruker
+  `get_team_support_summary` (00040). Fremmed/foreldet lag-id gir
+  NULL-scopede felter, aldri feil. Payload-paritet med PostgREST-formene →
+  klienten gjenbruker de eksisterende mapperne.
+- **Klient**: `lib/runtimeConfig.ts` (flagglager, per-felt-sanitisering,
+  alltid komplette flagg), `lib/activeTeamStorage.ts` (nøkkelen flyttet
+  fra TeamContext), `api/sessionContext.ts` (RPC + mapping),
+  `queries/sessionContext.ts` (orkestrator: single-flight satt SYNKRONT,
+  seeding av livekamp+lagkassa i query-cachen, `peekSessionContext`,
+  generasjonsvern koblet på `clearLocalCaches`). TeamContext (memberships
+  + membercount fra konteksten, boot-prefetch av feed/events), UserContext
+  (profilen deler kallet via maxAgeMs 60 s), NotificationsContext (badgen
+  via peek ved boot, kontekst ved foreground), MatchButtonContext
+  (foreground-invalidering → seeding). **Hver konsument faller tilbake til
+  nøyaktig dagens enkeltkall når kontekst-svaret er null** — gammel app
+  rører aldri RPC-en, ny app mot base uten 00079 oppfører seg som før S2.
+  Rollback = revert (planens kjede).
+
+**Kallbudsjett kaldstart (husket lag, netMetrics-telling §0.1-3):**
+før ~11 (profil + memberships + membercount HEAD + unread HEAD + livekamp
++ lagkassa + feed + events×2 + signering ≤2) → **etter ≤6** (kontekst 1 +
+feed 1 + events 2 + signering ≤2, avfyrt parallelt) — innenfor målet ≤7.
+Foreground-resume: 3 kall → **1**. Bonus: kampknappens `bootReady` kommer
+raskere (livekampen seedes før observeren monterer).
+
+**Kill-switchen i S2 = plumbing, ikke atferd** (bevisst — flagget skal
+finnes FØR transportbyttet i S3): flaggene leses og lagres ved hvert
+boot-/foreground-kall, ingenting konsumerer dem ennå, 60 s-pollingen er
+uendret klientkonstant til S3c. Rollback-veien er operativ: én UPDATE på
+`runtime_config` når flåten ved neste foreground. Feiler trygt: manglende
+rad → RPC-COALESCE-defaults; manglende/feilet RPC → klientdefaults;
+søppel → per-felt-sanitisering.
+
+**Avvik fra planens bokstav (alle bevisste, dokumentert i koden):**
+første oppstart uten husket lag dekker ikke lag-feltene (~8 kall den ene
+gangen; ≤7-målet gjelder normal kaldstart) · foreground-resume gjenbruker
+de tre eksisterende AppState-lytterne delt via single-flight (feed/events-
+resync dekkes allerede av focusManager + staleTime) · CHECK-ene på
+runtime_config er hardening utover planteksten · mapProfile/
+mapEnrichedMembership eksportert, `mapLiveMatchRow` ny · tre prettier-
+omslag av preeksisterende linjer (teams.ts/api-events.ts).
+
+**Resultater:** `npx jest` = **793 bestått, 2 hoppet over, 0 røde**
+(781 baseline + 12 nye: `sessionContext.test.tsx` — mapping, seeding,
+single-flight, maxAge, degradering, generasjonsvern; `sessionBoot.test.tsx`
+— boot uten enkeltkall, fallback, foreground-deling). «Worker failed to
+exit»-advarselen er preeksisterende. Én eksisterende test feilet i ÉN
+mellomkjøring og var grønn ved rerun + i begge fulle kjøringer
+(rekkefølge-flake, ikke S2). `npx tsc --noEmit` = **7 kjente feil =
+baselinen**. Lint på endrede filer: 0 problemer.
+
+⛔ **HARD SPERRE FØR DEPLOY/PUSH AV MIGRASJONEN:**
+`supabase/migrations/00079_session_context.sql` er KUN OPPRETTET LOKALT —
+**ingenting er deployet, og databasesiden er IKKE verifisert**.
+`scripts/verify-00079.sql` (20 prober: dører, RLS/privilegier, énradsvern,
+CHECK-avvisning, scoping medlem/fremmed/uten lag, payload-form,
+manglende-rad-degradering) er skrevet men **ALDRI KJØRT mot noen
+database**. Rekkefølgen er ufravikelig (00075-lærdommen): kjør
+verify-00079.sql (grønn SUM) + anon-42501-proben mot
+`/rest/v1/rpc/get_session_context` FØR migrasjonen pushes til prod.
+Klienten er trygg å shippe uavhengig (fallback til dagens enkeltkall),
+men boot-gevinsten finnes ikke før migrasjonen er ute.
+
+▶️ **NESTE (besluttet av Brage 2026-08-26): SELEKTIV S7-PERSISTERING
+(planens §2) FØR S3** — produktprioriteten er premium cold start og
+umiddelbart innhold. Omfanget i §2 gjelder: KUN selektivt (feed side 1,
+events, members, authors — ALDRI liveMatch/varsler), hevet staleTime per
+query, bruker-scopet nøkkel + versjonsbuster, rydding i `clearLocalCaches`.
+UX-skive, ikke skalering. S3 (Broadcast) kommer ETTER S7, og S2-sperren
+over må uansett løses før S3a.
+
+## ✅ S1 KLIENTLEKKASJENE FERDIG OG GODKJENT (tidligere START HER, oppdatert 2026-08-26 — neste var S2)
 
 ✅ **S1 — KLIENTLEKKASJENE — ER IMPLEMENTERT, GODKJENT AV BRAGE OG
 COMMITTET PÅ `Brage` 2026-08-26.** Skiva er §5 (S1-a til S1-f) i den

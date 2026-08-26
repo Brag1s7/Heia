@@ -3,7 +3,8 @@ import {getUserId} from './authUser';
 import {primeAvatars} from '../media/avatar';
 import type {Profile} from '../types';
 
-function mapProfile(row: any): Profile {
+/** Eksportert for get_session_context (S2): samme rad, samme mapping. */
+export function mapProfile(row: any): Profile {
   return {
     id: row.id,
     displayName: row.display_name,
