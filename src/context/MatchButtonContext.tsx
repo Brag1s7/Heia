@@ -58,8 +58,6 @@ interface MatchButtonContextValue {
    * Ingenting skjer om vi ikke står inne i en kamp.
    */
   press: () => void;
-  /** Fanefokus henter fasit — settings-uavhengig, se `useLiveMatch`. */
-  refreshLiveMatch: () => void;
 }
 
 /** Hvor lenge oppstarten får vente på kampsvaret før appen vises uansett. */
@@ -69,7 +67,7 @@ const MatchButtonContext = createContext<MatchButtonContextValue | null>(null);
 
 export function MatchButtonProvider({children}: {children: ReactNode}) {
   const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
-  const {liveNonce} = useNotifications();
+  const {matchNonce} = useNotifications();
   const [presence, setPresence] = useState<MatchPresence | null>(null);
   const [appActive, setAppActive] = useState(
     () => AppState.currentState === 'active',
@@ -96,11 +94,13 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
     return () => sub.remove();
   }, [activeTeamSpaceId]);
 
-  // Det raske sporet. Bumper på hvert varsel jeg faktisk mottar — som er
-  // grunnen til at det ikke kan stå alene (se `useLiveMatch`).
+  // Det raske sporet. Bumper på hvert KAMPVARSEL jeg faktisk mottar — som
+  // er grunnen til at det ikke kan stå alene (se `useLiveMatch`). S1-d:
+  // før sto `liveNonce` her, og da invaliderte ETHVERT varsel (👏,
+  // kommentar, RSVP …) livekamp-spørringen.
   useEffect(() => {
-    if (liveNonce > 0) invalidateLiveMatch(activeTeamSpaceId);
-  }, [liveNonce, activeTeamSpaceId]);
+    if (matchNonce > 0) invalidateLiveMatch(activeTeamSpaceId);
+  }, [matchNonce, activeTeamSpaceId]);
 
   const {data: liveMatch, isPending} = useLiveMatch(activeTeamSpaceId, {
     appActive,
@@ -144,10 +144,6 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
     actionRef.current?.();
   }, []);
 
-  const refreshLiveMatch = useCallback(() => {
-    invalidateLiveMatch(activeTeamSpaceId);
-  }, [activeTeamSpaceId]);
-
   // Vet vi det ennå? Står du INNE i kampen er spørringen slått av og
   // `isPending` sann for alltid — men da vet presence alt vi trenger.
   const known = presence !== null || !isPending;
@@ -190,7 +186,6 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
       enterMatch,
       leaveMatch,
       press,
-      refreshLiveMatch,
     }),
     [
       state,
@@ -200,7 +195,6 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
       enterMatch,
       leaveMatch,
       press,
-      refreshLiveMatch,
     ],
   );
 

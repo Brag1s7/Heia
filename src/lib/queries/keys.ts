@@ -25,6 +25,12 @@ export const queryKeys = {
    *  annen livssyklus enn kalenderens vindu, og den skal kunne slås av mens
    *  man står inne i kampen uten at det rører hendelseslista. */
   liveMatch: (teamSpaceId: string) => ['liveMatch', teamSpaceId] as const,
+  /** Lagkassa-aggregatet på Hjem/Sesongen (S1-c) — bevisst justering av
+   *  P7-grensen: dette er en varm LESE-sti delt av to skjermer, og hører
+   *  derfor hjemme i cachen. Mutasjoner/checkout i payments forblir
+   *  imperative kall utenfor cachen. */
+  supportSummary: (teamSpaceId: string) =>
+    ['supportSummary', teamSpaceId] as const,
   members: (teamSpaceId: string) => ['members', teamSpaceId] as const,
   /** Forfatter-oppslaget (00067) — som members, men inkluderer utmeldte
    *  og bærer aldri telefon/barn. Egen nøkkel: rosteret og forfatterskapet

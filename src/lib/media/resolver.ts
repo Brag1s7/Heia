@@ -54,6 +54,13 @@ const REFRESH_MARGIN_MS = 6 * 3600 * 1000;
 const UNUSABLE_MARGIN_MS = 5 * 60 * 1000;
 const REFRESH_MIN_INTERVAL_MS = 60 * 1000;
 
+/**
+ * Maks paths per `createSignedUrls`-kall (S1-e). Én batch på flere hundre
+ * paths er én stor, treg respons som alt venter på — og et vilkårlig stort
+ * request-body. Chunken holder hvert kall forutsigbart; 250 paths = 3 kall.
+ */
+export const SIGN_BATCH_MAX = 100;
+
 // Versjonert nøkkel: bytt formatet → bump versjonen, gamle rader ignoreres
 // og utløper hos AsyncStorage-lesingen under (aldri migrering av en cache).
 // v2 = nøkkelen bærer bucket foran path (to private buckets fra 00068).
@@ -78,7 +85,9 @@ function cacheKey(bucket: string, path: string): string {
 }
 
 const cache = new Map<string, Entry>();
-const inflight = new Map<string, Promise<string | null>>();
+// Pågående signering per cache-nøkkel (S1-e): to samtidige primes med samme
+// paths — eller en prime og en resolve — skal bli ETT signeringskall.
+const inflight = new Map<string, Promise<void>>();
 const lastRefreshAt = new Map<string, number>();
 let hydrated: Promise<void> | null = null;
 
@@ -139,13 +148,46 @@ async function signBatch(bucket: string, paths: string[]): Promise<void> {
 }
 
 /**
- * ÉN signeringsbatch per skjermlast (P1): kall den med alle paths skjermen
+ * Signerer paths i chunker på ≤ SIGN_BATCH_MAX, med inflight-dedupe per
+ * path (S1-e): paths som allerede er i flukt (fra en annen prime eller en
+ * resolve) ventes på i stedet for å signeres på nytt. Løses når ALLE
+ * involverte paths er avgjort.
+ */
+async function signPaths(bucket: string, paths: string[]): Promise<void> {
+  const waits: Promise<void>[] = [];
+  const fresh: string[] = [];
+  for (const p of paths) {
+    const pending = inflight.get(cacheKey(bucket, p));
+    if (pending) {
+      waits.push(pending);
+    } else {
+      fresh.push(p);
+    }
+  }
+  for (let i = 0; i < fresh.length; i += SIGN_BATCH_MAX) {
+    const chunk = fresh.slice(i, i + SIGN_BATCH_MAX);
+    const promise = signBatch(bucket, chunk).finally(() => {
+      for (const p of chunk) {
+        inflight.delete(cacheKey(bucket, p));
+      }
+    });
+    for (const p of chunk) {
+      inflight.set(cacheKey(bucket, p), promise);
+    }
+    waits.push(promise);
+  }
+  await Promise.all(waits);
+}
+
+/**
+ * ÉN signeringsrunde per skjermlast (P1): kall den med alle paths skjermen
  * skal vise, FØR items leveres til UI-et. Paths med god tid igjen hopper
- * den over — gjenbruk er hele poenget.
+ * den over — gjenbruk er hele poenget. Store lister chunkes
+ * (SIGN_BATCH_MAX), og to samtidige primes med samme paths dedupes til
+ * ett kall (S1-e).
  *
  * En skjerm som viser BEGGE bucketene (feeden: bilder + forfatteravatarer)
- * kaller den to ganger — én batch per bucket, som er nøyaktig så mange
- * rundturer signeringen krever.
+ * kaller den to ganger — én runde per bucket.
  */
 export async function primeMediaUrls(
   paths: string[],
@@ -157,7 +199,7 @@ export async function primeMediaUrls(
     const entry = cache.get(cacheKey(bucket, p));
     return !entry || entry.exp - now < REFRESH_MARGIN_MS;
   });
-  await signBatch(bucket, stale);
+  await signPaths(bucket, stale);
 }
 
 /** Synkron lesing fra varm cache — `MediaImage` slipper et tomt førsteframe. */
@@ -174,7 +216,7 @@ export function peekMediaUrl(
 /**
  * URL for én variant. Nesten alltid et cache-treff (prime har vært der);
  * ved miss signeres path-en alene, med dedupe så to samtidige `MediaImage`
- * for samme bilde blir ETT kall.
+ * for samme bilde blir ETT kall — `signPaths` eier inflight-registeret.
  */
 export async function resolveMediaUrl(
   ref: MediaRef,
@@ -182,21 +224,12 @@ export async function resolveMediaUrl(
 ): Promise<string | null> {
   const bucket = ref.bucket ?? FEED_MEDIA_BUCKET;
   const path = mediaPathFor(ref, variant);
-  const key = cacheKey(bucket, path);
   await hydrate();
   const warm = peekMediaUrl(path, bucket);
   if (warm) return warm;
 
-  const pending = inflight.get(key);
-  if (pending) return pending;
-
-  const promise = signBatch(bucket, [path])
-    .then(() => peekMediaUrl(path, bucket))
-    .finally(() => {
-      inflight.delete(key);
-    });
-  inflight.set(key, promise);
-  return promise;
+  await signPaths(bucket, [path]);
+  return peekMediaUrl(path, bucket);
 }
 
 /**

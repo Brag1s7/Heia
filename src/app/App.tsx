@@ -48,7 +48,7 @@ function App() {
             <OnboardingProvider>
               <NotificationsProvider>
                 {/* ⚠️ UNDER NotificationsProvider med vilje: kampknappen
-                    bruker `liveNonce` som sitt raske spor (men hviler ikke
+                    bruker `matchNonce` som sitt raske spor (men hviler ikke
                     på det — varselrader er gatet på brukerens innstillinger,
                     se `useLiveMatch`). Over navigatoren, fordi baren er
                     alltid montert. */}

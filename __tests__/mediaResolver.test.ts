@@ -121,6 +121,36 @@ test('prime signerer batchen i ETT kall og hopper over varme paths', async () =>
   expect(signMock).toHaveBeenLastCalledWith(['ts-1/c.jpg'], expect.anything());
 });
 
+test('chunking (S1-e): 250 paths signeres som 3 kall på maks 100', async () => {
+  const mange = Array.from({length: 250}, (_, i) => `ts-1/p${i}.jpg`);
+  await primeMediaUrls(mange);
+  expect(signMock).toHaveBeenCalledTimes(3);
+  expect(signMock.mock.calls.map((c: unknown[][]) => c[0].length)).toEqual([
+    100, 100, 50,
+  ]);
+  // Alle 250 landet i cachen — chunkingen mistet ingen.
+  expect(peekMediaUrl('ts-1/p249.jpg')).toContain('ts-1/p249.jpg');
+});
+
+test('inflight-dedupe (S1-e): samtidige primes med samme paths = ETT kall', async () => {
+  // To skjermer primer samme liste samtidig (feed + kommentartråd åpnet
+  // raskt): før S1-e ga det to identiske signeringskall.
+  await Promise.all([
+    primeMediaUrls(['ts-1/a.jpg', 'ts-1/b.jpg']),
+    primeMediaUrls(['ts-1/a.jpg', 'ts-1/b.jpg']),
+  ]);
+  expect(signMock).toHaveBeenCalledTimes(1);
+
+  // Delvis overlapp: den inflight path-en ventes på, kun den NYE signeres.
+  signMock.mockClear();
+  await Promise.all([
+    primeMediaUrls(['ts-1/c.jpg', 'ts-1/d.jpg']),
+    primeMediaUrls(['ts-1/d.jpg', 'ts-1/e.jpg']),
+  ]);
+  expect(signMock).toHaveBeenCalledTimes(2);
+  expect(signMock).toHaveBeenLastCalledWith(['ts-1/e.jpg'], expect.anything());
+});
+
 test('thumb-varianten leser thumbPath, med fallback til path', async () => {
   const withThumb = {path: 'ts-1/a.jpg', thumbPath: 'ts-1/a-t480.jpg'};
   await resolveMediaUrl(withThumb, 'thumb');

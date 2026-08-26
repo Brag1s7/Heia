@@ -37,8 +37,13 @@ import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {isSystemMatchPost} from '../shared/matchEngagement';
-import {getLiveMatch} from '../lib/api/events';
 import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
+import {invalidateLiveMatch, useLiveMatchValue} from '../lib/queries/liveMatch';
+import {
+  invalidateSupportSummary,
+  supportSummaryKey,
+  useSupportSummary,
+} from '../lib/queries/supportSummary';
 import {
   useTeamFeed,
   teamFeedKey,
@@ -52,10 +57,6 @@ import {
 } from '../lib/queries/feed';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {tournamentTitleFor} from '../shared/calendarList';
-import {
-  getTeamSupportSummary,
-  type TeamSupportSummary,
-} from '../lib/api/payments';
 import {
   createTextPost,
   createImagePost,
@@ -184,7 +185,9 @@ const FeedRow = React.memo(function FeedRow({
         onComment={() => onComment(item)}
         // Kun trener/lagleder — RLS («Admins can moderate posts»)
         // ville uansett avvist andre.
-        onUnpin={canBroadcast && item.isPinned ? () => onUnpin(item) : undefined}
+        onUnpin={
+          canBroadcast && item.isPinned ? () => onUnpin(item) : undefined
+        }
         onMore={() => onMore(item)}
       />
     </View>
@@ -212,7 +215,16 @@ export function TeamHomeScreen() {
   const canBroadcast = isTeamAdmin(activeRole);
   const myId = session?.user?.id;
 
-  const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
+  // ÉN kilde for livekampen (S1-b): samme nøkkel som kampknappen i
+  // tab-baren — intervallet eies av MatchButtonContext, og skjermen leser
+  // bare svaret. Før eide `loadHeroes` sin egen `getLiveMatch`-henting her.
+  const liveMatchQuery = useLiveMatchValue(activeTeamSpaceId);
+  const liveMatch = liveMatchQuery.data ?? null;
+  // Lagkassa-aggregatet deles med Sesongen via cachen (S1-c) — fokus-resync
+  // følger 60 s-regelen, og en feed-burst refetcher den ikke lenger.
+  const supportQuery = useSupportSummary(activeTeamSpaceId);
+  const supportSummary = supportQuery.data ?? null;
+  useScreenFocusRefetch(supportSummaryKey(activeTeamSpaceId ?? ''));
   // Hendelsene deles med Kalender via query-cachen (B2/P7) — én henting
   // for begge faner, og en 👏-burst i feeden refetcher ikke lenger
   // kalenderdata. Feiler hentingen er data undefined → heroene skjules,
@@ -250,32 +262,21 @@ export function TeamHomeScreen() {
     }
     return titles;
   }, [nextEvents, eventsQuery.data]);
-  const [supportSummary, setSupportSummary] =
-    useState<TeamSupportSummary | null>(null);
   const [composeText, setComposeText] = useState('');
-  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(null);
+  const [selectedImage, setSelectedImage] = useState<SelectedImage | null>(
+    null,
+  );
   const [posting, setPosting] = useState(false);
   const [fullscreenItem, setFullscreenItem] = useState<FeedItem | null>(null);
   // «Varsle hele laget» — festes øverst i feeden + gir alle et varsel.
   const [broadcast, setBroadcast] = useState(false);
 
-  // Heroene (live kamp + lagkassa) er sekundære og feiler stille — de
-  // blokkerer aldri feeden. De bor fortsatt i lokal state: to småkall uten
-  // paginering; B3 flytter dem videre ved behov.
-  const loadHeroes = useCallback(async () => {
-    if (!activeTeamSpaceId) return;
-    const [live, support] = await Promise.all([
-      getLiveMatch(activeTeamSpaceId).catch(() => null),
-      getTeamSupportSummary(activeTeamSpaceId).catch(() => null),
-    ]);
-    setLiveMatch(live);
-    setSupportSummary(support);
-  }, [activeTeamSpaceId]);
-
   // FOKUS-bundet abonnement (fase A, F19-fiksen): en TeamHome bak kampsiden
   // eller en annen fane skal hverken lytte eller refetche; ved blur rives
   // kanal og ventende debounce. Feedens fokus-RESYNC eies nå av
-  // useScreenFocusRefetch (60 s-regelen) — heroene hentes fortsatt per fokus.
+  // useScreenFocusRefetch (60 s-regelen). Heroene (live kamp + lagkassa) bor
+  // fra S1 i query-cachen og har sine egne fokus-/invalideringsstier — de
+  // hentes ikke lenger her.
   //
   // Payload-først (B3, P6-tabellen): 👏 og kommentarer justerer tellerne
   // RETT i cachen (null kall — før kostet en 👏-burst full refetch + heroer),
@@ -287,7 +288,6 @@ export function TeamHomeScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!activeTeamSpaceId) return;
-      loadHeroes();
       let timer: ReturnType<typeof setTimeout> | null = null;
       // 'full' slår 'top': har én hendelse i vinduet krevd full refetch,
       // skal debouncen ikke nedgradere den til en side 1-henting.
@@ -303,10 +303,10 @@ export function TeamHomeScreen() {
             refetchFeedFirstPage(activeTeamSpaceId, myId);
           }
           pending = 'top';
-          // Heroene (live kamp + lagkassa) rir kun på post-hendelser:
-          // match_start/-end/resultat ER feed-poster, mens en 👏 aldri
-          // endrer dem.
-          loadHeroes();
+          // ⚠️ INGEN hero-kall her (S1-c): en feed-burst skal koste feed,
+          // ikke lagkassa/livekamp. Livekampen holdes fersk av sin egen
+          // nøkkel (matchNonce + intervallet i MatchButtonContext), og
+          // lagkassa av 60 s-fokusregelen.
         }, 400);
       };
       const unsubscribe = subscribeToFeed(activeTeamSpaceId, myId, evt => {
@@ -343,9 +343,11 @@ export function TeamHomeScreen() {
             break;
           case 'resync':
             // Reconnect er sjeldent og alvorlig (tapte hendelser) — hent
-            // straks, uten debounce.
+            // straks, uten debounce. Heroene kan også ha driftet mens
+            // kanalen var nede: marker nøklene deres som utdaterte.
             invalidateFeed(activeTeamSpaceId);
-            loadHeroes();
+            invalidateLiveMatch(activeTeamSpaceId);
+            invalidateSupportSummary(activeTeamSpaceId);
             break;
         }
       });
@@ -360,17 +362,22 @@ export function TeamHomeScreen() {
         }
         unsubscribe();
       };
-    }, [activeTeamSpaceId, loadHeroes, myId]),
+    }, [activeTeamSpaceId, myId]),
   );
 
+  const refetchLiveMatch = liveMatchQuery.refetch;
+  const refetchSupport = supportQuery.refetch;
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     // Eksplisitt brukerhandling hopper over staleTime (refetch, ikke
     // invalidate) — og henter også heroene.
-    Promise.all([refetchFeed(), refetchEvents(), loadHeroes()]).finally(() =>
-      setRefreshing(false),
-    );
-  }, [refetchFeed, refetchEvents, loadHeroes]);
+    Promise.all([
+      refetchFeed(),
+      refetchEvents(),
+      refetchLiveMatch(),
+      refetchSupport(),
+    ]).finally(() => setRefreshing(false));
+  }, [refetchFeed, refetchEvents, refetchLiveMatch, refetchSupport]);
 
   const handleToggleHeia = useCallback(
     async (post: FeedItem) => {
@@ -738,7 +745,8 @@ export function TeamHomeScreen() {
             disabled={posting}
             accessibilityRole="switch"
             accessibilityState={{checked: broadcast}}>
-            <View style={[styles.broadcastBox, broadcast && styles.broadcastBoxOn]}>
+            <View
+              style={[styles.broadcastBox, broadcast && styles.broadcastBoxOn]}>
               {broadcast && (
                 <Check size={14} color={colors.heiaInk} strokeWidth={3} />
               )}
@@ -783,8 +791,8 @@ export function TeamHomeScreen() {
     <View style={styles.emptyFeed}>
       <Text style={styles.emptyTitle}>Stille her ennå …</Text>
       <Text style={styles.emptyText}>
-        Skriv den første meldingen, eller inviter foreldre og spillere så
-        blir laget levende.
+        Skriv den første meldingen, eller inviter foreldre og spillere så blir
+        laget levende.
       </Text>
       <Button
         title="Inviter laget"
@@ -795,52 +803,57 @@ export function TeamHomeScreen() {
 
   return (
     <>
-    {/* Fast header + separat scrollflate — samme mønster som Kalender og
+      {/* Fast header + separat scrollflate — samme mønster som Kalender og
         Varsler: TeamHeader er søsken OVER lista, ikke inni den. Lista er
         FlatList (B2): kun det synlige vinduet av feeden er montert, og
         onEndReached henter neste side via cursoren. */}
-    <View style={styles.screen}>
-      {/* ⚠️ KILDEBEVARENDE (Brage 2026-08-21): snarveien er en HJEM-inngang
+      <View style={styles.screen}>
+        {/* ⚠️ KILDEBEVARENDE (Brage 2026-08-21): snarveien er en HJEM-inngang
           til den samme `SeasonScreen` som Kamp-fanen har som rot. Du kom fra
           Hjem, Hjem forblir valgt, og «tilbake» fører til Hjem. Et fanebytte
           her ville vært en tilbakeknapp som teleporterer — nettopp det
           modellen forbyr. */}
-      <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
-      <FlatList
-        data={feed}
-        renderItem={renderFeedItem}
-        keyExtractor={feedKeyExtractor}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmpty}
-        ListFooterComponent={
-          isFetchingNextPage ? (
-            <ActivityIndicator style={styles.feedFooter} color={colors.heia} />
-          ) : null
-        }
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.5}
-        // Ingen horisontal padding her — karusellen i headeren er full
-        // bredde; radene har sin egen (cardWrap).
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.heia}
-          />
-        }
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
-        windowSize={7}
-      />
-    </View>
+        <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
+        <FlatList
+          data={feed}
+          renderItem={renderFeedItem}
+          keyExtractor={feedKeyExtractor}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
+          ListFooterComponent={
+            isFetchingNextPage ? (
+              <ActivityIndicator
+                style={styles.feedFooter}
+                color={colors.heia}
+              />
+            ) : null
+          }
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          // Ingen horisontal padding her — karusellen i headeren er full
+          // bredde; radene har sin egen (cardWrap).
+          contentContainerStyle={{
+            paddingBottom: insets.bottom + spacing['3xl'],
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.heia}
+            />
+          }
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={7}
+        />
+      </View>
 
-    {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
-    <MatchPhotoGallery
-      photos={fullscreenItem ? toGalleryPhoto(fullscreenItem) : []}
-      initialPhotoId={fullscreenItem?.id ?? null}
-      onClose={() => setFullscreenItem(null)}
-    />
+      {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
+      <MatchPhotoGallery
+        photos={fullscreenItem ? toGalleryPhoto(fullscreenItem) : []}
+        initialPhotoId={fullscreenItem?.id ?? null}
+        onClose={() => setFullscreenItem(null)}
+      />
     </>
   );
 }

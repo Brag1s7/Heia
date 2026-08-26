@@ -1,6 +1,63 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 10 GODKJENT OG PUSHET. NESTE: DESIGNGJENNOMGANG)
+## ▶️▶️ START HER (oppdatert 2026-08-26 — S1 KLIENTLEKKASJENE FERDIG OG GODKJENT. NESTE: S2, KUN ETTER EKSPLISITT GODKJENNING)
+
+✅ **S1 — KLIENTLEKKASJENE — ER IMPLEMENTERT, GODKJENT AV BRAGE OG
+COMMITTET PÅ `Brage` 2026-08-26.** Skiva er §5 (S1-a til S1-f) i den
+GODKJENTE skaleringsplanen v2.1 (`~/.claude/plans/les-f-rst-docs-egress-
+media-arkitektur-2-cosmic-hickey.md`); arkitekturbakgrunnen står i
+`docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md`. Ren JS: ingen migrasjoner, ingen
+Broadcast-endringer, ingen runtime_config, ingen nye pakker.
+
+**Hva som ble endret (16 kildefiler + 5 testfiler):**
+- **S1-a** Fanebytte-avgiften: tab-barens fokuslytter (`AppNavigator`) er
+  60 s-gatet via ny `refreshLiveMatchIfStale` (`queries/liveMatch.ts`) og
+  `refreshUnreadIfStale` (`NotificationsContext`). Den feilaktige
+  «staleTime hindrer kallstorm»-kommentaren er rettet.
+- **S1-b** ÉN kilde for livekampen: TeamHome og Inbox leser
+  `['liveMatch', ts]` via ny `useLiveMatchValue` — intervallet eies fortsatt
+  KUN av MatchButtonContext.
+- **S1-c** Support-summary i cachen: ny `queries/supportSummary.ts` +
+  nøkkel `['supportSummary', ts]` (staleTime 60 s — bevisst P7-justering
+  for en varm LESE-sti), delt av TeamHome og SeasonScreen. `loadHeroes` er
+  borte; feed-burst refetcher ikke lenger heroer.
+- **S1-d** Nonce-splitt: `liveNonce` → `matchNonce` (kun `match_live`,
+  driver kampknappen) + `inboxNonce` (alle varsler, driver Inbox).
+- **S1-e** `primeMediaUrls`: chunking ≤ 100 paths per signeringskall +
+  inflight-dedupe (samtidige primes = ett kall); members-/authors-priming
+  cappet til 100.
+- **S1-f** Varselkanalen overlever lagbytte: bruker-scopet kanal leser
+  `activeTeamSpaceId`/`refreshUnread` via refs; lagbytte trigger fortsatt
+  unread-refresh.
+
+**Før/etter-kallbudsjett:** fanebytte 2 kall → **0** innenfor 60 s ·
+feed-burst 3 kall (feed + livekamp + lagkassa) → **kun feed side 1** ·
+Inbox-varsel: egen `getLiveMatch` per burst → **0** (deler kampknappens) ·
+ikke-kampvarsel invaliderte livekampen → **0** · lagbytte rev WS-kanalen →
+består · Hjem→Sesongen: nytt lagkassa-kall per fokus → delt 60 s-gatet
+nøkkel · 250 media-paths = 3 chunkede kall, doble primes dedupet.
+
+**Avvik fra planen (alle bevisste, dokumentert i koden/testene):**
+`useLiveMatchValue` er fokus-gatet (`useIsFocused`) så monterte-men-
+ubevoktede skjermer ikke refetcher på hver invalidering; `refreshLiveMatch`
+er FJERNET fra MatchButtonContext (død API etter S1-a); feed-RESYNC
+invaliderer også hero-nøklene (burst gjør det aldri); kommentarrettelser i
+App.tsx/MatchPulseCard (liveNonce→matchNonce/inboxNonce) + tre
+prettier-omslag av eksisterende overlange linjer.
+
+**Resultater:** `npx jest` = **781 bestått, 2 hoppet over, 0 røde**
+(suiten hadde 774 grønne før skiva — den gamle «750»-baselinen var utdatert;
+7 nye tester: `focusStaleness`, `nonceSplit`, resolver-chunk/dedupe, og
+`feedRefetch` beviser nå at burst ikke drar hero-kall). `npx tsc --noEmit`
+= **7 kjente feil = baselinen** (TimeSheet/lib-media/netMetrics/Lagkassa).
+
+▶️ **NESTE: S2 (`get_session_context` + parallell boot-trio + runtime_config,
+planens §9) — men KUN etter Brages eksplisitte godkjenning i ny samtale.**
+Tre detaljer er LÅST i planens §0.1: `membership_revoked` kun privat på
+`user:{userId}`; `message_id` ≠ `entity_id` med apply-hvis-nyere på
+`entity_id`+seq; boot-exit teller ALLE HTTP-kall inkl. signeringsbatcher.
+
+## ✅ SKIVE 10 GODKJENT OG PUSHET (tidligere START HER, oppdatert 2026-08-21 — neste var designgjennomgang)
 
 ✅ **SKIVE 10 — KAMPKNAPPEN — ER TELEFONGODKJENT OG PUSHET 2026-08-21**
 (`366dc10` på `Brage`). Brage: «Nå fungerer endelig rapporteringen nærmest

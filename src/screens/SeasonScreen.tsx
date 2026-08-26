@@ -33,9 +33,10 @@ import {
   type SeasonView,
 } from '../lib/api/stats';
 import {
-  getTeamSupportSummary,
-  type TeamSupportSummary,
-} from '../lib/api/payments';
+  supportSummaryKey,
+  useSupportSummary,
+} from '../lib/queries/supportSummary';
+import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
 import {formatKr} from '../lib/money';
 import {getMatchSchedule} from '../lib/api/events';
 import {buildMatchSchedule} from '../shared/matchSchedule';
@@ -212,17 +213,17 @@ export function SeasonScreen() {
   // null = «serverens valg» (inneværende halvår). Settes av velgeren.
   const [selected, setSelected] = useState<SeasonView | null>(null);
   // Lagkassa (fase 5) — den permanente inngangen ved siden av lagets tall.
-  const [supportSummary, setSupportSummary] =
-    useState<TeamSupportSummary | null>(null);
+  // Deles med TeamHome via cachen (S1-c): fanebyttet Hjem → Sesongen koster
+  // ikke lenger et nytt kall innenfor 60 s. Feiler oppslaget, er data
+  // undefined og kortet skjules — samme oppførsel som før.
+  const supportQuery = useSupportSummary(activeTeamSpaceId);
+  const supportSummary = supportQuery.data ?? null;
+  useScreenFocusRefetch(supportSummaryKey(activeTeamSpaceId ?? ''));
 
   const loadStats = useCallback(async () => {
     if (!activeTeamSpaceId) return;
     setError(null);
-    // Lagkassa-kortet er sekundært — feiler oppslaget, skjules kortet.
-    getTeamSupportSummary(activeTeamSpaceId)
-      .then(setSupportSummary)
-      .catch(() => setSupportSummary(null));
-    // Programmet er også sekundært for sesongTALLENE: feiler det, skal
+    // Programmet er sekundært for sesongTALLENE: feiler det, skal
     // arkivet fortsatt kunne leses.
     getMatchSchedule(activeTeamSpaceId)
       .then(setSchedule)
@@ -245,10 +246,13 @@ export function SeasonScreen() {
     }, [loadStats]),
   );
 
+  const refetchSupport = supportQuery.refetch;
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    // Eksplisitt brukerhandling hopper over staleTime også for lagkassa.
+    refetchSupport();
     loadStats();
-  }, [loadStats]);
+  }, [loadStats, refetchSupport]);
 
   if (!activeTeamSpaceId) return null;
 

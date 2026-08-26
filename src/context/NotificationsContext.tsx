@@ -33,14 +33,29 @@ interface NotificationsContextValue {
   unreadCount: number;
   /** Fire-and-forget: henter telleren på nytt. */
   refreshUnread: () => void;
+  /**
+   * Fanebytte-porten (S1-a): henter telleren KUN hvis forrige vellykkede
+   * henting er > 60 s gammel — samme regel som `useScreenFocusRefetch`.
+   * Resync-stiene (forgrunn, reconnect, lest-markeringer) bruker fortsatt
+   * den ubetingede `refreshUnread`.
+   */
+  refreshUnreadIfStale: () => void;
   markRead: (ids: string[]) => Promise<void>;
   markAllRead: () => Promise<void>;
   /**
-   * Teller opp for hvert live-varsel. InboxScreen bruker den som
-   * dependency for å laste lista på nytt — da holder ÉN kanal for både
-   * badgen og skjermen.
+   * NONCE-SPLITTEN (S1-d). Før bar ETT tall begge jobbene, og da
+   * invaliderte HVERT varsel (👏, kommentar, RSVP …) livekamp-spørringen.
+   *
+   * `matchNonce` teller KUN kampvarsler (`match_live`) — den driver
+   * kampknappens invalidering i MatchButtonContext.
    */
-  liveNonce: number;
+  matchNonce: number;
+  /**
+   * `inboxNonce` teller ALLE varsler — den driver InboxScreens
+   * inkrementelle resync. Da holder fortsatt ÉN kanal for både badgen
+   * og skjermen.
+   */
+  inboxNonce: number;
   /**
    * Siste varsel som kom inn mens appen var åpen, til banneret. Databasen har
    * allerede bestemt hvem som skal ha det: triggeren i 00023 skriver rader til
@@ -66,7 +81,8 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
   const {session} = useAuth();
   const {activeTeamSpaceId} = useActiveTeam();
   const [unreadCount, setUnreadCount] = useState(0);
-  const [liveNonce, setLiveNonce] = useState(0);
+  const [matchNonce, setMatchNonce] = useState(0);
+  const [inboxNonce, setInboxNonce] = useState(0);
   const [banner, setBanner] = useState<{
     id: string;
     title: string;
@@ -91,6 +107,11 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
 
   const userId = session?.user?.id ?? null;
 
+  // Forrige VELLYKKEDE tellerhenting (epoch ms) — grunnlaget for
+  // fanebytte-porten. En feilet henting stempler ikke: neste fokus skal
+  // få prøve igjen.
+  const unreadFetchedAtRef = useRef(0);
+
   const refreshUnread = useCallback(() => {
     if (!userId || !activeTeamSpaceId) {
       setUnreadCount(0);
@@ -98,9 +119,21 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
     }
     // Svelger feil med vilje: en badge skal aldri kunne velte appen.
     getUnreadCount(activeTeamSpaceId)
-      .then(setUnreadCount)
+      .then(count => {
+        unreadFetchedAtRef.current = Date.now();
+        setUnreadCount(count);
+      })
       .catch(() => {});
   }, [userId, activeTeamSpaceId]);
+
+  // 60 s-porten (S1-a) — samme regel som `useScreenFocusRefetch`. Raske
+  // fanebytter var før dette ETT HEAD-kall HVER, uansett hvor ferskt
+  // tallet var.
+  const refreshUnreadIfStale = useCallback(() => {
+    if (Date.now() - unreadFetchedAtRef.current > 60_000) {
+      refreshUnread();
+    }
+  }, [refreshUnread]);
 
   useEffect(() => {
     refreshUnread();
@@ -116,6 +149,17 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
     });
     return () => sub.remove();
   }, [refreshUnread]);
+
+  // Kanalen er BRUKER-scopet, ikke lag-scopet — derfor leses
+  // `activeTeamSpaceId` og `refreshUnread` via refs i callbacken (S1-f).
+  // Sto de i effect-deps, ville hvert lagbytte revet og gjenoppbygget
+  // WS-kanalen for et abonnement som er identisk uansett lag. Lagbyttets
+  // unread-refresh skjer fortsatt: mount-effekten over fyrer når
+  // `refreshUnread` bytter identitet.
+  const activeTeamSpaceIdRef = useRef(activeTeamSpaceId);
+  activeTeamSpaceIdRef.current = activeTeamSpaceId;
+  const refreshUnreadRef = useRef(refreshUnread);
+  refreshUnreadRef.current = refreshUnread;
 
   // Live badge (00025). Uten denne kom varselet først ved fanebytte — mens
   // kampen på Hjem oppdaterte seg selv. Filteret på user_id er ikke bare
@@ -148,14 +192,19 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
           // henvist til resync-stiene (fokus/forgrunn/reconnect). Mangler
           // feltene (skjemadrift) → tell fasit (P6s fallback).
           if (row?.id == null) {
-            refreshUnread();
+            refreshUnreadRef.current();
           } else if (
             row.team_space_id == null ||
-            row.team_space_id === activeTeamSpaceId
+            row.team_space_id === activeTeamSpaceIdRef.current
           ) {
             setUnreadCount(c => c + 1);
           }
-          setLiveNonce(n => n + 1);
+          // Nonce-splitten (S1-d): alle varsler driver inboxen, men KUN
+          // kampvarsler skal invalidere livekamp-spørringen.
+          setInboxNonce(n => n + 1);
+          if (row?.category === 'match_live') {
+            setMatchNonce(n => n + 1);
+          }
           // Står du på kampsiden, ER dette øyeblikket skjermen foran deg
           // (scoren spretter, forløpet ruller). Demp banneret for den
           // kampen — badgen/inboxen over er allerede oppdatert.
@@ -172,21 +221,23 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
         },
       )
       // Resync ved reconnect (B3, P6): kanalen har vært nede → +1-strømmen
-      // kan ha mistet rader. Hent fasit-telleren og dytt liveNonce, så en
-      // fokusert inbox drar sin inkrementelle resync (hull-vakten der tar
-      // store gap). Første SUBSCRIBED er IKKE resync — mount-effekten over
-      // har alt hentet telleren.
+      // kan ha mistet rader. Hent fasit-telleren og dytt BEGGE noncene —
+      // vi kan ikke vite hvilke kategorier som gikk tapt — så en fokusert
+      // inbox drar sin inkrementelle resync (hull-vakten der tar store
+      // gap) og kampknappen henter fasit. Første SUBSCRIBED er IKKE
+      // resync — mount-effekten over har alt hentet telleren.
       .subscribe(
         createResyncStatusHandler(() => {
-          refreshUnread();
-          setLiveNonce(n => n + 1);
+          refreshUnreadRef.current();
+          setInboxNonce(n => n + 1);
+          setMatchNonce(n => n + 1);
         }),
       );
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, activeTeamSpaceId, refreshUnread]);
+  }, [userId]);
 
   const markRead = useCallback(
     async (ids: string[]) => {
@@ -222,9 +273,11 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
     () => ({
       unreadCount,
       refreshUnread,
+      refreshUnreadIfStale,
       markRead,
       markAllRead,
-      liveNonce,
+      matchNonce,
+      inboxNonce,
       banner,
       dismissBanner,
       watchEvent,
@@ -232,9 +285,11 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
     [
       unreadCount,
       refreshUnread,
+      refreshUnreadIfStale,
       markRead,
       markAllRead,
-      liveNonce,
+      matchNonce,
+      inboxNonce,
       banner,
       dismissBanner,
       watchEvent,
@@ -251,7 +306,9 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
 export function useNotifications(): NotificationsContextValue {
   const ctx = useContext(NotificationsContext);
   if (!ctx) {
-    throw new Error('useNotifications must be used within NotificationsProvider');
+    throw new Error(
+      'useNotifications must be used within NotificationsProvider',
+    );
   }
   return ctx;
 }

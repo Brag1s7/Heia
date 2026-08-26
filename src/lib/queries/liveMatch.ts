@@ -1,4 +1,5 @@
 import {useQuery} from '@tanstack/react-query';
+import {useIsFocused} from '@react-navigation/native';
 import {queryClient} from './queryClient';
 import {queryKeys} from './keys';
 // Direkte fil-import (ikke api-barrelen) — samme sirkelvern som eventDetail.ts.
@@ -16,14 +17,15 @@ import {getLiveMatch} from '../api/events';
  * svaret nå ligger i query-cachen, slik at en alltid montert tab-bar kan lese
  * det uten å eie en henting.
  *
- * De to skjermene beholder sine egne `useState`-hentinger. Å skrive dem om
- * ville endret to MÅLTE kallbudsjetter (`feedRefetch.test.tsx`) i en skive
- * som ikke handler om det. Samme funksjon, samme mapping ⇒ samme modell.
+ * Fra S1-b leser også `TeamHomeScreen` og `InboxScreen` den SAMME nøkkelen
+ * (via `useLiveMatchValue` under) i stedet for egne `useState`-hentinger —
+ * ÉN kilde for livekampen, og kallbudsjettet i `feedRefetch.test.tsx` er
+ * oppdatert bevisst. Intervallet eies fortsatt KUN av MatchButtonContext.
  *
  * ---------------------------------------------------------------------------
  * ⚠️ HVORFOR DEN HAR ET EKTE INTERVALL, OG IKKE BARE `staleTime`
  *
- * Det raske sporet er `liveNonce` i `NotificationsContext`: hvert
+ * Det raske sporet er `matchNonce` i `NotificationsContext`: hvert
  * kampvarsel bumper den, og provideren invaliderer denne nøkkelen. MEN
  * varselradene er GATET på brukerens egne innstillinger — triggerne spør
  * `inbox_enabled(user_id, team_space_id, 'match_live')` (00023:104,
@@ -67,6 +69,55 @@ export function useLiveMatch(
       enabled && options.appActive ? LIVE_MATCH_POLL_MS : (false as const),
     refetchIntervalInBackground: false,
   });
+}
+
+/**
+ * SKJERMENES LESEVINDU MOT SAMME NØKKEL (S1-b) — TeamHome (hero-banneret)
+ * og Inbox (live-stripa) leser lagets pågående kamp HERFRA i stedet for å
+ * eie hver sin `getLiveMatch`-henting.
+ *
+ * Ingen `refetchInterval`: intervallet eies KUN av `MatchButtonContext` —
+ * to observere til på samme nøkkel skal ikke bety tre pollere. Denne
+ * henter bare når cachen er kald eller noen har invalidert nøkkelen
+ * (matchNonce, foreground, fokus-gaten i AppNavigator).
+ *
+ * ⚠️ FOKUS-GATET med vilje: skjermene står montert bak andre faner, og en
+ * ufokusert observer ville ellers refetchet på hver invalidering — f.eks.
+ * hvert kampvarsel mens man står INNE i kampen, der providerens spørring
+ * bevisst er slått av. Ute av fokus tier vi; ved retur henter TanStack
+ * selv hvis nøkkelen er stale/invalidert.
+ */
+export function useLiveMatchValue(teamSpaceId: string | null | undefined) {
+  const isFocused = useIsFocused();
+  return useQuery({
+    queryKey: liveMatchKey(teamSpaceId ?? 'ingen'),
+    queryFn: () => getLiveMatch(teamSpaceId as string),
+    enabled: !!teamSpaceId && isFocused,
+    staleTime: LIVE_MATCH_POLL_MS,
+  });
+}
+
+/**
+ * Fanebytte-porten (S1-a): samme 60 s-regel som `useScreenFocusRefetch`,
+ * for kallstedet som IKKE er en skjerm — tab-barens fokuslytter. Den gamle
+ * ubetingede `invalidateQueries`-veien refetchet på HVERT fanebytte
+ * (`staleTime` tillater en refetch, den stopper ingen invalidering).
+ */
+export function refreshLiveMatchIfStale(
+  teamSpaceId: string | null | undefined,
+  staleMs: number = LIVE_MATCH_POLL_MS,
+): void {
+  if (!teamSpaceId) return;
+  const state = queryClient.getQueryState(liveMatchKey(teamSpaceId));
+  // Allerede i flukt: en invalidering nå ville avbrutt og startet på nytt.
+  if (state?.fetchStatus === 'fetching') return;
+  if (
+    state?.isInvalidated ||
+    !state?.dataUpdatedAt ||
+    Date.now() - state.dataUpdatedAt > staleMs
+  ) {
+    queryClient.invalidateQueries({queryKey: liveMatchKey(teamSpaceId)});
+  }
 }
 
 /**

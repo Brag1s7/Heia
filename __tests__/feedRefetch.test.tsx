@@ -43,8 +43,7 @@ jest.mock('../src/lib/supabase', () => {
   // B3: payload-klassifiseringen ruter per TABELL — mocken må kunne fyre
   // målrettet (__fire) i tillegg til bredside (__burst). Status-callbackene
   // samles så __reconnect kan simulere frafall + rejoin (resync-stien).
-  const handlersByTable: Record<string, Array<(payload: unknown) => void>> =
-    {};
+  const handlersByTable: Record<string, Array<(payload: unknown) => void>> = {};
   const statusCallbacks: Array<(status: string) => void> = [];
 
   /** Kjedbar spørring som kan await-es: alle metoder → seg selv, tomt svar. */
@@ -224,9 +223,8 @@ test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', asy
   jest.useFakeTimers();
   const {supabase, __burst} = jest.requireMock('../src/lib/supabase');
   const feedCalls = () =>
-    supabase.rpc.mock.calls.filter(
-      (c: unknown[]) => c[0] === 'get_team_feed',
-    ).length;
+    supabase.rpc.mock.calls.filter((c: unknown[]) => c[0] === 'get_team_feed')
+      .length;
 
   let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
   await ReactTestRenderer.act(async () => {
@@ -256,11 +254,14 @@ test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', asy
   });
   // …og så NØYAKTIG én refetch — ikke én per hendelse.
   expect(feedCalls()).toBe(2);
-  expect(supabase.rpc).toHaveBeenCalledTimes(4); // 2 ved åpning + 2 i refetchen
+  // S1-c: en feed-burst koster KUN feed. Før dro debouncen også heroene
+  // (livekamp + lagkassa) — budsjettet var 4 rpc og 3 events-spørringer;
+  // nå bor begge i query-cachen med egne invaliderings-/fokusstier.
+  expect(supabase.rpc).toHaveBeenCalledTimes(3); // 2 ved åpning + 1 i refetchen
   // B2: hendelsene bor i query-cachen og refetches IKKE av en feed-burst
-  // lenger (åpning: live + events; bursten: kun live). Går tallet til 4
-  // igjen, har noen dratt kalenderdata inn i feed-refetchen på nytt.
-  expect(supabase.from).toHaveBeenCalledTimes(3);
+  // (åpningens to events-spørringer er alt). Går tallet opp igjen, har
+  // noen dratt kalender- eller livekampdata inn i feed-refetchen på nytt.
+  expect(supabase.from).toHaveBeenCalledTimes(2);
 
   // Ingen etterslep: mer tid skal ikke gi flere kall.
   await ReactTestRenderer.act(async () => {
@@ -369,9 +370,8 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
     ),
   );
   const feedCalls = () =>
-    supabase.rpc.mock.calls.filter(
-      (c: unknown[]) => c[0] === 'get_team_feed',
-    ).length;
+    supabase.rpc.mock.calls.filter((c: unknown[]) => c[0] === 'get_team_feed')
+      .length;
   const heroCalls = () =>
     supabase.rpc.mock.calls.filter(
       (c: unknown[]) => c[0] === 'get_team_support_summary',
@@ -441,7 +441,11 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
   await ReactTestRenderer.act(async () => {
     __fire('comments', {
       eventType: 'UPDATE',
-      new: {id: 'c1', feed_post_id: 'post-1', deleted_at: '2026-08-18T13:00:00Z'},
+      new: {
+        id: 'c1',
+        feed_post_id: 'post-1',
+        deleted_at: '2026-08-18T13:00:00Z',
+      },
     });
     jest.advanceTimersByTime(1000);
   });
@@ -470,7 +474,10 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
   expect(cachedPost()).toBeUndefined();
   expect(feedCalls()).toBe(1);
 
-  // --- Nytt innlegg: debounced henting av KUN side 1 + heroene ---
+  // --- Nytt innlegg: debounced henting av KUN side 1 — INGEN heroer.
+  // ⚠️ SELVE S1-c-PÅSTANDEN: en feed-burst drar aldri hero-kall lenger.
+  // Livekampen holdes fersk av sin egen nøkkel (matchNonce + intervallet i
+  // MatchButtonContext), lagkassa av 60 s-fokusregelen. ---
   await ReactTestRenderer.act(async () => {
     __fire('feed_posts', {
       eventType: 'INSERT',
@@ -482,15 +489,17 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
     jest.advanceTimersByTime(400);
   });
   expect(feedCalls()).toBe(2);
-  expect(heroCalls()).toBe(heroesAfterOpen + 1);
+  expect(heroCalls()).toBe(heroesAfterOpen);
 
-  // --- Reconnect: kanalen har vært nede → full resync + heroer ---
+  // --- Reconnect: kanalen har vært nede → full resync. Hero-nøklene
+  // invalideres OGSÅ (de kan ha driftet i frafallet) — dette er den ENESTE
+  // realtime-stien som fortsatt koster et lagkassa-kall. ---
   await ReactTestRenderer.act(async () => {
     __reconnect();
     jest.advanceTimersByTime(1000);
   });
   expect(feedCalls()).toBe(3);
-  expect(heroCalls()).toBe(heroesAfterOpen + 2);
+  expect(heroCalls()).toBe(heroesAfterOpen + 1);
 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();

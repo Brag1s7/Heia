@@ -1,5 +1,12 @@
 import React, {useEffect, useRef} from 'react';
-import {View, Text, Pressable, StyleSheet, Animated, Easing} from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  Animated,
+  Easing,
+} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {LiveBadge} from './LiveBadge';
 import {StadiumSurface} from './StadiumSurface';
@@ -71,7 +78,7 @@ export function MatchPulseCard({
 
   // Sprett + feiringsvask. Fyrer på MONTERING for et nytt mål (varselet er
   // «nytt» første gang du ser det) og igjen hvis stillingen endrer seg mens
-  // du står på skjermen — liveNonce i InboxScreen refetcher da.
+  // du står på skjermen — inboxNonce i InboxScreen refetcher da.
   const pop = useRef(new Animated.Value(1)).current;
   const glow = useRef(new Animated.Value(0)).current;
 
@@ -149,7 +156,11 @@ export function MatchPulseCard({
 
   const opponent = match.opponent ?? 'motstanderen';
   const newCount =
-    unread > 1 ? `${unread} nye hendelser` : unread === 1 ? '1 ny hendelse' : null;
+    unread > 1
+      ? `${unread} nye hendelser`
+      : unread === 1
+      ? '1 ny hendelse'
+      : null;
 
   // Tidslinja: bare når kampen faktisk har flere hendelser å fortelle om.
   // Fem, ikke tre — pause, andre omgang og motstanderens mål skal få plass
@@ -159,9 +170,7 @@ export function MatchPulseCard({
   // felt forteller ingenting, og ser ut som en feil (den ER en feil).
   const timeline =
     items.length > 1
-      ? items
-          .slice(0, 5)
-          .filter(i => eventLine(i, teamName).trim().length > 0)
+      ? items.slice(0, 5).filter(i => eventLine(i, teamName).trim().length > 0)
       : [];
 
   const a11y =
