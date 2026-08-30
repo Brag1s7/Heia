@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-30 — S7/S7b PREMIUM COLD START FERDIG, TELEFONGODKJENT OG COMMITTET. NESTE: S3 BROADCAST — MEN S2-SPERREN (00079) MÅ LØSES FØRST)
+## ▶️▶️ START HER (oppdatert 2026-08-30 — S7/S7b FERDIG + 00079-PORTEN LUKKET: DEPLOYET OG VERIFISERT 24/24 MOT PROD. NESTE: S3 BROADCAST I NY SAMTALE)
 
 ✅ **S7 (selektiv query-persistering) + S7b (bootfrø + kallvakt) + Lagkassa-
 lastetilstanden — IMPLEMENTERT, FYSISK TELEFONGODKJENT OG COMMITTET PÅ
@@ -86,18 +86,25 @@ ScoreBoards effect-cleanup (MatchArena hadde det alt — og stop() var også
 riktig i app: isWin-flipp lot gammel spring slåss mot setValue(0)) +
 unmount-hygiene i matchTopBar etter matchArena-mønsteret.
 
-⛔ **SPERRENE STÅR (uendret fra S2-bolken under):**
-`00079_session_context.sql` er FORTSATT kun lokal — ALDRI kjørt mot noen
-database, `verify-00079.sql` ALDRI kjørt, INGENTING deployet. Rekkefølgen
-i S2-bolken er ufravikelig før push/deploy av migrasjonen. **S3 er IKKE
-startet.**
+✅ **00079-PORTEN LUKKET 2026-08-30 (S2-sperren fra bolken under er LØST):**
+`00079_session_context.sql` er DEPLOYET mot prod-prosjektet
+`sswncdrbsrfieudkdmhj` med `supabase db push` (bekreftet eneste ventende
+migrasjon; 00001–00078 var i full synk). `scripts/verify-00079.sql` kjørt
+av Brage i Supabase SQL-editoren → **SUM 24/24 GRØNT** (scriptet har 24
+prober, ikke 20 som tidligere omtalt: A1–A7 dører, B1–B5 runtime_config,
+C1–C7 scoping, D1–D4 form, E1 degradering; riggen rullet selv tilbake alle
+fixturer). Anon-proben mot `/rest/v1/rpc/get_session_context` ga **HTTP
+401 / code 42501** («permission denied for function») — døren stenges av
+REVOKE-en, ikke selvvakten. Ekstra ekte-bruker-probe bevisst DROPPET
+(Brages beslutning): ingen sikkerhetsegenskap utover A2+C1–C7; positiv-
+stien bevises av klienten ved første boot. **S3 er IKKE startet.**
 
-▶️ **NESTE: S3 (Broadcast, planens §1.1–1.3 + S3a–c i §9) i NY samtale —
-men S2-sperren over løses FØRST** (databaseverifisering av 00079 er
-inngangsporten til alt S3-arbeid). `Brage` ligger nå 6 commits foran
-`origin/Brage`; push når Brage sier fra.
+▶️ **NESTE: S3 (Broadcast, planens §1.1–1.3 + S3a–c i §9) i NY samtale.**
+Inngangsporten (00079-verifiseringen) er lukket. `Brage` ligger nå
+7 commits foran `origin/Brage` (6 skiver + denne handoff-oppdateringen);
+push når Brage sier fra.
 
-## ✅ S2 SESSION CONTEXT + RUNTIME-CONFIG FERDIG OG GODKJENT (tidligere START HER, oppdatert 2026-08-30 — neste var S7; ⛔-sperren om 00079 gjelder FORTSATT)
+## ✅ S2 SESSION CONTEXT + RUNTIME-CONFIG FERDIG OG GODKJENT (tidligere START HER, oppdatert 2026-08-30 — neste var S7; ⛔-sperren om 00079 ble LØST 2026-08-30, se øverst)
 
 ✅ **S2 — `get_session_context` + BOOT-TRIO + `runtime_config` — ER
 IMPLEMENTERT, GODKJENT AV BRAGE OG COMMITTET PÅ `Brage` 2026-08-26.**
@@ -170,7 +177,7 @@ baselinen**. Lint på endrede filer: 0 problemer.
 ⛔ **HARD SPERRE FØR DEPLOY/PUSH AV MIGRASJONEN:**
 `supabase/migrations/00079_session_context.sql` er KUN OPPRETTET LOKALT —
 **ingenting er deployet, og databasesiden er IKKE verifisert**.
-`scripts/verify-00079.sql` (20 prober: dører, RLS/privilegier, énradsvern,
+`scripts/verify-00079.sql` (24 prober: dører, RLS/privilegier, énradsvern,
 CHECK-avvisning, scoping medlem/fremmed/uten lag, payload-form,
 manglende-rad-degradering) er skrevet men **ALDRI KJØRT mot noen
 database**. Rekkefølgen er ufravikelig (00075-lærdommen): kjør
