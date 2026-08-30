@@ -215,8 +215,10 @@ BEGIN
     VALUES (team1, club_id, sport_id, 'Verify T1'),
            (team2, club_id, sport_id, 'Verify T2');
     INSERT INTO public.team_spaces (id, team_id, display_name, invite_code)
-    VALUES (ts1, team1, 'Verify Lag 1', 'XVRF80AA'),
-           (ts2, team2, 'Verify Lag 2', 'XVRF80BB');
+    -- invite_code-constrainten (00007:20) tillater KUN
+    -- [ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8} — aldri 0/1/I/L/O.
+    VALUES (ts1, team1, 'Verify Lag 1', 'XVRF8AAA'),
+           (ts2, team2, 'Verify Lag 2', 'XVRF8BBB');
     INSERT INTO public.memberships
       (user_id, team_space_id, role, status, joined_at)
     VALUES (u_a, ts1, 'trener',   'active', now() - interval '3 days'),
