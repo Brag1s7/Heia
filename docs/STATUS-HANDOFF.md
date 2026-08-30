@@ -1,6 +1,103 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-26 — S2 SESSION CONTEXT + RUNTIME-CONFIG FERDIG OG GODKJENT. NESTE: SELEKTIV S7-PERSISTERING, SÅ S3)
+## ▶️▶️ START HER (oppdatert 2026-08-30 — S7/S7b PREMIUM COLD START FERDIG, TELEFONGODKJENT OG COMMITTET. NESTE: S3 BROADCAST — MEN S2-SPERREN (00079) MÅ LØSES FØRST)
+
+✅ **S7 (selektiv query-persistering) + S7b (bootfrø + kallvakt) + Lagkassa-
+lastetilstanden — IMPLEMENTERT, FYSISK TELEFONGODKJENT OG COMMITTET PÅ
+`Brage` 2026-08-30.** Skiva er planens §2 utvidet med bootfrø etter Brages
+eksplisitte godkjenning (analyse → S7b-ordre → to blokkere → polish).
+Ingen migrasjoner, ingen Broadcast/Realtime-endringer, ingen nye pakker
+(gjenbruker `dehydrate`/`hydrate` fra installert TanStack 5.101.4), ingen
+native.
+
+**Hva brukeren får:** gjentatt kaldstart viser CACHED HJEMSKJERM (feed,
+kalender, lagnavn) FØR nettverket svarer — nettet henter ferskt stille i
+bakgrunnen og er alltid autoritativt. Eneste gjenværende port er
+kampknappens bootReady: min(livekamp-svar, det urørte 1,5 s-taket).
+
+**S7 — selektiv persistering (`src/lib/queries/persistedCache.ts`):**
+- HVITLISTE (aldri svarteliste): `feed` (KUN side 1, trimmet ved skriving),
+  `events`, `members`, `authors`. ALDRI: liveMatch, notifications/unread,
+  supportSummary/betaling, event-detaljer, session context, runtime-flagg,
+  tokens, signerte URL-er. Håndheves ved BÅDE skriving og lesing.
+- Nøkkel `heia:querycache:<userId>`, buster v1, maxAge 24 t; Date-felter
+  gjenopplives felt-for-felt; hydrate lar ferskere nettdata vinne.
+- Restore awaites i TeamContext FØR `loading` slippes → skeleton-flashen
+  er borte som kontrakt, ikke flaks.
+
+**S7b — bootfrø (`heia:bootseed:<userId>`, samme buster/24 t/rydding):**
+- Minimal profil (telefon + householdId NULLES) + medlemsrader som
+  eksplisitt felt-hvitliste (inviteCode TØMMES, activatedAt nulles — se
+  toSeedMembership for endelig liste). Frøet leses KUN for lokal sessions
+  eksakte userId (nøkkel + payload-sjekk + id-vakt).
+- Frøet setter ALDRI loadedForRef; `rolesVerified` holder `activeRole`
+  null til FERSK liste er verifisert → all isTeamAdmin-gating i appen er
+  disk-immun. Ferskt nettsvar vinner alltid (freshApplied-flagget).
+- RYDDEVEIER: utlogging/kontosletting → `clearPersistedQueryCache` sveiper
+  BEGGE prefiksene; medlemskapstap/«forlat lag» → `prunePersistedTeams` +
+  frøet omskrives ved hver ferske liste; buster/utløp/feil eier/korrupt →
+  forkastes og slettes ved restore (dagens BootScreen-flyt tar over).
+- SIKKERHETSAVVEINING (GODKJENT av Brage): en fjernet bruker kan se cachet
+  laginnhold til første vellykkede synk (offline: maks 24 t før frøet
+  utløper). UI-eksponering, aldri autoritet — serverens RLS/RPC-dører er
+  uendret, og offline gis ingen ny myndighet (rolle er null).
+
+**Kallbudsjettet HOLDT (LÅST ≤7, §0.1-3): frø-boot = ≤6 HTTP** (kontekst 1
++ feed 1 + events 2 + signering ≤2). `pendingSessionContext()` lar
+livekamp/badge/lagkassa HOPPE PÅ det pågående kontekst-kallet i stedet for
+duplikate enkeltkall; null/feil/udekket → dagens enkeltkall som fallback
+ETTER forsøket (aldri deadlock, aldri disabled query). Vaktet av
+`bootBudget.test.tsx`. Membercount-HEAD er i tillegg gatet på verifisert
+liste (hindret også falskt 0 mot foreldet frø-lag).
+
+**Lagkassa-lastetilstanden (telefonfunn):** karusellen reserverer
+lagkassa-siden fra FØRSTE cached frame (`lagkassaLoading`), med husets
+skeleton-puls i NØYAKTIG samme HeroSurface-kort — ingen beløp, ingen falsk
+0-status, stabile dots/indeks/rekkefølge; innholdet byttes i ro når svaret
+lander. Feil/ingen data = dagens sluttstatus (siden finnes ikke).
+supportSummary persisteres fortsatt ALDRI.
+
+**Logo-URL-ene i frøet er trygge:** teamSpace/club `logoUrl` skrives kun av
+`uploadLogo` → OFFENTLIG `club-logos`-bucket (00034:41-43, public=true),
+immutable filnavn, `getPublicUrl` — stabile, aldri signerte. Dokumentert i
+hvitlist-kommentaren med regel: flyttes logoene til privat bucket, MÅ
+feltene ut av frøet samtidig.
+
+**Fysisk iPhone-test (Brage, godkjent 2026-08-30):** gjentatt online
+kaldstart uten feed-skeleton ✓, Lagkassa-plassen stabil ✓, paginering uten
+dubletter/hopp ✓, kampskjerm/ScoreBoard normal etter cleanup ✓.
+⚠️ FLYMODUS ende-til-ende KUNNE IKKE testes fysisk — utviklingsappen
+trenger Metro. Automatisert offline-dekning (persistedCache/bootSeed-
+suitene) er godtatt som dekning INNTIL VIDERE; kjør flymodustesten på en
+TestFlight-build når den finnes.
+
+**Resultater:** `npx jest` = **819 bestått, 2 hoppet over, 0 røde** (fire
+fulle kjøringer på rad). `npx tsc --noEmit` = **7 kjente feil = baselinen**.
+Nye suiter: persistedCache (12), bootSeed (6), bootSeedProfile (4),
+bootBudget (2), lagkassaCarouselLoading (2).
+
+**ScoreBoard-flaken (preeksisterende, fikset i samme commit):** seier-
+pillens spring har 250 ms delay; `matchTopBar.test.tsx` monterte 2–1 uten
+unmount → cleanup kjørte aldri → timeren detonerte i en TILFELDIG neste
+suite på samme jest-worker (`getNativeTagFromPublicInstance is not a
+function`; ofrene varierte). Cleanupen inngår i skiva fordi den nye
+lagkassa-suiten ble første offer og gjorde bomben synlig: `anim.stop()` i
+ScoreBoards effect-cleanup (MatchArena hadde det alt — og stop() var også
+riktig i app: isWin-flipp lot gammel spring slåss mot setValue(0)) +
+unmount-hygiene i matchTopBar etter matchArena-mønsteret.
+
+⛔ **SPERRENE STÅR (uendret fra S2-bolken under):**
+`00079_session_context.sql` er FORTSATT kun lokal — ALDRI kjørt mot noen
+database, `verify-00079.sql` ALDRI kjørt, INGENTING deployet. Rekkefølgen
+i S2-bolken er ufravikelig før push/deploy av migrasjonen. **S3 er IKKE
+startet.**
+
+▶️ **NESTE: S3 (Broadcast, planens §1.1–1.3 + S3a–c i §9) i NY samtale —
+men S2-sperren over løses FØRST** (databaseverifisering av 00079 er
+inngangsporten til alt S3-arbeid). `Brage` ligger nå 6 commits foran
+`origin/Brage`; push når Brage sier fra.
+
+## ✅ S2 SESSION CONTEXT + RUNTIME-CONFIG FERDIG OG GODKJENT (tidligere START HER, oppdatert 2026-08-30 — neste var S7; ⛔-sperren om 00079 gjelder FORTSATT)
 
 ✅ **S2 — `get_session_context` + BOOT-TRIO + `runtime_config` — ER
 IMPLEMENTERT, GODKJENT AV BRAGE OG COMMITTET PÅ `Brage` 2026-08-26.**

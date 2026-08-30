@@ -2,8 +2,10 @@ import {useQuery} from '@tanstack/react-query';
 import {useIsFocused} from '@react-navigation/native';
 import {queryClient} from './queryClient';
 import {queryKeys} from './keys';
+import {pendingSessionContext} from './sessionContext';
 // Direkte fil-import (ikke api-barrelen) — samme sirkelvern som eventDetail.ts.
 import {getLiveMatch} from '../api/events';
+import type {HeiaEvent} from '../../shared/types';
 
 /**
  * LAGETS PÅGÅENDE KAMP — kilden til kampknappen i tab-baren (skive 10).
@@ -45,6 +47,26 @@ export function liveMatchKey(teamSpaceId: string) {
   return queryKeys.liveMatch(teamSpaceId);
 }
 
+/**
+ * S7b: ved frø-boot monterer observerne FØR kontekst-kallet (som seeder
+ * denne nøkkelen) har landet — da blir henting et hopp på det pågående
+ * kallet i stedet for et duplikat enkeltkall (bootbudsjettet ≤7, §0.1-3).
+ * Dekker svaret ikke laget, eller feiler kallet (null), tas dagens
+ * enkeltkall ETTER at forsøket er ferdig — spørringen er aldri disabled,
+ * og promiset resolver alltid (ingen deadlock). Utenom boot/foreground er
+ * det ingen inflight, og dette er en ren passthrough til getLiveMatch.
+ */
+async function fetchLiveMatch(teamSpaceId: string): Promise<HeiaEvent | null> {
+  const pending = pendingSessionContext();
+  if (pending) {
+    const ctx = await pending;
+    if (ctx && ctx.coveredTeamSpaceId === teamSpaceId) {
+      return ctx.liveMatch;
+    }
+  }
+  return getLiveMatch(teamSpaceId);
+}
+
 /** Hvor ofte knappen henter fasit når ingenting annet skjer. */
 export const LIVE_MATCH_POLL_MS = 60_000;
 
@@ -60,7 +82,7 @@ export function useLiveMatch(
   const enabled = !!teamSpaceId && !options.inMatch;
   return useQuery({
     queryKey: liveMatchKey(teamSpaceId ?? 'ingen'),
-    queryFn: () => getLiveMatch(teamSpaceId as string),
+    queryFn: () => fetchLiveMatch(teamSpaceId as string),
     enabled,
     // Samme 60 s-regel som fokus-broen (`useScreenFocusRefetch`): raske
     // fanebytter skal ikke bli en kallstorm.
@@ -91,7 +113,7 @@ export function useLiveMatchValue(teamSpaceId: string | null | undefined) {
   const isFocused = useIsFocused();
   return useQuery({
     queryKey: liveMatchKey(teamSpaceId ?? 'ingen'),
-    queryFn: () => getLiveMatch(teamSpaceId as string),
+    queryFn: () => fetchLiveMatch(teamSpaceId as string),
     enabled: !!teamSpaceId && isFocused,
     staleTime: LIVE_MATCH_POLL_MS,
   });

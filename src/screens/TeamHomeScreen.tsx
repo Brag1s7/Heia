@@ -224,6 +224,11 @@ export function TeamHomeScreen() {
   // følger 60 s-regelen, og en feed-burst refetcher den ikke lenger.
   const supportQuery = useSupportSummary(activeTeamSpaceId);
   const supportSummary = supportQuery.data ?? null;
+  // S7b: frø-boot monterer skjermen FØR kontekst-svaret har seedet lagkassa
+  // — karusellen reserverer siden med skeleton mens tallene er uavklart,
+  // så kortet ikke popper inn når svaret lander. Feil/ingen data etterpå =
+  // dagens sluttstatus (siden finnes ikke).
+  const supportLoading = supportQuery.isPending;
   useScreenFocusRefetch(supportSummaryKey(activeTeamSpaceId ?? ''));
   // Hendelsene deles med Kalender via query-cachen (B2/P7) — én henting
   // for begge faner, og en 👏-burst i feeden refetcher ikke lenger
@@ -652,7 +657,7 @@ export function TeamHomeScreen() {
             }
           />
         </View>
-      ) : nextEvents.length > 0 || supportSummary ? (
+      ) : nextEvents.length > 0 || supportSummary || supportLoading ? (
         <View style={styles.carouselSection}>
           <NextEventCarousel
             events={nextEvents}
@@ -666,6 +671,7 @@ export function TeamHomeScreen() {
                 ?.navigate('KalenderStack')
             }
             lagkassa={supportSummary}
+            lagkassaLoading={supportLoading}
             onOpenLagkassa={() => navigation.navigate('Lagkassa')}
           />
         </View>

@@ -56,16 +56,20 @@ export function ScoreBoard({
   const seierIn = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (isWin) {
-      Animated.spring(seierIn, {
+      const anim = Animated.spring(seierIn, {
         toValue: 1,
         delay: 250,
         friction: 5,
         tension: 120,
         useNativeDriver: true,
-      }).start();
-    } else {
-      seierIn.setValue(0);
+      });
+      anim.start();
+      // Cleanup MÅ til: delay-timeren overlevde ellers unmount (og et
+      // isWin-flipp lot den gamle springen slåss mot setValue(0)). I jest
+      // detonerte den forlatte timeren i NESTE testsuite på samme worker.
+      return () => anim.stop();
     }
+    seierIn.setValue(0);
   }, [isWin, seierIn]);
 
   return (

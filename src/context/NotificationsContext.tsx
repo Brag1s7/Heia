@@ -15,6 +15,7 @@ import {supabase} from '../lib/supabase';
 import {createResyncStatusHandler} from '../lib/realtimeChannels';
 import {
   peekSessionContext,
+  pendingSessionContext,
   refreshSessionContext,
 } from '../lib/queries/sessionContext';
 import {
@@ -162,6 +163,35 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
         unreadFetchedAtRef.current = hit.fetchedAt;
         setUnreadCount(hit.ctx.unreadCount);
         return;
+      }
+      // S7b: frø-boot velger laget FØR kontekst-kallet har landet (peek
+      // miss selv om kallet er i flukt) — badgen venter på svaret som
+      // uansett bærer telleren, i stedet for et duplikat HEAD-kall
+      // (bootbudsjettet ≤7, §0.1-3). Mens vi venter står badgen skjult —
+      // «venter», aldri et påstått 0. Dekker svaret ikke laget, eller
+      // feiler kallet (null — promiset resolver alltid), tas dagens
+      // HEAD-kall som fallback ETTER forsøket.
+      const pending = pendingSessionContext();
+      if (pending) {
+        let cancelled = false;
+        pending.then(ctx => {
+          if (cancelled || activeTeamSpaceIdRef.current !== activeTeamSpaceId) {
+            return;
+          }
+          if (
+            ctx &&
+            ctx.coveredTeamSpaceId === activeTeamSpaceId &&
+            ctx.unreadCount != null
+          ) {
+            unreadFetchedAtRef.current = Date.now();
+            setUnreadCount(ctx.unreadCount);
+          } else {
+            refreshUnreadRef.current();
+          }
+        });
+        return () => {
+          cancelled = true;
+        };
       }
     }
     refreshUnread();

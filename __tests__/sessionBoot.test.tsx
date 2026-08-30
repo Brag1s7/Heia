@@ -27,6 +27,9 @@ const mockPeekSessionContext = jest.fn();
 jest.mock('../src/lib/queries/sessionContext', () => ({
   refreshSessionContext: (...a: unknown[]) => mockRefreshSessionContext(...a),
   peekSessionContext: (...a: unknown[]) => mockPeekSessionContext(...a),
+  // S7b: badgen spør etter et PÅGÅENDE kall før HEAD-fallbacken — null her
+  // betyr «ingen inflight», som er situasjonen i alle disse testene.
+  pendingSessionContext: () => null,
   abandonSessionContext: jest.fn(),
 }));
 

@@ -13,6 +13,7 @@ import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
 import {Calendar} from './icons';
 import {NextEventHero} from './NextEventHero';
 import {HeroSurface} from './HeroSurface';
+import {Skeleton} from './Skeleton';
 import {formatKr} from '../lib/money';
 import type {HeiaEvent} from '../shared/types';
 
@@ -31,6 +32,13 @@ interface NextEventCarouselProps {
   tournamentTitles?: Record<string, string>;
   /** Lagkassa-side i karusellen — Hjem er den emosjonelle inngangen. */
   lagkassa?: LagkassaCardData | null;
+  /**
+   * S7b: tallene er UAVKLART (spørringen pågår) — reserver lagkassa-siden
+   * fra første frame med en rolig skeleton i nøyaktig samme kort, så siden
+   * ikke popper inn (og dots/indeks hopper) når svaret lander. Uten data
+   * OG uten loading gjelder dagens sluttstatus: siden finnes ikke.
+   */
+  lagkassaLoading?: boolean;
   onOpenLagkassa?: () => void;
 }
 
@@ -54,6 +62,7 @@ export function NextEventCarousel({
   onOpenCalendar,
   tournamentTitles,
   lagkassa,
+  lagkassaLoading,
   onOpenLagkassa,
 }: NextEventCarouselProps) {
   const {width} = useWindowDimensions();
@@ -61,7 +70,9 @@ export function NextEventCarousel({
 
   const items: CarouselItem[] = [
     ...events.map(event => ({kind: 'event' as const, event})),
-    ...(lagkassa ? [{kind: 'lagkassa' as const}] : []),
+    // Reservert også mens tallene lastes (S7b) — samme side, samme nøkkel,
+    // så antall sider, dots og gjeldende indeks står stille når de lander.
+    ...(lagkassa || lagkassaLoading ? [{kind: 'lagkassa' as const}] : []),
     // Kalenderkortet følger hendelsene — uten hendelser er lagkassa alene
     // (P8-regelen «aldri et ensomt kalenderkort» består).
     ...(events.length > 0 ? [{kind: 'calendar' as const}] : []),
@@ -92,26 +103,42 @@ export function NextEventCarousel({
             style={({pressed}) => [styles.flexCard, pressed && styles.pressed]}>
             <HeroSurface style={styles.lagkassaCard}>
               <Text style={styles.lagkassaPill}>💚 LAGKASSA</Text>
-              {lagkassa && lagkassa.supporters > 0 ? (
-                <>
-                  <Text style={styles.lagkassaAmount}>
-                    {formatKr(lagkassa.monthlyToClubMinor)}
-                  </Text>
-                  <Text style={styles.lagkassaCaption}>
-                    til laget hver måned ·{' '}
-                    {lagkassa.supporters === 1
-                      ? '1 støttespiller'
-                      : `${lagkassa.supporters} støttespillere`}
-                  </Text>
-                </>
+              {lagkassa ? (
+                lagkassa.supporters > 0 ? (
+                  <>
+                    <Text style={styles.lagkassaAmount}>
+                      {formatKr(lagkassa.monthlyToClubMinor)}
+                    </Text>
+                    <Text style={styles.lagkassaCaption}>
+                      til laget hver måned ·{' '}
+                      {lagkassa.supporters === 1
+                        ? '1 støttespiller'
+                        : `${lagkassa.supporters} støttespillere`}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.lagkassaEmpty}>
+                      Bli lagets første støttespiller
+                    </Text>
+                    <Text style={styles.lagkassaCaption}>
+                      Hver krone gjør lagfølelsen større
+                    </Text>
+                  </>
+                )
               ) : (
+                // Uavklart (S7b): to bones i beløps- og captionlinjenes
+                // posisjon — husets skeleton-puls, ingen tall, ingen
+                // «bli første»-påstand (det ville vært en falsk 0-status).
+                // Innholdet byttes i ro når svaret lander; kortet og siden
+                // står allerede der.
                 <>
-                  <Text style={styles.lagkassaEmpty}>
-                    Bli lagets første støttespiller
-                  </Text>
-                  <Text style={styles.lagkassaCaption}>
-                    Hver krone gjør lagfølelsen større
-                  </Text>
+                  <Skeleton width={148} height={30} style={styles.bone} />
+                  <Skeleton
+                    width={190}
+                    height={13}
+                    style={styles.boneCaption}
+                  />
                 </>
               )}
             </HeroSurface>
@@ -238,6 +265,16 @@ const styles = StyleSheet.create({
     ...typography.bodySmall,
     color: colors.textSecondary,
     marginTop: spacing.xs,
+  },
+  // Bones på hero-flaten: samme dempede grønnfamilie som dots-ene, ikke
+  // den grå kortflate-fargen (kortet er mint/krem, ikke hvitt).
+  bone: {
+    backgroundColor: 'rgba(8, 57, 46, 0.12)',
+    marginTop: 3,
+  },
+  boneCaption: {
+    backgroundColor: 'rgba(8, 57, 46, 0.08)',
+    marginTop: spacing.sm,
   },
   calendarIcon: {
     width: 44,

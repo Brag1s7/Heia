@@ -1,6 +1,9 @@
 import {queryClient} from './queryClient';
-import {liveMatchKey} from './liveMatch';
-import {supportSummaryKey} from './supportSummary';
+// Nøklene DIREKTE fra keys.ts, ikke via liveMatch/supportSummary-modulene:
+// de to importerer nå `pendingSessionContext` herfra (S7b), og modulveien
+// ville gitt importsirkler. Verdiene er identiske (key-funksjonene er rene
+// passthroughs til queryKeys).
+import {queryKeys} from './keys';
 import {prefetchTeamFeedFirstPage} from './feed';
 import {prefetchTeamEvents} from './events';
 // Direkte fil-import (ikke api-barrelen) — samme sirkelvern som resten av
@@ -77,11 +80,11 @@ async function fetchAndApply(
       // null er et ekte svar («ingen pågående kamp») og skal seedes som
       // data — undefined ville slettet cache-posten.
       queryClient.setQueryData(
-        liveMatchKey(ctx.coveredTeamSpaceId),
+        queryKeys.liveMatch(ctx.coveredTeamSpaceId),
         ctx.liveMatch,
       );
       queryClient.setQueryData(
-        supportSummaryKey(ctx.coveredTeamSpaceId),
+        queryKeys.supportSummary(ctx.coveredTeamSpaceId),
         ctx.supportSummary,
       );
     }
@@ -129,6 +132,18 @@ export function refreshSessionContext(
   ).finally(() => {
     inflight = null;
   });
+  return inflight;
+}
+
+/**
+ * S7b: det PÅGÅENDE kontekst-kallet, om noe — ALDRI et nytt kall. Frø-boot
+ * monterer hjemskjermen mens kallet fortsatt er i flukt, og da skal
+ * livekamp/badge/lagkassa VENTE på svaret som uansett seeder dem, i stedet
+ * for å fyre duplikate enkeltkall (bootbudsjettet ≤7 er LÅST, §0.1-3).
+ * Promiset resolver alltid (fetchAndApply kaster aldri) — null ved feil, og
+ * da tar kallerne sine vanlige enkeltkall som fallback.
+ */
+export function pendingSessionContext(): Promise<SessionContext | null> | null {
   return inflight;
 }
 

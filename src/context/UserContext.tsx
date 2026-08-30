@@ -10,6 +10,10 @@ import type {Session} from '@supabase/supabase-js';
 import {supabase} from '../lib/supabase';
 import {getProfile} from '../lib/api/profile';
 import {refreshSessionContext} from '../lib/queries/sessionContext';
+import {
+  readBootSeed,
+  writeBootSeedProfile,
+} from '../lib/queries/persistedCache';
 import {clearLocalCaches} from '../lib/account';
 import {stopPush} from '../lib/push';
 import type {Profile} from '../lib/types';
@@ -80,23 +84,41 @@ export function AuthProvider({children}: PropsWithChildren) {
       return;
     }
     let cancelled = false;
+    // S7b: bootfrøets minimale profil slipper navigatoren forbi
+    // `session && !profile`-porten uten å vente på nett. `prev ??` gjør
+    // frøet til en no-op når nettsvaret alt har landet (krav 7) — ferskt
+    // vinner alltid, og frøet leses kun for nøyaktig denne userId-en.
+    readBootSeed(userId)
+      .then(seed => {
+        const seedProfile = seed?.profile;
+        if (!cancelled && seedProfile && seedProfile.id === userId) {
+          setProfile(prev => prev ?? seedProfile);
+        }
+      })
+      .catch(() => {});
     refreshSessionContext(undefined, {maxAgeMs: 60_000}).then(ctx => {
       if (cancelled) {
         return;
       }
       if (ctx?.profile && ctx.profile.id === userId) {
         setProfile(ctx.profile);
+        // S7b: frøet speiler siste ferske profil (telefon/husholdning
+        // nulles i skriveren) — neste kaldstart booter på den.
+        writeBootSeedProfile(userId, ctx.profile);
         return;
       }
       getProfile(userId)
         .then(p => {
           if (!cancelled) {
             setProfile(p);
+            writeBootSeedProfile(userId, p);
           }
         })
         .catch(() => {
           if (!cancelled) {
-            setProfile(null);
+            // S7b: en frø-satt profil skal OVERLEVE et feilet nettkall
+            // (offline kaldstart, krav 10) — null kun når ingenting står.
+            setProfile(prev => prev ?? null);
           }
         });
     });

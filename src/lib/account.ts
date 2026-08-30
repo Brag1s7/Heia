@@ -8,6 +8,7 @@ import {
 import {clearMediaUrlCache} from './media/resolver';
 import {queryClient} from './queries/queryClient';
 import {abandonSessionContext} from './queries/sessionContext';
+import {clearPersistedQueryCache} from './queries/persistedCache';
 
 // Skjermnære modul-cacher (f.eks. «Min støtte» i ProfilScreen) registrerer
 // seg her ved modul-last. account.ts kan ikke importere fra screens/ selv —
@@ -38,6 +39,10 @@ export async function clearLocalCaches(): Promise<void> {
   }
   clearOpsAdminCache();
   clearPaymentManagerCache();
+  // S7: disk-snapshotet av query-cachen slettes og skrivingen stoppes FØR
+  // minnet tømmes — ellers kunne clear()-hendelsene under køet et nytt skriv
+  // mot den utloggede brukerens nøkkel.
+  await clearPersistedQueryCache();
   // Query-cachen bærer feed/medlemmer/varsler — personlige data som ikke
   // skal overleve til neste bruker på samme enhet (samme P1-funn som over).
   queryClient.clear();
