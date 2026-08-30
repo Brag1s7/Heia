@@ -1,4 +1,5 @@
 import {useQuery, keepPreviousData} from '@tanstack/react-query';
+import {queryClient} from './queryClient';
 import {queryKeys} from './keys';
 // Direkte fil-import (ikke api-barrelen) — samme sirkelvern som members.ts.
 import {getTeamEvents} from '../api/events';
@@ -46,5 +47,19 @@ export function useTeamEvents(teamSpaceId: string | null | undefined) {
     queryFn: () => getTeamEvents(teamSpaceId as string, computeWindow()),
     enabled: !!teamSpaceId,
     placeholderData: keepPreviousData,
+  });
+}
+
+/**
+ * Boot-trioen (S2, §1.4): hendelsesvinduet forhåndshentes PARALLELT med
+ * kontekst-RPC-en for kandidatlaget fra forrige økt. Samme nøkkel/vindu som
+ * `useTeamEvents` — når Hjem/Kalender monterer, er dataen fersk (staleTime)
+ * og hooken refetcher ikke. Foreldet kandidat: RLS svarer tomt, prefetch
+ * svelger feilen, cache-posten vises aldri (se prefetchTeamFeedFirstPage).
+ */
+export function prefetchTeamEvents(teamSpaceId: string): void {
+  queryClient.prefetchQuery({
+    queryKey: teamEventsKey(teamSpaceId),
+    queryFn: () => getTeamEvents(teamSpaceId, computeWindow()),
   });
 }

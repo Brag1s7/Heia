@@ -1,6 +1,15 @@
 import {supabase} from '../supabase';
 import {deleteAvatarFile, primeAvatars} from '../media/avatar';
+import {SIGN_BATCH_MAX} from '../media/resolver';
 import type {User, UserRole} from '../../shared/types';
+
+/**
+ * Tak på avatar-PRIMINGEN (S1-e): forhåndssigner maks én batch. Et stort
+ * lag/forfatterregister skal ikke koste flere signeringskall FØR noe vises —
+ * avatarer utenfor taket signeres lat av `resolveMediaUrl` når (om) raden
+ * faktisk rulles frem, med inflight-dedupe i resolveren.
+ */
+const AVATAR_PRIME_MAX = SIGN_BATCH_MAX;
 
 /** Et lagmedlem slik appen bruker det: en person med en rolle i lagrommet. */
 export type TeamMember = User & {
@@ -84,9 +93,14 @@ export async function getTeamMembers(
   }
 
   const members = [...byUser.values()];
-  // ÉN signeringsbatch for hele lagoversikten (P1) — uten den ville hver
-  // rad signert sitt eget bilde da den rullet inn i skjermen.
-  await primeAvatars(members.map(m => m.avatarPath));
+  // ÉN signeringsbatch for lagoversikten (P1, cappet i S1-e) — uten den
+  // ville hver rad signert sitt eget bilde da den rullet inn i skjermen.
+  await primeAvatars(
+    members
+      .map(m => m.avatarPath)
+      .filter((p): p is string => !!p)
+      .slice(0, AVATAR_PRIME_MAX),
+  );
   return members;
 }
 
@@ -114,8 +128,14 @@ export async function getTeamAuthors(
     role: row.role as UserRole,
   }));
   // Kommentartråden tegner én avatar per kommentar, alle fra dette
-  // oppslaget — så batchen hører hjemme her, ikke i skjermen.
-  await primeAvatars(authors.map(a => a.avatarPath));
+  // oppslaget — så batchen hører hjemme her, ikke i skjermen. Samme
+  // S1-e-tak som members over.
+  await primeAvatars(
+    authors
+      .map(a => a.avatarPath)
+      .filter((p): p is string => !!p)
+      .slice(0, AVATAR_PRIME_MAX),
+  );
   return authors;
 }
 

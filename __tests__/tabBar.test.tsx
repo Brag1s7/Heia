@@ -61,7 +61,6 @@ jest.mock('../src/context/MatchButtonContext', () => ({
     press: mockPress,
     enterMatch: jest.fn(),
     leaveMatch: jest.fn(),
-    refreshLiveMatch: jest.fn(),
   }),
   useMatchPresence: () => {},
 }));
@@ -70,7 +69,11 @@ jest.mock('../src/context', () => ({
   useAuth: () => ({session: null, profile: null, loading: false}),
   useActiveTeam: () => ({activeRole: 'trener', activeTeamSpaceId: 'ts1'}),
   useOnboarding: () => ({justCreatedTeamSpaceId: null}),
-  useNotifications: () => ({unreadCount: 3, refreshUnread: jest.fn()}),
+  useNotifications: () => ({
+    unreadCount: 3,
+    refreshUnread: jest.fn(),
+    refreshUnreadIfStale: jest.fn(),
+  }),
 }));
 
 jest.mock('../src/components', () => {

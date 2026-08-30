@@ -25,7 +25,9 @@ export interface LogoImageInput {
   fileName: string;
 }
 
-function mapEnrichedMembership(row: any): EnrichedMembership {
+/** Eksportert for get_session_context (S2): RPC-en former radene nøyaktig
+ *  som PostgREST-embedden under, så mapperen er delt — én kilde. */
+export function mapEnrichedMembership(row: any): EnrichedMembership {
   const ts = row.team_space;
   const t = ts.team;
   return {
@@ -170,9 +172,7 @@ export async function joinTeamSpace(
 export async function getMyTeamHistory(
   userId: string,
   teamSpaceId: string,
-): Promise<
-  import('../../shared/teamReentry').MembershipHistoryRow[]
-> {
+): Promise<import('../../shared/teamReentry').MembershipHistoryRow[]> {
   const {data, error} = await supabase
     .from('memberships')
     .select('id, status, role, managed_child_id, joined_at, left_reason')

@@ -306,6 +306,15 @@ export async function getLiveMatch(
   return row ? mapEventRow(row, teamSpaceId, emptyRsvp()) : null;
 }
 
+/**
+ * get_session_context (S2) leverer livekamp-raden formet nøyaktig som
+ * LIVE_MATCH_COLUMNS over — samme mapper, én kilde. RSVP hentes ikke der
+ * heller (banneret viser stilling, ikke oppmøte).
+ */
+export function mapLiveMatchRow(row: any, teamSpaceId: string): HeiaEvent {
+  return mapEventRow(row, teamSpaceId, emptyRsvp());
+}
+
 /** Felter `NewEventScreen` samler inn. `opponent`/`isHome` gjelder kun kamp. */
 export interface CreateEventInput {
   teamSpaceId: string;
@@ -380,9 +389,7 @@ export async function getMatchSchedule(
 
   return ((data || []) as any[])
     .map(row => mapEventRow(row, teamSpaceId, emptyRsvp()))
-    .filter(
-      e => e.matchStatus !== 'finished' && e.matchStatus !== 'cancelled',
-    );
+    .filter(e => e.matchStatus !== 'finished' && e.matchStatus !== 'cancelled');
 }
 
 export async function createEvent(input: CreateEventInput): Promise<string> {
@@ -1074,7 +1081,7 @@ export function mapMatchEventRow(
     // ting (skive 8 skrev dem fra hverandre). På en eldre målrad ligger
     // scoreren i `description`, og den er alt vist som `player` over —
     // uten dette vilkåret ville navnet stått to ganger på raden.
-    note: me.player_name ? (me.description ?? undefined) : undefined,
+    note: me.player_name ? me.description ?? undefined : undefined,
     // Kolonnen rå — se `MatchEvent.descriptionRaw` for hvorfor den ikke er
     // den samme som `note`.
     descriptionRaw: me.description ?? undefined,

@@ -13,6 +13,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from './UserContext';
 import {registerTeamSwitcher} from '../navigation/deepLink';
 import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
+import {refreshSessionContext} from '../lib/queries/sessionContext';
+import {
+  restorePersistedQueries,
+  prunePersistedTeams,
+  readBootSeed,
+  writeBootSeedMemberships,
+} from '../lib/queries/persistedCache';
+import {
+  ACTIVE_TEAM_KEY,
+  readStoredActiveTeamSpaceId,
+} from '../lib/activeTeamStorage';
 import {pickPrimaryMembership} from '../shared/activeMembership';
 import {purgeMediaCacheByPrefix} from '../lib/media/resolver';
 import type {
@@ -44,17 +55,18 @@ const TeamContext = createContext<TeamContextValue | undefined>(undefined);
 // Sist aktive lag overlever app-omstart (telefonfunn 2026-08-18: bruker med
 // tre lag ble kastet til lag 1 ved hver oppstart). Kun ID-en lagres —
 // gyldigheten avgjøres ALLTID mot ferske memberships før den brukes, så en
-// som er fjernet fra laget faller trygt tilbake til første lag.
-const ACTIVE_TEAM_KEY = 'heia:activeTeamSpace:v1';
+// som er fjernet fra laget faller trygt tilbake til første lag. Nøkkelen
+// bor i lib/activeTeamStorage fra S2: kontekst-RPC-en leser kandidatlaget
+// derfra FØR denne provideren har rukket å velge.
 
 export function TeamProvider({children}: PropsWithChildren) {
   const {session} = useAuth();
   const [activeTeamSpaceId, setActiveTeamSpaceId] = useState<string | null>(
     null,
   );
-  const [userMemberships, setUserMemberships] = useState<
-    EnrichedMembership[]
-  >([]);
+  const [userMemberships, setUserMemberships] = useState<EnrichedMembership[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
 
   // Husket lagvalg fra forrige økt. undefined = ikke lest ennå (auto-valget
@@ -79,6 +91,15 @@ export function TeamProvider({children}: PropsWithChildren) {
   // kastet brukeren til Hjem-fanen (telefonfunn 2026-07-31).
   const loadedForRef = useRef<string | null>(null);
 
+  // S7b: hvem gjeldende liste er FRØ-booted for (disk, uverifisert). Skilt
+  // fra loadedForRef med vilje: frøet slipper navigatoren, men teller ALDRI
+  // som fersk — medlemskapsvakten og rolle-gatingen venter på loadedForRef.
+  const seededForRef = useRef<string | null>(null);
+  // Krav 9: cached rolle er presentasjon, aldri autorisasjon. activeRole
+  // holdes null til en fersk liste er verifisert — all isTeamAdmin-gating i
+  // appen går via activeRole, så admin-flater kan ikke tegnes fra disk.
+  const [rolesVerified, setRolesVerified] = useState(false);
+
   // Speiler userMemberships synkront for lagbytteren (registrert én gang,
   // leser utenfor render-syklusen — se registerTeamSwitcher-effekten).
   const membershipsRef = useRef<EnrichedMembership[]>([]);
@@ -87,25 +108,141 @@ export function TeamProvider({children}: PropsWithChildren) {
     setUserMemberships(list);
   }, []);
 
+  // Kandidatlaget til kontekst-RPC-en leses via ref: sto activeTeamSpaceId
+  // i fetchMemberships-deps, ville hvert lagbytte gitt hele boot-kjeden på
+  // nytt (samme ref-idiom som varselkanalen i NotificationsContext, S1-f).
+  const activeTeamSpaceIdRef = useRef<string | null>(null);
+  activeTeamSpaceIdRef.current = activeTeamSpaceId;
+
+  // Medlemstallet til TeamHeader-underteksten — cachen bor her (over
+  // fetchMemberships, som fyller den fra kontekst-svaret), tegne-effekten
+  // lenger ned. Cachet per lagrom, så et lagbytte viser forrige tall med
+  // én gang mens ferskt hentes.
+  const memberCountCache = useRef<Map<string, number>>(new Map());
+  // Når kontekst-RPC-en nettopp leverte medlemstallet for et lag, skal
+  // telle-effekten under IKKE sende sitt eget HEAD-kall oppå (60 s-regelen).
+  const memberCountFreshRef = useRef<{teamSpaceId: string; at: number} | null>(
+    null,
+  );
+
   const fetchMemberships = useCallback(async () => {
     if (!userId) {
       loadedForRef.current = null;
+      seededForRef.current = null;
+      setRolesVerified(false);
       applyMemberships([]);
       return;
     }
     const isRefresh = loadedForRef.current === userId;
-    if (!isRefresh) {
+    const isSeeded = seededForRef.current === userId;
+    // S7b: en frø-booted app skal ikke rives tilbake til BootScreen av
+    // neste henteforsøk (foreground-resync etter feilet boot-kall) —
+    // loading brukes kun når hverken ferskt eller frø har sluppet oss inn.
+    if (!isRefresh && !isSeeded) {
       setLoading(true);
     }
+    // Kappløpet frø/nett: ferskt svar er ALLTID autoritativt (krav 6/7) —
+    // flagget gjør en frølanding etter nettet til en no-op.
+    let freshApplied = false;
+    let seedBoot: Promise<void> = Promise.resolve();
     try {
-      const memberships = await getUserMemberships(userId);
+      // S7: restaurer forrige økts feed/kalender/roster fra disken PARALLELT
+      // med kontekst-kallet — startet her, awaitet lenger ned. Ikke await
+      // FØR refreshSessionContext: da ville UserContexts effekt vunnet
+      // single-flighten og boot-trioens prefetch (§1.4) aldri fyrt.
+      const persistedRestore = restorePersistedQueries(userId);
+      // S7b: bootfrøet fra forrige økt kan slippe navigatoren FØR nettet
+      // svarer — gjentatt kaldstart viser cached hjemskjerm mens kontekst-
+      // kallet fortsatt er i flukt. Frøet er presentasjon: loadedForRef og
+      // rolle-verifiseringen settes ALDRI her (krav 5/9), så medlemskaps-
+      // vakten og admin-gatingen venter fortsatt på fersk liste.
+      if (!isRefresh && !isSeeded) {
+        seedBoot = readBootSeed(userId)
+          .then(async seed => {
+            const seedMemberships = seed?.memberships;
+            if (!seedMemberships?.length || freshApplied) {
+              return;
+            }
+            // Krav 3: query-cachen skal være hydrert før noen skjerm kan
+            // montere og konkludere «tomt» — men vi venter aldri på nett.
+            await persistedRestore;
+            if (freshApplied) {
+              return;
+            }
+            // Aktivt lag settes I SAMME commit som slippet: ellers ville
+            // navigatoren rukket å tegne MainTabs uten lag (bootReady sann)
+            // og så hoppet tilbake til BootScreen når laget kom til.
+            const stored = await readStoredActiveTeamSpaceId();
+            if (freshApplied) {
+              return;
+            }
+            const remembered =
+              stored && seedMemberships.some(m => m.teamSpaceId === stored)
+                ? stored
+                : null;
+            seededForRef.current = userId;
+            applyMemberships(seedMemberships);
+            setActiveTeamSpaceId(
+              prev => prev ?? remembered ?? seedMemberships[0].teamSpaceId,
+            );
+            setLoading(false);
+          })
+          .catch(() => {});
+      }
+      // S2: ETT kontekst-kall bærer memberships + membercount (+ profil,
+      // unread, livekamp, lagkassa til de andre kontekstene — single-flight
+      // i orkestratoren gjør alle konsumentene til dette ene kallet).
+      // Kandidatlag: aktivt lag når det finnes (foreground-resume), ellers
+      // forrige økts lagrede valg (boot — orkestratoren leser lagringen).
+      // Ved boot avfyres feed/events-prefetchen parallelt (§1.4-trioen).
+      // S7b endrer ikke dette: kallet starter umiddelbart uansett frø.
+      const ctx = await refreshSessionContext(activeTeamSpaceIdRef.current, {
+        bootPrefetchUserId: isRefresh ? undefined : userId,
+      });
+      let memberships = ctx?.memberships ?? null;
+      if (ctx?.coveredTeamSpaceId && ctx.memberCount != null) {
+        memberCountCache.current.set(ctx.coveredTeamSpaceId, ctx.memberCount);
+        memberCountFreshRef.current = {
+          teamSpaceId: ctx.coveredTeamSpaceId,
+          at: Date.now(),
+        };
+      }
+      // Fallback (RPC mangler/feiler — f.eks. base uten 00079): nøyaktig
+      // dagens enkeltkall, med nøyaktig dagens feilhåndtering under.
+      if (!memberships) {
+        memberships = await getUserMemberships(userId);
+      }
+      // Krav 7: nettet vant — en frølanding som fortsatt står i kø skal
+      // aldri overskrive det ferske svaret. Flagget er nok (IKKE await:
+      // en treg disk skal aldri holde den ferske stien igjen): callbacken
+      // over sjekker flagget rett før den appliserer, og sjekk+applisering
+      // ligger i samme synkrone segment — de kan ikke flettes med denne.
+      freshApplied = true;
+      // S7: hydreringen SKAL være ferdig før `loading` slippes i finally —
+      // det er dette punktet som gjør persisteringen til en garanti mot
+      // skeleton-flash, ikke bare en skriv-til-disk.
+      await persistedRestore;
+      // S7: lag brukeren ikke lenger står i (fjernet/forlatt) ut av både
+      // minne og disk — KUN på en fersk, vellykket liste (catch under
+      // pruner aldri, så en nettglipp sletter ingenting).
+      prunePersistedTeams(memberships.map(m => m.teamSpaceId));
       loadedForRef.current = userId;
+      // Krav 9: først NÅ er rollene verifisert — activeRole går fra null
+      // til ekte rolle i samme render som den ferske lista.
+      setRolesVerified(true);
       applyMemberships(memberships);
+      // S7b: frøet speiler alltid siste ferske liste — et forlatt/fjernet
+      // lag forsvinner fra disken her, og neste kaldstart booter riktig.
+      writeBootSeedMemberships(userId, memberships);
     } catch {
+      // La en ev. frølanding fullføre før vi konkluderer — ellers kunne
+      // tom-listen under og frølisten kappløpe om siste ord.
+      await seedBoot;
       // Første last: tom liste (onboarding-flyten eier feilen). Stille
-      // refresh: behold forrige liste — et nettverksglipp skal ikke sende
-      // en innlogget bruker tilbake til onboarding.
-      if (!isRefresh) {
+      // refresh ELLER frø-booted: behold lista som står — et nettverks-
+      // glipp skal ikke sende en innlogget bruker til onboarding, og en
+      // offline kaldstart skal bli stående på cached innhold (krav 10).
+      if (!isRefresh && seededForRef.current !== userId) {
         applyMemberships([]);
       }
     } finally {
@@ -197,14 +334,15 @@ export function TeamProvider({children}: PropsWithChildren) {
 
   const activeTeamSpace = activeMembership?.teamSpace ?? null;
   const activeTeam = activeMembership?.team ?? null;
-  const activeRole = activeMembership?.role ?? null;
+  // S7b/krav 9: null til lista er ferskt verifisert — en frø-booted trener
+  // ser supporter-flaten i sekundene til nettet svarer, aldri omvendt.
+  // Serverens RLS/RPC-dører er uansett autoriteten; dette er UI-hygiene.
+  const activeRole = rolesVerified ? activeMembership?.role ?? null : null;
 
-  // Medlemstallet til TeamHeader-underteksten. Cachet per lagrom, så et
-  // lagbytte viser forrige tall med én gang mens ferskt hentes. Feiler
-  // hentingen beholdes cache/null — headeren har sport · årsklasse som
-  // fallback. userMemberships er bevisst med i deps: en refresh av
-  // medlemskapene skal også friske opp tallet (head-count er billig).
-  const memberCountCache = useRef<Map<string, number>>(new Map());
+  // Medlemstallet tegnes her. Feiler hentingen beholdes cache/null —
+  // headeren har sport · årsklasse som fallback. userMemberships er bevisst
+  // med i deps: en refresh av medlemskapene skal også friske opp tallet
+  // (head-count er billig).
   const [activeMemberCount, setActiveMemberCount] = useState<number | null>(
     null,
   );
@@ -214,10 +352,31 @@ export function TeamProvider({children}: PropsWithChildren) {
       setActiveMemberCount(null);
       return;
     }
-    setActiveMemberCount(memberCountCache.current.get(activeTeamSpaceId) ?? null);
+    setActiveMemberCount(
+      memberCountCache.current.get(activeTeamSpaceId) ?? null,
+    );
     // RLS teller kun rader man selv ser — uten eget medlemskap ville svaret
     // blitt et falskt 0, så vent til medlemskapet finnes i listen.
-    if (!userMemberships.some(m => m.teamSpaceId === activeTeamSpaceId)) {
+    // S7b: og listen må være FERSK — et frø kan påstå medlemskap i et lag
+    // brukeren er fjernet fra, og da ville HEAD-kallet gitt nettopp det
+    // falske 0-et. Gatingen sparer også boot-budsjettet: tallet kommer fra
+    // kontekst-svaret når det lander (fresh-ref-vakten under), ikke fra et
+    // ekstra HEAD-kall avfyrt før konteksten.
+    if (
+      !rolesVerified ||
+      !userMemberships.some(m => m.teamSpaceId === activeTeamSpaceId)
+    ) {
+      return;
+    }
+    // S2: kontekst-kallet som nettopp trigget denne effekten (ny
+    // memberships-identitet) leverte tallet selv — ikke send et HEAD-kall
+    // oppå et svar som er sekunder gammelt.
+    const fresh = memberCountFreshRef.current;
+    if (
+      fresh &&
+      fresh.teamSpaceId === activeTeamSpaceId &&
+      Date.now() - fresh.at <= 60_000
+    ) {
       return;
     }
     let cancelled = false;
@@ -232,7 +391,7 @@ export function TeamProvider({children}: PropsWithChildren) {
     return () => {
       cancelled = true;
     };
-  }, [activeTeamSpaceId, userMemberships]);
+  }, [activeTeamSpaceId, userMemberships, rolesVerified]);
 
   const setActiveTeamSpace = useCallback((teamSpaceId: string) => {
     setActiveTeamSpaceId(teamSpaceId);

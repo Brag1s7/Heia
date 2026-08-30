@@ -38,6 +38,7 @@ import {
   handleDeepLinkUrl,
 } from './deepLink';
 import {noteScreen} from '../lib/netMetrics';
+import {refreshLiveMatchIfStale} from '../lib/queries/liveMatch';
 import {TeamHomeScreen} from '../screens/TeamHomeScreen';
 import {EventDetailScreen} from '../screens/EventDetailScreen';
 import {NewEventScreen} from '../screens/NewEventScreen';
@@ -328,12 +329,9 @@ const tabIcons: Record<
  */
 export function MainTabs() {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
-  const {unreadCount, refreshUnread} = useNotifications();
-  const {
-    state: matchButton,
-    press: pressMatch,
-    refreshLiveMatch,
-  } = useMatchButton();
+  const {activeTeamSpaceId} = useActiveTeam();
+  const {unreadCount, refreshUnreadIfStale} = useNotifications();
+  const {state: matchButton, press: pressMatch} = useMatchButton();
 
   // Et varsel-trykk ved kaldstart kommer mens onboarding/lasting står fremme,
   // og da finnes ikke HjemStack ennå. Fanene er første øyeblikk målet faktisk
@@ -401,15 +399,20 @@ export function MainTabs() {
   return (
     <>
       <Tab.Navigator
-        // `notifications` er ikke i realtime-publiseringen, så badgen hentes på
-        // nytt ved fanebytte. Live-kampen henger på samme hendelse, og det er
-        // med vilje: den er den SETTINGS-UAVHENGIGE kilden for en bruker som
-        // har slått av kampvarsler (se `useLiveMatch`). `staleTime` hindrer at
-        // raske fanebytter blir en kallstorm.
+        // Fanebytte er en RESYNC-mulighet, ikke en hentegaranti: badgen og
+        // live-kampen friskes opp KUN hvis forrige svar er > 60 s gammelt
+        // (S1-a, samme regel som `useScreenFocusRefetch`). Live-stien er
+        // fortsatt den SETTINGS-UAVHENGIGE kilden for en bruker som har
+        // slått av kampvarsler (se `useLiveMatch`).
+        //
+        // ⚠️ Den gamle kommentaren her påsto at `staleTime` hindret en
+        // kallstorm — det var feil: `staleTime` TILLATER en refetch, den
+        // stopper ingen `invalidateQueries`, og HEAD-telleren har ingen
+        // staleTime i det hele tatt. Hvert fanebytte kostet to kall.
         screenListeners={{
           focus: () => {
-            refreshUnread();
-            refreshLiveMatch();
+            refreshUnreadIfStale();
+            refreshLiveMatchIfStale(activeTeamSpaceId);
           },
         }}
         screenOptions={({route}) => ({

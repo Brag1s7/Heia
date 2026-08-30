@@ -1,6 +1,326 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-21 — SKIVE 10 GODKJENT OG PUSHET. NESTE: DESIGNGJENNOMGANG)
+## ▶️▶️ START HER (oppdatert 2026-08-30 — S3a BROADCAST-BACKEND FERDIG: 00080+00081 DEPLOYET, VERIFY 33/33 GRØNT. NESTE: S3b I NY SAMTALE)
+
+✅ **S3a (Broadcast-backend, skaleringsplan v2.1 §1.1–1.3 + §9 S3a) —
+IMPLEMENTERT, DEPLOYET MOT PROD `sswncdrbsrfieudkdmhj` OG VERIFISERT
+2026-08-30.** Skiveplanen ble godkjent av Brage før koding, med fem
+presiseringer (extension='broadcast' i alle policyer, realtime.topic()-
+mønsteret, eksplisitt private=true på hvert send-kall, aldri røre
+ukjente policyer på realtime.messages, verify-bevis for alt dette) +
+godkjent trigger-variant av membership_revoked. REN DUAL-RUN: postgres_
+changes-publikasjonen står urørt og `runtime_config` står på pgc/pgc/pgc
+— INGEN klient endrer oppførsel før flagget flippes i S3b/c.
+
+**Hva som ligger i prod nå (00080 + 00081):**
+- **Tre private join-policyer på `realtime.messages`** (kun SELECT TO
+  authenticated, alle bundet til `extension = 'broadcast'` OG
+  `realtime.topic()`): `user:{userId}` selv-match, `team:{teamSpaceId}`
+  via `is_team_member`, `match:{sessionId}` via ny
+  `is_match_session_member` (session→event→aktivt medlemskap). Ingen
+  INSERT-policy — klienter kan aldri publisere. Uuid-søppel i topic gir
+  stille nekt via ny `try_uuid` (aldri SQL-feil). Migrasjonen har vakt
+  som STOPPER på ukjente policyer (fant ingen).
+- **Konvolutten (LÅST §0.1-2)** `{v:1, message_id, entity_id, seq,
+  emitted_at, data}` i én funksjon (`heia_broadcast_envelope`), og
+  **8 triggere**: varsler statement-nivå → `notif` på user: (én send
+  per mottaker, kun dennes kanal); feed_posts INSERT/UPDATE →
+  `feed_post` på team: (+ `photo`/`engagement`-speil til match: ved
+  INSERT m/ event_id); reactions INSERT/DELETE og comments
+  INSERT/UPDATE/DELETE → team: (+ match-speil); match_events I/U/D →
+  `match_event` m/ seq=sequence; match_sessions UPDATE → `session` på
+  match: + `live` på team: (det S3c bygger kampknappen på);
+  memberships-trigger (UPDATE fra 'active' + DELETE av aktiv) →
+  `membership_revoked` KUN privat på user: (LÅST §0.1-1). Feildisiplin
+  §1.2: ingen EXCEPTION WHEN OTHERS; FK-garantert routing-miss gir
+  WARNING 'heia_broadcast: …', cascade-DELETE-miss er stille;
+  Logs Explorer-spørringen står i 00080-filhodet.
+- **00081 (lærdommen fra første prod-kjøring):** verify-C9 fant 18
+  rader / 14 unike message_id — reactions/comments/match_sessions
+  gjenbrukte konvolutten på begge kanalene sine, så to leveringer
+  delte message_id (brudd på §0.1-2: gen_random_uuid VED SEND; delt id
+  ville gitt kryss-kanal-dedup i transportlaget). 00081 CREATE OR
+  REPLACE-er kun de tre funksjonene: envelope PER SEND. 00080 ble ikke
+  redigert (allerede applisert — 00075-lærdommen om drift).
+
+**Verifisert:** `scripts/verify-00080.sql` kjørt av Brage i SQL-
+editoren mot prod → **SUM 33/33 GRØNT** (A dører/form · B policyform ·
+C fanout m/ konvolutt/privat/unikhet · D join-emulering m/ rollebytte:
+medlem ser, ikke-medlem/annet lag/andres user-kanal/anon/uuid-søppel
+nektes · E revokering kun på user-topic · F cascade velter aldri
+skriv). Første kjøring stoppet på fixturkode med '0' —
+invite_code-regexen (00007:20) tillater ALDRI 0/1/I/L/O; regelen er
+nå kommentert i scriptet. Migrasjonsliste lokal ↔ remote i full synk
+00001–00081.
+
+⚠️ **OBLIGATORISK S3b-EXIT-KRITERIUM (Brage 2026-08-30, dokumentert i
+00080-filhodet + verify-scriptet):** kanalpolicyene MÅ testes gjennom
+EKTE private WebSocket-joins fra klienten (`{private: true}`): egen
+user-/team-/match-kanal tillates, annen brukers og fremmed lags kanal
+nektes. SQL-emuleringen i verify-00080 erstatter ikke dette.
+
+▶️ **NESTE: S3b (klient kamp — `subscribeToMatch` → broadcast bak
+flagget, gap-deteksjon + delta-resync, §9 S3b) i NY SAMTALE.**
+`eventDetailRefetch`-vaktene kjøres UENDRET som kontraktbevis;
+runtime_config røres ikke før klienten kan lese begge transporter.
+Ingen klientkode er endret i S3a; jest-suiten (819) er urørt. `Brage`
+ligger nå 10 commits foran `origin/Brage` (e4c4b6d S3a, 2d83818
+S3a-fix, + denne handoff-oppdateringen); push når Brage sier fra.
+
+---
+
+## ✅ S7/S7b + 00079-PORTEN (tidligere START HER, oppdatert 2026-08-30 — neste var S3; S3a er nå FERDIG OG DEPLOYET, se øverst)
+
+✅ **S7 (selektiv query-persistering) + S7b (bootfrø + kallvakt) + Lagkassa-
+lastetilstanden — IMPLEMENTERT, FYSISK TELEFONGODKJENT OG COMMITTET PÅ
+`Brage` 2026-08-30.** Skiva er planens §2 utvidet med bootfrø etter Brages
+eksplisitte godkjenning (analyse → S7b-ordre → to blokkere → polish).
+Ingen migrasjoner, ingen Broadcast/Realtime-endringer, ingen nye pakker
+(gjenbruker `dehydrate`/`hydrate` fra installert TanStack 5.101.4), ingen
+native.
+
+**Hva brukeren får:** gjentatt kaldstart viser CACHED HJEMSKJERM (feed,
+kalender, lagnavn) FØR nettverket svarer — nettet henter ferskt stille i
+bakgrunnen og er alltid autoritativt. Eneste gjenværende port er
+kampknappens bootReady: min(livekamp-svar, det urørte 1,5 s-taket).
+
+**S7 — selektiv persistering (`src/lib/queries/persistedCache.ts`):**
+- HVITLISTE (aldri svarteliste): `feed` (KUN side 1, trimmet ved skriving),
+  `events`, `members`, `authors`. ALDRI: liveMatch, notifications/unread,
+  supportSummary/betaling, event-detaljer, session context, runtime-flagg,
+  tokens, signerte URL-er. Håndheves ved BÅDE skriving og lesing.
+- Nøkkel `heia:querycache:<userId>`, buster v1, maxAge 24 t; Date-felter
+  gjenopplives felt-for-felt; hydrate lar ferskere nettdata vinne.
+- Restore awaites i TeamContext FØR `loading` slippes → skeleton-flashen
+  er borte som kontrakt, ikke flaks.
+
+**S7b — bootfrø (`heia:bootseed:<userId>`, samme buster/24 t/rydding):**
+- Minimal profil (telefon + householdId NULLES) + medlemsrader som
+  eksplisitt felt-hvitliste (inviteCode TØMMES, activatedAt nulles — se
+  toSeedMembership for endelig liste). Frøet leses KUN for lokal sessions
+  eksakte userId (nøkkel + payload-sjekk + id-vakt).
+- Frøet setter ALDRI loadedForRef; `rolesVerified` holder `activeRole`
+  null til FERSK liste er verifisert → all isTeamAdmin-gating i appen er
+  disk-immun. Ferskt nettsvar vinner alltid (freshApplied-flagget).
+- RYDDEVEIER: utlogging/kontosletting → `clearPersistedQueryCache` sveiper
+  BEGGE prefiksene; medlemskapstap/«forlat lag» → `prunePersistedTeams` +
+  frøet omskrives ved hver ferske liste; buster/utløp/feil eier/korrupt →
+  forkastes og slettes ved restore (dagens BootScreen-flyt tar over).
+- SIKKERHETSAVVEINING (GODKJENT av Brage): en fjernet bruker kan se cachet
+  laginnhold til første vellykkede synk (offline: maks 24 t før frøet
+  utløper). UI-eksponering, aldri autoritet — serverens RLS/RPC-dører er
+  uendret, og offline gis ingen ny myndighet (rolle er null).
+
+**Kallbudsjettet HOLDT (LÅST ≤7, §0.1-3): frø-boot = ≤6 HTTP** (kontekst 1
++ feed 1 + events 2 + signering ≤2). `pendingSessionContext()` lar
+livekamp/badge/lagkassa HOPPE PÅ det pågående kontekst-kallet i stedet for
+duplikate enkeltkall; null/feil/udekket → dagens enkeltkall som fallback
+ETTER forsøket (aldri deadlock, aldri disabled query). Vaktet av
+`bootBudget.test.tsx`. Membercount-HEAD er i tillegg gatet på verifisert
+liste (hindret også falskt 0 mot foreldet frø-lag).
+
+**Lagkassa-lastetilstanden (telefonfunn):** karusellen reserverer
+lagkassa-siden fra FØRSTE cached frame (`lagkassaLoading`), med husets
+skeleton-puls i NØYAKTIG samme HeroSurface-kort — ingen beløp, ingen falsk
+0-status, stabile dots/indeks/rekkefølge; innholdet byttes i ro når svaret
+lander. Feil/ingen data = dagens sluttstatus (siden finnes ikke).
+supportSummary persisteres fortsatt ALDRI.
+
+**Logo-URL-ene i frøet er trygge:** teamSpace/club `logoUrl` skrives kun av
+`uploadLogo` → OFFENTLIG `club-logos`-bucket (00034:41-43, public=true),
+immutable filnavn, `getPublicUrl` — stabile, aldri signerte. Dokumentert i
+hvitlist-kommentaren med regel: flyttes logoene til privat bucket, MÅ
+feltene ut av frøet samtidig.
+
+**Fysisk iPhone-test (Brage, godkjent 2026-08-30):** gjentatt online
+kaldstart uten feed-skeleton ✓, Lagkassa-plassen stabil ✓, paginering uten
+dubletter/hopp ✓, kampskjerm/ScoreBoard normal etter cleanup ✓.
+⚠️ FLYMODUS ende-til-ende KUNNE IKKE testes fysisk — utviklingsappen
+trenger Metro. Automatisert offline-dekning (persistedCache/bootSeed-
+suitene) er godtatt som dekning INNTIL VIDERE; kjør flymodustesten på en
+TestFlight-build når den finnes.
+
+**Resultater:** `npx jest` = **819 bestått, 2 hoppet over, 0 røde** (fire
+fulle kjøringer på rad). `npx tsc --noEmit` = **7 kjente feil = baselinen**.
+Nye suiter: persistedCache (12), bootSeed (6), bootSeedProfile (4),
+bootBudget (2), lagkassaCarouselLoading (2).
+
+**ScoreBoard-flaken (preeksisterende, fikset i samme commit):** seier-
+pillens spring har 250 ms delay; `matchTopBar.test.tsx` monterte 2–1 uten
+unmount → cleanup kjørte aldri → timeren detonerte i en TILFELDIG neste
+suite på samme jest-worker (`getNativeTagFromPublicInstance is not a
+function`; ofrene varierte). Cleanupen inngår i skiva fordi den nye
+lagkassa-suiten ble første offer og gjorde bomben synlig: `anim.stop()` i
+ScoreBoards effect-cleanup (MatchArena hadde det alt — og stop() var også
+riktig i app: isWin-flipp lot gammel spring slåss mot setValue(0)) +
+unmount-hygiene i matchTopBar etter matchArena-mønsteret.
+
+✅ **00079-PORTEN LUKKET 2026-08-30 (S2-sperren fra bolken under er LØST):**
+`00079_session_context.sql` er DEPLOYET mot prod-prosjektet
+`sswncdrbsrfieudkdmhj` med `supabase db push` (bekreftet eneste ventende
+migrasjon; 00001–00078 var i full synk). `scripts/verify-00079.sql` kjørt
+av Brage i Supabase SQL-editoren → **SUM 24/24 GRØNT** (scriptet har 24
+prober, ikke 20 som tidligere omtalt: A1–A7 dører, B1–B5 runtime_config,
+C1–C7 scoping, D1–D4 form, E1 degradering; riggen rullet selv tilbake alle
+fixturer). Anon-proben mot `/rest/v1/rpc/get_session_context` ga **HTTP
+401 / code 42501** («permission denied for function») — døren stenges av
+REVOKE-en, ikke selvvakten. Ekstra ekte-bruker-probe bevisst DROPPET
+(Brages beslutning): ingen sikkerhetsegenskap utover A2+C1–C7; positiv-
+stien bevises av klienten ved første boot. **S3 er IKKE startet.**
+
+▶️ **NESTE: S3 (Broadcast, planens §1.1–1.3 + S3a–c i §9) i NY samtale.**
+Inngangsporten (00079-verifiseringen) er lukket. `Brage` ligger nå
+7 commits foran `origin/Brage` (6 skiver + denne handoff-oppdateringen);
+push når Brage sier fra.
+
+## ✅ S2 SESSION CONTEXT + RUNTIME-CONFIG FERDIG OG GODKJENT (tidligere START HER, oppdatert 2026-08-30 — neste var S7; ⛔-sperren om 00079 ble LØST 2026-08-30, se øverst)
+
+✅ **S2 — `get_session_context` + BOOT-TRIO + `runtime_config` — ER
+IMPLEMENTERT, GODKJENT AV BRAGE OG COMMITTET PÅ `Brage` 2026-08-26.**
+Skiva er §1.4 + §1.5 (S2 i §9) i den godkjente skaleringsplanen v2.1
+(`~/.claude/plans/les-f-rst-docs-egress-media-arkitektur-2-cosmic-hickey.md`).
+Ingen Broadcast-endringer, ingen postgres_changes rørt, ingen nye pakker,
+ingen native.
+
+**Hva som ble bygget (8 nye filer + 10 endrede):**
+- **Migrasjon `00079_session_context.sql`**: én-rads `runtime_config`
+  (defaults = dagens atferd: pgc/pgc/pgc, poll 0; RLS på, SELECT kun for
+  authenticated, INGEN skrivepolicy — service/ops bypasser; skrive-
+  privilegier trukket; CHECK-er avviser feilstavet transport/ugyldig poll
+  så en kill-switch-UPDATE med skrivefeil feiler høyt) + RPC
+  **`get_session_context(p_team_space_id default null)`**: SECURITY
+  DEFINER, STABLE, `search_path = public, pg_temp` (00077-formen), GRANT
+  authenticated FØR REVOKE PUBLIC+anon (00076-rekkefølgen, anon skal gi
+  42501). Definer bypasser RLS → hver spørring eksplisitt scopet til
+  `auth.uid()`/`is_team_member`; lagkassa gjenbruker
+  `get_team_support_summary` (00040). Fremmed/foreldet lag-id gir
+  NULL-scopede felter, aldri feil. Payload-paritet med PostgREST-formene →
+  klienten gjenbruker de eksisterende mapperne.
+- **Klient**: `lib/runtimeConfig.ts` (flagglager, per-felt-sanitisering,
+  alltid komplette flagg), `lib/activeTeamStorage.ts` (nøkkelen flyttet
+  fra TeamContext), `api/sessionContext.ts` (RPC + mapping),
+  `queries/sessionContext.ts` (orkestrator: single-flight satt SYNKRONT,
+  seeding av livekamp+lagkassa i query-cachen, `peekSessionContext`,
+  generasjonsvern koblet på `clearLocalCaches`). TeamContext (memberships
+  + membercount fra konteksten, boot-prefetch av feed/events), UserContext
+  (profilen deler kallet via maxAgeMs 60 s), NotificationsContext (badgen
+  via peek ved boot, kontekst ved foreground), MatchButtonContext
+  (foreground-invalidering → seeding). **Hver konsument faller tilbake til
+  nøyaktig dagens enkeltkall når kontekst-svaret er null** — gammel app
+  rører aldri RPC-en, ny app mot base uten 00079 oppfører seg som før S2.
+  Rollback = revert (planens kjede).
+
+**Kallbudsjett kaldstart (husket lag, netMetrics-telling §0.1-3):**
+før ~11 (profil + memberships + membercount HEAD + unread HEAD + livekamp
++ lagkassa + feed + events×2 + signering ≤2) → **etter ≤6** (kontekst 1 +
+feed 1 + events 2 + signering ≤2, avfyrt parallelt) — innenfor målet ≤7.
+Foreground-resume: 3 kall → **1**. Bonus: kampknappens `bootReady` kommer
+raskere (livekampen seedes før observeren monterer).
+
+**Kill-switchen i S2 = plumbing, ikke atferd** (bevisst — flagget skal
+finnes FØR transportbyttet i S3): flaggene leses og lagres ved hvert
+boot-/foreground-kall, ingenting konsumerer dem ennå, 60 s-pollingen er
+uendret klientkonstant til S3c. Rollback-veien er operativ: én UPDATE på
+`runtime_config` når flåten ved neste foreground. Feiler trygt: manglende
+rad → RPC-COALESCE-defaults; manglende/feilet RPC → klientdefaults;
+søppel → per-felt-sanitisering.
+
+**Avvik fra planens bokstav (alle bevisste, dokumentert i koden):**
+første oppstart uten husket lag dekker ikke lag-feltene (~8 kall den ene
+gangen; ≤7-målet gjelder normal kaldstart) · foreground-resume gjenbruker
+de tre eksisterende AppState-lytterne delt via single-flight (feed/events-
+resync dekkes allerede av focusManager + staleTime) · CHECK-ene på
+runtime_config er hardening utover planteksten · mapProfile/
+mapEnrichedMembership eksportert, `mapLiveMatchRow` ny · tre prettier-
+omslag av preeksisterende linjer (teams.ts/api-events.ts).
+
+**Resultater:** `npx jest` = **793 bestått, 2 hoppet over, 0 røde**
+(781 baseline + 12 nye: `sessionContext.test.tsx` — mapping, seeding,
+single-flight, maxAge, degradering, generasjonsvern; `sessionBoot.test.tsx`
+— boot uten enkeltkall, fallback, foreground-deling). «Worker failed to
+exit»-advarselen er preeksisterende. Én eksisterende test feilet i ÉN
+mellomkjøring og var grønn ved rerun + i begge fulle kjøringer
+(rekkefølge-flake, ikke S2). `npx tsc --noEmit` = **7 kjente feil =
+baselinen**. Lint på endrede filer: 0 problemer.
+
+⛔ **HARD SPERRE FØR DEPLOY/PUSH AV MIGRASJONEN:**
+`supabase/migrations/00079_session_context.sql` er KUN OPPRETTET LOKALT —
+**ingenting er deployet, og databasesiden er IKKE verifisert**.
+`scripts/verify-00079.sql` (24 prober: dører, RLS/privilegier, énradsvern,
+CHECK-avvisning, scoping medlem/fremmed/uten lag, payload-form,
+manglende-rad-degradering) er skrevet men **ALDRI KJØRT mot noen
+database**. Rekkefølgen er ufravikelig (00075-lærdommen): kjør
+verify-00079.sql (grønn SUM) + anon-42501-proben mot
+`/rest/v1/rpc/get_session_context` FØR migrasjonen pushes til prod.
+Klienten er trygg å shippe uavhengig (fallback til dagens enkeltkall),
+men boot-gevinsten finnes ikke før migrasjonen er ute.
+
+▶️ **NESTE (besluttet av Brage 2026-08-26): SELEKTIV S7-PERSISTERING
+(planens §2) FØR S3** — produktprioriteten er premium cold start og
+umiddelbart innhold. Omfanget i §2 gjelder: KUN selektivt (feed side 1,
+events, members, authors — ALDRI liveMatch/varsler), hevet staleTime per
+query, bruker-scopet nøkkel + versjonsbuster, rydding i `clearLocalCaches`.
+UX-skive, ikke skalering. S3 (Broadcast) kommer ETTER S7, og S2-sperren
+over må uansett løses før S3a.
+
+## ✅ S1 KLIENTLEKKASJENE FERDIG OG GODKJENT (tidligere START HER, oppdatert 2026-08-26 — neste var S2)
+
+✅ **S1 — KLIENTLEKKASJENE — ER IMPLEMENTERT, GODKJENT AV BRAGE OG
+COMMITTET PÅ `Brage` 2026-08-26.** Skiva er §5 (S1-a til S1-f) i den
+GODKJENTE skaleringsplanen v2.1 (`~/.claude/plans/les-f-rst-docs-egress-
+media-arkitektur-2-cosmic-hickey.md`); arkitekturbakgrunnen står i
+`docs/EGRESS-MEDIA-ARKITEKTUR-2026-08.md`. Ren JS: ingen migrasjoner, ingen
+Broadcast-endringer, ingen runtime_config, ingen nye pakker.
+
+**Hva som ble endret (16 kildefiler + 5 testfiler):**
+- **S1-a** Fanebytte-avgiften: tab-barens fokuslytter (`AppNavigator`) er
+  60 s-gatet via ny `refreshLiveMatchIfStale` (`queries/liveMatch.ts`) og
+  `refreshUnreadIfStale` (`NotificationsContext`). Den feilaktige
+  «staleTime hindrer kallstorm»-kommentaren er rettet.
+- **S1-b** ÉN kilde for livekampen: TeamHome og Inbox leser
+  `['liveMatch', ts]` via ny `useLiveMatchValue` — intervallet eies fortsatt
+  KUN av MatchButtonContext.
+- **S1-c** Support-summary i cachen: ny `queries/supportSummary.ts` +
+  nøkkel `['supportSummary', ts]` (staleTime 60 s — bevisst P7-justering
+  for en varm LESE-sti), delt av TeamHome og SeasonScreen. `loadHeroes` er
+  borte; feed-burst refetcher ikke lenger heroer.
+- **S1-d** Nonce-splitt: `liveNonce` → `matchNonce` (kun `match_live`,
+  driver kampknappen) + `inboxNonce` (alle varsler, driver Inbox).
+- **S1-e** `primeMediaUrls`: chunking ≤ 100 paths per signeringskall +
+  inflight-dedupe (samtidige primes = ett kall); members-/authors-priming
+  cappet til 100.
+- **S1-f** Varselkanalen overlever lagbytte: bruker-scopet kanal leser
+  `activeTeamSpaceId`/`refreshUnread` via refs; lagbytte trigger fortsatt
+  unread-refresh.
+
+**Før/etter-kallbudsjett:** fanebytte 2 kall → **0** innenfor 60 s ·
+feed-burst 3 kall (feed + livekamp + lagkassa) → **kun feed side 1** ·
+Inbox-varsel: egen `getLiveMatch` per burst → **0** (deler kampknappens) ·
+ikke-kampvarsel invaliderte livekampen → **0** · lagbytte rev WS-kanalen →
+består · Hjem→Sesongen: nytt lagkassa-kall per fokus → delt 60 s-gatet
+nøkkel · 250 media-paths = 3 chunkede kall, doble primes dedupet.
+
+**Avvik fra planen (alle bevisste, dokumentert i koden/testene):**
+`useLiveMatchValue` er fokus-gatet (`useIsFocused`) så monterte-men-
+ubevoktede skjermer ikke refetcher på hver invalidering; `refreshLiveMatch`
+er FJERNET fra MatchButtonContext (død API etter S1-a); feed-RESYNC
+invaliderer også hero-nøklene (burst gjør det aldri); kommentarrettelser i
+App.tsx/MatchPulseCard (liveNonce→matchNonce/inboxNonce) + tre
+prettier-omslag av eksisterende overlange linjer.
+
+**Resultater:** `npx jest` = **781 bestått, 2 hoppet over, 0 røde**
+(suiten hadde 774 grønne før skiva — den gamle «750»-baselinen var utdatert;
+7 nye tester: `focusStaleness`, `nonceSplit`, resolver-chunk/dedupe, og
+`feedRefetch` beviser nå at burst ikke drar hero-kall). `npx tsc --noEmit`
+= **7 kjente feil = baselinen** (TimeSheet/lib-media/netMetrics/Lagkassa).
+
+▶️ **NESTE: S2 (`get_session_context` + parallell boot-trio + runtime_config,
+planens §9) — men KUN etter Brages eksplisitte godkjenning i ny samtale.**
+Tre detaljer er LÅST i planens §0.1: `membership_revoked` kun privat på
+`user:{userId}`; `message_id` ≠ `entity_id` med apply-hvis-nyere på
+`entity_id`+seq; boot-exit teller ALLE HTTP-kall inkl. signeringsbatcher.
+
+## ✅ SKIVE 10 GODKJENT OG PUSHET (tidligere START HER, oppdatert 2026-08-21 — neste var designgjennomgang)
 
 ✅ **SKIVE 10 — KAMPKNAPPEN — ER TELEFONGODKJENT OG PUSHET 2026-08-21**
 (`366dc10` på `Brage`). Brage: «Nå fungerer endelig rapporteringen nærmest

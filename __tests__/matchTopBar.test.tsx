@@ -56,6 +56,19 @@ const NO_ENGAGEMENT = {byMatchEvent: new Map(), byPost: new Map()};
 const stillProgress = () =>
   new Animated.Value(0).interpolate({inputRange: [0, 1], outputRange: [0, 1]});
 
+// ⚠️ SEIER-SPRINGEN HAR EN 250 ms-LUNTE (ScoreBoard/MatchArena: delay: 250,
+// kamprapport-fixturen her er 2–1). Uten unmount kjører aldri effect-
+// cleanupen som stopper den, og timeren DETONERER I NESTE TESTSUITE på
+// samme worker (funnet 2026-08-27: tilfeldig suite feilet med
+// `getNativeTagFromPublicInstance is not a function`). Samme mønster som
+// matchArena/finishedMatch.
+const mounted: ReactTestRenderer.ReactTestRenderer[] = [];
+afterEach(() => {
+  act(() => {
+    while (mounted.length) mounted.pop()!.unmount();
+  });
+});
+
 async function render(el: React.ReactElement) {
   let tree!: ReactTestRenderer.ReactTestRenderer;
   // `useReducedMotion` spør gjennom et løfte — uten `async act` løses det
@@ -63,6 +76,7 @@ async function render(el: React.ReactElement) {
   await act(async () => {
     tree = ReactTestRenderer.create(el);
   });
+  mounted.push(tree);
   return tree;
 }
 
@@ -651,6 +665,7 @@ describe('Reduce Motion', () => {
     await act(async () => {
       tree = ReactTestRenderer.create(<Probe home={0} />);
     });
+    mounted.push(tree);
     sequence.mockClear();
     await act(async () => {
       tree.update(<Probe home={1} />);
@@ -673,6 +688,7 @@ describe('Reduce Motion', () => {
     await act(async () => {
       tree = ReactTestRenderer.create(<Probe home={0} />);
     });
+    mounted.push(tree);
     sequence.mockClear();
     await act(async () => {
       tree.update(<Probe home={1} />);

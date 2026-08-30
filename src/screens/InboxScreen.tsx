@@ -29,7 +29,7 @@ import {useActiveTeam, useNotifications} from '../context';
 import {getNotifications} from '../lib/api/notifications';
 import {buildEntries, groupByAge, mergeNotifications} from '../shared/inbox';
 import type {Entry, HeiaNotification} from '../shared/inbox';
-import {getLiveMatch} from '../lib/api/events';
+import {useLiveMatchValue} from '../lib/queries/liveMatch';
 import {useTeamAuthors} from '../lib/queries/members';
 import {matchMinute} from '../shared/matchClock';
 import type {HeiaEvent} from '../shared/types';
@@ -57,11 +57,15 @@ export function InboxScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
-  const {unreadCount, refreshUnread, markRead, markAllRead, liveNonce} =
+  const {unreadCount, refreshUnread, markRead, markAllRead, inboxNonce} =
     useNotifications();
 
   const [items, setItems] = useState<HeiaNotification[]>([]);
-  const [liveMatch, setLiveMatch] = useState<HeiaEvent | null>(null);
+  // ÉN kilde for livekampen (S1-b): samme nøkkel som kampknappen — før
+  // eide `load`/`loadNewer` egne `getLiveMatch`-hentinger, så HVERT varsel
+  // kostet en ekstra events-spørring herfra.
+  const liveMatch: HeiaEvent | null =
+    useLiveMatchValue(activeTeamSpaceId).data ?? null;
   // Kampklokka må TIKKE. Var minuttet regnet ut én gang ved render, frøs
   // stripa på minuttet skjermen ble åpnet — og sa «6′» mens kampen var på 20.
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -113,13 +117,10 @@ export function InboxScreen() {
       const gen = listGenRef.current;
       const isNewTeam = loadedTeamRef.current !== activeTeamSpaceId;
       try {
-        // Live-kampen hentes ved siden av varslene: stripa skal stå der også
-        // når du har lest alle kamphendelsene. Feiler den, mister vi bare
-        // stripa — varslene er hovedsaken.
-        const [notifications, live] = await Promise.all([
-          getNotifications(activeTeamSpaceId, {limit: PAGE_SIZE}),
-          getLiveMatch(activeTeamSpaceId).catch(() => null),
-        ]);
+        // Live-stripa leser query-cachen (S1-b) — lista henter kun varsler.
+        const notifications = await getNotifications(activeTeamSpaceId, {
+          limit: PAGE_SIZE,
+        });
         if (gen !== listGenRef.current) return;
         const existing = itemsRef.current;
         // HULL-VAKTEN: kom det MER enn en full side siden sist (helgecup,
@@ -158,7 +159,6 @@ export function InboxScreen() {
           // scrollet frem beholdes — lista hopper ikke under fingeren.
           setItems(prev => mergeNotifications(prev, notifications));
         }
-        setLiveMatch(live);
         // Lista er sannheten — hold badgen i takt med det du faktisk ser.
         refreshUnread();
       } catch {
@@ -194,13 +194,10 @@ export function InboxScreen() {
     }
     const gen = listGenRef.current;
     try {
-      const [fresh, live] = await Promise.all([
-        getNotifications(activeTeamSpaceId, {
-          limit: PAGE_SIZE,
-          after: newest.createdAt,
-        }),
-        getLiveMatch(activeTeamSpaceId).catch(() => null),
-      ]);
+      const fresh = await getNotifications(activeTeamSpaceId, {
+        limit: PAGE_SIZE,
+        after: newest.createdAt,
+      });
       if (gen !== listGenRef.current) return;
       if (fresh.length >= PAGE_SIZE) {
         await load();
@@ -212,7 +209,6 @@ export function InboxScreen() {
         );
         setItems(prev => mergeNotifications(prev, fresh));
       }
-      setLiveMatch(live);
       // Badgen: +1 skjedde alt lokalt i NotificationsContext (B3, P6 —
       // «ingen count-spørring» per varsel); full load() og lest-markeringer
       // resyncer fasit.
@@ -256,12 +252,12 @@ export function InboxScreen() {
   const isFocused = useIsFocused();
   const handledNonceRef = useRef(0);
   const nonceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const liveNonceRef = useRef(liveNonce);
-  liveNonceRef.current = liveNonce;
+  const inboxNonceRef = useRef(inboxNonce);
+  inboxNonceRef.current = inboxNonce;
 
   useFocusEffect(
     useCallback(() => {
-      handledNonceRef.current = liveNonceRef.current;
+      handledNonceRef.current = inboxNonceRef.current;
       load();
       return () => {
         if (nonceTimerRef.current) {
@@ -273,18 +269,19 @@ export function InboxScreen() {
   );
 
   // Står du på skjermen når varselet kommer, skal raden dukke opp av seg
-  // selv. Kanalen bor i NotificationsContext — den teller opp liveNonce.
-  // Debounced: en burst (mål + kommentar i samme sekund) blir ÉN henting —
-  // og den hentingen er nå inkrementell (loadNewer).
+  // selv. Kanalen bor i NotificationsContext — den teller opp inboxNonce
+  // (S1-d: ALLE varsler driver inboxen; kampknappen har sin egen
+  // matchNonce). Debounced: en burst (mål + kommentar i samme sekund) blir
+  // ÉN henting — og den hentingen er nå inkrementell (loadNewer).
   useEffect(() => {
-    if (!isFocused || liveNonce === handledNonceRef.current) return;
-    handledNonceRef.current = liveNonce;
+    if (!isFocused || inboxNonce === handledNonceRef.current) return;
+    handledNonceRef.current = inboxNonce;
     if (nonceTimerRef.current) clearTimeout(nonceTimerRef.current);
     nonceTimerRef.current = setTimeout(() => {
       nonceTimerRef.current = null;
       loadNewer();
     }, 400);
-  }, [isFocused, liveNonce, loadNewer]);
+  }, [isFocused, inboxNonce, loadNewer]);
 
   // Tikker kun når en kamp faktisk pågår — ingen timer i bakgrunnen ellers.
   useEffect(() => {
@@ -334,8 +331,8 @@ export function InboxScreen() {
           item.targetScreen === 'club_payments'
             ? 'ClubPayments'
             : item.targetScreen === 'team_members'
-              ? 'TeamMembers'
-              : 'SupportSetup',
+            ? 'TeamMembers'
+            : 'SupportSetup',
         );
         return;
       }
@@ -584,8 +581,8 @@ export function InboxScreen() {
       </View>
       <Text style={styles.emptyTitle}>Her blir det liv</Text>
       <Text style={styles.emptyText}>
-        Mål, kampstart, trenerbeskjeder og applaus fra laget havner her
-        — også når du ikke rakk å se dem.
+        Mål, kampstart, trenerbeskjeder og applaus fra laget havner her — også
+        når du ikke rakk å se dem.
       </Text>
     </View>
   ) : null;
