@@ -1,6 +1,75 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-30 — S7/S7b FERDIG + 00079-PORTEN LUKKET: DEPLOYET OG VERIFISERT 24/24 MOT PROD. NESTE: S3 BROADCAST I NY SAMTALE)
+## ▶️▶️ START HER (oppdatert 2026-08-30 — S3a BROADCAST-BACKEND FERDIG: 00080+00081 DEPLOYET, VERIFY 33/33 GRØNT. NESTE: S3b I NY SAMTALE)
+
+✅ **S3a (Broadcast-backend, skaleringsplan v2.1 §1.1–1.3 + §9 S3a) —
+IMPLEMENTERT, DEPLOYET MOT PROD `sswncdrbsrfieudkdmhj` OG VERIFISERT
+2026-08-30.** Skiveplanen ble godkjent av Brage før koding, med fem
+presiseringer (extension='broadcast' i alle policyer, realtime.topic()-
+mønsteret, eksplisitt private=true på hvert send-kall, aldri røre
+ukjente policyer på realtime.messages, verify-bevis for alt dette) +
+godkjent trigger-variant av membership_revoked. REN DUAL-RUN: postgres_
+changes-publikasjonen står urørt og `runtime_config` står på pgc/pgc/pgc
+— INGEN klient endrer oppførsel før flagget flippes i S3b/c.
+
+**Hva som ligger i prod nå (00080 + 00081):**
+- **Tre private join-policyer på `realtime.messages`** (kun SELECT TO
+  authenticated, alle bundet til `extension = 'broadcast'` OG
+  `realtime.topic()`): `user:{userId}` selv-match, `team:{teamSpaceId}`
+  via `is_team_member`, `match:{sessionId}` via ny
+  `is_match_session_member` (session→event→aktivt medlemskap). Ingen
+  INSERT-policy — klienter kan aldri publisere. Uuid-søppel i topic gir
+  stille nekt via ny `try_uuid` (aldri SQL-feil). Migrasjonen har vakt
+  som STOPPER på ukjente policyer (fant ingen).
+- **Konvolutten (LÅST §0.1-2)** `{v:1, message_id, entity_id, seq,
+  emitted_at, data}` i én funksjon (`heia_broadcast_envelope`), og
+  **8 triggere**: varsler statement-nivå → `notif` på user: (én send
+  per mottaker, kun dennes kanal); feed_posts INSERT/UPDATE →
+  `feed_post` på team: (+ `photo`/`engagement`-speil til match: ved
+  INSERT m/ event_id); reactions INSERT/DELETE og comments
+  INSERT/UPDATE/DELETE → team: (+ match-speil); match_events I/U/D →
+  `match_event` m/ seq=sequence; match_sessions UPDATE → `session` på
+  match: + `live` på team: (det S3c bygger kampknappen på);
+  memberships-trigger (UPDATE fra 'active' + DELETE av aktiv) →
+  `membership_revoked` KUN privat på user: (LÅST §0.1-1). Feildisiplin
+  §1.2: ingen EXCEPTION WHEN OTHERS; FK-garantert routing-miss gir
+  WARNING 'heia_broadcast: …', cascade-DELETE-miss er stille;
+  Logs Explorer-spørringen står i 00080-filhodet.
+- **00081 (lærdommen fra første prod-kjøring):** verify-C9 fant 18
+  rader / 14 unike message_id — reactions/comments/match_sessions
+  gjenbrukte konvolutten på begge kanalene sine, så to leveringer
+  delte message_id (brudd på §0.1-2: gen_random_uuid VED SEND; delt id
+  ville gitt kryss-kanal-dedup i transportlaget). 00081 CREATE OR
+  REPLACE-er kun de tre funksjonene: envelope PER SEND. 00080 ble ikke
+  redigert (allerede applisert — 00075-lærdommen om drift).
+
+**Verifisert:** `scripts/verify-00080.sql` kjørt av Brage i SQL-
+editoren mot prod → **SUM 33/33 GRØNT** (A dører/form · B policyform ·
+C fanout m/ konvolutt/privat/unikhet · D join-emulering m/ rollebytte:
+medlem ser, ikke-medlem/annet lag/andres user-kanal/anon/uuid-søppel
+nektes · E revokering kun på user-topic · F cascade velter aldri
+skriv). Første kjøring stoppet på fixturkode med '0' —
+invite_code-regexen (00007:20) tillater ALDRI 0/1/I/L/O; regelen er
+nå kommentert i scriptet. Migrasjonsliste lokal ↔ remote i full synk
+00001–00081.
+
+⚠️ **OBLIGATORISK S3b-EXIT-KRITERIUM (Brage 2026-08-30, dokumentert i
+00080-filhodet + verify-scriptet):** kanalpolicyene MÅ testes gjennom
+EKTE private WebSocket-joins fra klienten (`{private: true}`): egen
+user-/team-/match-kanal tillates, annen brukers og fremmed lags kanal
+nektes. SQL-emuleringen i verify-00080 erstatter ikke dette.
+
+▶️ **NESTE: S3b (klient kamp — `subscribeToMatch` → broadcast bak
+flagget, gap-deteksjon + delta-resync, §9 S3b) i NY SAMTALE.**
+`eventDetailRefetch`-vaktene kjøres UENDRET som kontraktbevis;
+runtime_config røres ikke før klienten kan lese begge transporter.
+Ingen klientkode er endret i S3a; jest-suiten (819) er urørt. `Brage`
+ligger nå 10 commits foran `origin/Brage` (e4c4b6d S3a, 2d83818
+S3a-fix, + denne handoff-oppdateringen); push når Brage sier fra.
+
+---
+
+## ✅ S7/S7b + 00079-PORTEN (tidligere START HER, oppdatert 2026-08-30 — neste var S3; S3a er nå FERDIG OG DEPLOYET, se øverst)
 
 ✅ **S7 (selektiv query-persistering) + S7b (bootfrø + kallvakt) + Lagkassa-
 lastetilstanden — IMPLEMENTERT, FYSISK TELEFONGODKJENT OG COMMITTET PÅ
