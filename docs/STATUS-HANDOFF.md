@@ -1,6 +1,52 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-01 — S3b LUKKET: ALLE PORTER GRØNNE, COMMITTET; FLIPP-UPDATE LEVERT BRAGE; S3c I GANG SAMME ØKT)
+## ▶️▶️ START HER (oppdatert 2026-09-01 — S3c IMPLEMENTERT: feed+varsler+kampknapp → broadcast bak flaggene, 60 s-pollingen gates av; SKALERINGSSPORET PARKERES ETTER TELEFONTEST — NESTE ER DESIGNSPORET)
+
+✅ **S3c (feed + varsler + kampknappen → Broadcast, skaleringsplan v2.1
+§9 S3c) — IMPLEMENTERT 2026-09-01, ÉN ØKT ETTER S3b-MØNSTERET.** Fasit:
+`docs/S3C-BROADCAST-FEED-NOTIF.md`. REN DUAL-RUN — `runtime_config` står
+på pgc for feed/notif, ingen adferd endres før flipp. Innholdet:
+
+- **Delt konvoluttåpner** `broadcastEnvelope.ts` (§1 validering + §2
+  message_id-LRU trukket ut av match-dekoderen — ett hjem for reglene).
+- **Feed**: `subscribeToFeed` velger sti på `realtime_transport.feed`;
+  broadcast = privat `team:{id}`-kanal m/ dekoder
+  (`feedBroadcastDecode.ts`, pgc-paritet inkl. 👏-ekko-filteret);
+  CHANNEL_READY emitter MED VILJE ingenting (ulikt kampens fallback —
+  fokus-broens 60 s-regel dekker vinduet, ellers ett kall per fanebytte);
+  terminal join-nekt → pgc-stien under `feed:{id}` + resync.
+- **Kampknappen**: `subscribeToTeamLive` i MatchButtonContext lytter på
+  team-kanalens `live`-event (deler fysisk kanal med feeden; egen
+  dedupe) → `invalidateLiveMatch` per kampendring. 60 s-pollingen gates
+  av `liveMatchPollMs`: pgc/degradert = 60 s som i dag; broadcast =
+  serverens `live_fallback_poll_s` (0 = av). matchNonce-sporet består.
+- **Varsler**: NotificationsContext velger sti på
+  `realtime_transport.notif`; broadcast = privat `user:{id}`-kanal VIA
+  registryet (race-fiksen/sentinelene gjenbrukt), `notif`-raden går til
+  SAMME handler (badge/nonces/banner er transportblinde); dedupe på
+  message_id; ugyldig konvolutt → fasit-telleren; terminal nekt →
+  pgc-kanalen + resync. `membership_revoked` bindes ikke (senere skive).
+
+**Verifisert:** suite 888/888 (860 + 28 nye: feed-dekoder 12,
+feed/teamLive-bryter 8, notif-bryter 4, poll-gate 4); prettier husstil +
+grep-verifisert.
+
+▶️ **PORTER FØR FLIPP AV feed/notif (fasiten §7):** fysisk telefontest
+med dev-override `setDevRealtimeTransportOverride({feed: 'broadcast',
+notif: 'broadcast'})` (post/HEIA/kommentar live i feeden, badge +1,
+kampknappen oppdaterer på mål uten 60 s-ventetid, bakgrunn→forgrunn) →
+Brages godkjenning → én UPDATE per felt (jsonb_set, samme mønster som
+match-flippen; kill-switch = UPDATE tilbake). `live_fallback_poll_s`
+kan settes (f.eks. 300) som belte-og-bukse under utrullingen.
+
+⏸️ **SKALERINGSSPORET PARKERES HER** (Brages beslutning 2026-09-01):
+S4 senere; S5/S6/S8 er pre-launch. **NESTE SPOR: DESIGN** —
+HEIA-VISUAL-HANDOFF.md §13 (design-skill-canvas m/ referanser side om
+side + lav-fi retningsvalg; aldri kode-først).
+
+---
+
+## ✅ S3b LUKKET (tidligere START HER 2026-09-01 — alle porter grønne, committet df8f0d8; flipp-UPDATE for match levert Brage)
 
 ✅ **S3b FERDIG 2026-09-01.** Token-refresh-porten (siste S3b-port) er
 bevist grønn på fysisk telefon: `[S3B-TEST] OK`-linjer med nytt

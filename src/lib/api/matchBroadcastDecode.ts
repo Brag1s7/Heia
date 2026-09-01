@@ -10,25 +10,24 @@
  * dekoder uavhengig og får hver sin komplette strøm.
  */
 import type {MatchRealtimeEvent} from './events';
+import {
+  createBroadcastDedupe,
+  openBroadcastEnvelope,
+  type BroadcastDedupe,
+} from './broadcastEnvelope';
 
-export interface MatchDecodeState {
+export interface MatchDecodeState extends BroadcastDedupe {
   /** Løpende maks av match_event-seq — KUN til gap-dom, aldri dedupe (§3). */
   lastSeq: number | null;
   /** Vannmerke for session.updated_at (ms) — stale-vernet (§6). */
   lastSessionTs: number | null;
-  /** LRU over message_id (§2): sett + innsettingsrekkefølge. */
-  seenIds: Set<string>;
-  seenOrder: string[];
 }
-
-const SEEN_LIMIT = 200;
 
 export function createMatchDecodeState(): MatchDecodeState {
   return {
     lastSeq: null,
     lastSessionTs: null,
-    seenIds: new Set(),
-    seenOrder: [],
+    ...createBroadcastDedupe(),
   };
 }
 
@@ -43,23 +42,12 @@ export function decodeMatchBroadcast(
   envelope: unknown,
   state: MatchDecodeState,
 ): MatchRealtimeEvent[] {
-  // §1: konvoluttvalidering. Ukjent v (skjemadrift) er også fallback.
-  if (envelope === null || typeof envelope !== 'object') return FALLBACK;
-  const env = envelope as Record<string, unknown>;
-  if (env.v !== 1 || typeof env.message_id !== 'string') return FALLBACK;
-  const data = env.data;
-  if (data === null || typeof data !== 'object') return FALLBACK;
-
-  // §2: dedupe KUN på message_id (seq gjenbrukes lovlig — aldri dedupe der).
-  if (state.seenIds.has(env.message_id)) return [];
-  state.seenIds.add(env.message_id);
-  state.seenOrder.push(env.message_id);
-  if (state.seenOrder.length > SEEN_LIMIT) {
-    const evicted = state.seenOrder.shift();
-    if (evicted !== undefined) state.seenIds.delete(evicted);
-  }
-
-  const row = data as Record<string, unknown>;
+  // §1 konvoluttvalidering + §2 message_id-dedupe (seq gjenbrukes lovlig —
+  // aldri dedupe der) — delt med S3c-lytterne, se broadcastEnvelope.ts.
+  const opened = openBroadcastEnvelope(envelope, state);
+  if (opened.outcome === 'invalid') return FALLBACK;
+  if (opened.outcome === 'duplicate') return [];
+  const {env, row} = opened;
   const op = row.op;
 
   switch (eventName) {

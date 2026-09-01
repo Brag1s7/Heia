@@ -5,6 +5,7 @@ import {queryKeys} from './keys';
 import {pendingSessionContext} from './sessionContext';
 // Direkte fil-import (ikke api-barrelen) — samme sirkelvern som eventDetail.ts.
 import {getLiveMatch} from '../api/events';
+import {getRuntimeConfig} from '../runtimeConfig';
 import type {HeiaEvent} from '../../shared/types';
 
 /**
@@ -67,8 +68,28 @@ async function fetchLiveMatch(teamSpaceId: string): Promise<HeiaEvent | null> {
   return getLiveMatch(teamSpaceId);
 }
 
-/** Hvor ofte knappen henter fasit når ingenting annet skjer. */
+/** Hvor ofte knappen henter fasit når ingenting annet skjer (pgc-transport). */
 export const LIVE_MATCH_POLL_MS = 60_000;
+
+/**
+ * S3c: pollingintervallet gates av transporten. På broadcast erstatter
+ * team-kanalens `live`-event pollingen (`subscribeToTeamLive` i
+ * MatchButtonContext invaliderer nøkkelen per hendelse) — da bestemmer
+ * serverens `live_fallback_poll_s` en eventuell fallback-poll (0 = av,
+ * dagens serververdi). På pgc, eller når broadcast-kanalen er terminalt
+ * nektet (`degraded`), gjelder dagens 60 s. Leses ved render — flaggene
+ * oppdateres ved boot/foreground, som gir re-render (samme «neste
+ * subscribe»-semantikk som transportbryterne).
+ */
+export function liveMatchPollMs(degraded: boolean): number | false {
+  const flags = getRuntimeConfig();
+  if (flags.realtimeTransport.feed !== 'broadcast' || degraded) {
+    return LIVE_MATCH_POLL_MS;
+  }
+  return flags.liveFallbackPollS > 0
+    ? flags.liveFallbackPollS * 1000
+    : (false as const);
+}
 
 export function useLiveMatch(
   teamSpaceId: string | null | undefined,
@@ -77,18 +98,21 @@ export function useLiveMatch(
     appActive: boolean;
     /** Vi står INNE i en kamp: skjermen der eier realtime, vi tier. */
     inMatch: boolean;
+    /** S3c: broadcast-kanalen er terminalt nektet — poll som på pgc. */
+    liveTransportDegraded?: boolean;
   },
 ) {
   const enabled = !!teamSpaceId && !options.inMatch;
+  const pollMs = liveMatchPollMs(options.liveTransportDegraded ?? false);
   return useQuery({
     queryKey: liveMatchKey(teamSpaceId ?? 'ingen'),
     queryFn: () => fetchLiveMatch(teamSpaceId as string),
     enabled,
     // Samme 60 s-regel som fokus-broen (`useScreenFocusRefetch`): raske
-    // fanebytter skal ikke bli en kallstorm.
+    // fanebytter skal ikke bli en kallstorm. Gjelder BEGGE transporter —
+    // staleTime er en port, ikke en utløser.
     staleTime: LIVE_MATCH_POLL_MS,
-    refetchInterval:
-      enabled && options.appActive ? LIVE_MATCH_POLL_MS : (false as const),
+    refetchInterval: enabled && options.appActive ? pollMs : (false as const),
     refetchIntervalInBackground: false,
   });
 }
