@@ -546,10 +546,30 @@ describe('MatchTimeline — engasjementet avslutter øyeblikket (skive 4)', () =
       ],
       startedAt: new Date(2026, 7, 20, 18, 0),
       renderEngagement: entry => {
-        seen.push(entry.event ? `event:${entry.event.id}` : `photo:${entry.photo!.id}`);
+        seen.push(
+          entry.event ? `event:${entry.event.id}` : `photo:${entry.photo!.id}`,
+        );
         return null;
       },
     });
     expect(seen).toEqual(['event:g1', 'photo:p2']);
+  });
+
+  it('viser reporterens fritekst på mål IMOT — samme felt som på mål for oss', () => {
+    // `describeMatchEvent` legger friteksten i `player` for BEGGE
+    // målretninger; baklengsmål-raden mistet den (telefonfunn 2026-08-31).
+    const tree = render({
+      matchEvents: [
+        ev('g1', 'mål', 12, {teamSide: 'home', player: 'Erlend Hagen'}),
+        ev('g2', 'mål', 23, {
+          teamSide: 'away',
+          description: 'Mål til Ridabu',
+          player: 'Straffe etter hands',
+        }),
+      ],
+    });
+    const all = texts(tree);
+    expect(all).toContain('Erlend Hagen');
+    expect(all).toContain('Straffe etter hands');
   });
 });

@@ -31,8 +31,20 @@ const esmPackages = [
   'react-native-image-picker',
 ].join('|');
 
+// Presetens transform dekker bare `js|ts|tsx` — `.mjs` faller utenom og
+// treffer Node urørt («Cannot use import statement outside a module»).
+// Verifikasjonsscriptenes rene logikk ligger som .mjs i `scripts/` (kjøres
+// direkte med node) og jest-testes; derfor utvides mønsteret her. Spread-en
+// beholder presetens asset-transformer — et rent `transform`-objekt ville
+// ERSTATTET hele presetens og knekt bildeimportene.
+const rnPreset = require('react-native/jest-preset');
+
 module.exports = {
   preset: 'react-native',
+  transform: {
+    ...rnPreset.transform,
+    '^.+\\.mjs$': 'babel-jest',
+  },
   transformIgnorePatterns: [`node_modules/(?!(?:jest-)?(?:${esmPackages})/)`],
 
   // Kjøres ETTER testmiljøet er satt opp, så `jest.mock` er tilgjengelig.

@@ -1,7 +1,17 @@
 import {supabase} from '../supabase';
 import {getUserIdOrNull} from './authUser';
 import {invalidateEventQueries} from '../queries/invalidate';
-import {acquireChannel, isChannelResync} from '../realtimeChannels';
+import {
+  acquireChannel,
+  isChannelJoinError,
+  isChannelReady,
+  isChannelResync,
+} from '../realtimeChannels';
+import {getRuntimeConfig} from '../runtimeConfig';
+import {
+  createMatchDecodeState,
+  decodeMatchBroadcast,
+} from './matchBroadcastDecode';
 import {dayKey, eachDay, type BusyDays} from '../../shared/calendar';
 import type {EditableEvent} from '../../shared/eventForm';
 import type {
@@ -835,13 +845,44 @@ export type MatchRealtimeEvent =
   | {kind: 'fallback'}
   | {kind: 'resync'};
 
+/**
+ * S3b-2: transportbryteren. `runtime_config.realtime_transport.match` (lest
+ * ved boot/foreground, default 'pgc') velger sti ved SUBSCRIBE-tidspunktet —
+ * en flaggflipp virker altså ved neste subscribe, ikke øyeblikkelig for en
+ * allerede åpen skjerm (blur/fokus roterer naturlig). Begge stier leverer
+ * samme `MatchRealtimeEvent`-union — skjermen kan ikke merke byttet.
+ * Fasit for broadcast-dekodingen: docs/S3B2-BROADCAST-DECODE.md.
+ */
 export function subscribeToMatch(
   matchSessionId: string,
   eventId: string,
   onEvent: (event: MatchRealtimeEvent) => void,
 ): () => void {
-  return acquireChannel(
+  if (getRuntimeConfig().realtimeTransport.match === 'broadcast') {
+    return subscribeToMatchBroadcast(matchSessionId, eventId, onEvent);
+  }
+  return subscribeToMatchPgc(
+    matchSessionId,
+    eventId,
+    onEvent,
     `match:${matchSessionId}`,
+  );
+}
+
+/**
+ * Dagens postgres_changes-sti — UENDRET oppførsel (dual-run-kontrakten).
+ * `topic` er parameter kun fordi nødkanalen fra broadcast-stien må hete
+ * `pgc:match:{id}`: bibliotekets `channel(topic)`-dedupe gjør at samme
+ * topic aldri kan bære to transporter.
+ */
+function subscribeToMatchPgc(
+  matchSessionId: string,
+  eventId: string,
+  onEvent: (event: MatchRealtimeEvent) => void,
+  topic: string,
+): () => void {
+  return acquireChannel(
+    topic,
     (channel, emit) => {
       channel
         .on(
@@ -1003,11 +1044,118 @@ export function subscribeToMatch(
     payload => {
       if (isChannelResync(payload)) {
         onEvent({kind: 'resync'});
-      } else {
-        onEvent(payload as MatchRealtimeEvent);
+        return;
       }
+      // S3b-2-sentinelene tilhører broadcast-stien: pgc-atferden ved første
+      // join (ingen emit) og ved join-feil (phoenix' egen rejoin) er uendret.
+      if (isChannelReady(payload) || isChannelJoinError(payload)) {
+        return;
+      }
+      onEvent(payload as MatchRealtimeEvent);
     },
   );
+}
+
+// Broadcast-eventene 00080-triggerne sender på match:{sessionId} — én
+// `.on('broadcast', …)` per navn; dekodetabellen ligger i
+// matchBroadcastDecode.ts (fasit: docs/S3B2-BROADCAST-DECODE.md).
+const MATCH_BROADCAST_EVENTS = [
+  'match_event',
+  'session',
+  'photo',
+  'engagement',
+  'reaction',
+  'comment',
+] as const;
+
+/**
+ * Broadcast-stien (S3b-2). Privat kanal (`{private: true}` — join-policyene
+ * fra 00080 håndhever medlemskap, bevist i S3b-1), DB-triggerne er eneste
+ * avsender. Dekodetilstanden er per registrering; skjermkontrakten er
+ * identisk med pgc-stien.
+ *
+ * Feildisiplin (S3b-1-klassifiseringen, LÅST): CHANNEL_ERROR før første
+ * join → én retry med FRISK kanal (race-fiksen garanterer ny), deretter
+ * terminal → pgc-nødkanalen under `pgc:match:{id}` + én resync. TIMED_OUT
+ * er transient og håndteres av phoenix-rejoin + resync-handleren.
+ */
+function subscribeToMatchBroadcast(
+  matchSessionId: string,
+  eventId: string,
+  onEvent: (event: MatchRealtimeEvent) => void,
+): () => void {
+  const state = createMatchDecodeState();
+  let joinErrors = 0;
+  let downgraded = false;
+  let released = false;
+  let releaseCurrent: () => void = () => {};
+
+  const listener = (payload: unknown) => {
+    if (released) return;
+    if (isChannelResync(payload)) {
+      onEvent({kind: 'resync'});
+      return;
+    }
+    if (isChannelReady(payload)) {
+      // Fallback-emitten som lukker fetch→subscribe-vinduet (§5 i fasiten):
+      // skjermens debouncede refetch gir snapshotet ved-eller-etter join.
+      onEvent({kind: 'fallback'});
+      return;
+    }
+    if (isChannelJoinError(payload)) {
+      handleJoinError();
+      return;
+    }
+    const msg = payload as {event?: unknown; payload?: unknown};
+    if (typeof msg?.event !== 'string') return;
+    for (const evt of decodeMatchBroadcast(msg.event, msg.payload, state)) {
+      onEvent(evt);
+    }
+  };
+
+  const acquireBroadcast = () =>
+    acquireChannel(
+      `match:${matchSessionId}`,
+      (channel, emit) => {
+        for (const name of MATCH_BROADCAST_EVENTS) {
+          channel.on('broadcast', {event: name}, message => {
+            emit({event: name, payload: (message as any)?.payload});
+          });
+        }
+      },
+      listener,
+      {config: {private: true}},
+    );
+
+  const handleJoinError = () => {
+    if (released || downgraded) return;
+    joinErrors += 1;
+    if (joinErrors === 1) {
+      // Retry med frisk kanal. Med flere samtidige lyttere på registreringen
+      // blir dette en no-op (kanalen holdes i live av de andre) — da feller
+      // neste JOIN_ERROR avgjørelsen i stedet. Se fasiten §7.
+      releaseCurrent();
+      releaseCurrent = acquireBroadcast();
+      return;
+    }
+    // Terminal nekt: over på dagens transport under EGEN nøkkel, og hent
+    // alt friskt — broadcast kan ha mistet hendelser siden join-forsøket.
+    downgraded = true;
+    releaseCurrent();
+    releaseCurrent = subscribeToMatchPgc(
+      matchSessionId,
+      eventId,
+      onEvent,
+      `pgc:match:${matchSessionId}`,
+    );
+    onEvent({kind: 'resync'});
+  };
+
+  releaseCurrent = acquireBroadcast();
+  return () => {
+    released = true;
+    releaseCurrent();
+  };
 }
 
 function mapAttendees(rows: any): EventAttendee[] {

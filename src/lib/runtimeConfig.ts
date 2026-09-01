@@ -77,8 +77,33 @@ export function sanitizeRuntimeFlags(raw: unknown): RuntimeFlags {
 
 let current: RuntimeFlags = DEFAULT_RUNTIME_FLAGS;
 
+/**
+ * S3b-2: KUN utvikling — tving transport per domene for fysisk telefontest
+ * av broadcast-stien uten å røre serverraden (som styrer hele flåten).
+ * Hard `__DEV__`-gate: i release-bygg er dette en no-op, så en glemt
+ * kall-linje kan aldri endre prod-adferd. Overstyrer bare LESINGEN her.
+ */
+let devTransportOverride: Partial<RuntimeFlags['realtimeTransport']> | null =
+  null;
+
+export function setDevRealtimeTransportOverride(
+  override: Partial<RuntimeFlags['realtimeTransport']> | null,
+): void {
+  if (!__DEV__) return;
+  devTransportOverride = override;
+}
+
 /** Gjeldende flagg — alltid komplette (server-verdi hvis hentet, ellers defaults). */
 export function getRuntimeConfig(): RuntimeFlags {
+  if (__DEV__ && devTransportOverride) {
+    return {
+      ...current,
+      realtimeTransport: {
+        ...current.realtimeTransport,
+        ...devTransportOverride,
+      },
+    };
+  }
   return current;
 }
 
@@ -90,4 +115,5 @@ export function setRuntimeConfig(flags: RuntimeFlags): void {
 /** Tilbake til defaults (tester; utlogging trenger det ikke — configen er global). */
 export function resetRuntimeConfig(): void {
   current = DEFAULT_RUNTIME_FLAGS;
+  devTransportOverride = null;
 }

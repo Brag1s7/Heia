@@ -479,6 +479,17 @@ export function MatchEventRow({
                   </Text>
                 )}
               </View>
+              {/* `player` bærer reporterens fritekst på mål — for BEGGE
+                  retninger (`describeMatchEvent`). På baklengsmålet er den
+                  en dempet fotnote, ikke en feiret scorer: raden skal ikke
+                  juble, men det reporteren skrev skal alltid ut. */}
+              {event.player && (
+                <Text
+                  style={[styles.goalNote, {maxWidth: grid.measureMax}]}
+                  maxFontSizeMultiplier={grid.fontCap}>
+                  {event.player}
+                </Text>
+              )}
               {event.note && (
                 <Text
                   style={[styles.goalNote, {maxWidth: grid.measureMax}]}

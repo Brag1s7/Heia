@@ -1,7 +1,12 @@
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
 import {getUserId, getUserIdOrNull} from './authUser';
-import {acquireChannel, isChannelResync} from '../realtimeChannels';
+import {
+  acquireChannel,
+  isChannelJoinError,
+  isChannelReady,
+  isChannelResync,
+} from '../realtimeChannels';
 import {primeAvatars} from '../media/avatar';
 import {
   FEED_MEDIA_BUCKET,
@@ -436,9 +441,14 @@ export function subscribeToFeed(
     payload => {
       if (isChannelResync(payload)) {
         onEvent({kind: 'resync'});
-      } else {
-        onEvent(payload as FeedRealtimeEvent);
+        return;
       }
+      // S3b-2-sentinelene (første join / join-feil) tilhører broadcast-
+      // stien for kamp; feeden er pgc til S3c og skal ignorere dem.
+      if (isChannelReady(payload) || isChannelJoinError(payload)) {
+        return;
+      }
+      onEvent(payload as FeedRealtimeEvent);
     },
   );
 }

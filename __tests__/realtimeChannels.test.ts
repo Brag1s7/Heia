@@ -36,6 +36,7 @@ jest.mock('../src/lib/supabase', () => {
 import {
   acquireChannel,
   createResyncStatusHandler,
+  isChannelReady,
   isChannelResync,
 } from '../src/lib/realtimeChannels';
 
@@ -87,23 +88,34 @@ describe('acquireChannel + resync', () => {
     const got1: unknown[] = [];
     const got2: unknown[] = [];
 
-    const release1 = acquireChannel('t-1', () => {}, p => got1.push(p));
-    const release2 = acquireChannel('t-1', () => {}, p => got2.push(p));
+    const release1 = acquireChannel(
+      't-1',
+      () => {},
+      p => got1.push(p),
+    );
+    const release2 = acquireChannel(
+      't-1',
+      () => {},
+      p => got2.push(p),
+    );
     expect(supabase.channel).toHaveBeenCalledTimes(1); // duplikatvernet
 
-    __status('SUBSCRIBED'); // første join — ingen resync
-    expect(got1).toHaveLength(0);
+    // Første join er aldri RESYNC — fra S3b-2 deles CHANNEL_READY ut i
+    // stedet (broadcast-stiens fallback-emit; pgc-lyttere ignorerer den).
+    __status('SUBSCRIBED');
+    expect(got1.filter(isChannelResync)).toHaveLength(0);
+    expect(got1.filter(isChannelReady)).toHaveLength(1);
 
     __status('CHANNEL_ERROR');
-    __status('SUBSCRIBED'); // rejoin — resync til BEGGE
-    expect(got1).toHaveLength(1);
-    expect(got2).toHaveLength(1);
-    expect(isChannelResync(got1[0])).toBe(true);
+    __status('SUBSCRIBED'); // rejoin — resync til BEGGE, aldri ny READY
+    expect(got1.filter(isChannelResync)).toHaveLength(1);
+    expect(got2.filter(isChannelResync)).toHaveLength(1);
+    expect(got1.filter(isChannelReady)).toHaveLength(1);
 
     release1();
     __status('SUBSCRIBED'); // ny rejoin — kun gjenværende lytter
-    expect(got1).toHaveLength(1);
-    expect(got2).toHaveLength(2);
+    expect(got1.filter(isChannelResync)).toHaveLength(1);
+    expect(got2.filter(isChannelResync)).toHaveLength(2);
 
     release2();
     expect(supabase.removeChannel).toHaveBeenCalledTimes(1);
