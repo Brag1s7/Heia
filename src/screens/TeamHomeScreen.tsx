@@ -32,6 +32,8 @@ import {
   MatchPhotoGallery,
   Avatar,
   FeedCardSkeleton,
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
 } from '../components';
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
@@ -814,6 +816,12 @@ export function TeamHomeScreen() {
         FlatList (B2): kun det synlige vinduet av feeden er montert, og
         onEndReached henter neste side via cursoren. */}
       <View style={styles.screen}>
+        {/* SKIVE 1A — DAGSLYSGRUNNEN (Brage 2026-09-02): statisk bakgrunnstest,
+          KUN på Hjem. Absolutt lag bak laghodet og lista; lista er
+          gjennomsiktig, laghodet dekker sin del. Slås av med
+          DAYLIGHT_GROUND_AB = false, og da er skjermen nøyaktig som før
+          (styles.screen står urørt på colors.background under den). */}
+        {DAYLIGHT_GROUND_AB && <DaylightGround />}
         {/* ⚠️ KILDEBEVARENDE (Brage 2026-08-21): snarveien er en HJEM-inngang
           til den samme `SeasonScreen` som Kamp-fanen har som rot. Du kom fra
           Hjem, Hjem forblir valgt, og «tilbake» fører til Hjem. Et fanebytte

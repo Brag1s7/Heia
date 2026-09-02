@@ -30,7 +30,13 @@ import {
 import {useMatchButton} from '../context/MatchButtonContext';
 import {matchButtonHasGlyph} from '../shared/matchButton';
 import {matchButtonGeometry} from '../shared/matchButtonGeometry';
-import {BootScreen, MatchTabButton, NotificationBanner} from '../components';
+import {
+  BootScreen,
+  MatchTabButton,
+  NotificationBanner,
+  DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
+} from '../components';
 import {Bell, Calendar, House, User} from '../components/icons';
 import {
   navigationRef,
@@ -156,7 +162,19 @@ const newEventOptions = ({
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={stackScreenOptions}>
-      <HomeStack.Screen name="TeamHome" component={TeamHomeScreen} />
+      {/* Skive 1A: med dagslysgrunnen på Hjem males kortet bak skjermen i
+          grunnens dominante mint, ellers blinker krem i kantene under
+          push/pop (samme grep som EventDetail gjør for kampens grunn).
+          Følger A/B-bryteren, så «av» er nøyaktig som før. */}
+      <HomeStack.Screen
+        name="TeamHome"
+        component={TeamHomeScreen}
+        options={
+          DAYLIGHT_GROUND_AB
+            ? {contentStyle: {backgroundColor: DAYLIGHT_GROUND_FALLBACK}}
+            : undefined
+        }
+      />
       <HomeStack.Screen name="EventDetail" component={EventDetailScreen} />
       <HomeStack.Screen
         name="NewEvent"

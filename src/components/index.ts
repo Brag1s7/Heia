@@ -46,6 +46,13 @@ export {NotificationBanner} from './NotificationBanner';
 export {StadiumSurface} from './StadiumSurface';
 export {BootScreen} from './BootScreen';
 export {HeroSurface} from './HeroSurface';
+// Dagslysgrunnen (skive 1A, statisk bakgrunnstest på Hjem) + A/B-bryteren
+// og fallback-fargen navigatoren deler med den.
+export {
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
+} from './DaylightGround';
 export {MatchPhotoSheet} from './MatchPhotoSheet';
 export {MatchPhotoRail} from './MatchPhotoRail';
 export {MatchPhotoGallery} from './MatchPhotoGallery';

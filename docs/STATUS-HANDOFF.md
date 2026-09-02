@@ -1,6 +1,60 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-01 — S3c IMPLEMENTERT: feed+varsler+kampknapp → broadcast bak flaggene, 60 s-pollingen gates av; SKALERINGSSPORET PARKERES ETTER TELEFONTEST — NESTE ER DESIGNSPORET)
+## ▶️▶️ START HER (oppdatert 2026-09-02 — DESIGNSPORET: skive 1A DaylightGround TELEFONGODKJENT og committet; materialhypotesen B-puls er LEDENDE; neste = prototype av NextEventHero (kamp) i rolig stadionglass etter godkjent forslag)
+
+🎨 **SKIVE 1A — DAGSLYSGRUNNEN PÅ HJEM: TELEFONGODKJENT OG LÅST 2026-09-02.**
+`src/components/DaylightGround.tsx` oversetter
+`docs/Heia_Design_Master/Heia_Background_Master.svg` 1:1 i masterens eget
+1290 × 2796-koordinatrom (`xMidYMin slice`: masteren er en hel skjermramme,
+tab-baren dekker det dype hjørnet). Én statisk SVG uten filtre: masterens
+blur-ellipser og beamet er radiale gradienter, kornet er utelatt
+(feTurbulence finnes ikke nativt i react-native-svg 15.15.3). Montert bak
+laghodet og lista i `TeamHomeScreen`, bak A/B-bryteren `DAYLIGHT_GROUND_AB`
+(BEHOLDES som bryter gjennom materialarbeidet); Home-ruten i `AppNavigator`
+har `contentStyle` i grunnens dominante mint (`#26F5AD`) mot kremblink.
+Fargene er LOKALE i komponenten med vilje (Brage): ingen `worldColors`, og
+ALDRI en ny global `heiaInk`/`heiaDeep` med annen verdi enn dagens tokens —
+promotering til tokens skjer i egen skive etter materialene. Bevist på
+fysisk iPhone: de elliptiske `gradientTransform`-radialene rendrer riktig.
+Typecheck (`npx tsc --noEmit -p tsconfig.json`, package.json har ikke noe
+script): 0 nye feil; 7 pre-eksisterende (TimeSheet, media ×3, netMetrics,
+LagkassaScreen ×2) identiske på HEAD, innført 7.–19. aug — tsc har ikke vært
+port siden minst 27. aug.
+
+🧭 **MATERIALHIERARKIET — LEDENDE HYPOTESE (Brage 2026-09-02, skal BEVISES
+før noe gjøres globalt):** B-puls. Kommende kamp = ROLIG mørkt stadionglass
+(dyp Heia-grønn i kampverdenens arenafamilie #25563F→#1D4633→#123325, L*
+21–33 — IKKE dagens nesten sorte StadiumSurface L* 7–18); live = samme
+materialfamilie med høyere intensitet (neon score, coral, HEIA); ferdig kamp
+= LYS feedpost med SOLID resultatkapsel (ingen slutt-hero). Lagkassa, feed,
+compose og hverdagsinformasjon = lyst opalglass (varm krem, ~0,88–0,92,
+aldri rent hvitt). Tynne lyse glasspaneler KUN på mørk flate; på lyse kort
+er sekundærlag blekk-tynne. Solide kontroller: dyp grønn = struktur/standard,
+neon = HEIA/live/mål/score/aktiv. Karusellen bytter materiale KUN etter
+hendelsestype (kamp mørk, alt annet opal), lik geometri på alle sider.
+Skill-linser godkjent som beslutningsgrunnlag: `apple-hig-designer`
+(installert), emilkowalski `apple-design`/`emil-design-eng`/`animate-expo`
+(lest fra main, IKKE installert, kun review). Sperret: backdrop-blur,
+systemfont-default, Reanimated (core `Animated` native driver for eventuell
+bakgrunnsdrift senere; Reduce Motion bygges SAMMEN med bevegelsen).
+
+▶️ **NESTE: én isolert prototype — `NextEventHero` for KOMMENDE KAMP i rolig
+stadionintensitet, KUN på Hjem.** Sperrer fra Brage: ikke rør global
+`StadiumSurface` (12 konsumenter) eller `HeroSurface` (5); lokal/eksplisitt
+variant; ingen endring av layout, høyde, padding, innhold, navigasjon eller
+tilstandslogikk; ingen slutt-hero; ikke FeedCard/ScoreChip/Lagkassa/header/
+tab-bar; ingen pakker, ingen blur; lokal A/B-bryter; Reduce Transparency og
+Increase Contrast støttes i selve materialvarianten. Flyten: forslag →
+godkjenning → bygg → fysisk telefon, FØR live-varianten eller opalkortene
+røres. Android-opal: IKKE alpha 1 automatisk pga. elevation — RN 0.83 har
+`boxShadow` (Fabric) som klipper bort border-box på Android
+(`OutsetBoxShadowDrawable.clipOutPath`), så skyggen ikke blør gjennom
+gjennomskinnelige flater; anbefaling dokumenteres i forslaget.
+
+---
+
+## ✅ Skaleringssporet LUKKET (tidligere START HER 2026-09-01/02)
+
 
 ✅ **S3c (feed + varsler + kampknappen → Broadcast, skaleringsplan v2.1
 §9 S3c) — IMPLEMENTERT 2026-09-01, ÉN ØKT ETTER S3b-MØNSTERET.** Fasit:
