@@ -17,7 +17,7 @@ export {CalendarNav} from './calendar/CalendarNav';
 export {DayCell, DOT_COLOR} from './calendar/DayCell';
 export {useReducedMotion} from './useReducedMotion';
 export {TournamentDayCard} from './TournamentDayCard';
-export {FeedCard, FEED_OPAL_AB} from './FeedCard';
+export {FeedCard, FEED_OPAL_AB, PINNED_GLASS_AB} from './FeedCard';
 export {StatusPill} from './StatusPill';
 export {TeamBadge} from './TeamBadge';
 export {ScoreChip} from './ScoreChip';

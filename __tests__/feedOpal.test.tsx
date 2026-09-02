@@ -9,8 +9,10 @@
  *   1. Blekket måles mot flaten det står på: opalens mørkeste base-stopp
  *      over den mørkeste grunnen et kort kan nå, MED neon-opptaket i
  *      hjørnet, og inne i reaksjonspillens blekkvask oppå det igjen.
- *   2. Bryteren bytter KUN ikke-festede kort; VIKTIG-kort er solide og
- *      beholder tokenblekket. Padding-boksen er identisk med `styles.card`.
+ *   2. Bryteren bytter ikke-festede kort til `card`-glass; festede VIKTIG-
+ *      kort går i `important`-varianten (varm perle, PINNED_GLASS_AB) og
+ *      faller uten glass til én SOLID varm perle — aldri tilbake til det
+ *      mettede cardSun-papiret. Padding-boksen er identisk med `styles.card`.
  *   3. Systembryterne: Reduce Transparency → solid base + solid bunn,
  *      Increase Contrast → blekk-hårlinje i stedet for lys, høylys av.
  *      Android: `boxShadow`, aldri `elevation`/`shadow*` (blør gjennom).
@@ -20,8 +22,13 @@ import React from 'react';
 import ReactTestRenderer, {act} from 'react-test-renderer';
 import {AccessibilityInfo, StyleSheet, type ViewStyle} from 'react-native';
 import {LinearGradient, Rect, Stop} from 'react-native-svg';
-import {FeedCard, FEED_OPAL_AB} from '../src/components/FeedCard';
+import {
+  FeedCard,
+  FEED_OPAL_AB,
+  PINNED_GLASS_AB,
+} from '../src/components/FeedCard';
 import {OpalSurface, OPAL} from '../src/components/OpalSurface';
+import {GLASS} from '../src/components/LiquidGlassSurface';
 import {colors, radius, spacing} from '../src/theme';
 import type {FeedItem} from '../src/shared/types';
 
@@ -209,8 +216,42 @@ const highlightStops = (root: ReactTestRenderer.ReactTestRenderer) =>
     ?.findAllByType(Stop)
     .map(s => s.props.stopOpacity);
 
+describe('GLASS-variantene (Brages godkjente tall 2026-09-02)', () => {
+  const alpha = (rgba: string) => Number(rgba.match(/,\s*([\d.]+)\)$/)![1]);
+
+  it('control er tynnest, card i midten, important mest solid', () => {
+    expect(alpha(GLASS.control.tint)).toBe(0.2);
+    expect(alpha(GLASS.card.tint)).toBe(0.34);
+    expect(alpha(GLASS.important.tint)).toBe(0.52);
+  });
+
+  it('compose-glasset har halv sheen og ingen trykkrespons; kortene har full', () => {
+    expect(GLASS.control.sheen).toBe(GLASS.card.sheen / 2);
+    expect(GLASS.control.interactive).toBe(false);
+    expect(GLASS.card.interactive).toBe(true);
+    expect(GLASS.important.interactive).toBe(true);
+  });
+
+  it('important-fallbacken er en varm perle, ikke cardSun, og holder blekket 4,5:1', () => {
+    expect(GLASS.importantSolid).not.toBe(colors.sun);
+    // Varm: rød ≥ grønn ≥ blå, men mindre mettet enn sun (mindre R−B-avstand).
+    const [r, g, b] = rgb(GLASS.importantSolid);
+    const [sr, , sb] = rgb(colors.sun);
+    expect(r).toBeGreaterThanOrEqual(g);
+    expect(g).toBeGreaterThanOrEqual(b);
+    expect(r - b).toBeLessThan(sr - sb);
+    expect(
+      ratio(OPAL.inkSecondary, GLASS.importantSolid),
+    ).toBeGreaterThanOrEqual(4.5);
+    expect(
+      ratio(OPAL.inkTertiary, GLASS.importantSolid),
+    ).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
 describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
-  it('bryteren står PÅ i prototypen', () => {
+  it('bryterne står PÅ i prototypen', () => {
+    expect(PINNED_GLASS_AB).toBe(true);
     expect(FEED_OPAL_AB).toBe(true);
   });
 
@@ -226,17 +267,24 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     root.unmount();
   });
 
-  it('festet VIKTIG-kort: solid solskinnsflate, tokenblekk, ingen opal', async () => {
+  it('festet VIKTIG-kort: important-varianten — uten glass én solid varm perle, opalblekk, aldri cardSun', async () => {
     const root = await render(festet);
+    // Ingen SVG-variant for important: fallbacken er en flat View.
     expect(root.root.findAllByType(OpalSurface)).toHaveLength(0);
     const card = root.root.findAllByType('View' as never)[0];
-    expect(flat(card.props.style).backgroundColor).toBe(colors.sun);
-    expect(textsWithColor(root, colors.textSecondary)).toEqual([
+    const style = flat(card.props.style);
+    expect(style.backgroundColor).toBe(GLASS.importantSolid);
+    expect(style.backgroundColor).not.toBe(colors.sun);
+    expect(style.borderColor).toBe(GLASS.importantSolidEdge);
+    expect(style.borderWidth).toBe(1);
+    expect(style.borderRadius).toBe(radius.xl);
+    expect(style.padding).toBe(spacing.xl);
+    expect(textsWithColor(root, OPAL.inkSecondary)).toEqual([
       '👏 3 heier',
       '2',
     ]);
-    expect(textsWithColor(root, OPAL.inkSecondary)).toEqual([]);
-    expect(textsWithColor(root, colors.heiaInk)).toEqual(['Trener']);
+    expect(textsWithColor(root, colors.textSecondary)).toEqual([]);
+    expect(textsWithColor(root, OPAL.inkAccent)).toEqual(['Trener']);
     root.unmount();
   });
 

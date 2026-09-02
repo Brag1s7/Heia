@@ -110,6 +110,49 @@ telefontestet).
 veldig bra ut»). HELE GLASS-SKIVA ER DERMED TELEFONGODKJENT — men
 UKOMMITTERT, og zz-riggfilene ligger fortsatt i treet.
 
+✅ STEG 1 GJORT (2026-09-02 natt): zz-riggfilene slettet, suite 937/937
+grønn, eslint rent i skivefilene (to GAMLE feil i `__tests__/tabBar.test.tsx`
+og `KalenderScreen.tsx` er urørt og ikke våre), HELE glass-skiva committet
+som 89e52e7 på Brage. IKKE pushet. emilkowalski-skillen ligger på
+`skills/apple-design/SKILL.md` i repoet (den flate stien gir 404).
+
+🫧 STEG 2 KODET (2026-09-02 natt) — UKOMMITTERT, IKKE TELEFONTESTET.
+Brage godkjente forslaget med tre presiseringer: (1) compose = control-
+glass tint 0,20, halv sheen, ingen kortrespons; (2) VIKTIG = varm perle
+0,52 + eksisterende gullpill, INGEN uniform gullkant (leser som annonse/
+advarsel) — startet UTEN ekstra gullrefleks, materialet og pillen bærer
+hierarkiet; (3) Android/Reduce Transparency får én SOLID varm perle, ikke
+cardSun-papir. Kampinnlegg er IKKE rørt (egen MatchEventCard-variant
+kommer ETTER denne skiva: samme FeedCard-glass + FRA KAMPEN + Heia-
+pulslinje/hendelsespunkt + faste hendelsesikoner + dagens mørke minutt-/
+scorekapsel + diskret «Se kampen ›». Ingen mørk kortflate.)
+BYGGET: `GLASS` i `LiquidGlassSurface.tsx` er nå tre varianter valgt med
+`variant`-prop — card rgba(233,235,234,0,34)/sheen 0,18/interactive;
+control rgba(244,246,245,0,20)/sheen 0,09/IKKE interactive; important
+rgba(246,240,226,0,52)/sheen 0,18/interactive; `importantSolid` #F4F1E6 +
+goldInk-kant 0,14 som flat View-fallback (ingen ny SVG). NATIVE: to nye
+props `sheenOpacity` (CGFloat, skalerer sheen-stigen) og `interactive`
+(BOOL, slår av gjenkjenneren + UIGlassEffect.interactive) i
+`HeiaLiquidGlassView.{h,m}` + manager — clang -fsyntax-only OK mot iOS
+26.5-SDK. ⚠️ KREVER Cmd+R I XCODE (Metro-reload tar ikke .m). FeedCard:
+`PINNED_GLASS_AB = true` → festede kort i `important`, OPAL.ink* på dem
+også. TeamHomeScreen: `COMPOSE_GLASS_AB = true` → `ComposeSurface`
+(modulnivå, så TextInput beholder identiteten) i `control`-glass med
+wrapper-marg + innerpadding, feltet som blekkvask rgba(8,57,46,0,06),
+placeholder i OPAL.inkTertiary; kameraknappen beholder solid heiaTint.
+Verifisert: full suite grønn (feedOpal utvidet med GLASS-variant-tester
++ important-fallback-kontrast ≥ 4,5:1), eslint rent i alle rørte filer.
+TELEFONTEST (Brage, Cmd+R, Light OG Dark Mode): (a) compose leser som
+tynnere/lysere enn feedkortene, ikke hvit boks, og lyser IKKE ved trykk
+på boksen — men feltet får fokus og kameraknappen virker; (b) VIKTIG-
+kortet leser som varmere og mer solid enn feedkortene uten å bli krem/
+papir, gullpillen bærer aksenten; (c) trykkresponsen på vanlige kort er
+uendret (runde 7); (d) Reduce Transparency → VIKTIG = flat varm perle.
+Kjent, ikke rørt: «Varsle hele laget»-raden inni compose er fortsatt solid
+surfaceMuted/heiaSoft (vises kun mens man skriver). Om VIKTIG leser for
+flat: eneste tillatte tillegg er en svært svak gullrefleks øverst til
+venstre (retningsbestemt, ikke kant). Etter dom: commit (ikke push).
+
 ▶️ **NESTE SAMTALE — START HER:**
 1. FØRST: `git status` → slett `__tests__/zz_opal_rig.test.tsx` og
    `src/components/zz_FeedCardHead.tsx` → commit HELE skiva (lysfelt-grunn,

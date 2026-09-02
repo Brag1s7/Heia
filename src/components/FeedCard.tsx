@@ -21,6 +21,14 @@ import type {FeedItem} from '../shared/types';
  */
 export const FEED_OPAL_AB = true;
 
+/**
+ * LOKAL BRYTER (Brage 2026-09-02, godkjent forslag): `true` = festede
+ * VIKTIG-kort tegnes i glass-varianten `important` (varm perle 0,52,
+ * gullpillen bærer aksenten); `false` = cardSun-papir som før. Kampinnlegg
+ * er IKKE rørt av denne skiva (egen MatchEventCard-variant kommer etter).
+ */
+export const PINNED_GLASS_AB = true;
+
 interface FeedCardProps {
   item: FeedItem;
   onHeia?: () => void;
@@ -153,8 +161,10 @@ export function FeedCard({
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
   const strong = item.isPinned || isMatchType(item) || item.type === 'resultat';
   const heiaCount = item.heiaCount ?? 0;
-  // Opalprototypen: KUN ikke-festede kort. Festet = solid solskinnsflate.
-  const opal = FEED_OPAL_AB && !item.isPinned;
+  // Opalprototypen: ikke-festede kort i `card`-glass; festede VIKTIG-kort i
+  // `important`-glass bak PINNED_GLASS_AB (ellers solid solskinnsflate).
+  const opal = FEED_OPAL_AB && (!item.isPinned || PINNED_GLASS_AB);
+  const glassVariant = item.isPinned ? 'important' : 'card';
   // Opalens blekk (kontrastporten): lokalt mørkere sekundær/aksent på
   // opalen, tokenene på alt annet. Se OPAL.inkSecondary/inkAccent.
   const inkSecondary = opal ? OPAL.inkSecondary : colors.textSecondary;
@@ -309,7 +319,10 @@ export function FeedCard({
       return (
         <Pressable onPress={onPress} accessibilityRole="button">
           {({pressed}) => (
-            <LiquidGlassSurface style={styles.cardOpal} pressed={pressed}>
+            <LiquidGlassSurface
+              style={styles.cardOpal}
+              variant={glassVariant}
+              pressed={pressed}>
               {inner}
             </LiquidGlassSurface>
           )}
@@ -317,7 +330,9 @@ export function FeedCard({
       );
     }
     return (
-      <LiquidGlassSurface style={styles.cardOpal}>{inner}</LiquidGlassSurface>
+      <LiquidGlassSurface style={styles.cardOpal} variant={glassVariant}>
+        {inner}
+      </LiquidGlassSurface>
     );
   }
 

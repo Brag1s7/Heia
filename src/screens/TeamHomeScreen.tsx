@@ -35,6 +35,7 @@ import {
   DaylightGround,
   DAYLIGHT_GROUND_AB,
 } from '../components';
+import {LiquidGlassSurface, OPAL} from '../components';
 import {Camera, Check} from '../components/icons';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
@@ -77,6 +78,31 @@ import type {
   HomeStackParamList,
   RootTabParamList,
 } from '../shared/types';
+
+/**
+ * LOKAL BRYTER (Brage 2026-09-02, godkjent forslag): `true` = compose-boksen
+ * tegnes i glass-varianten `control` («tynt, lyst og nøytralt kontrollglass»,
+ * tint 0,20, halv sheen, ingen trykkrespons på boksen) med feltet som
+ * blekkvask og placeholder i opalblekk; `false` = helhvit boks som før.
+ */
+const COMPOSE_GLASS_AB = true;
+
+/**
+ * Compose-flaten. Modulnivå (ikke nestet) så elementet i `listHeader`
+ * beholder typen mellom rendere — TextInput-en mister ellers fokus.
+ */
+function ComposeSurface({children}: {children: React.ReactNode}) {
+  if (!COMPOSE_GLASS_AB) {
+    return <View style={styles.composeCard}>{children}</View>;
+  }
+  return (
+    <View style={styles.composeWrap}>
+      <LiquidGlassSurface variant="control" style={styles.composeGlass}>
+        {children}
+      </LiquidGlassSurface>
+    </View>
+  );
+}
 
 /** Valgt bilde i compose-boksen: preview-uri + payload for opplasting. */
 type SelectedImage = PickedImage;
@@ -693,7 +719,7 @@ export function TeamHomeScreen() {
           permanensen som gjorde det forsvarlig å fjerne den generiske
           «+»-knappen fra tab-baren til fordel for kampknappen. Flytter du
           den inn i en tilstand, mister laget sin eneste vei til å skrive. */}
-      <View style={styles.composeCard}>
+      <ComposeSurface>
         <View style={styles.composeRow}>
           <Avatar
             name={profile?.displayName ?? 'Du'}
@@ -701,14 +727,20 @@ export function TeamHomeScreen() {
             color={profile?.avatarColor}
             size="md"
           />
-          <View style={styles.composeField}>
+          <View
+            style={[
+              styles.composeField,
+              COMPOSE_GLASS_AB && styles.composeFieldGlass,
+            ]}>
             <TextInput
               ref={composeRef}
               style={styles.composeInput}
               value={composeText}
               onChangeText={setComposeText}
               placeholder="Del noe med laget …"
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={
+                COMPOSE_GLASS_AB ? OPAL.inkTertiary : colors.textTertiary
+              }
               multiline
               editable={!posting}
               // Placeholder leses av VoiceOver, men den er en oppfordring —
@@ -780,7 +812,7 @@ export function TeamHomeScreen() {
             />
           </View>
         )}
-      </View>
+      </ComposeSurface>
     </>
   );
 
@@ -901,6 +933,16 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     gap: spacing.md,
   },
+  // Kontrollglass: marg på wrapperen, padding/gap på innerboksen (glasset
+  // eier kant, radius og materiale — som cardWrap/cardOpal for feedkortet).
+  composeWrap: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  composeGlass: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   composeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -913,6 +955,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     justifyContent: 'center',
+  },
+  // Blekkvask i stedet for solid surfaceMuted: aldri en lys solid flate oppå
+  // lyst glass (Emil-linsa). Samme vask som komponeringslinja på
+  // kommentarsiden.
+  composeFieldGlass: {
+    backgroundColor: 'rgba(8, 57, 46, 0.06)',
   },
   composeInput: {
     ...typography.input,

@@ -60,8 +60,10 @@ static const CGFloat kScrollSlop = 12.0;
   if ((self = [super initWithFrame:frame])) {
     self.backgroundColor = UIColor.clearColor;
     _cornerRadius = 24.0;
-    // Nesten fargeløs perlegrå — JS sender GLASS.tint, dette er bare default.
+    // Nesten fargeløs perlegrå — JS sender GLASS.card.tint, dette er bare default.
     _glassTint = [UIColor colorWithRed:0.914 green:0.922 blue:0.918 alpha:0.34];
+    _sheenOpacity = 0.18;
+    _interactive = YES;
 
     _effectView = [[UIVisualEffectView alloc] initWithEffect:[self makeEffect]];
     _effectView.frame = self.bounds;
@@ -79,11 +81,7 @@ static const CGFloat kScrollSlop = 12.0;
     _sheenView = [[UIView alloc] initWithFrame:CGRectZero];
     _sheenView.userInteractionEnabled = NO;
     _sheen = [CAGradientLayer layer];
-    _sheen.colors = @[
-      (id)[UIColor colorWithWhite:1.0 alpha:0.18].CGColor,
-      (id)[UIColor colorWithWhite:1.0 alpha:0.06].CGColor,
-      (id)[UIColor colorWithWhite:1.0 alpha:0.0].CGColor,
-    ];
+    [self applySheen];
     _sheen.locations = @[ @0.0, @0.32, @0.62 ];
     _sheen.startPoint = CGPointMake(0.0, 0.0);
     _sheen.endPoint = CGPointMake(0.7, 1.0);
@@ -120,10 +118,42 @@ static const CGFloat kScrollSlop = 12.0;
     glass.tintColor = _glassTint;
     // Får aldri touch bak RN-barna (se toppen) — står for det tilfellet UIKit
     // en dag videresender; responsen vår er den som faktisk kjører.
-    glass.interactive = !UIAccessibilityIsReduceMotionEnabled();
+    glass.interactive = _interactive && !UIAccessibilityIsReduceMotionEnabled();
     return glass;
   }
   return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialLight];
+}
+
+// Sheen: hvit topp → 1/3 → 0 diagonalt. `sheenOpacity` skalerer hele stigen,
+// så kontrollglasset (0,09) får samme retning, halv styrke.
+- (void)applySheen
+{
+  CGFloat top = _sheenOpacity;
+  [CATransaction begin];
+  [CATransaction setDisableActions:YES];
+  _sheen.colors = @[
+    (id)[UIColor colorWithWhite:1.0 alpha:top].CGColor,
+    (id)[UIColor colorWithWhite:1.0 alpha:top / 3.0].CGColor,
+    (id)[UIColor colorWithWhite:1.0 alpha:0.0].CGColor,
+  ];
+  [CATransaction commit];
+}
+
+- (void)setSheenOpacity:(CGFloat)sheenOpacity
+{
+  _sheenOpacity = sheenOpacity;
+  [self applySheen];
+}
+
+- (void)setInteractive:(BOOL)interactive
+{
+  _interactive = interactive;
+  _press.enabled = interactive;
+  _effectView.effect = [self makeEffect];
+  if (!interactive) {
+    _touchDown = NO;
+    [self refreshPressed];
+  }
 }
 
 - (void)applyCornerRadius

@@ -15,6 +15,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) UIColor *glassTint;
 /** Trykktilstand fra Pressable: flytter det delte lyset svakt. */
 @property (nonatomic, assign) BOOL pressed;
+/** Sheenens toppopasitet (0–1). Kort 0,18, kontrollglass (compose) 0,09. */
+@property (nonatomic, assign) CGFloat sheenOpacity;
+/**
+ * NO = ingen trykkrespons: gjenkjenneren slås av og glasset settes
+ * ikke-interaktivt. Compose-boksen — feltet og kameraknappen er kontrollene.
+ */
+@property (nonatomic, assign) BOOL interactive;
 
 @end
 

@@ -8,7 +8,7 @@ import {
   type ViewProps,
   type ViewStyle,
 } from 'react-native';
-import {radius} from '../theme';
+import {radius, shadows} from '../theme';
 import {OpalSurface} from './OpalSurface';
 import {useMaterialAccessibility} from './useMaterialAccessibility';
 
@@ -34,20 +34,49 @@ import {useMaterialAccessibility} from './useMaterialAccessibility';
 export const FEED_LIQUID_GLASS_AB = true;
 
 /**
- * Tinten i glasset: NESTEN FARGELØS perlegrå (Brage runde 2: bakgrunnen eier
- * Heia-minten, glasset låner grønt kun gjennom blur/refraksjon). Ikke mer
- * hvitt fyll, ikke lavere transparens — bare metningen ut. Alfa = styrke.
+ * ÉN komponent, tre varianter (Brage 2026-09-02, godkjent): materialvekt
+ * koder hierarki (Emil-linsa), tynt glass til kontroller og tykkere glass til
+ * større innholdsflater (HIG). Alfa = styrke; fargen er alltid en perle,
+ * aldri hvitt fyll og aldri krem.
+ *
+ *   card       feedkortet (LÅST): nesten fargeløs perlegrå 0,34 — bakgrunnen
+ *              eier Heia-minten, glasset låner grønt kun gjennom blur.
+ *              Mål ~75 % perle / 25 % grunn. Full sheen, trykkrespons på.
+ *   control    compose-boksen: «tynt, lyst og nøytralt kontrollglass» —
+ *              nesten hvit 0,20 (~60 % grunn), halv sheen, INGEN trykk-
+ *              respons (feltet og kameraknappen er kontrollene).
+ *   important  festet VIKTIG-kort: «varmere og mer solid opalglass» — varm
+ *              perle (sun-tonen med metningen ned) 0,52 (~85 % perle), full
+ *              sheen, trykkrespons på (åpner kommentartråden). Gullpillen
+ *              bærer aksenten; INGEN uniform gullkant (leser som annonse/
+ *              advarsel — Brage). Ikke mørkt, ikke cardSun-papir.
  */
+export type GlassVariant = 'card' | 'control' | 'important';
+
 export const GLASS = {
-  // Runde 3 (Brage: «mintfarget plast» på telefon ved 0,26): samme nøytrale
-  // farge, ett kontrollert alfa-steg opp. Mål: ~75 % perle / 25 % grunn.
-  tint: 'rgba(233, 235, 234, 0.34)',
+  card: {tint: 'rgba(233, 235, 234, 0.34)', sheen: 0.18, interactive: true},
+  control: {tint: 'rgba(244, 246, 245, 0.2)', sheen: 0.09, interactive: false},
+  important: {
+    tint: 'rgba(246, 240, 226, 0.52)',
+    sheen: 0.18,
+    interactive: true,
+  },
+  /**
+   * Solid varm perle for `important` uten glass (Android / Reduce
+   * Transparency / eldre iOS): tinten over lysfelt-grunnen regnet ut til én
+   * flat farge, så materialretningen beholdes — IKKE det mettede
+   * `colors.sun`-papiret. Kanten er goldInk-blekk, svakt.
+   */
+  importantSolid: '#F4F1E6',
+  importantSolidEdge: 'rgba(92, 74, 0, 0.14)',
 } as const;
 
 interface NativeProps extends ViewProps {
   cornerRadius: number;
   glassTint: string;
   pressed: boolean;
+  sheenOpacity: number;
+  interactive: boolean;
 }
 
 const iosMajor =
@@ -69,6 +98,8 @@ const NativeGlass = LIQUID_GLASS_SUPPORTED
 interface LiquidGlassSurfaceProps {
   style?: StyleProp<ViewStyle>;
   pressed?: boolean;
+  /** Materialvariant — se `GLASS`. Default = feedkortet. */
+  variant?: GlassVariant;
   /** Hjørneradius — kort = radius.xl (default), kantlinjer/bar = 0. */
   cornerRadius?: number;
   children?: React.ReactNode;
@@ -77,11 +108,21 @@ interface LiquidGlassSurfaceProps {
 export function LiquidGlassSurface({
   style,
   pressed = false,
+  variant = 'card',
   cornerRadius = radius.xl,
   children,
 }: LiquidGlassSurfaceProps) {
   const {reduceTransparency} = useMaterialAccessibility();
+  const glass = GLASS[variant];
   if (!FEED_LIQUID_GLASS_AB || !NativeGlass || reduceTransparency) {
+    if (variant === 'important') {
+      return (
+        <View
+          style={[styles.importantSolid, {borderRadius: cornerRadius}, style]}>
+          {children}
+        </View>
+      );
+    }
     return (
       <OpalSurface style={style} pressed={pressed}>
         {children}
@@ -92,7 +133,9 @@ export function LiquidGlassSurface({
     <NativeGlass
       style={[styles.glass, {borderRadius: cornerRadius}]}
       cornerRadius={cornerRadius}
-      glassTint={GLASS.tint}
+      glassTint={glass.tint}
+      sheenOpacity={glass.sheen}
+      interactive={glass.interactive}
       pressed={pressed}>
       <View style={[styles.surface, {borderRadius: cornerRadius}, style]}>
         {children}
@@ -110,5 +153,13 @@ const styles = StyleSheet.create({
     // Samme padding-boks som OpalSurface: 1 pt gjennomsiktig kant.
     borderWidth: 1,
     borderColor: 'transparent',
+  },
+  // Solid varm perle (important-fallback). Samme padding-boks: 1 pt kant.
+  importantSolid: {
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: GLASS.importantSolidEdge,
+    backgroundColor: GLASS.importantSolid,
+    ...shadows.cardResting,
   },
 });
