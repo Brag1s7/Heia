@@ -46,8 +46,27 @@ GODKJENT AV BRAGE og installert som prosjektskill i
 `.claude/skills/apple-hig-designer/` — brukes som GUARDRAIL for
 native-proporsjoner (typeskala, 44 pt-mål, tab-bar, konsentriske
 radier) ETTER retningsvalg, aldri som art direction (§13-konklusjonen
-står). Brage har dessuten en egen mappe med designmaler/-referanser han
-vil bruke — be om stien i designsamtalen.
+står).
+
+🎨 **DESIGNSPORETS STARTPUNKT (Brage 2026-09-02):**
+`docs/Heia_Design_Master/` — Brages EGEN retning: bakgrunnsmaster
+(`Heia_Background_Master.png` = visuell fasit), materialpreview (KUN
+materialforståelse — aldri kopier layout/ikoner/tekst) og
+`Heia_Claude_Build_Brief.md` med låst palett (heiaNeon `#02FFAB`,
+heiaDeep/Ink, cream-flater, heiaSun kun atmosfærisk), bakgrunns-
+konstruksjon, dynamisk lagfarge-topplag, motion-regler (transform/
+opacity, aldri JS-drevet), materialsystem (opal/silkematt hverdag,
+stadionglass live) og akseptansetest. **Retningsvalget fra §13 er
+dermed GJORT av Brage selv** — lav-fi-canvas-trinnet utgår; §13s
+forbudsliste og kritikkregel («Behance ved siden av Goalify?»)
+gjelder fortsatt. Ny samtale følger briefens egen sisteinstruks:
+(1) inspiser eksisterende bakgrunns-/tema-primitiver og SI hvilke
+filer/tokens som eier Hjem-bakgrunnen i dag, (2) foreslå MINSTE
+REVERSIBLE implementasjon av masteren på ÉN hverdagsskjerm (kun
+bakgrunnslaget + minimal flatetone), (3) INGEN kode før Brage har
+godkjent forslaget, (4) fysisk telefon i lyst og dempet miljø før
+noe spres. RN CLI + eksisterende StyleSheet/tokens.ts — ingen nye
+pakker/kits.
 
 ⏸️ **SKALERINGSSPORET PARKERES HER** (Brages beslutning 2026-09-01):
 S4 senere; S5/S6/S8 er pre-launch. **NESTE SPOR: DESIGN** —
