@@ -31,13 +31,23 @@ på pgc for feed/notif, ingen adferd endres før flipp. Innholdet:
 feed/teamLive-bryter 8, notif-bryter 4, poll-gate 4); prettier husstil +
 grep-verifisert.
 
-▶️ **PORTER FØR FLIPP AV feed/notif (fasiten §7):** fysisk telefontest
-med dev-override `setDevRealtimeTransportOverride({feed: 'broadcast',
-notif: 'broadcast'})` (post/HEIA/kommentar live i feeden, badge +1,
-kampknappen oppdaterer på mål uten 60 s-ventetid, bakgrunn→forgrunn) →
-Brages godkjenning → én UPDATE per felt (jsonb_set, samme mønster som
-match-flippen; kill-switch = UPDATE tilbake). `live_fallback_poll_s`
-kan settes (f.eks. 300) som belte-og-bukse under utrullingen.
+✅ **ALLE S3-PORTER GRØNNE 2026-09-02.** Match-flippen kjørt av Brage
+mot prod og telefonbevist («runde 1 grønn» — kampen går på broadcast i
+flåten). S3c-telefontesten («runde 2») grønn med dev-override: feed
+live, badge +1, kampknappen oppdaterer på mål uten 60 s-ventetid.
+Testlinjen i index.js fjernet (aldri committet). Flipp-UPDATE-ene for
+`feed` og `notif` (jsonb_set-mønsteret; kill-switch = UPDATE tilbake)
+er levert Brage, som kjører dem selv. `live_fallback_poll_s` kan settes
+(f.eks. 300) som belte-og-bukse under utrullingen.
+
+🧰 **Designverktøy klargjort 2026-09-02:** `apple-hig-designer`
+(tristan-mcinnis, vurdert i HEIA-VISUAL-HANDOFF §13-tabellen) er nå
+GODKJENT AV BRAGE og installert som prosjektskill i
+`.claude/skills/apple-hig-designer/` — brukes som GUARDRAIL for
+native-proporsjoner (typeskala, 44 pt-mål, tab-bar, konsentriske
+radier) ETTER retningsvalg, aldri som art direction (§13-konklusjonen
+står). Brage har dessuten en egen mappe med designmaler/-referanser han
+vil bruke — be om stien i designsamtalen.
 
 ⏸️ **SKALERINGSSPORET PARKERES HER** (Brages beslutning 2026-09-01):
 S4 senere; S5/S6/S8 er pre-launch. **NESTE SPOR: DESIGN** —
