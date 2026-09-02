@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Heia Background Master</title>
+  <style>
+    :root {
+      --heia-neon: #02ffab;
+      --heia-neon-soft: #79ffd3;
+      --heia-aqua: #8fffe0;
+      --heia-sun: #cfff74;
+      --heia-mint: #d8fff0;
+      --heia-daylight: #a9ffda;
+      --heia-cream: #f7f5e9;
+      --heia-deep: #063a2d;
+      --heia-ink: #052c23;
+      --heia-shadow: rgba(5, 55, 42, 0.20);
+      --opal: rgba(250, 250, 241, 0.70);
+      --opal-strong: rgba(250, 250, 241, 0.84);
+      --opal-border: rgba(255, 255, 255, 0.76);
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #d8fff0;
+      color: var(--heia-ink);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", Inter, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .screen {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      min-height: 720px;
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        radial-gradient(72% 54% at 8% 31%, rgba(207, 255, 116, 0.64) 0%, rgba(181, 255, 107, 0.30) 38%, rgba(181, 255, 107, 0) 78%),
+        radial-gradient(86% 58% at 3% -4%, rgba(174, 255, 222, 0.92) 0%, rgba(112, 255, 205, 0.62) 38%, rgba(72, 242, 184, 0.16) 68%, rgba(72, 242, 184, 0) 100%),
+        radial-gradient(64% 45% at 103% -2%, rgba(6, 58, 45, 0.21) 0%, rgba(6, 58, 45, 0.08) 45%, rgba(6, 58, 45, 0) 100%),
+        radial-gradient(85% 68% at -4% 59%, rgba(2, 255, 171, 0.98) 0%, rgba(2, 255, 171, 0.88) 34%, rgba(35, 255, 184, 0.54) 66%, rgba(35, 255, 184, 0) 100%),
+        radial-gradient(76% 62% at 102% 47%, rgba(101, 231, 221, 0.94) 0%, rgba(57, 215, 196, 0.72) 42%, rgba(57, 215, 196, 0) 100%),
+        radial-gradient(68% 52% at 94% 105%, rgba(6, 58, 45, 0.43) 0%, rgba(6, 58, 45, 0.18) 47%, rgba(6, 58, 45, 0) 100%),
+        linear-gradient(158deg, #9fffd8 0%, #26f5ad 25%, #02ffab 52%, #31dcc9 76%, #0e7560 100%);
+    }
+
+    .light-field,
+    .shadow-field,
+    .aqua-field,
+    .light-beam {
+      position: absolute;
+      pointer-events: none;
+      will-change: transform, opacity;
+    }
+
+    .light-field {
+      z-index: -7;
+      width: 92vw;
+      height: 70vh;
+      left: -43vw;
+      top: 29vh;
+      border-radius: 48% 52% 58% 42% / 54% 42% 58% 46%;
+      background: rgba(2, 255, 171, 0.82);
+      filter: blur(62px);
+      animation: neonDrift 34s ease-in-out infinite alternate;
+    }
+
+    .aqua-field {
+      z-index: -8;
+      width: 78vw;
+      height: 52vh;
+      right: -42vw;
+      top: 18vh;
+      border-radius: 54% 46% 44% 56% / 48% 58% 42% 52%;
+      background: rgba(143, 255, 224, 0.76);
+      filter: blur(68px);
+      animation: aquaDrift 41s ease-in-out infinite alternate;
+    }
+
+    .shadow-field {
+      z-index: -6;
+      width: 70vw;
+      height: 44vh;
+      right: -36vw;
+      bottom: -17vh;
+      border-radius: 50%;
+      background: rgba(6, 58, 45, 0.18);
+      filter: blur(76px);
+      animation: shadowDrift 38s ease-in-out infinite alternate;
+    }
+
+    .light-beam {
+      z-index: -5;
+      width: 150vw;
+      height: 24vh;
+      left: -30vw;
+      top: 6vh;
+      transform: rotate(-10deg);
+      transform-origin: center;
+      background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.28), rgba(247,255,248,0.08), rgba(255,255,255,0));
+      filter: blur(26px);
+      opacity: 0.68;
+      animation: beamBreathe 29s ease-in-out infinite alternate;
+    }
+
+    .pitch-geometry {
+      position: absolute;
+      z-index: -3;
+      inset: -4%;
+      width: 108%;
+      height: 108%;
+      pointer-events: none;
+      opacity: 0.82;
+      animation: geometryFloat 36s ease-in-out infinite alternate;
+    }
+
+    .grain {
+      position: absolute;
+      z-index: -2;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.052;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+
+    .vignette {
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(7, 55, 43, 0.035), transparent 18%, transparent 78%, rgba(5, 46, 36, 0.08)),
+        radial-gradient(100% 78% at 50% 43%, transparent 60%, rgba(2, 60, 44, 0.07) 100%);
+    }
+
+    @keyframes neonDrift {
+      0% { transform: translate3d(-10px, 8px, 0) scale(1.00); opacity: 0.76; }
+      100% { transform: translate3d(22px, -15px, 0) scale(1.06); opacity: 0.91; }
+    }
+
+    @keyframes aquaDrift {
+      0% { transform: translate3d(8px, -9px, 0) scale(0.98); }
+      100% { transform: translate3d(-20px, 17px, 0) scale(1.05); }
+    }
+
+    @keyframes shadowDrift {
+      0% { transform: translate3d(4px, 9px, 0) scale(1); opacity: 0.13; }
+      100% { transform: translate3d(-16px, -12px, 0) scale(1.08); opacity: 0.21; }
+    }
+
+    @keyframes beamBreathe {
+      0% { transform: translate3d(-18px, 3px, 0) rotate(-10deg); opacity: 0.44; }
+      100% { transform: translate3d(18px, -5px, 0) rotate(-8.5deg); opacity: 0.72; }
+    }
+
+    @keyframes geometryFloat {
+      0% { transform: translate3d(-3px, 2px, 0); }
+      100% { transform: translate3d(6px, -5px, 0); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .light-field,
+      .shadow-field,
+      .aqua-field,
+      .light-beam,
+      .pitch-geometry { animation: none; }
+    }
+
+    .ui {
+      position: relative;
+      z-index: 3;
+      display: none;
+      height: 100%;
+      padding: 24px 20px 18px;
+    }
+
+    body.preview .ui {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 24px;
+      padding: 0 4px;
+      font-size: 14px;
+      font-weight: 760;
+      letter-spacing: -0.2px;
+    }
+
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+    }
+
+    .signal {
+      display: flex;
+      align-items: end;
+      gap: 2px;
+      height: 11px;
+    }
+
+    .signal i {
+      display: block;
+      width: 3px;
+      border-radius: 2px;
+      background: var(--heia-ink);
+    }
+
+    .signal i:nth-child(1) { height: 4px; }
+    .signal i:nth-child(2) { height: 6px; }
+    .signal i:nth-child(3) { height: 8px; }
+    .signal i:nth-child(4) { height: 11px; }
+
+    .battery {
+      position: relative;
+      width: 20px;
+      height: 10px;
+      border: 1.5px solid rgba(5,44,35,.78);
+      border-radius: 3px;
+    }
+
+    .battery::before {
+      content: "";
+      position: absolute;
+      inset: 1.5px;
+      width: 12px;
+      border-radius: 1px;
+      background: var(--heia-ink);
+    }
+
+    .battery::after {
+      content: "";
+      position: absolute;
+      right: -3px;
+      top: 2px;
+      width: 1.5px;
+      height: 4px;
+      border-radius: 0 2px 2px 0;
+      background: rgba(5,44,35,.65);
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 19px;
+      padding: 0 2px;
+    }
+
+    .wordmark {
+      font-size: 31px;
+      line-height: 1;
+      font-weight: 950;
+      letter-spacing: -2.4px;
+      color: var(--heia-ink);
+    }
+
+    .team {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 14px;
+      font-weight: 720;
+    }
+
+    .avatar {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: white;
+      font-size: 12px;
+      font-weight: 850;
+      background:
+        radial-gradient(circle at 35% 28%, rgba(255,255,255,.26), transparent 23%),
+        linear-gradient(150deg, #0d5b47, #042c22);
+      border: 2px solid rgba(255,255,255,.82);
+      box-shadow: 0 7px 18px rgba(4,53,40,.17);
+    }
+
+    .eyebrow {
+      margin: 34px 3px 12px;
+      font-size: 11px;
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: 1.7px;
+      text-transform: uppercase;
+      color: rgba(5,44,35,.70);
+    }
+
+    .opal-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: 30px;
+      border: 1px solid var(--opal-border);
+      background:
+        radial-gradient(115% 125% at 8% -4%, rgba(255,255,255,.78), rgba(255,255,255,.22) 45%, transparent 68%),
+        linear-gradient(146deg, rgba(251,250,239,.80), rgba(243,249,237,.62));
+      box-shadow:
+        0 24px 54px rgba(4, 67, 48, 0.17),
+        0 5px 14px rgba(4, 67, 48, 0.08),
+        inset 0 1px 0 rgba(255,255,255,.86),
+        inset 0 -1px 0 rgba(2,255,171,.10);
+      backdrop-filter: blur(20px) saturate(118%);
+      -webkit-backdrop-filter: blur(20px) saturate(118%);
+    }
+
+    .opal-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      background: linear-gradient(118deg, rgba(255,255,255,.30), transparent 35%, transparent 72%, rgba(2,255,171,.065));
+    }
+
+    .hero {
+      padding: 22px 22px 19px;
+    }
+
+    .hero-top,
+    .teams,
+    .hero-actions,
+    .moment-head,
+    .people {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kicker {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 840;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--heia-neon);
+      box-shadow: 0 0 0 5px rgba(2,255,171,.12), 0 0 16px rgba(2,255,171,.70);
+    }
+
+    .chip {
+      padding: 7px 11px;
+      border: 1px solid rgba(7,61,47,.10);
+      border-radius: 999px;
+      background: rgba(255,255,255,.36);
+      color: rgba(5,44,35,.72);
+      font-size: 11px;
+      font-weight: 730;
+      box-shadow: inset 0 1px rgba(255,255,255,.55);
+    }
+
+    .teams {
+      margin: 22px 0 19px;
+      gap: 14px;
+    }
+
+    .club {
+      flex: 1;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .crest {
+      width: 51px;
+      height: 51px;
+      margin: 0 auto 8px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      color: white;
+      font-size: 11px;
+      font-weight: 900;
+      background: linear-gradient(150deg, #0c5642, #052f25);
+      border: 1px solid rgba(255,255,255,.74);
+      box-shadow: 0 10px 22px rgba(5,52,40,.16);
+    }
+
+    .versus {
+      padding-top: 3px;
+      text-align: center;
+    }
+
+    .versus strong {
+      display: block;
+      font-size: 29px;
+      line-height: 1;
+      letter-spacing: -1.3px;
+    }
+
+    .versus span {
+      display: block;
+      margin-top: 6px;
+      color: rgba(5,44,35,.60);
+      font-size: 11px;
+      font-weight: 670;
+    }
+
+    .hero-actions {
+      padding-top: 16px;
+      border-top: 1px solid rgba(5,65,49,.10);
+    }
+
+    .people {
+      justify-content: flex-start;
+      gap: 9px;
+      color: rgba(5,44,35,.68);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .faces {
+      display: flex;
+      padding-left: 6px;
+    }
+
+    .face {
+      width: 27px;
+      height: 27px;
+      margin-left: -7px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 2px solid rgba(249,250,241,.90);
+      color: white;
+      font-size: 8px;
+      font-weight: 850;
+      background: linear-gradient(145deg, #2e795f, #073f30);
+    }
+
+    .face:nth-child(2) { background: linear-gradient(145deg, #8cc9a5, #25624b); }
+    .face:nth-child(3) { background: linear-gradient(145deg, #145544, #032d23); }
+
+    .dark-button {
+      min-width: 118px;
+      padding: 13px 18px;
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 17px;
+      background:
+        radial-gradient(90% 110% at 20% 0%, rgba(20,108,79,.46), transparent 55%),
+        linear-gradient(155deg, #0b4c3a, #052e24);
+      color: white;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 830;
+      box-shadow:
+        0 13px 27px rgba(3,45,34,.25),
+        inset 0 1px rgba(255,255,255,.14),
+        inset 0 -1px rgba(0,0,0,.14);
+    }
+
+    .dark-button span { color: var(--heia-neon); }
+
+    .dark-glass {
+      position: relative;
+      margin-top: 15px;
+      padding: 17px 18px;
+      overflow: hidden;
+      border-radius: 25px;
+      color: white;
+      border: 1px solid rgba(255,255,255,.17);
+      background:
+        radial-gradient(86% 160% at 88% 4%, rgba(2,255,171,.22), transparent 50%),
+        linear-gradient(145deg, rgba(7,68,51,.96), rgba(3,43,33,.94));
+      box-shadow:
+        0 22px 42px rgba(3,51,38,.24),
+        inset 0 1px rgba(255,255,255,.13),
+        inset 0 -1px rgba(0,0,0,.18);
+      backdrop-filter: blur(17px) saturate(120%);
+      -webkit-backdrop-filter: blur(17px) saturate(120%);
+    }
+
+    .dark-glass::before {
+      content: "";
+      position: absolute;
+      width: 190px;
+      height: 190px;
+      right: -92px;
+      top: -92px;
+      border: 1px solid rgba(104,255,207,.15);
+      border-radius: 50%;
+      box-shadow: 0 0 0 28px rgba(104,255,207,.025), 0 0 0 59px rgba(104,255,207,.025);
+    }
+
+    .live-copy {
+      position: relative;
+      z-index: 1;
+    }
+
+    .live-copy small {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: rgba(255,255,255,.68);
+      font-size: 10px;
+      font-weight: 770;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .live-copy strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 20px;
+      letter-spacing: -.5px;
+    }
+
+    .neon-button {
+      position: relative;
+      z-index: 1;
+      min-width: 102px;
+      padding: 13px 16px;
+      border-radius: 16px;
+      background: linear-gradient(145deg, #55ffc5, #02ffab);
+      color: #043428;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 900;
+      box-shadow: 0 10px 26px rgba(2,255,171,.24), inset 0 1px rgba(255,255,255,.48);
+    }
+
+    .moment {
+      margin-top: 15px;
+      padding: 17px 18px 16px;
+      border-radius: 25px;
+    }
+
+    .moment-head strong {
+      font-size: 16px;
+      letter-spacing: -.25px;
+    }
+
+    .moment-head span {
+      padding: 6px 9px;
+      border-radius: 999px;
+      background: rgba(2,255,171,.15);
+      color: #07503d;
+      font-size: 10px;
+      font-weight: 830;
+    }
+
+    .moment-line {
+      position: relative;
+      z-index: 1;
+      height: 48px;
+      margin-top: 15px;
+      overflow: hidden;
+      border-radius: 16px;
+      background: rgba(255,255,255,.28);
+      border: 1px solid rgba(255,255,255,.46);
+    }
+
+    .moment-line svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .tabbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      margin-top: auto;
+      min-height: 76px;
+      padding: 8px 10px;
+      border-radius: 27px;
+      border: 1px solid rgba(255,255,255,.76);
+      background: rgba(249,250,241,.76);
+      box-shadow: 0 18px 42px rgba(5,64,47,.19), inset 0 1px rgba(255,255,255,.84);
+      backdrop-filter: blur(22px) saturate(116%);
+      -webkit-backdrop-filter: blur(22px) saturate(116%);
+    }
+
+    .tab {
+      display: grid;
+      place-items: center;
+      gap: 4px;
+      min-width: 54px;
+      color: rgba(5,44,35,.62);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .tab .icon {
+      width: 25px;
+      height: 25px;
+      display: grid;
+      place-items: center;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 850;
+      border: 1.4px solid currentColor;
+    }
+
+    .tab.active {
+      color: white;
+      margin-top: -25px;
+      min-width: 68px;
+      min-height: 68px;
+      padding: 9px 8px 7px;
+      border-radius: 23px;
+      background: linear-gradient(150deg, #0c513e, #052f25);
+      box-shadow: 0 15px 28px rgba(3,47,35,.27), inset 0 1px rgba(255,255,255,.13);
+    }
+
+    .tab.active .icon {
+      color: var(--heia-neon);
+      border-color: rgba(2,255,171,.72);
+    }
+  </style>
+</head>
+<body>
+  <main class="screen" aria-label="Heia background master">
+    <div class="light-field"></div>
+    <div class="aqua-field"></div>
+    <div class="shadow-field"></div>
+    <div class="light-beam"></div>
+
+    <svg class="pitch-geometry" viewBox="0 0 430 932" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="chalk" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffffff" stop-opacity=".28" />
+          <stop offset=".46" stop-color="#ffffff" stop-opacity=".10" />
+          <stop offset="1" stop-color="#064635" stop-opacity=".16" />
+        </linearGradient>
+        <linearGradient id="inkChalk" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#064635" stop-opacity=".03" />
+          <stop offset=".56" stop-color="#064635" stop-opacity=".14" />
+          <stop offset="1" stop-color="#ffffff" stop-opacity=".08" />
+        </linearGradient>
+      </defs>
+      <ellipse cx="452" cy="384" rx="236" ry="236" fill="none" stroke="url(#chalk)" stroke-width="1.2" />
+      <ellipse cx="452" cy="384" rx="184" ry="184" fill="none" stroke="url(#chalk)" stroke-width=".75" />
+      <path d="M-100 185 C 96 229, 170 112, 510 184" fill="none" stroke="url(#chalk)" stroke-width="1.2" />
+      <path d="M-118 698 C 88 615, 276 738, 531 614" fill="none" stroke="url(#inkChalk)" stroke-width="1.15" />
+      <path d="M-102 728 C 99 650, 278 770, 530 651" fill="none" stroke="url(#inkChalk)" stroke-width=".7" />
+      <path d="M66 -30 L 379 976" fill="none" stroke="url(#chalk)" stroke-width=".7" opacity=".56" />
+      <circle cx="52" cy="675" r="5.5" fill="#ffffff" fill-opacity=".16" stroke="#064635" stroke-opacity=".10" stroke-width="1" />
+    </svg>
+
+    <svg class="grain" aria-hidden="true">
+      <filter id="noise">
+        <feTurbulence type="fractalNoise" baseFrequency="0.78" numOctaves="3" seed="19" stitchTiles="stitch" />
+        <feColorMatrix type="saturate" values="0" />
+      </filter>
+      <rect width="100%" height="100%" filter="url(#noise)" opacity="1" />
+    </svg>
+
+    <div class="vignette"></div>
+
+    <section class="ui" aria-label="Material preview">
+      <div class="status">
+        <span>09:41</span>
+        <div class="status-icons">
+          <span class="signal"><i></i><i></i><i></i><i></i></span>
+          <span>◒</span>
+          <span class="battery"></span>
+        </div>
+      </div>
+
+      <header class="header">
+        <div class="wordmark">HEIA</div>
+        <div class="team">
+          <span>Ridabu G10⌄</span>
+          <div class="avatar">RL</div>
+        </div>
+      </header>
+
+      <div class="eyebrow">Dagslys over banen</div>
+
+      <article class="opal-card hero">
+        <div class="hero-top">
+          <div class="kicker"><i class="dot"></i>Neste kamp</div>
+          <div class="chip">I morgen · 18:00</div>
+        </div>
+
+        <div class="teams">
+          <div class="club"><div class="crest">RID</div>Ridabu</div>
+          <div class="versus"><strong>–</strong><span>Black River Park</span></div>
+          <div class="club"><div class="crest">STO</div>Storhamar</div>
+        </div>
+
+        <div class="hero-actions">
+          <div class="people">
+            <div class="faces"><i class="face">A</i><i class="face">N</i><i class="face">J</i></div>
+            <span>18 kommer</span>
+          </div>
+          <div class="dark-button">Se kampen <span>›</span></div>
+        </div>
+      </article>
+
+      <article class="dark-glass">
+        <div class="hero-top">
+          <div class="live-copy">
+            <small><i class="dot"></i>Live fra laget</small>
+            <strong>Ridabu leder 2–1</strong>
+          </div>
+          <div class="neon-button">HEIA!</div>
+        </div>
+      </article>
+
+      <article class="opal-card moment">
+        <div class="moment-head"><strong>Kampens puls</strong><span>Mest liv nå</span></div>
+        <div class="moment-line">
+          <svg viewBox="0 0 340 48" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="pulseFill" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="#02ffab" stop-opacity=".08" />
+                <stop offset=".62" stop-color="#02ffab" stop-opacity=".28" />
+                <stop offset="1" stop-color="#02ffab" stop-opacity=".10" />
+              </linearGradient>
+            </defs>
+            <path d="M0 33 C27 33 35 13 61 16 C89 19 95 38 121 31 C150 23 161 10 186 19 C211 28 220 38 245 26 C271 14 287 7 340 24 L340 48 L0 48 Z" fill="url(#pulseFill)" />
+            <path d="M0 33 C27 33 35 13 61 16 C89 19 95 38 121 31 C150 23 161 10 186 19 C211 28 220 38 245 26 C271 14 287 7 340 24" fill="none" stroke="#04c98b" stroke-width="1.5" stroke-opacity=".62" />
+          </svg>
+        </div>
+      </article>
+
+      <nav class="tabbar" aria-label="Eksempel på opal navigasjon">
+        <div class="tab"><i class="icon">⌂</i><span>Hjem</span></div>
+        <div class="tab"><i class="icon">□</i><span>Kalender</span></div>
+        <div class="tab active"><i class="icon">▦</i><span>Kamp</span></div>
+        <div class="tab"><i class="icon">○</i><span>Lag</span></div>
+        <div class="tab"><i class="icon">⌁</i><span>Profil</span></div>
+      </nav>
+    </section>
+  </main>
+
+  <script>
+    const mode = new URLSearchParams(location.search).get("view");
+    if (mode === "preview") document.body.classList.add("preview");
+  </script>
+</body>
+</html>

@@ -12,7 +12,12 @@ import {AppState} from 'react-native';
 import {useFocusEffect, useIsFocused} from '@react-navigation/native';
 import {useActiveTeam} from './TeamContext';
 import {useNotifications} from './NotificationsContext';
-import {invalidateLiveMatch, useLiveMatch} from '../lib/queries/liveMatch';
+import {
+  invalidateLiveMatch,
+  refreshLiveMatchIfStale,
+  useLiveMatch,
+} from '../lib/queries/liveMatch';
+import {subscribeToTeamLive} from '../lib/api/feed';
 import {refreshSessionContext} from '../lib/queries/sessionContext';
 import {
   matchButtonState,
@@ -113,9 +118,31 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
     if (matchNonce > 0) invalidateLiveMatch(activeTeamSpaceId);
   }, [matchNonce, activeTeamSpaceId]);
 
+  // S3c: på broadcast-transport erstatter team-kanalens `live`-event
+  // 60 s-pollingen — hver kampsesjons-endring invaliderer nøkkelen, og
+  // `liveMatchPollMs` skrur intervallet av/ned. På pgc er lytteren en ren
+  // no-op og pollingen står som før. Terminal join-nekt → tilbake på
+  // dagens polling for resten av økten (`liveTransportDegraded`).
+  // Invalidering mens du står INNE i kampen (spørringen av) markerer bare
+  // stale — refetchen skjer i det du går ut, nøyaktig som matchNonce-sporet.
+  const [liveTransportDegraded, setLiveTransportDegraded] = useState(false);
+  useEffect(() => {
+    if (!activeTeamSpaceId) return;
+    setLiveTransportDegraded(false);
+    return subscribeToTeamLive(activeTeamSpaceId, {
+      onLive: () => invalidateLiveMatch(activeTeamSpaceId),
+      onResync: () => invalidateLiveMatch(activeTeamSpaceId),
+      // Ren førstejoin: boot-hentingen pågår/landet nettopp — 60 s-porten
+      // gjør dette gratis da, men lukker gap etter lange rejoin-hull.
+      onReady: () => refreshLiveMatchIfStale(activeTeamSpaceId),
+      onDegraded: () => setLiveTransportDegraded(true),
+    });
+  }, [activeTeamSpaceId]);
+
   const {data: liveMatch, isPending} = useLiveMatch(activeTeamSpaceId, {
     appActive,
     inMatch: presence !== null,
+    liveTransportDegraded,
   });
 
   // ⚠️ HANDLINGEN I EN REF, IKKE I STATE. `onPress` er en ny closure hver

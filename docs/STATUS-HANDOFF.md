@@ -1,6 +1,208 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-08-30 — S3a BROADCAST-BACKEND FERDIG: 00080+00081 DEPLOYET, VERIFY 33/33 GRØNT. NESTE: S3b I NY SAMTALE)
+## ▶️▶️ START HER (oppdatert 2026-09-01 — S3c IMPLEMENTERT: feed+varsler+kampknapp → broadcast bak flaggene, 60 s-pollingen gates av; SKALERINGSSPORET PARKERES ETTER TELEFONTEST — NESTE ER DESIGNSPORET)
+
+✅ **S3c (feed + varsler + kampknappen → Broadcast, skaleringsplan v2.1
+§9 S3c) — IMPLEMENTERT 2026-09-01, ÉN ØKT ETTER S3b-MØNSTERET.** Fasit:
+`docs/S3C-BROADCAST-FEED-NOTIF.md`. REN DUAL-RUN — `runtime_config` står
+på pgc for feed/notif, ingen adferd endres før flipp. Innholdet:
+
+- **Delt konvoluttåpner** `broadcastEnvelope.ts` (§1 validering + §2
+  message_id-LRU trukket ut av match-dekoderen — ett hjem for reglene).
+- **Feed**: `subscribeToFeed` velger sti på `realtime_transport.feed`;
+  broadcast = privat `team:{id}`-kanal m/ dekoder
+  (`feedBroadcastDecode.ts`, pgc-paritet inkl. 👏-ekko-filteret);
+  CHANNEL_READY emitter MED VILJE ingenting (ulikt kampens fallback —
+  fokus-broens 60 s-regel dekker vinduet, ellers ett kall per fanebytte);
+  terminal join-nekt → pgc-stien under `feed:{id}` + resync.
+- **Kampknappen**: `subscribeToTeamLive` i MatchButtonContext lytter på
+  team-kanalens `live`-event (deler fysisk kanal med feeden; egen
+  dedupe) → `invalidateLiveMatch` per kampendring. 60 s-pollingen gates
+  av `liveMatchPollMs`: pgc/degradert = 60 s som i dag; broadcast =
+  serverens `live_fallback_poll_s` (0 = av). matchNonce-sporet består.
+- **Varsler**: NotificationsContext velger sti på
+  `realtime_transport.notif`; broadcast = privat `user:{id}`-kanal VIA
+  registryet (race-fiksen/sentinelene gjenbrukt), `notif`-raden går til
+  SAMME handler (badge/nonces/banner er transportblinde); dedupe på
+  message_id; ugyldig konvolutt → fasit-telleren; terminal nekt →
+  pgc-kanalen + resync. `membership_revoked` bindes ikke (senere skive).
+
+**Verifisert:** suite 888/888 (860 + 28 nye: feed-dekoder 12,
+feed/teamLive-bryter 8, notif-bryter 4, poll-gate 4); prettier husstil +
+grep-verifisert.
+
+✅✅ **SKALERINGSSPORET LUKKET 2026-09-02: HELE FLÅTEN PÅ BROADCAST.**
+Brage har flippet alle tre flaggene i prod (match 2026-09-01, feed+notif
+2026-09-02) og prod-smoke-testen er GRØNN uten noen dev-override: feed
+live, badge +1, kampknappen reagerer på mål uten ventetid, bakgrunn→
+forgrunn OK. 60 s-pollingen er dermed død i flåten
+(`live_fallback_poll_s` = 0). Kill-switch består: én UPDATE per felt
+tilbake til `"pgc"` — klientene kan lese begge transporter for alltid
+(dual-run-koden beholdes). S4 (tømme postgres_changes-publikasjonen) er
+gatet på at flaggene står stabilt + gammel-klient-andel ≈ 0 — tas i
+pre-launch-pakken sammen med S5/S6/S8. **Ingen aktiv kø i dette sporet
+lenger.**
+
+🧰 **Designverktøy klargjort 2026-09-02:** `apple-hig-designer`
+(tristan-mcinnis, vurdert i HEIA-VISUAL-HANDOFF §13-tabellen) er nå
+GODKJENT AV BRAGE og installert som prosjektskill i
+`.claude/skills/apple-hig-designer/` — brukes som GUARDRAIL for
+native-proporsjoner (typeskala, 44 pt-mål, tab-bar, konsentriske
+radier) ETTER retningsvalg, aldri som art direction (§13-konklusjonen
+står).
+
+🎨 **DESIGNSPORETS STARTPUNKT (Brage 2026-09-02):**
+`docs/Heia_Design_Master/` — Brages EGEN retning: bakgrunnsmaster
+(`Heia_Background_Master.png` = visuell fasit), materialpreview (KUN
+materialforståelse — aldri kopier layout/ikoner/tekst) og
+`Heia_Claude_Build_Brief.md` med låst palett (heiaNeon `#02FFAB`,
+heiaDeep/Ink, cream-flater, heiaSun kun atmosfærisk), bakgrunns-
+konstruksjon, dynamisk lagfarge-topplag, motion-regler (transform/
+opacity, aldri JS-drevet), materialsystem (opal/silkematt hverdag,
+stadionglass live) og akseptansetest. **Retningsvalget fra §13 er
+dermed GJORT av Brage selv** — lav-fi-canvas-trinnet utgår; §13s
+forbudsliste og kritikkregel («Behance ved siden av Goalify?»)
+gjelder fortsatt. Ny samtale følger briefens egen sisteinstruks:
+(1) inspiser eksisterende bakgrunns-/tema-primitiver og SI hvilke
+filer/tokens som eier Hjem-bakgrunnen i dag, (2) foreslå MINSTE
+REVERSIBLE implementasjon av masteren på ÉN hverdagsskjerm (kun
+bakgrunnslaget + minimal flatetone), (3) INGEN kode før Brage har
+godkjent forslaget, (4) fysisk telefon i lyst og dempet miljø før
+noe spres. RN CLI + eksisterende StyleSheet/tokens.ts — ingen nye
+pakker/kits.
+
+⏸️ **SKALERINGSSPORET PARKERES HER** (Brages beslutning 2026-09-01):
+S4 senere; S5/S6/S8 er pre-launch. **NESTE SPOR: DESIGN** —
+HEIA-VISUAL-HANDOFF.md §13 (design-skill-canvas m/ referanser side om
+side + lav-fi retningsvalg; aldri kode-først).
+
+---
+
+## ✅ S3b LUKKET (tidligere START HER 2026-09-01 — alle porter grønne, committet df8f0d8; flipp-UPDATE for match levert Brage)
+
+✅ **S3b FERDIG 2026-09-01.** Token-refresh-porten (siste S3b-port) er
+bevist grønn på fysisk telefon: `[S3B-TEST] OK`-linjer med nytt
+utløpstidspunkt, og mål/HEIA/bilde/kommentar landet live ETTER refresh
+uten reload. Den midlertidige testblokka i `index.js` er FJERNET (aldri
+committet, som avtalt). Flipp-setningen for KUN
+`realtime_transport.match` → 'broadcast' (jsonb_set på runtime_config,
+kill-switch = samme UPDATE tilbake til 'pgc') er levert til Brage, som
+kjører den selv i SQL-editoren. Neste i denne økta: S3c (feed+varsler →
+broadcast + fjerne 60 s-pollingen, S3b-mønsteret, ÉN stram økt). Etter
+S3c PARKERES skaleringssporet (S4 senere; S5/S6/S8 pre-launch) — tilbake
+til designsporet (HEIA-VISUAL-HANDOFF.md §13).
+
+✅ **S3b-2 (transportbryteren + broadcast-dekoderen) — IMPLEMENTERT
+2026-08-31.** Planen ble godkjent med fire justeringer
+(race-fiks først; dekodetabell på disk som fasit; seq-regelen presisert:
+gap KUN ved INSERT med seq > lastSeq+1, gjenbruk lovlig, dedupe kun på
+message_id; terminal join-feil = CHANNEL_ERROR etter én retry med frisk
+kanal, TIMED_OUT transient). Bygget i én skive etter Brages tempo-beskjed:
+
+- **Race-fiksen (S3b-2a)**: `supabase.channel(topic)` deduper mot
+  klientens liste og ignorerer params; kanalen forlater listen først når
+  leave kvitteres (bevist i RealtimeClient.js 2.100.1). Registryet
+  (`realtimeChannels.ts`) utsetter nå kanalbygging bak pågående riving per
+  topic + `getChannels`-etterkontroll for 'error'-utfallet på leave.
+  Params-støtte (`{config: {private: true}}`) lagt til.
+- **Sentinels**: CHANNEL_READY (ren førstejoin → broadcast-stiens
+  fallback-emit) og CHANNEL_JOIN_ERROR (pre-join CHANNEL_ERROR); pgc- og
+  feed-lyttere ignorerer dem eksplisitt. Aldri READY+RESYNC samtidig.
+- **Fasit på disk**: `docs/S3B2-BROADCAST-DECODE.md` (konvolutt, dedupe,
+  seq-regler, dekodetabell m/ photo/engagement-paritetsfellen,
+  session-stale-vern, nødkanal, porter før flipp).
+- **Dekoderen**: `src/lib/api/matchBroadcastDecode.ts` (rene funksjoner,
+  tilstand per registrering).
+- **Bryteren**: `subscribeToMatch` velger sti på
+  `runtime_config.realtime_transport.match` ved subscribe; pgc-stien
+  bokstavelig uendret (kun topic-parameter + sentinel-vakter); terminal
+  join-feil → pgc-nødkanal `pgc:match:{id}` + én resync. Dev-override
+  `setDevRealtimeTransportOverride` (hard `__DEV__`-gate) for telefontest.
+
+**Verifisert:** full suite 859/859 (835 + 24 nye: race 6, dekoder 12,
+bryter 6); `eventDetailRefetch` kjørt UENDRET som kontraktbevis; prettier
+husstil + grep-verifisert; diff-hunks kun i tilsiktede regioner.
+`runtime_config` urørt (pgc/pgc/pgc) — ingen prod-adferd endret.
+
+**Telefontest 2026-08-31/09-01:** «alt funker på telefon» på broadcast-
+stien (mål/korrigering/bilder/HEIA/kommentarer live, bakgrunn→forgrunn OK).
+Testen avdekket en PRE-EKSISTERENDE visningsbugg (ikke S3b): fritekst på
+«mål imot» ble aldri rendret i kampforløpet — `describeMatchEvent` legger
+teksten i `player` for begge målretninger, men `isGoalThem`-grenen i
+`MatchEventRow` rendret den ikke. FIKSET 2026-09-01 (én fotnote-linje) +
+regresjonsvakt i matchTimeline.test som beviselig feiler uten fiksen.
+Suite nå 860/860.
+
+✅ **Token-refresh-porten BESTÅTT 2026-09-01** (metoden var en
+midlertidig __DEV__-testblokk i `index.js`: tvungen broadcast-transport +
+ekte `refreshSession()` hvert 90. s med `[S3B-TEST]`-logg; blokka er
+fjernet og ble aldri committet). Flippen av KUN
+`realtime_transport.match` gjøres av Brage med én UPDATE i SQL-editoren;
+virker ved neste subscribe, kill-switch = én UPDATE tilbake.
+
+---
+
+## ✅ S3b-1 LUKKET (tidligere START HER 2026-08-31 — WEBSOCKET-EXIT-KRITERIET BEVIST MOT PROD 12/12 GRØNT; S3b-2-planen som omtales under er nå GODKJENT m/ fire justeringer og implementert, se øverst)
+
+✅ **S3b-1 (WS-exit-testen, første del av S3b) — BYGGET, KJØRT MOT PROD
+AV BRAGE OG GODKJENT 2026-08-31: SUM 12/12 GRØNT.** Det obligatoriske
+exit-kriteriet fra 00080-filhodet (ekte private WebSocket-joins med
+`{private: true}` gjennom samme supabase-js som appen) er dermed bevist:
+egne user-/team-/match-kanaler TILLATES (P1–P3); EKTE fremmed lag og
+kamp, tilfeldige uuid-er, søppel-topic og anon mot alle tre familiene
+NEKTES (N1–N6c). Ingen produktkode er endret, runtime_config står
+urørt på pgc/pgc/pgc, dual-run fortsetter.
+
+**Filene (lokale, IKKE committet — klare når Brage sier fra):**
+- `scripts/verify-s3b-ws.mjs` — proberiggen. Brages tre S3b-1-regler er
+  håndhevet: (1) bærende negativ-prober bruker EKTE fremmed
+  teamSpaceId/matchSessionId (env; SQL-oppskrift i filhodet; tilfeldige
+  uuid-er kun som tillegg, og uuid-formatkontroll på env-id-ene så en
+  skrivefeil aldri gir falsk grønn nekt via try_uuid); (2) TIMED_OUT er
+  ALDRI grønn nekt — kun CHANNEL_ERROR MED reason teller, retry med
+  frisk kanal ellers ⚠️ UAVKLART og exit 1, pluss positiv-gate
+  (negativene ugyldiggjøres hvis P1–P3 ikke er grønne i samme kjøring)
+  og OK-dominans (et sikkerhetsbrudd kan aldri maskeres av senere
+  forsøk); (3) ingen credentials/prod-data i logg eller repo — alt via
+  env/.env, all utskrift uuid-maskeres (også server-reasons).
+- `scripts/wsProbeCore.mjs` — probelogikken som rene funksjoner, vaktet
+  av `__tests__/wsProbeCore.test.js` (16 tester som låser reglene over).
+- `jest.config.js` — transform utvidet med `.mjs` (RN-presetens mønster
+  dekker det ikke); spread beholder presetens asset-transformer.
+
+**Verifisert:** nye vakter 16/16; hele suiten 835/835 (819 gamle + 16
+nye, 2 skipped som før). «Worker force exited»-advarselen i noen
+fullkjøringer er FLAKY OG PRE-EKSISTERENDE (reproduserer og forsvinner
+uavhengig av de nye filene) — ikke innført av denne skiva. Prettier
+kjørt med husstil-flaggene, innhold grep-verifisert etterpå.
+
+**Viktige tekniske fakta funnet i S3b-planleggingen (gjelder S3b-2):**
+- supabase-js 2.100.1 vedlikeholder realtime-JWT SELV (accessToken-
+  callback + auth-lytter). SKRIV ALDRI `realtime.setAuth(token)` i
+  appkode — det setter `_manuallySetToken` og skrur av automatikken.
+  Test-mockene har heller ingen `supabase.realtime`.
+- `supabase.channel(topic)` DEDUPLISERER på topic-navn og ignorerer nye
+  params — derfor: registry-nøkkel = topic for begge transporter,
+  transport avgjøres ved FØRSTE acquire; en pgc-nødkanal må hete
+  `pgc:match:{id}`.
+- comment-triggeren dekker soft-delete (AFTER INSERT OR UPDATE OR
+  DELETE, 00080 §8) — intet backend-gap.
+
+▶️ **NESTE: S3b-2 (transportbryteren i `subscribeToMatch` bak
+`runtime_config.match`) — IKKE GODKJENT ENNÅ.** Revidert plan ligger i
+plan-filen fra 2026-08-30-samtalen; de seks revisjonene fra Brage er
+innarbeidet: fetch→subscribe-vinduet lukkes med ett fallback-emit ved
+første SUBSCRIBED (første mottatte sequence kan ikke være baseline
+alene); INGEN delta-resync i første versjon — full debounced resync ved
+konvoluttfeil/gap/reconnect; konvolutt-fixture fullstendig anonymisert;
+obligatorisk fysisk bakgrunn/forgrunn + token-refresh-test FØR
+prod-flaggflipp; re-acquire-racen i kanalregistryet er eksplisitt
+BLOCKER før flagget kan aktiveres. Skjermen røres ikke (unionen er
+sømmen); `eventDetailRefetch`-vaktene kjøres uendret som kontraktbevis.
+
+---
+
+## ✅ S3a BROADCAST-BACKEND (tidligere START HER, 2026-08-30 — 00080+00081 deployet, verify 33/33 GRØNT; S3b-1 er nå også lukket, se øverst)
 
 ✅ **S3a (Broadcast-backend, skaleringsplan v2.1 §1.1–1.3 + §9 S3a) —
 IMPLEMENTERT, DEPLOYET MOT PROD `sswncdrbsrfieudkdmhj` OG VERIFISERT

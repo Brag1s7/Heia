@@ -12,7 +12,18 @@ import {AppState} from 'react-native';
 import {useAuth} from './UserContext';
 import {useActiveTeam} from './TeamContext';
 import {supabase} from '../lib/supabase';
-import {createResyncStatusHandler} from '../lib/realtimeChannels';
+import {
+  acquireChannel,
+  createResyncStatusHandler,
+  isChannelJoinError,
+  isChannelReady,
+  isChannelResync,
+} from '../lib/realtimeChannels';
+import {getRuntimeConfig} from '../lib/runtimeConfig';
+import {
+  createBroadcastDedupe,
+  openBroadcastEnvelope,
+} from '../lib/api/broadcastEnvelope';
 import {
   peekSessionContext,
   pendingSessionContext,
@@ -235,80 +246,155 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
   }, [userId]);
 
   // Live badge (00025). Uten denne kom varselet først ved fanebytte — mens
-  // kampen på Hjem oppdaterte seg selv. Filteret på user_id er ikke bare
-  // effektivitet: RLS ville uansett stoppet andres rader, men da hadde vi
-  // fått tomme events å refetche på.
+  // kampen på Hjem oppdaterte seg selv. S3c: transporten velges av
+  // `runtime_config.realtime_transport.notif` ved subscribe — begge stier
+  // leverer raden til samme handler, så resten av provideren kan ikke
+  // merke byttet. Fasit: docs/S3C-BROADCAST-FEED-NOTIF.md.
   useEffect(() => {
     if (!userId) return;
-    const channel = supabase
-      .channel(`notifications:${userId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${userId}`,
+
+    // Payload-først (B3, P6): badgen teller per lag, og raden bærer
+    // team_space_id (null = globalt systemvarsel, teller i alle lag —
+    // samme scope som getUnreadCount). +1 lokalt; HEAD-spørringen er
+    // henvist til resync-stiene (fokus/forgrunn/reconnect). Mangler
+    // feltene (skjemadrift) → tell fasit (P6s fallback).
+    const handleInsertRow = (row: any) => {
+      if (row?.id == null) {
+        refreshUnreadRef.current();
+      } else if (
+        row.team_space_id == null ||
+        row.team_space_id === activeTeamSpaceIdRef.current
+      ) {
+        setUnreadCount(c => c + 1);
+      }
+      // Nonce-splitten (S1-d): alle varsler driver inboxen, men KUN
+      // kampvarsler skal invalidere livekamp-spørringen.
+      setInboxNonce(n => n + 1);
+      if (row?.category === 'match_live') {
+        setMatchNonce(n => n + 1);
+      }
+      // Står du på kampsiden, ER dette øyeblikket skjermen foran deg
+      // (scoren spretter, forløpet ruller). Demp banneret for den
+      // kampen — badgen/inboxen over er allerede oppdatert.
+      if (
+        row?.category === 'match_live' &&
+        row?.data?.event_id != null &&
+        row.data.event_id === watchedEventRef.current
+      ) {
+        return;
+      }
+      if (row?.id && row?.title) {
+        setBanner({id: row.id, title: row.title, body: row.body ?? ''});
+      }
+    };
+
+    // Resync ved reconnect (B3, P6): kanalen har vært nede → +1-strømmen
+    // kan ha mistet rader. Hent fasit-telleren og dytt BEGGE noncene —
+    // vi kan ikke vite hvilke kategorier som gikk tapt — så en fokusert
+    // inbox drar sin inkrementelle resync (hull-vakten der tar store
+    // gap) og kampknappen henter fasit. Første SUBSCRIBED er IKKE
+    // resync — mount-effekten over har alt hentet telleren.
+    const handleResync = () => {
+      refreshUnreadRef.current();
+      setInboxNonce(n => n + 1);
+      setMatchNonce(n => n + 1);
+    };
+
+    // Dagens postgres_changes-sti — UENDRET oppførsel (dual-run), og
+    // nødkanalen ved terminal broadcast-nekt (topicet `notifications:` kan
+    // aldri kollidere med broadcast-topicet `user:`). Filteret på user_id
+    // er ikke bare effektivitet: RLS ville uansett stoppet andres rader,
+    // men da hadde vi fått tomme events å refetche på.
+    const buildPgcChannel = () => {
+      const channel = supabase
+        .channel(`notifications:${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${userId}`,
+          },
+          payload => {
+            // INSERT-gaten står FØR alt annet (fase A, F16-fiksen):
+            // kanalen lytter på '*', men en UPDATE er «markert som lest» og
+            // en DELETE er opprydding — begge er ekko av noe klienten alt
+            // vet. Kun et NYTT varsel skal koste noe.
+            if (payload.eventType !== 'INSERT') return;
+            handleInsertRow(payload.new as any);
+          },
+        )
+        .subscribe(createResyncStatusHandler(handleResync));
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    };
+
+    if (getRuntimeConfig().realtimeTransport.notif !== 'broadcast') {
+      return buildPgcChannel();
+    }
+
+    // S3c broadcast-sti: privat user-kanal via registryet (race-fiksen og
+    // sentinelene fra S3b-2a gjelder også her). 00080-triggeren fyrer kun
+    // på INSERT og sender hele raden — handleren er identisk. CHANNEL_READY
+    // ignoreres (mount-effekten over har alt hentet telleren, pgc-paritet);
+    // `membership_revoked` konsumeres i en senere skive (configure binder
+    // den ikke). Feildisiplin: én retry med frisk kanal, deretter terminal
+    // → pgc-kanalen over + resync (broadcast kan ha mistet varsler).
+    const dedupe = createBroadcastDedupe();
+    let joinErrors = 0;
+    let downgraded = false;
+    let released = false;
+    let releaseCurrent: () => void = () => {};
+
+    const acquireBroadcast = () =>
+      acquireChannel(
+        `user:${userId}`,
+        (channel, emit) => {
+          channel.on('broadcast', {event: 'notif'}, message => {
+            emit({event: 'notif', payload: (message as any)?.payload});
+          });
         },
         payload => {
-          // INSERT-gaten står FØR alt annet (fase A, F16-fiksen):
-          // kanalen lytter på '*', men en UPDATE er «markert som lest» og en
-          // DELETE er opprydding — begge er ekko av noe klienten alt vet.
-          // Kun et NYTT varsel skal koste noe.
-          if (payload.eventType !== 'INSERT') return;
-
-          const row = payload.new as any;
-
-          // Payload-først (B3, P6): badgen teller per lag, og raden bærer
-          // team_space_id (null = globalt systemvarsel, teller i alle lag —
-          // samme scope som getUnreadCount). +1 lokalt; HEAD-spørringen er
-          // henvist til resync-stiene (fokus/forgrunn/reconnect). Mangler
-          // feltene (skjemadrift) → tell fasit (P6s fallback).
-          if (row?.id == null) {
-            refreshUnreadRef.current();
-          } else if (
-            row.team_space_id == null ||
-            row.team_space_id === activeTeamSpaceIdRef.current
-          ) {
-            setUnreadCount(c => c + 1);
-          }
-          // Nonce-splitten (S1-d): alle varsler driver inboxen, men KUN
-          // kampvarsler skal invalidere livekamp-spørringen.
-          setInboxNonce(n => n + 1);
-          if (row?.category === 'match_live') {
-            setMatchNonce(n => n + 1);
-          }
-          // Står du på kampsiden, ER dette øyeblikket skjermen foran deg
-          // (scoren spretter, forløpet ruller). Demp banneret for den
-          // kampen — badgen/inboxen over er allerede oppdatert.
-          if (
-            row?.category === 'match_live' &&
-            row?.data?.event_id != null &&
-            row.data.event_id === watchedEventRef.current
-          ) {
+          if (released) return;
+          if (isChannelResync(payload)) {
+            handleResync();
             return;
           }
-          if (row?.id && row?.title) {
-            setBanner({id: row.id, title: row.title, body: row.body ?? ''});
+          if (isChannelReady(payload)) return;
+          if (isChannelJoinError(payload)) {
+            if (downgraded) return;
+            joinErrors += 1;
+            if (joinErrors === 1) {
+              releaseCurrent();
+              releaseCurrent = acquireBroadcast();
+              return;
+            }
+            downgraded = true;
+            releaseCurrent();
+            releaseCurrent = buildPgcChannel();
+            handleResync();
+            return;
           }
+          const msg = payload as {event?: unknown; payload?: unknown};
+          if (msg?.event !== 'notif') return;
+          const opened = openBroadcastEnvelope(msg.payload, dedupe);
+          if (opened.outcome === 'duplicate') return;
+          if (opened.outcome === 'invalid') {
+            // Skjemadrift: vi vet et varsel kom, ikke hva — hent fasit.
+            handleResync();
+            return;
+          }
+          handleInsertRow(opened.row);
         },
-      )
-      // Resync ved reconnect (B3, P6): kanalen har vært nede → +1-strømmen
-      // kan ha mistet rader. Hent fasit-telleren og dytt BEGGE noncene —
-      // vi kan ikke vite hvilke kategorier som gikk tapt — så en fokusert
-      // inbox drar sin inkrementelle resync (hull-vakten der tar store
-      // gap) og kampknappen henter fasit. Første SUBSCRIBED er IKKE
-      // resync — mount-effekten over har alt hentet telleren.
-      .subscribe(
-        createResyncStatusHandler(() => {
-          refreshUnreadRef.current();
-          setInboxNonce(n => n + 1);
-          setMatchNonce(n => n + 1);
-        }),
+        {config: {private: true}},
       );
 
+    releaseCurrent = acquireBroadcast();
     return () => {
-      supabase.removeChannel(channel);
+      released = true;
+      releaseCurrent();
     };
   }, [userId]);
 

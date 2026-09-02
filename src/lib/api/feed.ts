@@ -1,7 +1,22 @@
+import type {RealtimeChannel} from '@supabase/supabase-js';
 import {supabase} from '../supabase';
 import {MATCH_STATUS_MAP} from './events';
 import {getUserId, getUserIdOrNull} from './authUser';
-import {acquireChannel, isChannelResync} from '../realtimeChannels';
+import {
+  acquireChannel,
+  isChannelJoinError,
+  isChannelReady,
+  isChannelResync,
+} from '../realtimeChannels';
+import {getRuntimeConfig} from '../runtimeConfig';
+import {
+  createBroadcastDedupe,
+  openBroadcastEnvelope,
+} from './broadcastEnvelope';
+import {
+  createFeedDecodeState,
+  decodeFeedBroadcast,
+} from './feedBroadcastDecode';
 import {primeAvatars} from '../media/avatar';
 import {
   FEED_MEDIA_BUCKET,
@@ -345,6 +360,23 @@ export function subscribeToFeed(
   myUserId: string | undefined,
   onEvent: (event: FeedRealtimeEvent) => void,
 ): () => void {
+  if (getRuntimeConfig().realtimeTransport.feed === 'broadcast') {
+    return subscribeToFeedBroadcast(teamSpaceId, myUserId, onEvent);
+  }
+  return subscribeToFeedPgc(teamSpaceId, myUserId, onEvent);
+}
+
+/**
+ * Dagens postgres_changes-sti — UENDRET oppførsel (dual-run-kontrakten).
+ * Topicet `feed:{teamSpaceId}` kolliderer aldri med broadcast-stiens
+ * `team:{teamSpaceId}`, så den er også nødkanalen ved terminal join-nekt —
+ * ingen prefiks-variant trengs (jf. `pgc:match:{id}`-regelen for kamp).
+ */
+function subscribeToFeedPgc(
+  teamSpaceId: string,
+  myUserId: string | undefined,
+  onEvent: (event: FeedRealtimeEvent) => void,
+): () => void {
   const classifyReaction = (
     row: any,
     delta: 1 | -1,
@@ -436,11 +468,202 @@ export function subscribeToFeed(
     payload => {
       if (isChannelResync(payload)) {
         onEvent({kind: 'resync'});
-      } else {
-        onEvent(payload as FeedRealtimeEvent);
+        return;
       }
+      // Broadcast-sentinelene: pgc-atferden ved første join (ingen emit)
+      // og ved join-feil (phoenix' egen rejoin) er uendret.
+      if (isChannelReady(payload) || isChannelJoinError(payload)) {
+        return;
+      }
+      onEvent(payload as FeedRealtimeEvent);
     },
   );
+}
+
+// Broadcast-eventene 00080-triggerne sender på team:{teamSpaceId}. Delt
+// mellom feed- og live-lytteren: registryets configure settes av FØRSTE
+// acquire for topicet, så begge må binde hele settet — hver lytter dekoder
+// uavhengig med egen tilstand.
+const TEAM_BROADCAST_EVENTS = [
+  'feed_post',
+  'reaction',
+  'comment',
+  'live',
+] as const;
+
+function configureTeamBroadcast(
+  channel: RealtimeChannel,
+  emit: (payload: unknown) => void,
+): void {
+  for (const name of TEAM_BROADCAST_EVENTS) {
+    channel.on('broadcast', {event: name}, message => {
+      emit({event: name, payload: (message as any)?.payload});
+    });
+  }
+}
+
+/**
+ * Broadcast-stien (S3c). Privat team-kanal (join-policyen fra 00080
+ * håndhever medlemskap), DB-triggerne er eneste avsender. Skjermkontrakten
+ * er identisk med pgc-stien.
+ *
+ * CHANNEL_READY ignoreres MED VILJE (ulikt kampens fallback-emit, fasiten
+ * §2): feeden har ingen seq-baseline å etablere, abonnementet er
+ * fokus-bundet, og pgc har heller ingen emit ved første join —
+ * fetch→join-vinduet dekkes av fokus-broens 60 s-regel, som i dag. En
+ * refetch her ville kostet ett kall per fanebytte.
+ *
+ * Feildisiplin (S3b-mønsteret): CHANNEL_ERROR før første join → én retry
+ * med frisk kanal, deretter terminal → pgc-stien over + én resync.
+ */
+function subscribeToFeedBroadcast(
+  teamSpaceId: string,
+  myUserId: string | undefined,
+  onEvent: (event: FeedRealtimeEvent) => void,
+): () => void {
+  const state = createFeedDecodeState();
+  let joinErrors = 0;
+  let downgraded = false;
+  let released = false;
+  let releaseCurrent: () => void = () => {};
+
+  const listener = (payload: unknown) => {
+    if (released) return;
+    if (isChannelResync(payload)) {
+      onEvent({kind: 'resync'});
+      return;
+    }
+    if (isChannelReady(payload)) {
+      return; // se dokumentasjonen over — bevisst ingen emit
+    }
+    if (isChannelJoinError(payload)) {
+      handleJoinError();
+      return;
+    }
+    const msg = payload as {event?: unknown; payload?: unknown};
+    if (typeof msg?.event !== 'string') return;
+    for (const evt of decodeFeedBroadcast(
+      msg.event,
+      msg.payload,
+      myUserId,
+      HEIA_EMOJI,
+      state,
+    )) {
+      onEvent(evt);
+    }
+  };
+
+  const acquireBroadcast = () =>
+    acquireChannel(`team:${teamSpaceId}`, configureTeamBroadcast, listener, {
+      config: {private: true},
+    });
+
+  const handleJoinError = () => {
+    if (released || downgraded) return;
+    joinErrors += 1;
+    if (joinErrors === 1) {
+      releaseCurrent();
+      releaseCurrent = acquireBroadcast();
+      return;
+    }
+    // Terminal nekt: over på dagens transport, og hent alt friskt —
+    // broadcast kan ha mistet hendelser siden join-forsøket.
+    downgraded = true;
+    releaseCurrent();
+    releaseCurrent = subscribeToFeedPgc(teamSpaceId, myUserId, onEvent);
+    onEvent({kind: 'resync'});
+  };
+
+  releaseCurrent = acquireBroadcast();
+  return () => {
+    released = true;
+    releaseCurrent();
+  };
+}
+
+/** Kampknappens kroker mot team-kanalens `live`-event (S3c). */
+export interface TeamLiveHandlers {
+  /** En kampsesjon endret seg (mål/status/klokke) — hent fasit. */
+  onLive: () => void;
+  /** Kanalen har vært nede — hendelser kan være tapt, hent fasit. */
+  onResync: () => void;
+  /** Ren førstejoin — lukk fetch→join-vinduet med 60 s-porten. */
+  onReady: () => void;
+  /** Terminal join-nekt — kampknappen må tilbake på pollingen. */
+  onDegraded: () => void;
+}
+
+/**
+ * Kampknappens lytter på team-kanalens `live`-event (S3c) — det som
+ * erstatter 60 s-pollingen i `MatchButtonContext` (skaleringsplan §9 S3c).
+ *
+ * På pgc-transport en ren no-op: da finnes ingen team-kanal, og knappen
+ * beholder dagens polling (som `liveMatchPollMs` også vet). På broadcast
+ * deles den fysiske kanalen med feed-lytteren (samme topic + configure);
+ * denne har egen dedupe-tilstand og bryr seg kun om `live`. En ugyldig
+ * konvolutt (skjemadrift) behandles som `live` — signalet er uansett bare
+ * «hent fasit», og payloaden appliseres aldri direkte.
+ *
+ * Feildisiplin: som feed-stien, men terminal nekt har ingen pgc-tvilling å
+ * falle til — `onDegraded` sier fra så pollingen gjenopptas.
+ */
+export function subscribeToTeamLive(
+  teamSpaceId: string,
+  handlers: TeamLiveHandlers,
+): () => void {
+  if (getRuntimeConfig().realtimeTransport.feed !== 'broadcast') {
+    return () => {};
+  }
+  const dedupe = createBroadcastDedupe();
+  let joinErrors = 0;
+  let degraded = false;
+  let released = false;
+  let releaseCurrent: () => void = () => {};
+
+  const acquire = () =>
+    acquireChannel(
+      `team:${teamSpaceId}`,
+      configureTeamBroadcast,
+      payload => {
+        if (released) return;
+        if (isChannelResync(payload)) {
+          handlers.onResync();
+          return;
+        }
+        if (isChannelReady(payload)) {
+          handlers.onReady();
+          return;
+        }
+        if (isChannelJoinError(payload)) {
+          if (degraded) return;
+          joinErrors += 1;
+          if (joinErrors === 1) {
+            releaseCurrent();
+            releaseCurrent = acquire();
+            return;
+          }
+          degraded = true;
+          releaseCurrent();
+          handlers.onDegraded();
+          return;
+        }
+        const msg = payload as {event?: unknown; payload?: unknown};
+        if (msg?.event !== 'live') return;
+        if (
+          openBroadcastEnvelope(msg.payload, dedupe).outcome === 'duplicate'
+        ) {
+          return;
+        }
+        handlers.onLive();
+      },
+      {config: {private: true}},
+    );
+
+  releaseCurrent = acquire();
+  return () => {
+    released = true;
+    releaseCurrent();
+  };
 }
 
 /**
@@ -596,14 +819,12 @@ export async function createImagePost({
     throw postError;
   }
 
-  const {error: attachError} = await supabase
-    .from('media_attachments')
-    .insert({
-      media_id: mediaId,
-      entity_type: 'feed_post',
-      entity_id: postRow.id,
-      sort_order: 0,
-    });
+  const {error: attachError} = await supabase.from('media_attachments').insert({
+    media_id: mediaId,
+    entity_type: 'feed_post',
+    entity_id: postRow.id,
+    sort_order: 0,
+  });
   if (attachError) {
     throw attachError;
   }

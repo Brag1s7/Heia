@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1290" height="2796" viewBox="0 0 1290 2796">
+  <defs>
+    <linearGradient id="base" x1="106" y1="90" x2="1175" y2="2692" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9FFFD8"/>
+      <stop offset="0.25" stop-color="#26F5AD"/>
+      <stop offset="0.52" stop-color="#02FFAB"/>
+      <stop offset="0.76" stop-color="#31DCC9"/>
+      <stop offset="1" stop-color="#0E7560"/>
+    </linearGradient>
+    <radialGradient id="sunField" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(115 860) rotate(18) scale(870 940)">
+      <stop offset="0" stop-color="#CFFF74" stop-opacity="0.66"/>
+      <stop offset="0.40" stop-color="#B5FF6B" stop-opacity="0.30"/>
+      <stop offset="0.78" stop-color="#B5FF6B" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="mintLift" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(80 -70) rotate(49) scale(1070 900)">
+      <stop offset="0" stop-color="#AEFFDE" stop-opacity="0.96"/>
+      <stop offset="0.38" stop-color="#70FFCD" stop-opacity="0.72"/>
+      <stop offset="0.68" stop-color="#48F2B8" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#48F2B8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="topDepth" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1320 -55) rotate(139) scale(820 850)">
+      <stop offset="0" stop-color="#063A2D" stop-opacity="0.23"/>
+      <stop offset="0.48" stop-color="#063A2D" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#063A2D" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="neonField" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(-30 1650) rotate(-10) scale(1140 1450)">
+      <stop offset="0" stop-color="#02FFAB" stop-opacity="1"/>
+      <stop offset="0.42" stop-color="#02FFAB" stop-opacity="0.91"/>
+      <stop offset="0.72" stop-color="#24FFB8" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#24FFB8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="aquaField" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1340 1270) rotate(173) scale(1010 1240)">
+      <stop offset="0" stop-color="#65E7DD" stop-opacity="0.95"/>
+      <stop offset="0.44" stop-color="#39D7C4" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#39D7C4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="deepField" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1240 2815) rotate(-118) scale(770 900)">
+      <stop offset="0" stop-color="#063A2D" stop-opacity="0.43"/>
+      <stop offset="0.5" stop-color="#063A2D" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#063A2D" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.43" stop-color="#FFFFFF" stop-opacity="0.34"/>
+      <stop offset="0.58" stop-color="#F8FFF9" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="chalk" x1="-100" y1="150" x2="1390" y2="2600" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.30"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#063A2D" stop-opacity="0.16"/>
+    </linearGradient>
+    <linearGradient id="inkChalk" x1="-100" y1="2300" x2="1450" y2="1400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#063A2D" stop-opacity="0.025"/>
+      <stop offset="0.58" stop-color="#063A2D" stop-opacity="0.145"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.08"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(645 1280) rotate(90) scale(1900 1100)">
+      <stop offset="0.62" stop-color="#063A2D" stop-opacity="0"/>
+      <stop offset="1" stop-color="#063A2D" stop-opacity="0.075"/>
+    </radialGradient>
+    <filter id="blur80" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="80"/></filter>
+    <filter id="blur52" x="-30%" y="-50%" width="160%" height="200%"><feGaussianBlur stdDeviation="52"/></filter>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="19" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="table" tableValues="0 0.055"/></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="1290" height="2796" fill="url(#base)"/>
+  <rect width="1290" height="2796" fill="url(#sunField)"/>
+  <rect width="1290" height="2796" fill="url(#mintLift)"/>
+  <rect width="1290" height="2796" fill="url(#topDepth)"/>
+  <rect width="1290" height="2796" fill="url(#neonField)"/>
+  <rect width="1290" height="2796" fill="url(#aquaField)"/>
+
+  <ellipse cx="-145" cy="1670" rx="690" ry="1010" fill="#02FFAB" fill-opacity="0.33" filter="url(#blur80)"/>
+  <ellipse cx="1425" cy="1230" rx="480" ry="740" fill="#65E7DD" fill-opacity="0.38" filter="url(#blur80)"/>
+  <ellipse cx="1290" cy="2800" rx="540" ry="430" fill="#063A2D" fill-opacity="0.24" filter="url(#blur80)"/>
+
+  <path d="M-260 490 L1390 170 L1470 730 L-190 880 Z" fill="url(#beam)" opacity="0.76" filter="url(#blur52)"/>
+
+  <g fill="none" opacity="0.86">
+    <ellipse cx="1355" cy="1140" rx="710" ry="710" stroke="url(#chalk)" stroke-width="3.4"/>
+    <ellipse cx="1355" cy="1140" rx="554" ry="554" stroke="url(#chalk)" stroke-width="2"/>
+    <path d="M-300 555 C288 685 510 330 1530 545" stroke="url(#chalk)" stroke-width="3.2"/>
+    <path d="M-350 2080 C265 1835 830 2180 1595 1810" stroke="url(#inkChalk)" stroke-width="3.2"/>
+    <path d="M-355 2170 C300 1935 835 2290 1600 1920" stroke="url(#inkChalk)" stroke-width="1.9"/>
+    <path d="M190 -120 L1135 2925" stroke="url(#chalk)" stroke-width="1.8" opacity="0.52"/>
+    <circle cx="155" cy="2024" r="17" fill="#FFFFFF" fill-opacity="0.14" stroke="#063A2D" stroke-opacity="0.10" stroke-width="2.5"/>
+  </g>
+
+  <rect width="1290" height="2796" fill="url(#deepField)"/>
+  <rect width="1290" height="2796" fill="url(#vignette)"/>
+  <rect width="1290" height="2796" filter="url(#grain)" opacity="0.72" style="mix-blend-mode:multiply"/>
+</svg>
