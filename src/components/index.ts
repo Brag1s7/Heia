@@ -17,7 +17,7 @@ export {CalendarNav} from './calendar/CalendarNav';
 export {DayCell, DOT_COLOR} from './calendar/DayCell';
 export {useReducedMotion} from './useReducedMotion';
 export {TournamentDayCard} from './TournamentDayCard';
-export {FeedCard} from './FeedCard';
+export {FeedCard, FEED_OPAL_AB} from './FeedCard';
 export {StatusPill} from './StatusPill';
 export {TeamBadge} from './TeamBadge';
 export {ScoreChip} from './ScoreChip';
@@ -47,6 +47,13 @@ export {StadiumSurface} from './StadiumSurface';
 // Stadionglasset — materialprototype (kamp-grenen i NextEventHero bak
 // NEXT_MATCH_GLASS_AB) + systembryterne materialet svarer på.
 export {StadiumGlass} from './StadiumGlass';
+export {OpalSurface, OPAL} from './OpalSurface';
+export {
+  LiquidGlassSurface,
+  FEED_LIQUID_GLASS_AB,
+  LIQUID_GLASS_SUPPORTED,
+  GLASS,
+} from './LiquidGlassSurface';
 export {useMaterialAccessibility} from './useMaterialAccessibility';
 export {BootScreen} from './BootScreen';
 export {HeroSurface} from './HeroSurface';

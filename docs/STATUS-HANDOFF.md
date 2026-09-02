@@ -1,6 +1,253 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-02 kveld — DESIGNSPORET: skive 1B StadiumGlass på kommende kamp TELEFONGODKJENT og committet, `NEXT_MATCH_GLASS_AB` STÅR PÅ; neste = OPALMATERIALET på hverdagsflatene i NY samtale, IKKE startet)
+## ▶️▶️ START HER (oppdatert 2026-09-02 sen kveld — LIQUID GLASS: ekte native iOS 26-glass bak FeedCard BYGGET, IKKE bygget til telefon, IKKE committet)
+
+🫧 **LIQUID GLASS-PROTOTYPEN — `LiquidGlassSurface` (JS) + `HeiaLiquidGlassView`
+(native ObjC, `UIGlassEffect`) bak `FEED_LIQUID_GLASS_AB = true`. BYGGET
+2026-09-02 (sen kveld), UKOMMITTERT, ALDRI KJØRT PÅ TELEFON.** Brage
+opphevet blur-sperren for AKKURAT denne flaten etter opal runde 2 (kjølig
+perlegrå, 0,92/0,87, kantpar, diagonal sheen — også ukommittert, ligger i
+`OpalSurface.tsx`): telefonen leste fortsatt «lys mint/hvit flate, ikke
+Liquid Glass». Ingen flere SVG-varianter — dommen er at flat SVG-maling
+ikke kan gi blur/refraksjon.
+
+FORUTSETNINGENE (sjekket): Xcode 26.6, iOS-SDK 26.5, Brages iPhone 15 på
+iOS 26.6, RN 0.83.1 med `RCTLegacyViewManagerInteropComponentView` i Pods →
+en legacy `RCTViewManager` går gjennom interop-laget UTEN codegen, UTEN ny
+pakke og UTEN pod install. Native-filene (syntaks-sjekket mot iOS 26.5-SDK +
+Pods-headere med clang -fsyntax-only: begge OK, `UIGlassEffect`-API-et
+kompilerer).
+
+FILENE: NYE `ios/Heia2/HeiaLiquidGlassView.h/.m` (UIView med
+`UIVisualEffectView` + `UIGlassEffect` iOS 26, `tintColor` = nøytral
+grå/mint rgba(214,232,224,0,32), `interactive` = systemets trykkrespons,
+AV under Reduce Motion; ÉN delt `CAGradientLayer`-sheen hvit 0,18→0
+diagonalt som glir 10/6 pt + demper til 0,7 ved press, 280 ms ease-out,
+kun opacity under Reduce Motion; ingen loop; RN-barna holdes over glasset
+via `didUpdateReactSubviews`/`didAddSubview`), `HeiaLiquidGlassViewManager.m`
+(`RCT_EXPORT_MODULE(HeiaLiquidGlassView)`, props cornerRadius/glassTint/
+pressed), registrert i `project.pbxproj` (Heia2-gruppa + Sources, plutil
+OK). NY `src/components/LiquidGlassSurface.tsx`: `requireNativeComponent`
+KUN når iOS-major ≥ 26; ellers og under Reduce Transparency →
+`OpalSurface` (solid fallback). Padding-boks identisk (1 pt gjennomsiktig
+kant + radius xl). ENDRET `FeedCard.tsx`: opal-grenen bruker
+`LiquidGlassSurface` (blekket er fortsatt OPAL.ink*, inkl. nytt
+`inkTertiary` på tidsstempel/⋯), `index.ts` eksporterer. Urørt: bakgrunn
+(LÅST), layout, innhold, tokens, StadiumGlass, compose, Lagkassa.
+Verifisert: feedOpal 16/16, eslint rent. Ikke kjørt: full suite, tsc.
+
+RUNDE 2 (Brage etter telefon: «veldig nærme, men stabelen for mintgrønn og
+monokrom — bakgrunnen eier minten»): tint byttet fra mint
+rgba(214,232,224,0,32) til nesten fargeløs perlegrå rgba(233,235,234,0,26)
+(`GLASS.tint` + native default), glasset LÅST til lys appearance
+(`overrideUserInterfaceStyle` på view + effectView) så Dark Mode ikke gjør
+glasset mørkt under mørkt blekk. Sjekket: ingen OpalSurface-base eller
+FeedCard-bakgrunn bak/over glasset (`cardOpal` = kun padding). Skal testes
+i lys OG Dark Mode på telefonen.
+
+RUNDE 3 (Brage etter telefon: «veldig nærme, men fortsatt for mye
+mint/neon, leser som mintfarget plast»): KUN tint-alfa, samme nøytrale
+perlegrå: 0,26 → 0,34 (`GLASS.tint` + native default). Brage ba om «øk
+til 0,26», men 0,26 sto allerede i treet fra runde 2 — så 0,34 er det
+reelle neste steget; om telefonen viste en eldre bundle, sett tilbake til
+0,26. Ingen andre lag rørt. Mål i hvile: ~75 % perle / 25 % grunn, grunnen
+beveger seg fortsatt gjennom ved scroll. Test lys + Dark Mode.
+
+✅ TINT 0,34 TELEFONGODKJENT (Brage 2026-09-02 kveld). RUNDE 4 = TRYKK-
+RESPONSEN (Brage: «merkes ikke på fysisk iPhone»). ÅRSAK FUNNET, to lag:
+(1) `UIGlassEffect.interactive` får aldri touch — RN-barna dekker flaten,
+hit-testen stopper i RN-viewet, effektviewet har userInteractionEnabled NO,
+og Apple har ingen API for å utløse responsen; (2) `pressed`-propen fra JS
+finnes bare på kort med Pressable, og `TeamHomeScreen` gir FeedCard
+`onPress` KUN for kampposter (matchId) — vanlige poster har ingen
+Pressable, så sheen-responsen kjørte aldri der, og på kampkortene var den
+for svak (sheen 0,18 × 0,7). LØSNING (kun `HeiaLiquidGlassView.m`, ingen
+JS-endring): én `UILongPressGestureRecognizer` med minimumPressDuration 0
+på native-viewet (RN sin RCTSurfaceTouchHandler har cancelsTouchesInView
+NO og canPreventGestureRecognizer NO → piller/⋯/kommentar virker som før;
+delegate sier ja til samtidig gjenkjenning med ScrollView-pan). Touch-down
+→ 120 ms: `_lightView` (hvit) alfa 0 → 0,12 + sheen glir 14/8 pt;
+bevegelse > 12 pt (scroll) eller slipp/avbrudd → 260 ms tilbake. UIView-
+animasjon med BeginFromCurrentState = avbrytbar. Reduce Motion → kun lyset
+(opacity), ingen gliding. Ingen loop, ingen haptikk. JS-`pressed`
+(kampkortene) OR-es inn i samme tilstand. Syntaks-sjekket OK. KJENT
+BIVIRKNING (bevisst, vurderes på telefon): et trykk på en pille inne i
+kortet lyser også glasset svakt — touchen er fysisk på glasset.
+RUNDE 5 (Brage: responsen synes, men «altfor svakt»): lys 0,12 → 0,28,
+sheen-gliding 14/8 → 26/16 pt, NYTT innoverskyv 0,975 som
+`self.layer.sublayerTransform` (skalerer glass + RN-barn rundt senter uten
+å røre viewets frame som interop-laget eier), slipp 0,26 → 0,30 s. Reduce
+Motion → fortsatt kun lyset.
+RUNDE 6 (Brage: «fremdeles nesten ikke synlig, boksen burde bevege seg»):
+skala 0,96 + 2 pt ned (sublayerTransform), lys 0,30. HUSK: .m-endringer
+krever Cmd+R i Xcode — Metro-reload tar dem IKKE med. Om det fortsatt er
+svakt ETTER nativt bygg, virker ikke sublayerTransform under interop-laget
+→ flytt skalaen til `self.transform` (RN setter frame kun ved relayout).
+RUNDE 7 (Brage hadde glemt nativt bygg; runde 6 sett ekte = «altfor mye»):
+lys 0,16, skala 0,98, 1 pt ned, sheen 18/10. sublayerTransform VIRKER under
+interop-laget (bevist av runde 6). Alle tallene er `kPress*` øverst i
+`HeiaLiquidGlassView.m`.
+✅ RUNDE 7 TELEFONGODKJENT (Brage: «funker veldig bra»).
+
+KORT-TRYKK = KOMMENTARTRÅDEN (Brage: glassresponsen lover en side):
+`TeamHomeScreen` gir nå FeedCard `onPress` for ALLE poster — kampposter →
+kampen som før, alle andre → `Comments` (samme mål som «Kommenter»-pillen).
+
+KOMMENTARSIDEN I SAMME VERDEN (Brage: «detaljsiden fra griden, ikke egen
+skive»): `CommentsScreen` legger `DaylightGround` bak; `CommentThread`
+(delt med bunnarket i kampskjermen!) tegner innlegget i `LiquidGlassSurface`
+(ikke trykkbart), replikkene som lys frost UTEN blur (hvit 0,62 + hvit kant
+0,78, chat-hjørnet beholdt — ett blur-lag per boble er dyrt og lyse
+translusente flater skal ikke stables), komponeringslinja som glass med
+`cornerRadius={0}` (ny valgfri prop på LiquidGlassSurface, sendes til
+native), feltet som blekkvask 0,06, OPAL.ink* på tid/⋯/pilletekst/tom-
+tekst. Send-knappen er den delte `Button`. ÅPENT: bunnarket i kampskjermen
+får samme glass/frost over sin egen bakgrunn — sjekk der også; Android/RT
+får komponeringslinja som OpalSurface med radius xl (fallback, ikke
+telefontestet).
+
+✅ KOMMENTARSIDEN TELEFONGODKJENT (Brage 2026-09-02 sen kveld: «ser
+veldig bra ut»). HELE GLASS-SKIVA ER DERMED TELEFONGODKJENT — men
+UKOMMITTERT, og zz-riggfilene ligger fortsatt i treet.
+
+▶️ **NESTE SAMTALE — START HER:**
+1. FØRST: `git status` → slett `__tests__/zz_opal_rig.test.tsx` og
+   `src/components/zz_FeedCardHead.tsx` → commit HELE skiva (lysfelt-grunn,
+   opal runde 2, LiquidGlassSurface + native HeiaLiquidGlassView + pbxproj,
+   trykkrespons, kort-trykk → kommentarer, kommentarsiden i glass, handoff).
+   Full suite + eslint før commit (ikke kjørt siden riggen). Ikke push uten
+   at Brage sier det.
+2. SÅ, to flater i samme materialsystem (Brages retning, ordrett):
+   • **Compose-boksen** («Del noe med laget …»): «tynt, lyst og nøytralt
+     kontrollglass». Den er i dag HELHVIT og skriker mellom glasskortene.
+     Tynnere enn feedglasset: lavere tint-alfa / evt. `.clear`-stil, ingen
+     trykkrespons på boksen (feltet og kameraknappen er kontrollene).
+   • **Festet VIKTIG-kort**: «varmere og mer solid opalglass med gul aksent —
+     ikke mørkt og ikke identisk med vanlige feedkort». Solid = høyere
+     tint-alfa i en VARM perle (ikke krem-fyll), gul aksent = VIKTIG-pillen +
+     evt. varm kantlys; fortsatt glass, ikke `cardSun`-papir.
+   Metode: inspiser → foreslå tall (tint/alfa per flate som egne
+   `GLASS`-varianter, ikke nye komponenter) → Brage godkjenner → kode →
+   fysisk iPhone i lys + Dark Mode. Skillene: `apple-hig-designer` +
+   emilkowalski/skills `apple-design` (curl raw) FØR forslaget. Ingen rigg.
+3. Åpne rester: bunnarket i kampskjermen deler `CommentThread` (sjekk der);
+   Android/RT-fallback for komponeringslinja; skygge under feedglasset og
+   vekt-bump på tekst (Emil-linsa); token-promotering + fjerning av
+   `DAYLIGHT_GROUND_AB`/`NEXT_MATCH_GLASS_AB`/`FEED_OPAL_AB`/
+   `FEED_LIQUID_GLASS_AB` i egen skive.
+
+▶️ **(historikk) NESTE (Brage, fysisk iPhone):** native kode krever NATIVT BYGG — Metro-
+reload holder ikke. Åpne `ios/Heia2.xcworkspace`, velg iPhone, Cmd+R (ingen
+pod install nødvendig). Sjekk: (1) at kortet faktisk viser blur/refraksjon
+av lysfeltet under (scroll — grunnen skal flytte seg BAK glasset); (2)
+tekst lesbar i tekstsonen; (3) press på kortet: systemets glassrespons +
+sheen som glir; (4) Reduce Transparency → opal solid; Reduce Motion →
+ingen gliding; (5) reaksjonspiller/⋯/kommentar trykkbare. FEIL-SCENARIER:
+«Unimplemented component: HeiaLiquidGlassView» = interop-laget fant ikke
+view manageren (sjekk at .m-filene er i target Heia2 → Build Phases →
+Compile Sources); glasset usynlig = barna dekker det (sjekk
+`didUpdateReactSubviews`); dobbel trykkrespons = sett `interactive = NO` i
+`makeEffect`. Deretter: dom → tune tint/sheen i `HeiaLiquidGlassView.m` +
+`GLASS.tint` → SLETT `zz_opal_rig.test.tsx` og `zz_FeedCardHead.tsx` →
+commit (opal runde 2 + glass sammen). emilkowalski/skills `apple-design` (BRAGE 2026-09-02: SKAL ALLTID BRUKES
+SAMMEN MED `apple-hig-designer` i hver designskive — hent rått fra main med
+curl; eldre «kun review/AVVIS»-dom lenger ned er OVERSTYRT): vibrancy over glass = mørkere, litt tyngre
+tekst (vi har OPAL.ink*; vekt-bump er åpen), større flater = tykkere
+materiale + dypere skygge (skygge under glass er ikke lagt — åpen),
+aldri to lyse translusente flater oppå hverandre (pillene er blekkvask,
+OK), ingen langsomme løkker (ingen).
+
+---
+
+## 🎨 Opalskiva runde 1 (tidligere START HER 2026-09-02 natt — riggverk-rendret, overkjørt av runde 2 + Liquid Glass over)
+
+🎨 **OPALSKIVA — `OpalSurface` på ikke-festede FeedCards bak
+`FEED_OPAL_AB = true`. BYGGET 2026-09-02 (natt), UKOMMITTET. De sju
+riggbildene er levert Brage (SendUserFile + scratchpad/opal/lever-*.png).
+Ingen telefontest ennå. Arbeidstreet er IKKE rent — se lista under.**
+
+Filer: NYE `src/components/OpalSurface.tsx` (én konsument, `OPAL`-konstant
+med alle tall) og `__tests__/feedOpal.test.tsx` (16: kontrastvakt mot MÅLT
+svakeste grunn, bryter, padding-boks, Android-vakt, RT/IC). ENDRET
+`FeedCard.tsx` (bryteren; opal-gren for ikke-festede kort; lokalt blekk
+`OPAL.inkSecondary` på pilletekst + kommentarikon og `OPAL.inkAccent` på
+rolle-pillen) og `index.ts` (eksporter). MIDLERTIDIG — SLETTES FØR COMMIT:
+`__tests__/zz_opal_rig.test.tsx` (RN→HTML-riggen) og
+`src/components/zz_FeedCardHead.tsx` (HEAD-kopi av FeedCard = ekte «før»
+uten testkroker i produktkoden). Urørt: compose, Lagkassa, HeroSurface,
+Card, StadiumSurface, tokens, typografi, layout, laghodet, tab-baren.
+Festede VIKTIG-kort er solide (cardSun) som før. Verifisert: suite 938/938
+(inkl. riggen), eslint rent, prettier husstil (timeAgo-blokken i FeedCard
+er tilbakestilt til HEAD-format så diffen er kun opal).
+
+Materialet (`OPAL`): base lineær #FBF9F0 → #F7F5E9 (0,55) → #F4F5E8 ved
+opasitet 0,90 (Reduce Transparency → 1 + solid #F7F5E9-bunn); sheen hvit
+0,22 radial fra øvre venstre; neon-opptak 0,05 nederst høyre; 1 pt
+topphøylys 0,55; KANTLYS = 1 pt ring UTENFOR border-boksen (egen svg med
+−1 pt innrykk, strøk 2 pt sentrert på svg-kanten, rx 25) hvit 0,85 → 0,30
+→ 0 nederst — riggen beviste at en hvit linje INNENFOR en L* 96-flate er
+usynlig på lys grunn (ΔL* ≈ 3), så lyset må ligge på kanten mot grunnen;
+Increase Contrast → uniform blekk-hårlinje #08392E 0,35, høylys av, halve
+reflekser; `boxShadow` 0/8/24 rgba(11,59,42,0.20) på ytterboksen, INGEN
+elevation/shadow*. Padding-boksen er identisk med `styles.card` (innerboks
+1 pt gjennomsiktig kant + padding xl). 0,90 mot 0,92 = ΔL* 0,3, ikke synlig
+— 0,90 anbefalt. Trykk = heiaSoft på innerboksen som før.
+
+KONTRASTPORTEN (målt på riggpiksler; svakeste grunn = #0E6656 nederst til
+høyre rett over tab-baren): flaten #D6E8D9 → inkSecondary 5,29 /
+textPrimary 12,7; inne i reaksjonspillen #D3E8D7 → 5,25; pillen hypotetisk
+i mørkeste hjørne 4,72; rolle-pill (heiaSoft) → inkAccent 5,02. Tokenene
+ville gitt 4,0 (flate) / 3,6 (pill) for textSecondary og 4,05 for heiaInk
+→ derfor lokalt blekk (#4C6054, #066A4E), ETTER at materialet var justert
+først (lysere base øverst, opptak ned til 0,05). Vakten «det lokale blekket
+finnes av én grunn» feiler den dagen tokenene holder selv. ÅPENT (ikke i
+porten Brage navnga, ikke rørt): `textTertiary` (tidsstempel, ⋯) er 2,7 på
+hvitt i dag og 2,1 på opalen — avgjøres i token-skiva.
+
+RIGGEN (oppskrift, `zz_opal_rig.test.tsx`): rendrer EKTE DaylightGround,
+NextEventHero (glass), SectionHeader og FeedCard før/etter i jest,
+serialiserer RN-treet til HTML/SVG (View→div flex, Text→div/span,
+rn-svg-kompositter→svg-tagger, RadialGradient rx/ry → r +
+gradientTransform, boxShadow→box-shadow, MediaImage mocket til foto-
+stand-in), skriver `opal.html`/`opal-scroll.html`/`opal-b.html`/`opal-f.html`
+i scratchpad/opal. Chrome: `--headless --disable-gpu --hide-scrollbars
+--allow-file-access-from-files --force-device-scale-factor=2
+--window-size=3360,960 --screenshot`; `--dump-dom` gir kortrektangler
+(`<pre id="rects">`); `crop.py`/`measure.py` beskjærer og pikselmåler.
+TRE FELLER: (1) HTML deler svg-id-er på tvers av instanser (RN gjør IKKE —
+hver Svg er egen rot) → id-ene prefikses per svg, ellers klippes alle kort
+til FØRSTE korts form og RT/IC-rammene viser første korts gradient; (2)
+sample aldri i hjørneutskjæringen (radius 24): (371,758) på et kort med
+bunn 764 er grunn, ikke kort; (3) RN-mockens a11y-gettere er delte
+jest.fn — kø Once-verdier KUN når bryteren skal PÅ; et festet kort
+monterer ikke hooken og lar en Once(false) ligge igjen til neste test.
+
+🌫️ **LYSFELT-GRUNNEN (Brage 2026-09-02 natt, UKOMMITTERT, ikke
+telefontestet):** Brages dom på riggbildene var at `DaylightGround` leste
+som «én jevn grønn/cyan-flate». `DaylightGround.tsx` er skrevet om til et
+LYSFELT: mellomtonebase + 16 store, myke, ROTERTE og overlappende radiale
+felt i Heia-familien (lime/mint-lysninger, neon som ett felt, aqua/cyan
+lokalt, emerald/teal-dybder, ett skrått lysbånd), definert som data i
+`FIELDS` (senter/rotasjon/radier/stopp i masterrommet) — banegeometrien
+halvert til ekstralag. Samme koordinatrom, ingen filtre, fargene lokale.
+Kortene er BEVISST ikke rørt (Brage: bakgrunnen først, så vurderes mer
+frost på opalen). Hjem-render levert (scratchpad/opal/home-lysfelt.png).
+Neste beslutning er visuell, Brages.
+
+▶️ **NESTE:** Brage vurderer de sju bildene → fysisk telefon i lyst og
+dempet miljø (sjekkliste: mint venstre/aqua høyre på samme kort; lys linje
+langs toppkanten som dør ut nedover; grønn skygge uten grå halo; pillene
+som blekkvask i materialet; VIKTIG solid mellom opaler; «Kommenter»-
+teksten i sol; RT/IC; ingen blink ved montering) → beslutning (0,90 står;
+små justeringer i `OPAL`) → SLETT zz-filene → commit. Deretter: live-raden
+av stadionglasset; så token-promotering (inkl. mørkere `textSecondary` —
+opalen har bevist behovet) + fjerning av `DAYLIGHT_GROUND_AB`/
+`NEXT_MATCH_GLASS_AB`/`FEED_OPAL_AB` i egen skive. Compose/Lagkassa-opal
+FØRST etter at FeedCard er telefongodkjent.
+
+---
+
+## ✅ Skive 1B StadiumGlass (tidligere START HER 2026-09-02 kveld — telefongodkjent og committet 2618ddb, `NEXT_MATCH_GLASS_AB` PÅ)
 
 🎨 **SKIVE 1B — STADIONGLASSET PÅ KOMMENDE KAMP: TELEFONGODKJENT OG
 COMMITTET 2026-09-02 (kveld).** Brages dom: «klart bedre enn A/B av» —

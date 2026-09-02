@@ -15,6 +15,14 @@ import Svg, {
  * DAGSLYSGRUNNEN — hverdagsskjermenes bunn.
  * SKIVE 1A: STATISK BAKGRUNNSTEST PÅ HJEM (Brage 2026-09-02).
  *
+ * LYSFELT-VERSJONEN (Brage 2026-09-02 natt): masterens lineære reise var for
+ * jevn — «én grønn/cyan-flate». Grunnen er nå et LYSFELT: mange store, myke,
+ * roterte og overlappende felt i Heia-familien (lime/mint-lysninger, neon,
+ * aqua lokalt, dyp emerald/teal), med overganger i flere retninger og
+ * forskjeller i både farge og lys. Fortsatt samme koordinatrom (1290 × 2796,
+ * xMidYMin slice), fortsatt kun radiale/lineære gradienter uten filtre;
+ * banegeometrien er beholdt som et svakere ekstralag. Fargene er lokale.
+ *
  * Fasiten er Brages egen master:
  *   docs/Heia_Design_Master/Heia_Background_Master.svg  (kilden, 1290 × 2796)
  *   docs/Heia_Design_Master/Heia_Background_Master.png  (bildet som skal treffes)
@@ -103,6 +111,265 @@ function Sheet({fill}: {fill: string}) {
   return <Rect x={0} y={0} width={W} height={H} fill={fill} />;
 }
 
+/** Lysfeltets egne farger — nyanser INNE i Heia-verdenen, ikke nye kulører. */
+const FIELD = {
+  baseTop: '#7FF0C4',
+  baseMint: '#2AE6A8',
+  baseGreen: '#17C594',
+  baseDeep: '#0F8C6A',
+  lime: '#D9FF8C',
+  limeSoft: '#BFFF7A',
+  mintLight: '#B9FFE3',
+  mintPocket: '#C4FFEA',
+  aqua: '#5AF0E4',
+  cyan: '#46E0D6',
+  teal: '#19B79B',
+  emerald: '#0C8A66',
+  deep: '#0B6E52',
+  deepTop: '#0E7F62',
+} as const;
+
+interface FieldProps {
+  id: string;
+  /** Senter i masterrommet. */
+  x: number;
+  y: number;
+  rotate: number;
+  rx: number;
+  ry: number;
+  color: string;
+  /** Stopp: [offset, opasitet]. */
+  stops: Array<[number, number]>;
+}
+
+/** Ett mykt, rotert lysfelt — en ellipse uten kant. */
+function Field({id, x, y, rotate, rx, ry, color, stops}: FieldProps) {
+  return (
+    <RadialGradient
+      id={id}
+      cx={0}
+      cy={0}
+      r={1}
+      gradientUnits="userSpaceOnUse"
+      gradientTransform={`translate(${x} ${y}) rotate(${rotate}) scale(${rx} ${ry})`}>
+      {stops.map(([offset, opacity]) => (
+        <Stop
+          key={offset}
+          offset={offset}
+          stopColor={color}
+          stopOpacity={opacity}
+        />
+      ))}
+      <Stop offset={1} stopColor={color} stopOpacity={0} />
+    </RadialGradient>
+  );
+}
+
+/** Feltene, i tegnerekkefølge (nederst først). Lys OG mørke, i flere retninger. */
+const FIELDS: FieldProps[] = [
+  // Dybde under overflaten — emerald/teal-partier.
+  {
+    id: 'fDeepTop',
+    x: 1290,
+    y: 620,
+    rotate: -40,
+    rx: 620,
+    ry: 340,
+    color: FIELD.deepTop,
+    stops: [
+      [0, 0.6],
+      [0.55, 0.25],
+    ],
+  },
+  {
+    id: 'fDeepR',
+    x: 1360,
+    y: 2000,
+    rotate: -60,
+    rx: 620,
+    ry: 880,
+    color: FIELD.deep,
+    stops: [
+      [0, 0.85],
+      [0.5, 0.4],
+    ],
+  },
+  {
+    id: 'fEmeraldL',
+    x: -80,
+    y: 2450,
+    rotate: 15,
+    rx: 620,
+    ry: 500,
+    color: FIELD.emerald,
+    stops: [
+      [0, 0.7],
+      [0.5, 0.3],
+    ],
+  },
+  {
+    id: 'fTealMid',
+    x: 560,
+    y: 1980,
+    rotate: -20,
+    rx: 560,
+    ry: 400,
+    color: FIELD.teal,
+    stops: [
+      [0, 0.55],
+      [0.55, 0.22],
+    ],
+  },
+  {
+    id: 'fTealTop',
+    x: 420,
+    y: 420,
+    rotate: 30,
+    rx: 520,
+    ry: 300,
+    color: FIELD.teal,
+    stops: [[0, 0.35]],
+  },
+  // Heia-energien — neon som ett stort felt, ikke hele flaten.
+  {
+    id: 'fNeon',
+    x: 60,
+    y: 1480,
+    rotate: -12,
+    rx: 860,
+    ry: 720,
+    color: '#02FFAB',
+    stops: [
+      [0, 1],
+      [0.45, 0.75],
+    ],
+  },
+  {
+    id: 'fNeon2',
+    x: 900,
+    y: 2380,
+    rotate: 20,
+    rx: 520,
+    ry: 360,
+    color: '#02FFAB',
+    stops: [
+      [0, 0.7],
+      [0.5, 0.3],
+    ],
+  },
+  // Aqua/cyan som kommer inn lokalt.
+  {
+    id: 'fAqua',
+    x: 1250,
+    y: 1150,
+    rotate: -35,
+    rx: 660,
+    ry: 920,
+    color: FIELD.aqua,
+    stops: [
+      [0, 0.95],
+      [0.5, 0.5],
+    ],
+  },
+  {
+    id: 'fCyanLow',
+    x: 700,
+    y: 2300,
+    rotate: 28,
+    rx: 620,
+    ry: 380,
+    color: FIELD.cyan,
+    stops: [
+      [0, 0.6],
+      [0.5, 0.25],
+    ],
+  },
+  {
+    id: 'fAquaTop',
+    x: 700,
+    y: 250,
+    rotate: -10,
+    rx: 460,
+    ry: 260,
+    color: FIELD.cyan,
+    stops: [[0, 0.45]],
+  },
+  // Lysninger — lime og mint der lyset treffer.
+  {
+    id: 'fLime',
+    x: 150,
+    y: 700,
+    rotate: 22,
+    rx: 800,
+    ry: 540,
+    color: FIELD.lime,
+    stops: [
+      [0, 0.9],
+      [0.5, 0.4],
+    ],
+  },
+  {
+    id: 'fMintTop',
+    x: 1000,
+    y: 150,
+    rotate: -15,
+    rx: 720,
+    ry: 420,
+    color: FIELD.mintLight,
+    stops: [
+      [0, 0.8],
+      [0.5, 0.3],
+    ],
+  },
+  {
+    id: 'fMintPocket',
+    x: 1010,
+    y: 1660,
+    rotate: 35,
+    rx: 440,
+    ry: 300,
+    color: FIELD.mintPocket,
+    stops: [
+      [0, 0.6],
+      [0.5, 0.2],
+    ],
+  },
+  {
+    id: 'fLime2',
+    x: 430,
+    y: 2540,
+    rotate: -30,
+    rx: 380,
+    ry: 250,
+    color: FIELD.limeSoft,
+    stops: [[0, 0.45]],
+  },
+  {
+    id: 'fLime3',
+    x: 1180,
+    y: 1900,
+    rotate: 50,
+    rx: 300,
+    ry: 200,
+    color: FIELD.limeSoft,
+    stops: [[0, 0.35]],
+  },
+  // Stadionlyset — ett skrått, mykt lysbånd.
+  {
+    id: 'fBeam',
+    x: 610,
+    y: 900,
+    rotate: -14,
+    rx: 1000,
+    ry: 260,
+    color: '#FFFFFF',
+    stops: [
+      [0, 0.22],
+      [0.5, 0.08],
+    ],
+  },
+];
+
 export function DaylightGround() {
   return (
     // ATMOSFÆRE, IKKE INNHOLD — skjult for skjermleser og uten trykkflate,
@@ -118,7 +385,7 @@ export function DaylightGround() {
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio={ASPECT}>
         <Defs>
-          {/* Fargereisen: mint → neon → aqua/teal → dyp grønn, 158°. */}
+          {/* Grunntonen: en MELLOMTONE, så feltene kan både lysne og mørkne. */}
           <LinearGradient
             id="dgBase"
             gradientUnits="userSpaceOnUse"
@@ -126,147 +393,14 @@ export function DaylightGround() {
             y1={90}
             x2={1175}
             y2={2692}>
-            <Stop offset={0} stopColor={MASTER.mintTop} />
-            <Stop offset={0.25} stopColor={MASTER.mint} />
-            <Stop offset={0.52} stopColor={MASTER.neon} />
-            <Stop offset={0.76} stopColor={MASTER.aquaDeep} />
-            <Stop offset={1} stopColor={MASTER.deepEdge} />
+            <Stop offset={0} stopColor={FIELD.baseTop} />
+            <Stop offset={0.35} stopColor={FIELD.baseMint} />
+            <Stop offset={0.7} stopColor={FIELD.baseGreen} />
+            <Stop offset={1} stopColor={FIELD.baseDeep} />
           </LinearGradient>
-
-          {/* Det ene, avgrensede sollysfeltet — heiaSun er kun dette. */}
-          <RadialGradient
-            id="dgSun"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(115 860) rotate(18) scale(870 940)">
-            <Stop offset={0} stopColor={MASTER.sun} stopOpacity={0.66} />
-            <Stop offset={0.4} stopColor={MASTER.sunSoft} stopOpacity={0.3} />
-            <Stop offset={0.78} stopColor={MASTER.sunSoft} stopOpacity={0} />
-          </RadialGradient>
-
-          {/* Mintløftet oppe til venstre — toppen skal være mint, aldri hvit. */}
-          <RadialGradient
-            id="dgLift"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(80 -70) rotate(49) scale(1070 900)">
-            <Stop offset={0} stopColor={MASTER.liftTop} stopOpacity={0.96} />
-            <Stop offset={0.38} stopColor={MASTER.liftMid} stopOpacity={0.72} />
-            <Stop offset={0.68} stopColor={MASTER.liftLow} stopOpacity={0.2} />
-            <Stop offset={1} stopColor={MASTER.liftLow} stopOpacity={0} />
-          </RadialGradient>
-
-          {/* Dybde i øvre høyre hjørne. */}
-          <RadialGradient
-            id="dgTopDepth"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(1320 -55) rotate(139) scale(820 850)">
-            <Stop offset={0} stopColor={MASTER.deep} stopOpacity={0.23} />
-            <Stop offset={0.48} stopColor={MASTER.deep} stopOpacity={0.08} />
-            <Stop offset={1} stopColor={MASTER.deep} stopOpacity={0} />
-          </RadialGradient>
-
-          {/* NEONFELTET — det overdimensjonerte #02FFAB-lyset, 50–65 % av
-              inntrykket. Skilles ut som eget lag i bevegelsesskiva. */}
-          <RadialGradient
-            id="dgNeon"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(-30 1650) rotate(-10) scale(1140 1450)">
-            <Stop offset={0} stopColor={MASTER.neon} stopOpacity={1} />
-            <Stop offset={0.42} stopColor={MASTER.neon} stopOpacity={0.91} />
-            <Stop
-              offset={0.72}
-              stopColor={MASTER.neonSoft}
-              stopOpacity={0.45}
-            />
-            <Stop offset={1} stopColor={MASTER.neonSoft} stopOpacity={0} />
-          </RadialGradient>
-
-          {/* AQUAFELTET — den kjølige motparten til høyre. Eget lag senere. */}
-          <RadialGradient
-            id="dgAqua"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(1340 1270) rotate(173) scale(1010 1240)">
-            <Stop offset={0} stopColor={MASTER.aqua} stopOpacity={0.95} />
-            <Stop offset={0.44} stopColor={MASTER.aquaMid} stopOpacity={0.72} />
-            <Stop offset={1} stopColor={MASTER.aquaMid} stopOpacity={0} />
-          </RadialGradient>
-
-          {/* Masterens tre blur80-ellipser, som radiale gradienter (avvik 1):
-              ellipse(-145 1670, 690×1010) #02FFAB .33
-              ellipse(1425 1230, 480×740)  #65E7DD .38
-              ellipse(1290 2800, 540×430)  #063A2D .24 */}
-          <RadialGradient
-            id="dgNeonPool"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(-145 1670) scale(850 1170)">
-            <Stop offset={0} stopColor={MASTER.neon} stopOpacity={0.33} />
-            <Stop offset={0.67} stopColor={MASTER.neon} stopOpacity={0.33} />
-            <Stop offset={0.84} stopColor={MASTER.neon} stopOpacity={0.165} />
-            <Stop offset={1} stopColor={MASTER.neon} stopOpacity={0} />
-          </RadialGradient>
-          <RadialGradient
-            id="dgAquaPool"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(1425 1230) scale(640 900)">
-            <Stop offset={0} stopColor={MASTER.aqua} stopOpacity={0.38} />
-            <Stop offset={0.57} stopColor={MASTER.aqua} stopOpacity={0.38} />
-            <Stop offset={0.78} stopColor={MASTER.aqua} stopOpacity={0.19} />
-            <Stop offset={1} stopColor={MASTER.aqua} stopOpacity={0} />
-          </RadialGradient>
-          <RadialGradient
-            id="dgDeepPool"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(1290 2800) scale(700 590)">
-            <Stop offset={0} stopColor={MASTER.deep} stopOpacity={0.24} />
-            <Stop offset={0.5} stopColor={MASTER.deep} stopOpacity={0.24} />
-            <Stop offset={0.75} stopColor={MASTER.deep} stopOpacity={0.12} />
-            <Stop offset={1} stopColor={MASTER.deep} stopOpacity={0} />
-          </RadialGradient>
-
-          {/* STADIONLYSBEAMET — masterens firkant M-260 490 L1390 170 L1470 730
-              L-190 880 med blur52 og opacity .76, her som ett mykt, skrått
-              lysbånd: senter (610 565), retning −8°, halv lengde 940, halv
-              tykkelse 340 (halv båndtykkelse 237 + 2σ). Opasitetene har
-              masterens .76 ganget inn. Eget lag i bevegelsesskiva. */}
-          <RadialGradient
-            id="dgBeam"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(610 565) rotate(-8) scale(940 340)">
-            <Stop offset={0} stopColor={MASTER.white} stopOpacity={0.26} />
-            <Stop offset={0.4} stopColor={MASTER.white} stopOpacity={0.16} />
-            <Stop
-              offset={0.75}
-              stopColor={MASTER.beamWarm}
-              stopOpacity={0.06}
-            />
-            <Stop offset={1} stopColor={MASTER.white} stopOpacity={0} />
-          </RadialGradient>
+          {FIELDS.map(f => (
+            <Field key={f.id} {...f} />
+          ))}
 
           {/* Kritt: lyst oppe til venstre, blekk nede til høyre. */}
           <LinearGradient
@@ -292,8 +426,7 @@ export function DaylightGround() {
             <Stop offset={1} stopColor={MASTER.white} stopOpacity={0.08} />
           </LinearGradient>
 
-          {/* Dyp grønn kantdybde nede til høyre — verdenen går mot dypt, men
-              hverdagsskjermen forblir lys. */}
+          {/* Dyp grønn kantdybde nede til høyre — tab-barens hjørne. */}
           <RadialGradient
             id="dgDeep"
             cx={0}
@@ -301,38 +434,19 @@ export function DaylightGround() {
             r={1}
             gradientUnits="userSpaceOnUse"
             gradientTransform="translate(1240 2815) rotate(-118) scale(770 900)">
-            <Stop offset={0} stopColor={MASTER.deep} stopOpacity={0.43} />
+            <Stop offset={0} stopColor={MASTER.deep} stopOpacity={0.45} />
             <Stop offset={0.5} stopColor={MASTER.deep} stopOpacity={0.18} />
             <Stop offset={1} stopColor={MASTER.deep} stopOpacity={0} />
           </RadialGradient>
-          <RadialGradient
-            id="dgVignette"
-            cx={0}
-            cy={0}
-            r={1}
-            gradientUnits="userSpaceOnUse"
-            gradientTransform="translate(645 1280) rotate(90) scale(1900 1100)">
-            <Stop offset={0.62} stopColor={MASTER.deep} stopOpacity={0} />
-            <Stop offset={1} stopColor={MASTER.deep} stopOpacity={0.075} />
-          </RadialGradient>
         </Defs>
 
-        {/* Lagrekkefølgen er masterens. */}
         <Sheet fill="url(#dgBase)" />
-        <Sheet fill="url(#dgSun)" />
-        <Sheet fill="url(#dgLift)" />
-        <Sheet fill="url(#dgTopDepth)" />
-        <Sheet fill="url(#dgNeon)" />
-        <Sheet fill="url(#dgAqua)" />
-        <Sheet fill="url(#dgNeonPool)" />
-        <Sheet fill="url(#dgAquaPool)" />
-        <Sheet fill="url(#dgDeepPool)" />
-        <Sheet fill="url(#dgBeam)" />
+        {FIELDS.map(f => (
+          <Sheet key={f.id} fill={`url(#${f.id})`} />
+        ))}
 
-        {/* BANEGEOMETRIEN — midtsirkelen i høyre kant, to brede banebuer, én
-            diagonal lysstripe og ett punkt. Skal bare gjenkjennes når man
-            leter etter den. */}
-        <G fill="none" opacity={0.86}>
+        {/* BANEGEOMETRIEN — et ekstralag, halvert: skal ikke bære bakgrunnen. */}
+        <G fill="none" opacity={0.45}>
           <Circle
             cx={1355}
             cy={1140}
@@ -381,8 +495,6 @@ export function DaylightGround() {
         </G>
 
         <Sheet fill="url(#dgDeep)" />
-        <Sheet fill="url(#dgVignette)" />
-        {/* Masterens korn-rect (feTurbulence, multiply .72) utelatt — avvik 2. */}
       </Svg>
     </View>
   );

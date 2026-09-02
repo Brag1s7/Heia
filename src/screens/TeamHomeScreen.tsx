@@ -181,7 +181,10 @@ const FeedRow = React.memo(function FeedRow({
     <View style={styles.cardWrap}>
       <FeedCard
         item={item}
-        onPress={matchId ? () => onOpenMatch(matchId) : undefined}
+        // Kortet er trykkbart (glassresponsen lover en side): kampposter
+        // åpner kampen, alle andre åpner kommentartråden — samme mål som
+        // «Kommenter»-pillen, så forventningen innfris.
+        onPress={matchId ? () => onOpenMatch(matchId) : () => onComment(item)}
         onExpandImage={item.media ? () => onExpandImage(item) : undefined}
         onHeia={() => onHeia(item)}
         onComment={() => onComment(item)}

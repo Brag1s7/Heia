@@ -7,8 +7,19 @@ import {Avatar} from './Avatar';
 import {avatarRef} from '../lib/media/avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
+import {OPAL} from './OpalSurface';
+import {LiquidGlassSurface} from './LiquidGlassSurface';
 import {feedAllowsHeia} from '../shared/matchEngagement';
 import type {FeedItem} from '../shared/types';
+
+/**
+ * A/B-BRYTER FOR TELEFONTESTEN — MIDLERTIDIG (Brage 2026-09-02).
+ * `true` = ikke-festede kort tegnes i opal (`OpalSurface`) med opalens
+ * lokale blekk på pilletekst, kommentarikon og rolle-pill; `false` = FeedCard
+ * nøyaktig som før. Festede VIKTIG-kort er solide (cardSun) uansett.
+ * Fjernes når materialet er avgjort på fysisk telefon.
+ */
+export const FEED_OPAL_AB = true;
 
 interface FeedCardProps {
   item: FeedItem;
@@ -38,11 +49,21 @@ function timeAgo(date: Date): string {
   const diffHour = Math.floor(diffMin / 60);
   const diffDay = Math.floor(diffHour / 24);
 
-  if (diffMin < 1) {return 'Akkurat nå';}
-  if (diffMin < 60) {return `${diffMin} min siden`;}
-  if (diffHour < 24) {return `${diffHour} t siden`;}
-  if (diffDay === 1) {return 'I går';}
-  if (diffDay < 7) {return `${diffDay} dager siden`;}
+  if (diffMin < 1) {
+    return 'Akkurat nå';
+  }
+  if (diffMin < 60) {
+    return `${diffMin} min siden`;
+  }
+  if (diffHour < 24) {
+    return `${diffHour} t siden`;
+  }
+  if (diffDay === 1) {
+    return 'I går';
+  }
+  if (diffDay < 7) {
+    return `${diffDay} dager siden`;
+  }
   return date.toLocaleDateString('nb-NO', {day: 'numeric', month: 'short'});
 }
 
@@ -132,6 +153,12 @@ export function FeedCard({
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
   const strong = item.isPinned || isMatchType(item) || item.type === 'resultat';
   const heiaCount = item.heiaCount ?? 0;
+  // Opalprototypen: KUN ikke-festede kort. Festet = solid solskinnsflate.
+  const opal = FEED_OPAL_AB && !item.isPinned;
+  // Opalens blekk (kontrastporten): lokalt mørkere sekundær/aksent på
+  // opalen, tokenene på alt annet. Se OPAL.inkSecondary/inkAccent.
+  const inkSecondary = opal ? OPAL.inkSecondary : colors.textSecondary;
+  const inkTertiary = opal ? OPAL.inkTertiary : colors.textTertiary;
 
   // ⚠️ P1, LÅST: INGEN HEIA PÅ MÅL IMOT — HELLER IKKE HER.
   // Det er den SAMME kanoniske posten som inne i kampskjermen, der knappen
@@ -174,9 +201,15 @@ export function FeedCard({
             <Text style={styles.name} numberOfLines={1}>
               {item.author.name}
             </Text>
-            {roleLabel && <Text style={styles.role}>{roleLabel}</Text>}
+            {roleLabel && (
+              <Text style={[styles.role, opal && styles.roleOpal]}>
+                {roleLabel}
+              </Text>
+            )}
           </View>
-          <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
+          <Text style={[styles.time, opal && styles.timeOpal]}>
+            {timeAgo(item.createdAt)}
+          </Text>
         </View>
         <Marker item={item} onUnpin={onUnpin} />
         {onMore && (
@@ -186,7 +219,7 @@ export function FeedCard({
             accessibilityRole="button"
             accessibilityLabel="Flere valg"
             style={({pressed}) => [styles.more, pressed && styles.morePressed]}>
-            <MoreHorizontal size={18} color={colors.textTertiary} />
+            <MoreHorizontal size={18} color={inkTertiary} />
           </Pressable>
         )}
       </View>
@@ -241,7 +274,11 @@ export function FeedCard({
               pressed && styles.reactPillPressed,
             ]}>
             <Text
-              style={[styles.reactText, item.iReacted && styles.reactTextOn]}>
+              style={[
+                styles.reactText,
+                opal && styles.reactTextOpal,
+                item.iReacted && styles.reactTextOn,
+              ]}>
               👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
             </Text>
           </Pressable>
@@ -255,14 +292,34 @@ export function FeedCard({
             styles.reactPill,
             pressed && styles.reactPillPressed,
           ]}>
-          <MessageCircle size={14} color={colors.textSecondary} />
-          <Text style={styles.reactText}>
+          <MessageCircle size={14} color={inkSecondary} />
+          <Text style={[styles.reactText, opal && styles.reactTextOpal]}>
             {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
           </Text>
         </Pressable>
       </View>
     </>
   );
+
+  // OPAL (prototypen): materialet bor i OpalSurface; padding-boksen er
+  // identisk med `styles.card` (1 pt kant + padding xl). Trykk = samme
+  // heiaSoft-tint som `cardPressed`, lagt på innerboksen over svg-en.
+  if (opal) {
+    if (onPress) {
+      return (
+        <Pressable onPress={onPress} accessibilityRole="button">
+          {({pressed}) => (
+            <LiquidGlassSurface style={styles.cardOpal} pressed={pressed}>
+              {inner}
+            </LiquidGlassSurface>
+          )}
+        </Pressable>
+      );
+    }
+    return (
+      <LiquidGlassSurface style={styles.cardOpal}>{inner}</LiquidGlassSurface>
+    );
+  }
 
   const surfaceStyle = [styles.card, item.isPinned && styles.cardSun];
 
@@ -297,6 +354,11 @@ const styles = StyleSheet.create({
   cardPressed: {
     backgroundColor: colors.heiaSoft,
   },
+  // Opal: kant, radius, skygge og trykk eies av OpalSurface — bare paddingen
+  // bor her, så padding-boksen er nøyaktig `card` sin.
+  cardOpal: {
+    padding: spacing.xl,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -327,10 +389,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
   },
+  roleOpal: {
+    color: OPAL.inkAccent,
+  },
   time: {
     ...typography.caption,
     color: colors.textTertiary,
     marginTop: 1,
+  },
+  timeOpal: {
+    color: OPAL.inkTertiary,
   },
   more: {
     padding: 2,
@@ -396,6 +464,10 @@ const styles = StyleSheet.create({
   // Stemmen bor i `typography.action` — delt med kommentartråden og
   // kampens engasjementslinje, så de tre ikke kan drifte fra hverandre.
   reactText: typography.action,
+  // Opalens sekundærblekk — samme stemme, mørkere farge (kontrastporten).
+  reactTextOpal: {
+    color: OPAL.inkSecondary,
+  },
   reactTextOn: {
     color: colors.heiaInk,
   },

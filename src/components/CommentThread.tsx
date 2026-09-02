@@ -12,6 +12,8 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar} from './Avatar';
+import {LiquidGlassSurface} from './LiquidGlassSurface';
+import {OPAL} from './OpalSurface';
 import {Button} from './Button';
 import {Skeleton} from './Skeleton';
 import {MediaImage} from '../lib/media/MediaImage';
@@ -288,7 +290,7 @@ export function CommentThread({
         contentContainerStyle={styles.listContent}>
         {/* Innlegget tråden hører til — konteksten et varsel ikke gir. */}
         {post && (
-          <View style={styles.postCard}>
+          <LiquidGlassSurface style={styles.postCard}>
             <View style={styles.postHeader}>
               <Avatar
                 name={post.author.name}
@@ -309,7 +311,7 @@ export function CommentThread({
                   styles.more,
                   pressed && styles.morePressed,
                 ]}>
-                <MoreHorizontal size={18} color={colors.textTertiary} />
+                <MoreHorizontal size={18} color={OPAL.inkTertiary} />
               </Pressable>
             </View>
             {post.content.trim().length > 0 && (
@@ -358,13 +360,13 @@ export function CommentThread({
                 </Pressable>
               </View>
             )}
-          </View>
+          </LiquidGlassSurface>
         )}
 
         {loading ? (
           <>
             {/* Innleggskortet + et par replikker — samme former som lastes. */}
-            <View style={styles.postCard}>
+            <LiquidGlassSurface style={styles.postCard}>
               <View style={styles.postHeader}>
                 <Skeleton width={32} height={32} round />
                 <View style={styles.skeletonHeaderText}>
@@ -374,7 +376,7 @@ export function CommentThread({
               </View>
               <Skeleton height={13} />
               <Skeleton width="60%" height={13} />
-            </View>
+            </LiquidGlassSurface>
             <View style={styles.comment}>
               <Skeleton width={32} height={32} round />
               <View style={styles.skeletonBubbleWrap}>
@@ -419,7 +421,7 @@ export function CommentThread({
                       styles.commentMore,
                       pressed && styles.morePressed,
                     ]}>
-                    <MoreHorizontal size={16} color={colors.textTertiary} />
+                    <MoreHorizontal size={16} color={OPAL.inkTertiary} />
                   </Pressable>
                 </View>
                 <Text style={styles.commentText}>{c.content}</Text>
@@ -429,7 +431,9 @@ export function CommentThread({
         )}
       </ScrollView>
 
-      <View
+      {/* Glass nederst — ett blur-lag, der handlingen bor. */}
+      <LiquidGlassSurface
+        cornerRadius={0}
         style={[
           styles.composeBar,
           {paddingBottom: insets.bottom + spacing.sm},
@@ -439,7 +443,7 @@ export function CommentThread({
           value={text}
           onChangeText={setText}
           placeholder="Skriv en kommentar…"
-          placeholderTextColor={colors.textTertiary}
+          placeholderTextColor={OPAL.inkTertiary}
           multiline
           editable={!sending}
         />
@@ -449,7 +453,7 @@ export function CommentThread({
           disabled={text.trim().length === 0}
           loading={sending}
         />
-      </View>
+      </LiquidGlassSurface>
     </>
   );
 }
@@ -462,13 +466,10 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.lg,
   },
+  // Materialet (glass/opal) eies av LiquidGlassSurface — bare paddingen her.
   postCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
     padding: spacing.lg,
     gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
   },
   postHeader: {
     flexDirection: 'row',
@@ -485,7 +486,7 @@ const styles = StyleSheet.create({
   },
   postTime: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   postContent: {
     ...typography.body,
@@ -515,7 +516,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   // Delt stemme — se `typography.action`.
-  reactText: typography.action,
+  reactText: {...typography.action, color: OPAL.inkSecondary},
   reactTextOn: {
     color: colors.heiaInk,
   },
@@ -532,7 +533,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
     marginTop: spacing.xl,
   },
@@ -543,13 +544,16 @@ const styles = StyleSheet.create({
   },
   // Chat-hjørnet (lite radius oppe til venstre, mot avataren) gjør boblen til
   // en replikk, ikke et kort til.
+  // Replikkene er IKKE glass (ett blur-lag per boble er dyrt i en lang tråd,
+  // og lyse translusente flater skal ikke stables): lys frost uten blur på
+  // grunnen, med lys kant — innlegget er hero, replikkene er samtale.
   commentBubble: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
     borderRadius: radius.lg,
     borderTopLeftRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: 'rgba(255, 255, 255, 0.78)',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: 2,
@@ -565,7 +569,7 @@ const styles = StyleSheet.create({
   },
   commentTime: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   more: {
     padding: 2,
@@ -580,15 +584,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     lineHeight: 22,
   },
+  // Materialet eies av LiquidGlassSurface (cornerRadius 0).
   composeBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
   },
   input: {
     ...typography.input,
@@ -599,7 +601,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surfaceMuted,
+    // Blekkvask i glasset, samme språk som reaksjonspillene.
+    backgroundColor: 'rgba(17, 36, 27, 0.06)',
     borderRadius: radius.lg,
     textAlignVertical: 'top',
   },
