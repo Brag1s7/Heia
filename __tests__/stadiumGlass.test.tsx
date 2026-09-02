@@ -310,6 +310,65 @@ describe('NEXT_MATCH_GLASS_AB bytter kun kamp-grenen', () => {
 // ---------------------------------------------------------------------------
 // Systembryterne
 // ---------------------------------------------------------------------------
+describe('compact + pressed (kampkortet deler heroens material-DNA)', () => {
+  async function mount(props: {compact?: boolean; pressed?: boolean}) {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await act(async () => {
+      root = ReactTestRenderer.create(
+        <StadiumGlass {...props}>
+          <></>
+        </StadiumGlass>,
+      );
+    });
+    await act(async () => {});
+    return root;
+  }
+  const ids = (root: ReactTestRenderer.ReactTestRenderer) =>
+    root.root
+      .findAllByType(Rect)
+      .map(r => r.props.fill ?? r.props.stroke)
+      .filter(Boolean);
+  const shadowOf = (root: ReactTestRenderer.ReactTestRenderer) => {
+    const outer = root.root.findAllByType('View' as never)[0];
+    const style = outer.props.style;
+    const flatStyle = (
+      Array.isArray(style) ? Object.assign({}, ...style.filter(Boolean)) : style
+    ) as {
+      boxShadow?: Array<{blurRadius: number; color: string}>;
+    };
+    return flatStyle.boxShadow?.[0];
+  };
+
+  it('compact tegner de samme lagene (base, opptak, neon, høylys, kant) — bare skyggen er lettere', async () => {
+    const hero = await mount({});
+    const compact = await mount({compact: true});
+    expect(ids(compact)).toEqual(ids(hero));
+    expect(shadowOf(hero)?.blurRadius).toBe(28);
+    expect(shadowOf(compact)?.blurRadius).toBe(16);
+    expect(shadowOf(compact)?.color).toBe(GLASS.shadowCompact);
+    hero.unmount();
+    compact.unmount();
+  });
+
+  it('pressed legger ett lyst lag inn i glasset; i hvile finnes det ikke', async () => {
+    const idle = await mount({compact: true});
+    const light = `rgba(255, 255, 255, ${GLASS.pressLight})`;
+    const has = (root: ReactTestRenderer.ReactTestRenderer) =>
+      root.root.findAllByType('View' as never).some(v => {
+        const st = v.props.style;
+        const f = Array.isArray(st)
+          ? Object.assign({}, ...st.filter(Boolean))
+          : st;
+        return f?.backgroundColor === light;
+      });
+    expect(has(idle)).toBe(false);
+    idle.unmount();
+    const pressed = await mount({compact: true, pressed: true});
+    expect(has(pressed)).toBe(true);
+    pressed.unmount();
+  });
+});
+
 describe('useMaterialAccessibility', () => {
   afterEach(() => {
     (AccessibilityInfo.isReduceTransparencyEnabled as jest.Mock).mockClear();

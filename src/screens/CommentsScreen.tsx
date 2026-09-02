@@ -36,6 +36,8 @@ export function CommentsScreen({route, navigation}: Props) {
         // Innlegget er slettet — tråden finnes ikke lenger, så skjermen
         // skal ikke bli stående tom.
         onPostDeleted={navigation.goBack}
+        // «Se kampen ›» på kampkortet — samme mål som fra feeden.
+        onOpenMatch={eventId => navigation.navigate('EventDetail', {eventId})}
       />
     </KeyboardAvoidingView>
   );

@@ -13,6 +13,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar} from './Avatar';
 import {LiquidGlassSurface} from './LiquidGlassSurface';
+import {FeedCard} from './FeedCard';
 import {OPAL} from './OpalSurface';
 import {Button} from './Button';
 import {Skeleton} from './Skeleton';
@@ -61,6 +62,13 @@ interface CommentThreadProps {
   teamSpaceId: string;
   /** Innlegget ble slettet — tråden finnes ikke lenger. Verten lukker seg. */
   onPostDeleted: () => void;
+  /**
+   * Kampinnlegg vises som SAMME kampkort som i feeden (Brage 2026-09-02:
+   * «må vise samme kort her og»). Settes av kommentarsiden, som kan åpne
+   * kampen; bunnarket i kampskjermen står allerede i kampen og utelater den
+   * — da er kortet ikke trykkbart og «Se kampen ›» skjules.
+   */
+  onOpenMatch?: (eventId: string) => void;
 }
 
 function timeAgo(date: Date): string {
@@ -79,10 +87,11 @@ export function CommentThread({
   postId,
   teamSpaceId,
   onPostDeleted,
+  onOpenMatch,
 }: CommentThreadProps) {
   const insets = useSafeAreaInsets();
   const {session} = useAuth();
-  const {activeTeamSpaceId, activeRole} = useActiveTeam();
+  const {activeTeamSpace, activeTeamSpaceId, activeRole} = useActiveTeam();
 
   const myId = session?.user?.id;
   // Tråden hører alltid til aktivt lag i praksis, men rollen gjelder KUN
@@ -288,8 +297,23 @@ export function CommentThread({
       <ScrollView
         style={styles.list}
         contentContainerStyle={styles.listContent}>
-        {/* Innlegget tråden hører til — konteksten et varsel ikke gir. */}
-        {post && (
+        {/* Innlegget tråden hører til — konteksten et varsel ikke gir.
+            Kampinnlegg = feedens kampkort (mørkt stadionglass), samme
+            komponent, samme heia/⋯-handlinger. */}
+        {post && isSystemMatchPost(post.type) && (
+          <FeedCard
+            item={post}
+            onHeia={handleHeia}
+            onMore={handlePostActions}
+            onPress={
+              onOpenMatch && post.eventId
+                ? () => onOpenMatch(post.eventId as string)
+                : undefined
+            }
+            teamColor={activeTeamSpace?.color}
+          />
+        )}
+        {post && !isSystemMatchPost(post.type) && (
           <LiquidGlassSurface style={styles.postCard}>
             <View style={styles.postHeader}>
               <Avatar

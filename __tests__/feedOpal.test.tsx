@@ -26,9 +26,13 @@ import {
   FeedCard,
   FEED_OPAL_AB,
   PINNED_GLASS_AB,
+  MATCH_GLASS_AB,
+  MATCH_INK,
 } from '../src/components/FeedCard';
 import {OpalSurface, OPAL} from '../src/components/OpalSurface';
 import {GLASS} from '../src/components/LiquidGlassSurface';
+import {StadiumGlass, GLASS as STADIUM} from '../src/components/StadiumGlass';
+import {matchColors} from '../src/theme';
 import {colors, radius, spacing} from '../src/theme';
 import type {FeedItem} from '../src/shared/types';
 
@@ -156,6 +160,25 @@ const melding = {
   commentCount: 2,
 } as unknown as FeedItem;
 const festet = {...melding, id: 'p2', isPinned: true} as FeedItem;
+const kampMaal = {
+  ...melding,
+  id: 'p3',
+  type: 'match_event',
+  content: 'MÅL! 2–1',
+  match: {minute: 41, status: 'live', home: 2, away: 1},
+  matchEvent: {type: 'mål', teamSide: 'home'},
+} as unknown as FeedItem;
+const resultat = {
+  ...melding,
+  id: 'p4',
+  type: 'resultat',
+  content: 'Seier 2–1',
+  match: {status: 'finished', home: 2, away: 1},
+} as unknown as FeedItem;
+const kamp = (patch: Record<string, unknown>) =>
+  ({...kampMaal, ...patch} as unknown as FeedItem);
+const allTexts = (root: ReactTestRenderer.ReactTestRenderer) =>
+  root.root.findAllByType('Text' as never).map(t => t.children.join(''));
 
 type A11y = {rt?: boolean; ic?: boolean};
 
@@ -232,6 +255,46 @@ describe('GLASS-variantene (Brages godkjente tall 2026-09-02)', () => {
     expect(GLASS.important.interactive).toBe(true);
   });
 
+  it('GLASS har ingen match-variant: kampkortet er mørkt stadionglass, ikke lyst glass', () => {
+    expect('match' in GLASS).toBe(false);
+    expect(MATCH_GLASS_AB).toBe(true);
+    expect(MATCH_INK.text).toBe(matchColors.text);
+    expect(MATCH_INK.dim).toBe(matchColors.dim);
+    expect(MATCH_INK.accent).toBe(colors.heia);
+  });
+
+  it.each(
+    Object.entries({
+      topp: matchColors.arenaTop,
+      midt: matchColors.arenaBottom,
+      bunn: matchColors.timeline,
+    }),
+  )(
+    'kampkortets blekk på %s: hovedtekst 7:1, dempet/aksent 4,5:1, også inne i de lyse lagene',
+    (_name, surface) => {
+      // Reaksjonspill (hvit 0,10), rollepill (opalhvit 0,14), kapselramme (hvit 0,06).
+      const pill = over('#FFFFFF', 0.1, surface);
+      const role = over('#EAFFF6', 0.14, surface);
+      const frame = over('#FFFFFF', 0.06, surface);
+      expect(ratio(MATCH_INK.text, surface)).toBeGreaterThanOrEqual(7);
+      expect(ratio(MATCH_INK.dim, surface)).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(MATCH_INK.accent, surface)).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(MATCH_INK.text, pill)).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(MATCH_INK.text, role)).toBeGreaterThanOrEqual(4.5);
+      expect(ratio(colors.stadiumDim, frame)).toBeGreaterThanOrEqual(3);
+      // Aldri sort: flaten er dyp grønn.
+      expect(luminance(rgb(surface))).toBeGreaterThan(
+        luminance(rgb('#0B1912')),
+      );
+    },
+  );
+
+  it('glasset er transparent (basen under 1) med lyset presset inn ved trykk', () => {
+    expect(STADIUM.baseOpacity).toBeLessThan(1);
+    expect(STADIUM.pressLight).toBeGreaterThan(0);
+    expect(STADIUM.pressLight).toBeLessThanOrEqual(0.16);
+  });
+
   it('important-fallbacken er en varm perle, ikke cardSun, og holder blekket 4,5:1', () => {
     expect(GLASS.importantSolid).not.toBe(colors.sun);
     // Varm: rød ≥ grønn ≥ blå, men mindre mettet enn sun (mindre R−B-avstand).
@@ -252,6 +315,7 @@ describe('GLASS-variantene (Brages godkjente tall 2026-09-02)', () => {
 describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
   it('bryterne står PÅ i prototypen', () => {
     expect(PINNED_GLASS_AB).toBe(true);
+    expect(MATCH_GLASS_AB).toBe(true);
     expect(FEED_OPAL_AB).toBe(true);
   });
 
@@ -286,6 +350,151 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     expect(textsWithColor(root, colors.textSecondary)).toEqual([]);
     expect(textsWithColor(root, OPAL.inkAccent)).toEqual(['Trener']);
     root.unmount();
+  });
+
+  it('kampkortet: StadiumGlass compact (mørkt), FRA KAMPEN i neon, kapsel i ramme, puls, lyse reaksjonslag, Se kampen ›', async () => {
+    const onPress = jest.fn();
+    const root = await render(kampMaal, {}, onPress);
+    // Materialet: kompakt stadionglass — ikke opal, ikke lyst glass.
+    expect(root.root.findAllByType(OpalSurface)).toHaveLength(0);
+    const glass = root.root.findAllByType(StadiumGlass);
+    expect(glass).toHaveLength(1);
+    expect(glass[0].props.compact).toBe(true);
+    expect(glass[0].props.pressed).toBe(false);
+    expect(flat(glass[0].props.style).padding).toBe(spacing.xl);
+    const views = root.root.findAllByType('View' as never);
+    expect(views[0].props.accessibilityRole).toBe('button');
+    expect(views[0].props.accessibilityLabel).toBe('Åpne kampen');
+
+    const texts = allTexts(root);
+    expect(texts).toContain('FRA KAMPEN');
+    expect(texts).toContain('Se kampen ›');
+    expect(texts).toContain('Mål · 41′');
+    expect(texts).not.toContain('41′');
+    // Blekk: opalhvit hovedtekst, dempet mintgrå sekundær, neon-etikett,
+    // coral på live-kapselen. Ingen lys-glass-blekk.
+    expect(textsWithColor(root, MATCH_INK.accent)).toEqual(['FRA KAMPEN']);
+    expect(textsWithColor(root, '#FF8A8D')).toEqual(['Mål · 41′']);
+    expect(textsWithColor(root, MATCH_INK.text).sort()).toEqual(
+      ['Jarle Wik', 'Trener', 'MÅL! 2–1', '👏 3 heier', '2'].sort(),
+    );
+    expect(textsWithColor(root, MATCH_INK.dim).sort()).toEqual(
+      ['Akkurat nå', 'Se kampen ›'].sort(),
+    );
+    for (const ink of [
+      OPAL.inkSecondary,
+      OPAL.inkTertiary,
+      OPAL.inkAccent,
+      colors.textSecondary,
+      colors.textTertiary,
+      colors.heiaDeep,
+    ]) {
+      expect(textsWithColor(root, ink)).toEqual([]);
+    }
+    // Reaksjonene er tynne lyse lag, ikke den mørke blekkvasken.
+    const pills = views.filter(v =>
+      ['Heia', 'Kommenter'].includes(v.props.accessibilityLabel),
+    );
+    expect(pills).toHaveLength(2);
+    for (const p of pills) {
+      const st = flat(p.props.style);
+      expect(st.backgroundColor).toBe('rgba(255, 255, 255, 0.1)');
+      expect(st.borderWidth).toBe(1);
+    }
+    // Kapselen står i en lys ramme; ett live-hendelsespunkt i neon.
+    const frame = views.find(
+      v => flat(v.props.style).borderColor === 'rgba(234, 255, 246, 0.28)',
+    );
+    expect(frame).toBeDefined();
+    const dots = views.filter(
+      v => flat(v.props.style).borderColor === matchColors.text,
+    );
+    expect(dots).toHaveLength(1);
+    expect(flat(dots[0].props.style).backgroundColor).toBe(colors.heia);
+    root.unmount();
+  });
+
+  it('kapselen: LIVE · 1–0, PAUSE, SLUTT · 1–1, hendelsestype + minutt, mål imot — aldri bare et minutt', async () => {
+    const cases: Array<[FeedItem, string[]]> = [
+      [
+        kamp({type: 'match_start', match: {status: 'live', home: 1, away: 0}}),
+        ['Live ·', '1–0'],
+      ],
+      [
+        kamp({
+          type: 'match_start',
+          match: {status: 'halfTime', home: 1, away: 0},
+        }),
+        ['Pause'],
+      ],
+      [
+        kamp({
+          type: 'match_start',
+          match: {status: 'finished', home: 1, away: 0},
+        }),
+        ['Avspark'],
+      ],
+      [
+        kamp({
+          type: 'match_end',
+          match: {status: 'finished', home: 1, away: 1},
+        }),
+        ['Slutt ·', '1–1'],
+      ],
+      [kamp({matchEvent: {type: 'mål', teamSide: 'away'}}), ['Mål imot · 41′']],
+      [
+        kamp({
+          matchEvent: {type: 'kort'},
+          match: {minute: 63, status: 'live', home: 2, away: 1},
+        }),
+        ['Kort · 63′'],
+      ],
+      [
+        kamp({
+          matchEvent: {type: 'bytte'},
+          match: {minute: 70, status: 'live', home: 2, away: 1},
+        }),
+        ['Bytte · 70′'],
+      ],
+      [
+        kamp({
+          matchEvent: undefined,
+          match: {minute: 0, status: 'live', home: 0, away: 0},
+        }),
+        ['Kamp · 0′'],
+      ],
+      [kamp({matchEvent: {type: 'pause'}}), ['Pause']],
+    ];
+    for (const [item, expected] of cases) {
+      const root = await render(item);
+      const texts = allTexts(root);
+      for (const e of expected) expect(texts).toContain(e);
+      expect(texts.some(x => /^\d+′$/.test(x))).toBe(false);
+      expect(texts).toContain('FRA KAMPEN');
+      root.unmount();
+    }
+  });
+
+  it('vanlig melding er urørt av kampkortet', async () => {
+    const root = await render(melding);
+    const texts = allTexts(root);
+    expect(texts).not.toContain('FRA KAMPEN');
+    expect(texts).not.toContain('Se kampen ›');
+    expect(root.root.findAllByType(OpalSurface)).toHaveLength(1);
+    root.unmount();
+  });
+
+  it('manuelt resultat beholder card (OpalSurface); festet kamp vinner important', async () => {
+    const res = await render(resultat);
+    expect(res.root.findAllByType(OpalSurface)).toHaveLength(1);
+    expect(allTexts(res)).toContain('Resultat');
+    expect(allTexts(res)).not.toContain('FRA KAMPEN');
+    res.unmount();
+    const festetKamp = await render({...kampMaal, isPinned: true} as FeedItem);
+    expect(festetKamp.root.findAllByType(OpalSurface)).toHaveLength(0);
+    const card = festetKamp.root.findAllByType('View' as never)[0];
+    expect(flat(card.props.style).backgroundColor).toBe(GLASS.importantSolid);
+    festetKamp.unmount();
   });
 
   it('padding-boksen er identisk med dagens kort: 1 pt kant + padding xl, radius xl', async () => {

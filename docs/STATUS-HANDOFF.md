@@ -1,6 +1,30 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-02 sen kveld — LIQUID GLASS: ekte native iOS 26-glass bak FeedCard BYGGET, IKKE bygget til telefon, IKKE committet)
+## ▶️▶️ START HER (oppdatert 2026-09-03 natt — HELE GLASS-SPORET TELEFONGODKJENT OG COMMITTET; NESTE = TAB-BAREN i NY samtale)
+
+✅ KAMPKORTET RUNDE 3 TELEFONGODKJENT (Brage: «veldig bra») + kommentar-
+tråden viser SAMME kampkort for kampinnlegg (FeedCard i CommentThread,
+«Se kampen ›» → EventDetail fra kommentarsiden; i kampskjermens bunnark
+uten onOpenMatch → ikke trykkbart, lenken skjult). COMMITTET (se git log).
+Tre commits på Brage, ikke pushet: 89e52e7 (Liquid Glass), fa8b107
+(control/important), og denne (StadiumGlass compact + kampkortet +
+kommentartråd). DESIGNREGEL LÅST: mørkt glass kjennetegner kamp.
+
+▶️ NESTE SAMTALE = TAB-BAREN (Brages neste designskive — ikke startet).
+Start med begge designskillene (apple-hig-designer + emilkowalski
+`skills/apple-design/SKILL.md` via curl raw), inspiser dagens tab-bar
+(`AppNavigator.tsx` MainTabs + `MatchTabButton`), foreslå → godkjenning →
+kode → telefon. Liquid Glass-tab-bar på iOS 26 er nativt mulig via samme
+interop-mønster som `HeiaLiquidGlassView` (krever da Cmd+R).
+Åpne rester (uendret): bryter-opprydding (`DAYLIGHT_GROUND_AB`/
+`NEXT_MATCH_GLASS_AB`/`FEED_OPAL_AB`/`FEED_LIQUID_GLASS_AB`/
+`PINNED_GLASS_AB`/`MATCH_GLASS_AB`/`COMPOSE_GLASS_AB`) + token-promotering
+i egen skive; Android/RT-fallback for komponeringslinja; «Varsle hele
+laget»-raden inni compose er fortsatt solid surfaceMuted.
+
+---
+
+## (historikk) START HER 2026-09-02 sen kveld — LIQUID GLASS
 
 🫧 **LIQUID GLASS-PROTOTYPEN — `LiquidGlassSurface` (JS) + `HeiaLiquidGlassView`
 (native ObjC, `UIGlassEffect`) bak `FEED_LIQUID_GLASS_AB = true`. BYGGET
@@ -116,7 +140,106 @@ og `KalenderScreen.tsx` er urørt og ikke våre), HELE glass-skiva committet
 som 89e52e7 på Brage. IKKE pushet. emilkowalski-skillen ligger på
 `skills/apple-design/SKILL.md` i repoet (den flate stien gir 404).
 
-🫧 STEG 2 KODET (2026-09-02 natt) — UKOMMITTERT, IKKE TELEFONTESTET.
+✅ STEG 2 TELEFONGODKJENT (Light + Dark) OG COMMITTET fa8b107 (ikke pushet).
+
+🏟️🔒 DESIGNREGEL LÅST (Brage 2026-09-02): MØRKT GLASS KJENNETEGNER KAMP I
+HEIA. Kommende-kamp-heroen og kampinnleggene deler SAMME material-DNA
+(`StadiumGlass`). Vanlige innlegg og VIKTIG er lyst glass og urørt.
+
+🏟️ KAMPKORTET RUNDE 3 (samme natt) — TELEFONGODKJENT OG COMMITTET
+(tidligere: KODET, JS-ONLY, VENTER TELEFONBILDE). Runde 2 (mellomgrønn vask over lyst glass) AVVIST: «havner
+mellom lyst perleglass og mørkt stadionglass, ser flat ut». Bygget:
+• `StadiumGlass` utvidet med `compact` (lettere skygge 0/4/16 0,18 — alle
+  andre lag identiske med heroen: base 0,96 arenaTop→arenaBottom→timeline,
+  aqua-opptak øverst til venstre, lagfargerefleks, neon nederst til høyre,
+  høylys, kant, buer) og `pressed` (hvitt lys 0,10 inn i glasset). Heroen
+  er uendret (stadiumGlass-testen beviser samme lag-id-er, kun skyggen
+  skiller).
+• `FeedCard` kampkortet (samme layout som runde 2: forfatterheader, FRA
+  KAMPEN, kontekstkapsel, pulslinje, HEIA/Kommenter, «Se kampen ›») bruker
+  nå `<StadiumGlass compact pressed teamColor>` — ALDRI LiquidGlassSurface,
+  ingen vask; `LiquidGlassSurface.tsx` er tilbake i fa8b107-tilstand (kun
+  card/control/important). Trykk: lys i glasset + 0,98/1 pt ned via
+  Pressable-stil (samme tall som native). Blekk: `MATCH_INK` = {text:
+  matchColors.text opalhvit, dim: matchColors.dim lys mintgrå, accent:
+  #02FFAB kun på FRA KAMPEN}; live-kapselen coral som før. Rollepill =
+  opalhvit 0,14-lag; reaksjonspillene = hvit 0,10 + 1 pt hvit 0,16 kant
+  (ikke blekkvask); kapselen i egen ramme (opalhvit 0,28 kant + hvit 0,06)
+  så den ikke forsvinner i flaten; pulslinje neon 0,55, punkt dim/neon.
+• `TeamHomeScreen` sender `teamColor={activeTeamSpace?.color}` gjennom
+  FeedRow → FeedCard (refleksen i hjørnet, som heroen).
+• Kontrastport (feedOpal-testen) på alle tre arenastopp: hovedtekst ≥ 7:1,
+  dim/neon ≥ 4,5:1, hovedtekst ≥ 4,5:1 inne i pill-/rollelagene, aldri
+  sort. Suite 951 grønn, eslint rent. INGEN native endring, INGEN Cmd+R.
+TELEFONBILDE (Brage, Light + Dark, Metro-reload holder): kampkortet skal
+lese som «kamp» ved første blikk og som SAMME materiale som heroen over;
+sjekk at kapselen har nok ramme, at reaksjonslagene er tynne og lyse, at
+lagfargerefleksen ikke blir en flekk, og at trykket merkes (lys + skala).
+INGEN COMMIT før dom. Justeringsknapper: `GLASS.shadowCompact`/`pressLight`
+i StadiumGlass, `matchChipFrame`/`reactPillMatch`/`matchPulse*` i FeedCard.
+
+🏟️ (historikk) KAMPKORTET RUNDE 2 — AVVIST (mellomgrønn vask). Runde 1 (kun røykperle-tint) ble AVVIST av Brage: «0′ alene
+oppe til høyre er ikke akseptabelt», kortet må umiddelbart lese som
+kamphendelse som åpner kampen. Brages spesifikasjon, bygget punkt for punkt
+i SAMME FeedCard bak `MATCH_GLASS_AB` (kun match_start/_event/_end, ikke
+festet; «resultat» = card; festet kamp = important):
+ 1. forfatterheaderen øverst, uendret (uten kapsel i headeren);
+ 2. `match`-glass = SAMME card-tint 0,34 + klippet blekkvask
+    rgba(8,57,46,0,20) som absoluteFill INNI innerboksen (radius xl−1,
+    pointerEvents none) i `LiquidGlassSurface`; solid fallback #C4D0CC
+    (= vasken over opalens solid);
+ 3. «FRA KAMPEN»-etikett (10/800/1,1) + kapselen (ScoreChip) på samme rad
+    over hovedhendelsen. KAPSELEN BÆRER ALLTID KONTEKST via `matchChip()`:
+    «MÅL · 3′» / «MÅL IMOT · 3′», «LIVE · 1–0» (label «Live ·» + score),
+    «PAUSE», «SLUTT · 1–1», «AVSPARK» (ferdig kamp), ellers type + minutt
+    (Kort/Bytte/2. omgang/Kamp); ukjent type → «Kamp». Aldri rått «0′».
+ 4. Heia-pulslinje: 10 pt kolonne til venstre for hovedteksten, 2 pt
+    mintlinje (heia 0,7) + ett 10 pt hendelsespunkt øverst (live → neon
+    m/ heiaDeep-ring, ellers heiaInk m/ heiaTint-ring);
+ 5. HEIA + Kommenter urørt (samme gate `feedAllowsHeia`);
+ 6. «Se kampen ›» (typography.action, heiaDeep) nederst til høyre i
+    reaksjonsraden — ren tekst, IKKE egen Pressable;
+ 7. hele kortet = eksisterende onPress fra TeamHomeScreen (kampposter →
+    kampen), accessibilityLabel «Åpne kampen»; Kommenter → tråden.
+KONTRASTPORTEN TVANG ET BLEKKBYTTE: under vasken over svakeste grunn
+faller OPAL.inkSecondary til ~3,9:1, så ALT sekundært/tertiært/aksent-
+blekk på kampkortet er `MATCH_INK = colors.heiaDeep` (#08392E): rolle,
+tid, pilletekst, FRA KAMPEN, Se kampen. Målt i feedOpal-testen mot alle
+tre grunner: ≥ 4,5:1 på flaten, i pillevasken og på rollefyllet;
+primærtekst ≥ 7:1. Vanlige kort, datamodell, navigasjon, ScoreChip-
+komponenten og OpalSurface er URØRT.
+Verifisert: feedOpal 28/28 inkl. kapsel-matrisen (9 tilfeller, aldri
+bare minutt), full suite grønn, eslint rent.
+TELEFONBILDE (Brage, Light + Dark; Metro-reload holder): les om kortet
+umiddelbart er en kamphendelse; om vasken 0,20 er «tydelig dypere» uten å
+bli mørkt hero-kort; om pulslinja/punktet og «Se kampen ›» er diskrete nok;
+om «LIVE · 1–0» leser riktig med chipens gap. INGEN COMMIT før dom.
+Justeringsknapper: `GLASS.match.wash`-alfa (0,20), `matchPulse*`-stiler,
+`matchEyebrow`. Blir vasken svakere enn ~0,12 må blekkporten måles på nytt
+(da kan opalblekket holde igjen).
+
+🏟️ (historikk) MATCH-VARIANTEN runde 1 — AVVIST. Brages ramme: kun farge/material på eksisterende FeedCard
+for automatiske kampinnlegg; ingen layout/innhold/knapper/datamodell, ingen
+ny MatchEventCard, ingen buer, ingen neonrefleks. Godkjent med justering:
+RØYKPERLE `rgba(205,216,213,0,40)` (ikke den grønnere 198/216/210 —
+grunnen gir allerede mint gjennom glasset). Bygget: `GLASS.match` i
+`LiquidGlassSurface.tsx` (sheen 0,18, interactive — som card), solid
+fallback `matchSolid` #D5DEDA + heiaDeep-kant 0,14 (Android/Reduce
+Transparency; ingen SVG — samme flate View-mønster som important, nå
+generalisert i en `SOLID`-tabell). FeedCard: `MATCH_GLASS_AB = true` →
+variantvalg pinned → important, ellers isMatchType (match_start/
+match_event/match_end) → match, ellers card. Manuelt «resultat» beholder
+card. ScoreChip (mørk kapsel) urørt = eneste mørke element = signaturen.
+Verifisert: suite 943 grønn, eslint rent; feedOpal-testen har mintplast-
+vakt (kanalspredning ≤ 12, g ≥ b ≥ r), «dypere enn opal-solid» og
+kontrastport ≥ 4,5:1 for OPAL.ink* på matchSolid.
+TELEFONTEST (Brage, Light + Dark; Metro-reload holder, ingen .m-endring):
+kampinnlegg skal lese tydelig dypere/kjøligere enn vanlige kort, fortsatt
+lyst, ikke mint. BLIR FORSKJELLEN FOR LITEN: gjør flaten DYPERE (mørkere
+kanaler, evt. alfa 0,40 → 0,46), IKKE grønnere. Etter dom: commit (ikke
+push). Så: token-promotering / bryter-opprydding er fortsatt egen skive.
+
+🫧 (historikk) STEG 2 KODET (2026-09-02 natt):
 Brage godkjente forslaget med tre presiseringer: (1) compose = control-
 glass tint 0,20, halv sheen, ingen kortrespons; (2) VIKTIG = varm perle
 0,52 + eksisterende gullpill, INGEN uniform gullkant (leser som annonse/

@@ -183,6 +183,8 @@ interface FeedRowProps {
   onComment: (item: FeedItem) => void;
   onUnpin: (item: FeedItem) => void;
   onMore: (item: FeedItem) => void;
+  /** Lagfargen — refleksen i kampkortets stadionglass. */
+  teamColor?: string;
 }
 
 /**
@@ -201,6 +203,7 @@ const FeedRow = React.memo(function FeedRow({
   onComment,
   onUnpin,
   onMore,
+  teamColor,
 }: FeedRowProps) {
   const matchId = openableMatchId(item);
   return (
@@ -220,6 +223,7 @@ const FeedRow = React.memo(function FeedRow({
           canBroadcast && item.isPinned ? () => onUnpin(item) : undefined
         }
         onMore={() => onMore(item)}
+        teamColor={teamColor}
       />
     </View>
   );
@@ -629,9 +633,11 @@ export function TeamHomeScreen() {
         onComment={handleComment}
         onUnpin={handleUnpin}
         onMore={handlePostActions}
+        teamColor={activeTeamSpace?.color}
       />
     ),
     [
+      activeTeamSpace?.color,
       canBroadcast,
       handleOpenMatch,
       handleExpandImage,

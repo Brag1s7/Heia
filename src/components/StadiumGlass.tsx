@@ -87,6 +87,10 @@ export const GLASS = {
   /** Indre topphøylys — 1,5 pt under kanten, sterkest ved 32 % fra venstre. */
   highlight: 0.14,
   shadow: 'rgba(11, 59, 42, 0.22)',
+  /** Kompakt (feedkort): lettere skygge — mindre flate, tynnere materiale. */
+  shadowCompact: 'rgba(11, 59, 42, 0.18)',
+  /** Trykk: hvitt lys presset inn i glasset (JS-motstykket til native 0,16 på lyst). */
+  pressLight: 0.1,
 } as const;
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -128,12 +132,27 @@ interface StadiumGlassProps {
   teamColor?: string;
   /** Padding/gap — legges oppå flaten (innerboksen). */
   style?: StyleProp<ViewStyle>;
+  /**
+   * Kompakt variant (Brage 2026-09-02, designregel: MØRKT GLASS KJENNETEGNER
+   * KAMP): kampinnleggene i feeden deler dette materialet med kommende-kamp-
+   * heroen — samme base, opptak, refleks, neon, kant, høylys og buer. Det
+   * eneste som skalerer er skyggen (mindre flate → lettere skygge).
+   */
+  compact?: boolean;
+  /** Trykk (Pressable): lys presses inn i glasset. Skalering eier Pressable. */
+  pressed?: boolean;
   children?: React.ReactNode;
 }
 
 const FULL = {x: '0', y: '0', width: '100%', height: '100%'} as const;
 
-export function StadiumGlass({teamColor, style, children}: StadiumGlassProps) {
+export function StadiumGlass({
+  teamColor,
+  style,
+  compact = false,
+  pressed = false,
+  children,
+}: StadiumGlassProps) {
   const {reduceTransparency, increaseContrast} = useMaterialAccessibility();
   const lifted = useMemo(
     () => (teamColor ? liftTeamColor(teamColor) : null),
@@ -152,7 +171,11 @@ export function StadiumGlass({teamColor, style, children}: StadiumGlassProps) {
     : [GLASS.edgeTop, GLASS.edgeMid, GLASS.edgeBottom];
 
   return (
-    <View style={[styles.shadow, reduceTransparency && styles.shadowSolid]}>
+    <View
+      style={[
+        compact ? styles.shadowCompact : styles.shadow,
+        reduceTransparency && styles.shadowSolid,
+      ]}>
       {/* ATMOSFÆRE, IKKE INNHOLD — skjult for skjermleser, som MatchGround. */}
       <View
         style={StyleSheet.absoluteFill}
@@ -252,6 +275,7 @@ export function StadiumGlass({teamColor, style, children}: StadiumGlassProps) {
       <View style={[styles.surface, style]}>
         <View style={styles.arcOuter} pointerEvents="none" />
         <View style={styles.arcInner} pointerEvents="none" />
+        {pressed && <View style={styles.pressLight} pointerEvents="none" />}
         {children}
       </View>
     </View>
@@ -262,6 +286,16 @@ const styles = StyleSheet.create({
   shadow: {
     borderRadius: radius.xl,
     boxShadow: [{offsetX: 0, offsetY: 8, blurRadius: 28, color: GLASS.shadow}],
+  },
+  shadowCompact: {
+    borderRadius: radius.xl,
+    boxShadow: [
+      {offsetX: 0, offsetY: 4, blurRadius: 16, color: GLASS.shadowCompact},
+    ],
+  },
+  pressLight: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: `rgba(255, 255, 255, ${GLASS.pressLight})`,
   },
   // Reduce Transparency: solid bunn under den (da ugjennomsiktige) svg-en.
   shadowSolid: {
