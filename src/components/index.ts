@@ -44,6 +44,10 @@ export {InviteCodeCard} from './InviteCodeCard';
 export {NotificationRow} from './NotificationRow';
 export {NotificationBanner} from './NotificationBanner';
 export {StadiumSurface} from './StadiumSurface';
+// Stadionglasset — materialprototype (kamp-grenen i NextEventHero bak
+// NEXT_MATCH_GLASS_AB) + systembryterne materialet svarer på.
+export {StadiumGlass} from './StadiumGlass';
+export {useMaterialAccessibility} from './useMaterialAccessibility';
 export {BootScreen} from './BootScreen';
 export {HeroSurface} from './HeroSurface';
 // Dagslysgrunnen (skive 1A, statisk bakgrunnstest på Hjem) + A/B-bryteren

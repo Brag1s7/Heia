@@ -1,6 +1,63 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-02 — DESIGNSPORET: skive 1A DaylightGround TELEFONGODKJENT og committet; materialhypotesen B-puls er LEDENDE; neste = prototype av NextEventHero (kamp) i rolig stadionglass etter godkjent forslag)
+## ▶️▶️ START HER (oppdatert 2026-09-02 kveld — DESIGNSPORET: skive 1B StadiumGlass på kommende kamp TELEFONGODKJENT og committet, `NEXT_MATCH_GLASS_AB` STÅR PÅ; neste = OPALMATERIALET på hverdagsflatene i NY samtale, IKKE startet)
+
+🎨 **SKIVE 1B — STADIONGLASSET PÅ KOMMENDE KAMP: TELEFONGODKJENT OG
+COMMITTET 2026-09-02 (kveld).** Brages dom: «klart bedre enn A/B av» —
+`NEXT_MATCH_GLASS_AB` i `NextEventHero.tsx` STÅR PÅ `true`.
+`src/components/StadiumGlass.tsx` har ÉN konsument (kamp-grenen i
+`NextEventHero`, kun Hjem) og rører ikke globale `StadiumSurface`
+(12 konsumenter), `HeroSurface` (5), tokens, FeedCard, ScoreChip,
+NextEventCarousel, TeamHeader eller tab-bar. Geometri, padding, innhold og
+navigasjon er uendret (innerboksen beholder 1 pt gjennomsiktig kant så
+padding-boksen er identisk med StadiumSurface).
+
+Materialet (runde 2, etter visuell dom mot Brages tre referansebilder —
+runde 1 fikk 5/10 «pen mørkegrønn boks», runde 2 6/10): base
+arenaTop → arenaBottom (40 %) → timeline ved opasitet 0,96; aqua-opptak
+(#8FFFE0) 0,05 i øvre venstre hjørne; lagfargerefleks = lagfargen LØFTET
+40 % mot hvitt FØR blanding (`liftTeamColor`), arenaklemmen
+(`arenaLightCap`) målt på den løftede fargen, tak 0,18 — marine 0,18, rød
+0,15, skoggrønn 0,11, gul 0,06, alle TILFØRER luminans (rå marine gjorde
+flaten mørkere; rød løftet er #E88080 som prøve, men leser som varmt lys
+ved 15 % over dyp grønn — bevisst, ikke dempet); neon konsentrert nederst
+høyre 0,16 under banebuene; kantLYS som SVG-gradientstrøk (#D6FFF1
+0,40 → 0,16 → 0,06, 3 pt klippet med ClipPath til nøyaktig 1,5 pt synlig)
++ 1,5 pt indre topphøylys; grønn `boxShadow` (RN 0.83 Fabric) på
+ytterboksen. Tynn hvit KAMP-pill (coral betyr LIVE), hvitt RSVP-fyll 0,55,
+avsparkstiden er eneste neon. Rå tall bor i `GLASS`-konstanten.
+
+`src/components/useMaterialAccessibility.ts`: Reduce Transparency → solid
+base + solid bunn; Increase Contrast → uniform hvit kant 0,45 (samme
+bredde) + halve reflekser. PLATTFORMPORTET MED VILJE: i RN 0.83.1 løser
+`isDarkerSystemColorsEnabled()` på Android og `isHighTextContrastEnabled()`
+på iOS ALDRI (`return Promise.resolve(false)` inne i executoren). Kontrast-
+vakt i `__tests__/stadiumGlass.test.tsx` (32): hjørnelysene måles på
+toppen (ingen brødtekst: 4,5:1 tekst / 3:1 neon) og i tekstsonen
+(sonefaktor 0,35 på både refleks og opptak: 7:1) — `matchColors.text` er
+#EAFFF6, ikke hvitt, så arenaTop alene er 8,1:1 og full opptak-styrke under
+tekst faller under 7. Verifisert: suite 921/921, eslint, prettier husstil,
+`npx tsc --noEmit -p tsconfig.json` = de 7 kjente feilene, 0 nye. Riggverk:
+HTML → headless Chrome før/etter med marine/skoggrønn/rød/gul + IC + RT.
+Materialet har nådd omtrent det det kan ALENE — resten av avstanden til
+referansen er nestet innhold (chips, fotstripe), som er en senere skive.
+
+▶️ **NESTE (NY samtale, IKKE startet): OPALMATERIALET på hverdagsflatene.**
+Lyst opalglass på feed (FeedCard), Lagkassa-siden i karusellen og compose,
+i samme metode som 1A/1B: inspiser → forslag → Brages godkjenning → én
+isolert variant bak lokal bryter → riggverk-render → fysisk telefon.
+Sperrer som står: vanlige feedposter ALDRI mørke; opal = varm krem
+~0,88–0,92, aldri rent hvitt; sekundærlag blekk-tynne på lyse kort; ingen
+blur, ingen pakker; Android: aldri alpha 1 automatisk — `boxShadow` for
+skygge på gjennomskinnelig flate (klipper border-boksen ut); RT/IC bygges
+SAMMEN med materialet (`useMaterialAccessibility` finnes og er eksportert).
+Etter opalen: live-raden av stadionglasset, deretter promotering av farger
+til tokens og fjerning av A/B-bryterne (`DAYLIGHT_GROUND_AB`,
+`NEXT_MATCH_GLASS_AB`) i egen skive.
+
+---
+
+## ✅ Skive 1A + materialhypotesen (tidligere START HER 2026-09-02)
 
 🎨 **SKIVE 1A — DAGSLYSGRUNNEN PÅ HJEM: TELEFONGODKJENT OG LÅST 2026-09-02.**
 `src/components/DaylightGround.tsx` oversetter
@@ -38,8 +95,9 @@ Skill-linser godkjent som beslutningsgrunnlag: `apple-hig-designer`
 systemfont-default, Reanimated (core `Animated` native driver for eventuell
 bakgrunnsdrift senere; Reduce Motion bygges SAMMEN med bevegelsen).
 
-▶️ **NESTE: én isolert prototype — `NextEventHero` for KOMMENDE KAMP i rolig
-stadionintensitet, KUN på Hjem.** Sperrer fra Brage: ikke rør global
+✅ **GJORT som skive 1B (se øverst) — prototypen: `NextEventHero` for
+KOMMENDE KAMP i rolig stadionintensitet, KUN på Hjem.** Sperrene fra Brage
+sto gjennom hele skiva: ikke rør global
 `StadiumSurface` (12 konsumenter) eller `HeroSurface` (5); lokal/eksplisitt
 variant; ingen endring av layout, høyde, padding, innhold, navigasjon eller
 tilstandslogikk; ingen slutt-hero; ikke FeedCard/ScoreChip/Lagkassa/header/
