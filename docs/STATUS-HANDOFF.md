@@ -31,14 +31,17 @@ på pgc for feed/notif, ingen adferd endres før flipp. Innholdet:
 feed/teamLive-bryter 8, notif-bryter 4, poll-gate 4); prettier husstil +
 grep-verifisert.
 
-✅ **ALLE S3-PORTER GRØNNE 2026-09-02.** Match-flippen kjørt av Brage
-mot prod og telefonbevist («runde 1 grønn» — kampen går på broadcast i
-flåten). S3c-telefontesten («runde 2») grønn med dev-override: feed
-live, badge +1, kampknappen oppdaterer på mål uten 60 s-ventetid.
-Testlinjen i index.js fjernet (aldri committet). Flipp-UPDATE-ene for
-`feed` og `notif` (jsonb_set-mønsteret; kill-switch = UPDATE tilbake)
-er levert Brage, som kjører dem selv. `live_fallback_poll_s` kan settes
-(f.eks. 300) som belte-og-bukse under utrullingen.
+✅✅ **SKALERINGSSPORET LUKKET 2026-09-02: HELE FLÅTEN PÅ BROADCAST.**
+Brage har flippet alle tre flaggene i prod (match 2026-09-01, feed+notif
+2026-09-02) og prod-smoke-testen er GRØNN uten noen dev-override: feed
+live, badge +1, kampknappen reagerer på mål uten ventetid, bakgrunn→
+forgrunn OK. 60 s-pollingen er dermed død i flåten
+(`live_fallback_poll_s` = 0). Kill-switch består: én UPDATE per felt
+tilbake til `"pgc"` — klientene kan lese begge transporter for alltid
+(dual-run-koden beholdes). S4 (tømme postgres_changes-publikasjonen) er
+gatet på at flaggene står stabilt + gammel-klient-andel ≈ 0 — tas i
+pre-launch-pakken sammen med S5/S6/S8. **Ingen aktiv kø i dette sporet
+lenger.**
 
 🧰 **Designverktøy klargjort 2026-09-02:** `apple-hig-designer`
 (tristan-mcinnis, vurdert i HEIA-VISUAL-HANDOFF §13-tabellen) er nå
