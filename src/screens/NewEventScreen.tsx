@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   View,
@@ -8,13 +8,17 @@ import {
   TextInput,
   Pressable,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  LayoutAnimation,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
-import {Button, DateField, TimeField, useBottomContentPadding} from '../components';
+import {Button, DateField, TimeField, useReducedMotion} from '../components';
+import {FormSheet, type FormSheetHandle} from '../components/FormSheet';
+import {DateSheet} from '../components/DateSheet';
+import {TimeSheet} from '../components/TimeSheet';
+import {OPAL} from '../components/OpalSurface';
 import {useActiveTeam} from '../context';
 import {
   createEvent,
@@ -85,7 +89,21 @@ const TYPE_LABEL: Record<EventType, string> = {
 };
 
 export function NewEventScreen({navigation, route}: Props) {
-  const bottomPad = useBottomContentPadding();
+  // Arket dekker tab-baren: bunnen er safe area, ikke barhøyden.
+  const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
+  // ARKET (Brage 2026-09-03): «Ny hendelse» oppfører seg som kommentararket
+  // — full bredde, glir opp over skjermen du står på, dras ned for å lukke.
+  // ALL lukking går via arket: utglidning først, så `navigation.goBack`.
+  const sheetRef = useRef<FormSheetHandle>(null);
+  const dismiss = useCallback(() => {
+    if (sheetRef.current) sheetRef.current.dismiss();
+    else navigation.goBack();
+  }, [navigation]);
+  // Arkene (dato/klokkeslett) rendres i SKJERMROTEN som inline glassark —
+  // ikke fra feltene, og ikke som `Modal` (se GlassSheet.tsx).
+  const [dateSheet, setDateSheet] = useState<'start' | 'end' | null>(null);
+  const [timeOpen, setTimeOpen] = useState(false);
   const {activeTeamSpaceId} = useActiveTeam();
 
   // Skjermen er TOSIDIG (Brage 2026-08-07). `eventId` = redigering av det
@@ -94,6 +112,7 @@ export function NewEventScreen({navigation, route}: Props) {
   // et eget redigeringsskjema ville betydd to steder å holde i synk.
   const editEventId = route.params?.eventId;
   const isEdit = !!editEventId;
+  const sheetTitle = isEdit ? 'Rediger' : 'Ny hendelse';
 
   // Fire innganger til modalen:
   //  - vanlig «Ny hendelse» (+): fri typevelger
@@ -119,11 +138,11 @@ export function NewEventScreen({navigation, route}: Props) {
     isNewTournament
       ? 'turnering'
       : // «Ny kamp» fra Sesongens kampprogram (skive 10.1). Typen er
-        // FORHÅNDSVALGT, ikke låst: inngangen vet hva den lager, men en
-        // trener som ombestemmer seg skal slippe å gå ut og inn igjen.
-        route.params?.presetType === 'kamp' || inTournament
-        ? 'kamp'
-        : 'trening',
+      // FORHÅNDSVALGT, ikke låst: inngangen vet hva den lager, men en
+      // trener som ombestemmer seg skal slippe å gå ut og inn igjen.
+      route.params?.presetType === 'kamp' || inTournament
+      ? 'kamp'
+      : 'trening',
   );
   // «Turnering»-feltet på en vanlig kamp: velges kun når det finnes noe å
   // velge i. null = vanlig seriekamp.
@@ -176,9 +195,7 @@ export function NewEventScreen({navigation, route}: Props) {
   const [day, setDay] = useState<Date>(parentFrom ?? presetDay ?? today);
   // Turneringens sluttdato. Standard er SAMME dag som starten, så en
   // endagsturnering er like rask som før (Brage 2026-08-06).
-  const [endDay, setEndDay] = useState<Date>(
-    parentFrom ?? presetDay ?? today,
-  );
+  const [endDay, setEndDay] = useState<Date>(parentFrom ?? presetDay ?? today);
   const [time, setTime] = useState(DEFAULT_TIME);
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
@@ -283,6 +300,22 @@ export function NewEventScreen({navigation, route}: Props) {
   const isMatch = type === 'kamp';
   const isTournament = type === 'turnering' || isNewTournament;
 
+  // Typebytte legger til/fjerner felt (Motstander, Hjemme/borte, Turnering).
+  // Uten overgang «hopper alt under boksene langt ned» (Brage 2026-09-03);
+  // med LayoutAnimation glir resten av skjemaet på plass. Reduce Motion =
+  // hopp, som før.
+  const chooseType = useCallback(
+    (next: EventType) => {
+      if (!reducedMotion) {
+        LayoutAnimation.configureNext(
+          LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'),
+        );
+      }
+      setType(next);
+    },
+    [reducedMotion],
+  );
+
   // ⛔ Ingen «ugyldig klokkeslett»-tilstand lenger. `TimeField` er et
   // rutenett, så `time` kan bare være en verdi den selv har sendt — det
   // maskerte tekstfeltet var det eneste som kunne produsere «17:75».
@@ -385,7 +418,7 @@ export function NewEventScreen({navigation, route}: Props) {
         // Tilbake dit man kom fra — hendelsessiden, som henter seg selv på
         // nytt ved fokus. Å kaste brukeren over i Kalender etter en rettelse
         // ville mistet stedet hun sto.
-        navigation.goBack();
+        dismiss();
         return;
       }
 
@@ -418,7 +451,7 @@ export function NewEventScreen({navigation, route}: Props) {
       // Turneringen vises nå i kalenderen som alle andre objekter, så det
       // er ingen grunn til å holde den unna lenger — men den skal treffes,
       // ikke ligge et sted i lista.
-      navigation.goBack();
+      dismiss();
       if (!inTournament && !isNewTournament) {
         navigation
           .getParent<NavigationProp<RootTabParamList>>()
@@ -442,6 +475,7 @@ export function NewEventScreen({navigation, route}: Props) {
       setSaving(false);
     }
   }, [
+    dismiss,
     activeTeamSpaceId,
     payload,
     saving,
@@ -480,7 +514,7 @@ export function NewEventScreen({navigation, route}: Props) {
     // Ingenting er endret: å sende en tom lagring ville bare vært en rundtur
     // til serveren. Basen ville uansett ikke skrevet et varsel.
     if (unchanged) {
-      navigation.goBack();
+      dismiss();
       return;
     }
     if (!movesIntoPast) {
@@ -504,6 +538,7 @@ export function NewEventScreen({navigation, route}: Props) {
       ],
     );
   }, [
+    dismiss,
     payload,
     saving,
     unchanged,
@@ -513,238 +548,285 @@ export function NewEventScreen({navigation, route}: Props) {
     day,
     today,
     time,
-    navigation,
   ]);
 
   // Redigering venter på arrangementet. Å tegne et tomt skjema først og fylle
   // det ut et øyeblikk senere ville sett ut som at feltene ble slettet.
   if (isEdit && !original) {
     return (
-      <View style={[styles.screen, styles.centered]}>
-        {loadError ? (
-          <Text style={styles.errorText}>Kunne ikke hente hendelsen.</Text>
-        ) : (
-          <ActivityIndicator color={colors.heiaInk} />
-        )}
+      <View style={styles.screen}>
+        <FormSheet
+          ref={sheetRef}
+          title={sheetTitle}
+          onDismissed={navigation.goBack}
+          reducedMotion={reducedMotion}>
+          <View style={styles.centered}>
+            {loadError ? (
+              <Text style={styles.errorText}>Kunne ikke hente hendelsen.</Text>
+            ) : (
+              <ActivityIndicator color={colors.heiaInk} />
+            )}
+          </View>
+        </FormSheet>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={{
-          paddingBottom: bottomPad,
-        }}
-        keyboardShouldPersistTaps="handled">
-        {/* Typen kan ikke endres på et arrangement som finnes: en trening som
+    <View style={styles.screen}>
+      {/* ARKET (Brage 2026-09-03): kommentararkets oppførsel — full bredde,
+          opp over skjermen bak, dras ned. Selve arket er glasset
+          (`GLASS.sheet`); feltene er lyse, halvgjennomsiktige felt på det.
+          Ingen KeyboardAvoidingView (keyboard.tsx-regelen): arket er fullt,
+          og ScrollView-en eier tastaturet. */}
+      <FormSheet
+        ref={sheetRef}
+        title={sheetTitle}
+        onDismissed={navigation.goBack}
+        reducedMotion={reducedMotion}>
+        <ScrollView
+          contentContainerStyle={{paddingBottom: insets.bottom + spacing.lg}}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets>
+          {/* Typen kan ikke endres på et arrangement som finnes: en trening som
             blir en kamp trenger en match_session, og det er ikke en rettelse
             (00057). En rad med døde chips ville bare invitert til et trykk
             som ikke gjør noe. */}
-        {isEdit ? (
-          <Field label="Hva skjer?">
-            <View style={styles.lockedBanner}>
-              <Text style={styles.lockedBannerText}>
-                {TYPE_LABEL[type] ?? 'Hendelse'}
-              </Text>
-            </View>
-          </Field>
-        ) : inTournament || isNewTournament ? (
-          <Field label="Hva skjer?">
-            <View style={styles.tournamentBanner}>
-              <Text style={styles.tournamentBannerText}>
-                {isNewTournament
-                  ? 'Turnering'
-                  : `Kamp i ${parentTitle ?? 'turneringen'}`}
-              </Text>
-            </View>
-          </Field>
-        ) : (
-          <Field label="Hva skjer?">
-            <View style={styles.chipRow}>
-              {TYPE_OPTIONS.map(option => (
-                <SelectChip
-                  key={option.value}
-                  label={option.label}
-                  selected={type === option.value}
-                  onPress={() => setType(option.value)}
-                />
-              ))}
-            </View>
-          </Field>
-        )}
-
-        {/* Kampen kan høre til en turnering — HVIS laget har en aktuell.
-            Ingen turneringer = feltet finnes ikke, og kampen er en vanlig
-            seriekamp (brukerens modell, 2026-07-30). */}
-        {isMatch && !inTournament && tournaments.length > 0 && (
-          <Field label="Turnering">
-            <View style={styles.chipRow}>
-              <SelectChip
-                label="Ingen"
-                selected={selectedTournament === null}
-                onPress={() => setSelectedTournament(null)}
-              />
-              {tournaments.map(tournament => (
-                <SelectChip
-                  key={tournament.id}
-                  label={tournament.title}
-                  selected={selectedTournament === tournament.id}
-                  onPress={() => setSelectedTournament(tournament.id)}
-                />
-              ))}
-            </View>
-          </Field>
-        )}
-
-        {isMatch && (
-          <>
-            <Field label="Motstander">
-              <TextInput
-                style={styles.input}
-                value={opponent}
-                onChangeText={setOpponent}
-                placeholder="Lyn"
-                placeholderTextColor={colors.textTertiary}
-                editable={!saving}
-              />
-            </Field>
-
-            <Field label="Hjemme eller borte?">
-              <View style={styles.chipRow}>
-                <SelectChip
-                  label="Hjemme"
-                  selected={isHome}
-                  onPress={() => setIsHome(true)}
-                />
-                <SelectChip
-                  label="Borte"
-                  selected={!isHome}
-                  onPress={() => setIsHome(false)}
-                />
+          {isEdit ? (
+            <Field label="Hva skjer?">
+              <View style={styles.lockedBanner}>
+                <Text style={styles.lockedBannerText}>
+                  {TYPE_LABEL[type] ?? 'Hendelse'}
+                </Text>
               </View>
             </Field>
-          </>
-        )}
+          ) : inTournament || isNewTournament ? (
+            <Field label="Hva skjer?">
+              <View style={styles.tournamentBanner}>
+                <Text style={styles.tournamentBannerText}>
+                  {isNewTournament
+                    ? 'Turnering'
+                    : `Kamp i ${parentTitle ?? 'turneringen'}`}
+                </Text>
+              </View>
+            </Field>
+          ) : (
+            <Field label="Hva skjer?">
+              <View style={styles.chipRow}>
+                {TYPE_OPTIONS.map(option => (
+                  <SelectChip
+                    key={option.value}
+                    label={option.label}
+                    selected={type === option.value}
+                    onPress={() => chooseType(option.value)}
+                  />
+                ))}
+              </View>
+            </Field>
+          )}
 
-        {/* Tittelen sto nest sist. Den er hendelsens navn, og hører hjemme
+          {/* Kampen kan høre til en turnering — HVIS laget har en aktuell.
+            Ingen turneringer = feltet finnes ikke, og kampen er en vanlig
+            seriekamp (brukerens modell, 2026-07-30). */}
+          {isMatch && !inTournament && tournaments.length > 0 && (
+            <Field label="Turnering">
+              <View style={styles.chipRow}>
+                <SelectChip
+                  label="Ingen"
+                  selected={selectedTournament === null}
+                  onPress={() => setSelectedTournament(null)}
+                />
+                {tournaments.map(tournament => (
+                  <SelectChip
+                    key={tournament.id}
+                    label={tournament.title}
+                    selected={selectedTournament === tournament.id}
+                    onPress={() => setSelectedTournament(tournament.id)}
+                  />
+                ))}
+              </View>
+            </Field>
+          )}
+
+          {isMatch && (
+            <>
+              <Field label="Motstander">
+                <TextInput
+                  style={styles.input}
+                  value={opponent}
+                  onChangeText={setOpponent}
+                  placeholder="Lyn"
+                  placeholderTextColor={OPAL.inkSecondary}
+                  editable={!saving}
+                />
+              </Field>
+
+              <Field label="Hjemme eller borte?">
+                <View style={styles.chipRow}>
+                  <SelectChip
+                    label="Hjemme"
+                    selected={isHome}
+                    onPress={() => setIsHome(true)}
+                  />
+                  <SelectChip
+                    label="Borte"
+                    selected={!isHome}
+                    onPress={() => setIsHome(false)}
+                  />
+                </View>
+              </Field>
+            </>
+          )}
+
+          {/* Tittelen sto nest sist. Den er hendelsens navn, og hører hjemme
             der man nettopp bestemte hva hendelsen ER (Brages hurtigflyt:
             type → motstander/tittel → dato → klokkeslett → sted → beskjed). */}
-        <Field label="Tittel">
-          <TextInput
-            style={styles.input}
-            value={title}
-            onChangeText={setTitle}
-            placeholder={defaultTitle(type, opponent)}
-            placeholderTextColor={colors.textTertiary}
-            editable={!saving}
-          />
-        </Field>
-
-        <Field label={isTournament ? 'Starter' : 'Dag'}>
-          <DateField
-            value={day}
-            onChange={setStartDay}
-            busy={busy}
-            busyLoading={busyLoading}
-            daysBack={daysBack}
-            monthsAhead={MONTHS_AHEAD}
-            disabled={saving}
-          />
-          {outsideParent && parentFrom && parentTo && (
-            <Text style={styles.noteText}>
-              Utenfor {parentTitle ?? 'turneringen'} (
-              {dayRangeLabel(parentFrom, parentTo)}). Kampen lagres likevel.
-            </Text>
-          )}
-        </Field>
-
-        {/* En cup varer ofte en helg. Sluttdatoen står som SAMME dag til
-            noen flytter den, så endagsturneringen er like rask som før. */}
-        {isTournament && (
-          <Field label="Slutter">
-            <DateField
-              value={endDay}
-              onChange={setEndDay}
-              busy={busy}
-              busyLoading={busyLoading}
-              minDate={day}
-              monthsAhead={MONTHS_AHEAD}
-              disabled={saving}
+          <Field label="Tittel">
+            <TextInput
+              style={styles.input}
+              value={title}
+              onChangeText={setTitle}
+              placeholder={defaultTitle(type, opponent)}
+              placeholderTextColor={OPAL.inkSecondary}
+              editable={!saving}
             />
-            <Text style={styles.noteText}>
-              {dayDiff(endDay, day) === 0
-                ? 'Én dag'
-                : `${dayDiff(endDay, day) + 1} dager · ${dayRangeLabel(
-                    day,
-                    endDay,
-                  )}`}
-            </Text>
           </Field>
-        )}
 
-        <Field label="Klokkeslett">
-          <TimeField value={time} onChange={setTime} disabled={saving} />
-          {startsInPast && (
-            <Text style={styles.noteText}>
-              Dette tidspunktet har vært. Laget får ingen varsling.
-            </Text>
+          <Field label={isTournament ? 'Starter' : 'Dag'}>
+            <DateField
+              value={day}
+              busy={busy}
+              disabled={saving}
+              open={dateSheet === 'start'}
+              onOpen={() => setDateSheet('start')}
+            />
+            {outsideParent && parentFrom && parentTo && (
+              <Text style={styles.noteText}>
+                Utenfor {parentTitle ?? 'turneringen'} (
+                {dayRangeLabel(parentFrom, parentTo)}). Kampen lagres likevel.
+              </Text>
+            )}
+          </Field>
+
+          {/* En cup varer ofte en helg. Sluttdatoen står som SAMME dag til
+            noen flytter den, så endagsturneringen er like rask som før. */}
+          {isTournament && (
+            <Field label="Slutter">
+              <DateField
+                value={endDay}
+                busy={busy}
+                disabled={saving}
+                open={dateSheet === 'end'}
+                onOpen={() => setDateSheet('end')}
+              />
+              <Text style={styles.noteText}>
+                {dayDiff(endDay, day) === 0
+                  ? 'Én dag'
+                  : `${dayDiff(endDay, day) + 1} dager · ${dayRangeLabel(
+                      day,
+                      endDay,
+                    )}`}
+              </Text>
+            </Field>
           )}
-          {/* Sier sant om konsekvensen FØR trykket. Vakten i 00057 og denne
+
+          <Field label="Klokkeslett">
+            <TimeField
+              value={time}
+              disabled={saving}
+              open={timeOpen}
+              onOpen={() => setTimeOpen(true)}
+            />
+            {startsInPast && (
+              <Text style={styles.noteText}>
+                Dette tidspunktet har vært. Laget får ingen varsling.
+              </Text>
+            )}
+            {/* Sier sant om konsekvensen FØR trykket. Vakten i 00057 og denne
               setningen regnes ut av samme funksjon — de kan ikke komme i
               utakt. */}
-          {notifiesTeam && (
-            <Text style={styles.noteText}>
-              Laget får én beskjed om det du har endret.
-            </Text>
-          )}
-        </Field>
+            {notifiesTeam && (
+              <Text style={styles.noteText}>
+                Laget får én beskjed om det du har endret.
+              </Text>
+            )}
+          </Field>
 
-        <Field label="Sted">
-          <TextInput
-            style={styles.input}
-            value={location}
-            onChangeText={setLocation}
-            placeholder="Kunstgresset"
-            placeholderTextColor={colors.textTertiary}
-            editable={!saving}
-          />
-        </Field>
+          <Field label="Sted">
+            <TextInput
+              style={styles.input}
+              value={location}
+              onChangeText={setLocation}
+              placeholder="Kunstgresset"
+              placeholderTextColor={OPAL.inkSecondary}
+              editable={!saving}
+            />
+          </Field>
 
-        <Field label="Beskjed til laget">
-          <TextInput
-            style={[styles.input, styles.multiline]}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="Husk shorts og drikkeflaske…"
-            placeholderTextColor={colors.textTertiary}
-            multiline
-            editable={!saving}
-          />
-        </Field>
+          <Field label="Beskjed til laget">
+            <TextInput
+              style={[styles.input, styles.multiline]}
+              value={description}
+              onChangeText={setDescription}
+              placeholder="Husk shorts og drikkeflaske…"
+              placeholderTextColor={OPAL.inkSecondary}
+              multiline
+              editable={!saving}
+            />
+          </Field>
 
-        <View style={styles.saveRow}>
-          <Button
-            title={
-              // Redigering LOVER ingenting om hvor noe havner — det ligger
-              // allerede der. Turneringen havner ikke i kalenderen, så
-              // knappen kan ikke love det heller.
-              isEdit
-                ? 'Lagre endringer'
-                : isTournament || isNewTournament
+          <View style={styles.saveRow}>
+            <Button
+              title={
+                // Redigering LOVER ingenting om hvor noe havner — det ligger
+                // allerede der. Turneringen havner ikke i kalenderen, så
+                // knappen kan ikke love det heller.
+                isEdit
+                  ? 'Lagre endringer'
+                  : isTournament || isNewTournament
                   ? 'Opprett turnering'
                   : 'Legg til i kalenderen'
-            }
-            onPress={handleSave}
-            disabled={!canSave}
-            loading={saving}
-            size="lg"
-          />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+              }
+              onPress={handleSave}
+              disabled={!canSave}
+              loading={saving}
+              size="lg"
+            />
+          </View>
+        </ScrollView>
+      </FormSheet>
+
+      {/* ARKENE — i skjermroten, over skjemaet, som inline glassark. Datoen
+          velger OG lukker; klokkeslettet lukker på «Ferdig»/«Avbryt». */}
+      <DateSheet
+        visible={dateSheet !== null}
+        value={dateSheet === 'end' ? endDay : day}
+        onChange={picked => {
+          if (dateSheet === 'end') setEndDay(picked);
+          else setStartDay(picked);
+          setDateSheet(null);
+        }}
+        onClose={() => setDateSheet(null)}
+        busy={busy}
+        busyLoading={busyLoading}
+        daysBack={dateSheet === 'end' ? 0 : daysBack}
+        minDate={dateSheet === 'end' ? day : undefined}
+        monthsAhead={MONTHS_AHEAD}
+        disabled={saving}
+        reducedMotion={reducedMotion}
+      />
+      <TimeSheet
+        visible={timeOpen}
+        value={time}
+        onCancel={() => setTimeOpen(false)}
+        onDone={next => {
+          setTime(next);
+          setTimeOpen(false);
+        }}
+        reducedMotion={reducedMotion}
+      />
+    </View>
   );
 }
 
@@ -793,40 +875,52 @@ function SelectChip({
 // ---------------------------------------------------------------------------
 // Stiler
 // ---------------------------------------------------------------------------
+/** Feltflaten på glasspanelet: lys perle 0,55 + svak blekk-hårlinje. */
+export const FIELD = {
+  fill: 'rgba(255, 255, 255, 0.55)',
+  edge: 'rgba(5, 44, 35, 0.12)',
+} as const;
+
 const styles = StyleSheet.create({
+  // Ruta er en transparentModal: skjermen bak synes gjennom scrimmet.
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   centered: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Tettere rytme (Brage 2026-09-03: «se alt innholdet uten å måtte bla»).
   field: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     gap: spacing.sm,
   },
   // Samme caps-uttrykk som seksjonsetikettene (A v2).
+  // Blekk på glass: OPAL.ink* (mørkere enn tokenene — kontrastporten over
+  // grunnens mørkeste sone).
   fieldLabel: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
+  // Felt og chips på panelet: lys, halvgjennomsiktig perle med blekk-
+  // hårlinje — leses som innfelt i glasset, ikke som hvite kort oppå.
   selectChip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: FIELD.edge,
+    backgroundColor: FIELD.fill,
   },
   selectChipSelected: {
     backgroundColor: colors.heiaSoft,
@@ -837,7 +931,7 @@ const styles = StyleSheet.create({
   },
   selectChipText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   selectChipTextSelected: {
     color: colors.heiaInk,
@@ -845,19 +939,19 @@ const styles = StyleSheet.create({
   },
   input: {
     ...typography.input,
-    backgroundColor: colors.surface,
+    backgroundColor: FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: FIELD.edge,
     color: colors.textPrimary,
   },
   // `timeInput` er FJERNET (2026-08-07). Klokkeslettet er ikke lenger et
   // tekstfelt — det er `TimeField`, som eier sin egen typografi. Det store
   // tallet i displayfonten bor der nå.
   multiline: {
-    minHeight: 96,
+    minHeight: 72,
     textAlignVertical: 'top',
   },
   errorText: {
@@ -867,11 +961,11 @@ const styles = StyleSheet.create({
   // Ikke en feil — en konsekvens brukeren skal se før den lagres.
   noteText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   saveRow: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing['2xl'],
+    paddingTop: spacing.lg,
   },
   // Låst kontekst («Kamp i Hamar Cup») — turneringens myke gulflate.
   tournamentBanner: {

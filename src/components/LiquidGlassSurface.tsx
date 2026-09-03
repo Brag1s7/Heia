@@ -56,7 +56,8 @@ export type GlassVariant =
   | 'control'
   | 'important'
   | 'bar'
-  | 'barMatch';
+  | 'barMatch'
+  | 'sheet';
 
 export const GLASS = {
   card: {tint: 'rgba(233, 235, 234, 0.34)', sheen: 0.18, interactive: true},
@@ -82,6 +83,17 @@ export const GLASS = {
    */
   barMatch: {tint: 'rgba(29, 70, 51, 0.62)', sheen: 0.06, interactive: false},
   /**
+   * ARKENE (Brage 2026-09-03): månedsvisningen fra «Måned», «Ny hendelse»
+   * («+ Ny» på Kalender og «Ny kamp» fra Sesongen). «Ganske tungt glass»:
+   * den tyngste perlen i familien, 0,80 — rutenettet og skjemaet skal være
+   * ekstremt lesbart, men grunnen skal fortsatt farge flaten (over neon blir
+   * arket lys mint, over teal kjølig perle). Lite sheen: et ark skinner
+   * ikke. Ingen scrim over siden bak — arket er et parallelt panel, ikke en
+   * blokkerende oppgave (Emil: «dim to focus, separate to keep flow»).
+   * Blekket på arket er OPAL.ink* (kontrastporten i glassSheet.test).
+   */
+  sheet: {tint: 'rgba(244, 246, 245, 0.8)', sheen: 0.1, interactive: false},
+  /**
    * Solid varm perle for `important` uten glass (Android / Reduce
    * Transparency / eldre iOS): tinten over lysfelt-grunnen regnet ut til én
    * flat farge, så materialretningen beholdes — IKKE det mettede
@@ -95,6 +107,9 @@ export const GLASS = {
   /** Solid arena for kampbaren uten glass + svak opalhvit kant. */
   barMatchSolid: '#1D4633',
   barMatchSolidEdge: 'rgba(234, 255, 246, 0.16)',
+  /** Solid perle for arkene uten glass (= OPAL.solid) + svak heiaDeep-kant. */
+  sheetSolid: '#EFF3F1',
+  sheetSolidEdge: 'rgba(8, 57, 46, 0.12)',
 } as const;
 
 /**
@@ -105,6 +120,7 @@ const SOLID: Partial<Record<GlassVariant, {fill: string; edge: string}>> = {
   important: {fill: GLASS.importantSolid, edge: GLASS.importantSolidEdge},
   bar: {fill: GLASS.barSolid, edge: GLASS.barSolidEdge},
   barMatch: {fill: GLASS.barMatchSolid, edge: GLASS.barMatchSolidEdge},
+  sheet: {fill: GLASS.sheetSolid, edge: GLASS.sheetSolidEdge},
 };
 
 interface NativeProps extends ViewProps {

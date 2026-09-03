@@ -1,7 +1,8 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, Modal, Pressable, StyleSheet} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {colors, typography, spacing, radius} from '../../theme';
+import {Text, Modal, Pressable, StyleSheet} from 'react-native';
+import {typography, spacing} from '../../theme';
+import {GlassSheetSurface} from '../GlassSheet';
+import {OPAL} from '../OpalSurface';
 import {MonthGrid} from './MonthGrid';
 import {type BusyDays} from '../../shared/calendar';
 import type {EventType} from '../../shared/types';
@@ -33,6 +34,16 @@ interface MonthSheetProps {
  *
  * Rutenettet, dagcellene og datomatten er de SAMME som i datovelgeren
  * (`DateField`). Det er presentasjonen som er ny, ikke logikken.
+ *
+ * MATERIALET (Brage 2026-09-03): arket er tungt Heia-glass (`GLASS.sheet`,
+ * ekte systemblur på iOS 26, solid perle ellers) — ikke en flat hvit
+ * flate, og INGEN mørk scrim over siden bak: Kalender står urørt og synlig
+ * over arket, bare kjølig og uskarp gjennom glasset. Bakflaten er fortsatt
+ * trykkbar for å lukke. Stor radius og drag-handle beholdes; dagene får
+ * ingen egne glassbokser — rutenettet er `plain`, som før.
+ * Selve arket er `GlassSheetSurface` (delt med dato- og klokkeslettarket i
+ * «Ny hendelse»); presentasjonen her er `Modal` fordi arket må dekke den
+ * flytende tab-baren — se GlassSheet.tsx.
  */
 export function MonthSheet({
   visible,
@@ -44,8 +55,6 @@ export function MonthSheet({
   onSelect,
   onClose,
 }: MonthSheetProps) {
-  const insets = useSafeAreaInsets();
-
   const [view, setView] = useState(
     () => new Date(selected.getFullYear(), selected.getMonth(), 1),
   );
@@ -70,8 +79,7 @@ export function MonthSheet({
         accessibilityRole="button"
         accessibilityLabel="Lukk månedsvisningen"
       />
-      <View style={[styles.sheet, {paddingBottom: insets.bottom + spacing.lg}]}>
-        <View style={styles.handle} />
+      <GlassSheetSurface>
         <MonthGrid
           view={view}
           onChangeView={setView}
@@ -85,34 +93,20 @@ export function MonthSheet({
         <Text style={styles.foot}>
           Trykk på en dato for å gå dit i kalenderen
         </Text>
-      </View>
+      </GlassSheetSurface>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  // Ingen scrim (Brage 2026-09-03): siden bak forblir som den er. Flaten er
+  // fortsatt trykkbar for å lukke.
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    alignSelf: 'center',
-    marginBottom: spacing.md,
   },
   foot: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
     paddingTop: spacing.sm,
   },

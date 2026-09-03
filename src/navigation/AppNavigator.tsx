@@ -3,8 +3,6 @@ import {
   Alert,
   Animated,
   Linking,
-  Pressable,
-  Text,
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
@@ -164,25 +162,16 @@ const daylightGroundOptions: NativeStackNavigationOptions | undefined =
 // slik at «Ny kamp» på en turneringsside virker uansett hvilken fane
 // turneringen ble åpnet fra.
 // ---------------------------------------------------------------------------
-const newEventOptions = ({
-  navigation,
-  route,
-}: any): NativeStackNavigationOptions => ({
-  // Samme modal, to jobber (2026-08-07). Tittelen er det eneste stedet
-  // brukeren ser forskjellen før feltene er fylt ut.
-  title: route?.params?.eventId ? 'Rediger' : 'Ny hendelse',
-  presentation: 'modal',
-  // Modalen beholder native header og vertikal systemanimasjon —
-  // `simple_push` fra fellesinnstillingene ville gjort den horisontal.
-  headerShown: true,
-  animation: 'default',
-  // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
-  headerLeft: () => (
-    <Pressable onPress={navigation.goBack} hitSlop={8}>
-      <Text style={styles.headerAction}>Avbryt</Text>
-    </Pressable>
-  ),
-});
+const newEventOptions: NativeStackNavigationOptions = {
+  // SKJEMA-ARKET (Brage 2026-09-03): «Ny hendelse» oppfører seg som
+  // kommentararket. Ruta er GJENNOMSIKTIG (skjermen bak står synlig), uten
+  // header og uten egen animasjon — `FormSheet` i skjermen eier glasset,
+  // scrimmet, innglidningen, draget og utglidningen (så `goBack`).
+  presentation: 'transparentModal',
+  animation: 'none',
+  headerShown: false,
+  contentStyle: {backgroundColor: 'transparent'},
+};
 
 // ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)

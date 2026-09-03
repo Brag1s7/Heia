@@ -2,16 +2,15 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
-  Modal,
   Pressable,
   Animated,
   StyleSheet,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius, fonts} from '../theme';
 import {Button} from './Button';
+import {GlassSheetSurface, InlineSheet} from './GlassSheet';
 import {parseTime} from '../shared/eventForm';
 
 /**
@@ -49,6 +48,16 @@ import {parseTime} from '../shared/eventForm';
  * ⛔ **`ScrollView`, ikke `FlatList`.** Med 24 og 12 elementer er
  * virtualisering ren overhead, og vindusberegningen kan gi tomme celler under
  * en rask fling. Alt rendres én gang.
+ *
+ * ⚠️ TO FEIL FUNNET PÅ TELEFONEN (Brage 2026-09-03) og rettet her:
+ *  1. «Henger i flere sekunder, må trykke rundt»: arket var en RN `Modal`
+ *     presentert fra «Ny hendelse», som selv er en native modal. Nå er det
+ *     et INLINE glassark (`InlineSheet`) rendret i skjermroten — ingen
+ *     `Modal`, ingen scrim, samme glass som månedsvisningen.
+ *  2. «Stopper opp hakkete»: `contentOffset` ble regnet av `value` på hver
+ *     render, og `value` endres ved drag-slipp — så mens momentumet fortsatt
+ *     rullet, fikk scrollflaten en NY contentOffset-prop og hoppet. Offsetet
+ *     fryses nå per montering (hjulet remonteres uansett per åpning).
  */
 
 /** Radhøyden, og dermed snap-intervallet. 44 pt = Apples minste trykkflate. */
@@ -61,7 +70,10 @@ const PAD = (VIEWPORT - ITEM_HEIGHT) / 2;
 
 const HOURS = Array.from({length: 24}, (_, i) => i);
 const MINUTE_STEP = 5;
-const MINUTES = Array.from({length: 60 / MINUTE_STEP}, (_, i) => i * MINUTE_STEP);
+const MINUTES = Array.from(
+  {length: 60 / MINUTE_STEP},
+  (_, i) => i * MINUTE_STEP,
+);
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -73,7 +85,10 @@ const pad = (n: number) => String(n).padStart(2, '0');
  * noen trykker «Ferdig», så «Avbryt» lar 18:07 stå urørt.
  */
 function snapMinute(minutes: number): number {
-  return Math.min(60 - MINUTE_STEP, Math.round(minutes / MINUTE_STEP) * MINUTE_STEP);
+  return Math.min(
+    60 - MINUTE_STEP,
+    Math.round(minutes / MINUTE_STEP) * MINUTE_STEP,
+  );
 }
 
 interface TimeSheetProps {
@@ -82,11 +97,16 @@ interface TimeSheetProps {
   value: string;
   onCancel: () => void;
   onDone: (next: string) => void;
+  reducedMotion?: boolean;
 }
 
-export function TimeSheet({visible, value, onCancel, onDone}: TimeSheetProps) {
-  const insets = useSafeAreaInsets();
-
+export function TimeSheet({
+  visible,
+  value,
+  onCancel,
+  onDone,
+  reducedMotion = false,
+}: TimeSheetProps) {
   // Utkast, ikke sannhet: arket endrer ingenting før «Ferdig».
   const [hour, setHour] = useState(18);
   const [minute, setMinute] = useState(0);
@@ -110,19 +130,12 @@ export function TimeSheet({visible, value, onCancel, onDone}: TimeSheetProps) {
   }, [onDone, hour, minute]);
 
   return (
-    <Modal
+    <InlineSheet
       visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onCancel}>
-      <Pressable
-        style={styles.backdrop}
-        onPress={onCancel}
-        accessibilityRole="button"
-        accessibilityLabel="Lukk klokkeslettvelgeren"
-      />
-      <View style={[styles.sheet, {paddingBottom: insets.bottom + spacing.lg}]}>
-        <View style={styles.handle} />
+      onClose={onCancel}
+      closeLabel="Lukk klokkeslettvelgeren"
+      reducedMotion={reducedMotion}>
+      <GlassSheetSurface style={styles.sheet}>
         <Text style={styles.title}>Klokkeslett</Text>
 
         <View style={styles.wheels}>
@@ -165,8 +178,8 @@ export function TimeSheet({visible, value, onCancel, onDone}: TimeSheetProps) {
             style={styles.action}
           />
         </View>
-      </View>
-    </Modal>
+      </GlassSheetSurface>
+    </InlineSheet>
   );
 }
 
@@ -191,15 +204,19 @@ function Wheel({
   accessibilityLabel,
   unit,
 }: WheelProps) {
-  const initialIndex = Math.max(0, items.indexOf(value));
+  // ⚠️ FRYSES PER MONTERING. Regnet av `value` på hver render endret
+  // `contentOffset`-propen midt i momentumet (value settes ved drag-slipp) —
+  // det var hakkingen. Startposisjonen leses uansett bare ved opprettelse.
+  const initialOffset = useRef(
+    Math.max(0, items.indexOf(value)) * ITEM_HEIGHT,
+  ).current;
 
   // Drives natively. Hele dimmingen henger på denne ene verdien, så ingen
   // render kjøres mens hjulet er i bevegelse.
-  const scrollY = useRef(
-    new Animated.Value(initialIndex * ITEM_HEIGHT),
-  ).current;
+  const scrollY = useRef(new Animated.Value(initialOffset)).current;
 
-  const scrollRef = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
+  const scrollRef =
+    useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
 
   /**
    * Verdiene er TRYKKBARE, ikke bare rullbare.
@@ -241,7 +258,7 @@ function Wheel({
         decelerationRate="fast"
         // iOS leser denne ved opprettelse — derfor remonteres hjulet per
         // åpning i stedet for at vi jager layouten med `scrollTo`.
-        contentOffset={{x: 0, y: initialIndex * ITEM_HEIGHT}}
+        contentOffset={{x: 0, y: initialOffset}}
         contentContainerStyle={styles.wheelContent}
         onScroll={Animated.event(
           [{nativeEvent: {contentOffset: {y: scrollY}}}],
@@ -304,24 +321,8 @@ function Wheel({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
   },
   title: {
     ...typography.heading3,

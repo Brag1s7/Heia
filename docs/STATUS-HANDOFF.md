@@ -1,6 +1,176 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-03 natt — DAGSLYSGRUNN «E-atmosphere» + MASTHEAD-LAGHODE TELEFONGODKJENT OG COMMITTET; NESTE = KALENDER-BLOKKEN + VARSLER-HANDLINGEN + PROFIL-HEADER, i NY samtale)
+## ▶️▶️ START HER (oppdatert 2026-09-04 — KALENDER-CHROMEN (35ae050) OG ARKENE I GLASS + «NY HENDELSE» SOM KOMMENTARARK TELEFONGODKJENT, COMMITTET OG PUSHET; NESTE = andre skjermer (Varsler-handlingen/-tittelen, Profil-header) i NY samtale)
+
+✅ TREET ER RENT OG PUSHET (2026-09-04). Brage: «Veldig bra! Commit og
+push». Header og DaylightGround er URØRT (visuelt låst av Brage
+2026-09-03 — «lar dem være helt urørt til designsporet er ferdig»).
+Ingen native endring i noen av skivene — Metro-reload holder.
+NY SAMTALE ER TRYGG: Brage vil se på andre skjermer (design og elementer).
+Anbefalt start: Varsler (tittel + «Merk alle som lest» i mørk topp — samme
+grep som Kalender: liten fast chrome i stadionblekk), deretter
+Profil-header (masthead-anatomi), deretter FeedCard mer glass
+(GLASS.sheet/FIELD-språket er startpunktet). Glassarkfamilien som skal
+gjenbrukes: `GlassSheetSurface` (flaten), `InlineSheet` (ark inne i en
+skjerm), `FormSheet` (ark som kommentararket over en transparentModal-rute),
+`MonthSheet` (Modal — må dekke tab-baren).
+
+1. KALENDER-CHROMEN — LUKKET, telefongodkjent («Det ser veldig bra ut og er
+   godkjent!»), commit 35ae050:
+   · Chromen (CalendarNav: måned + «I dag»/«Måned»/«+ Ny», WeekStrip,
+     statusrad) ligger FAST under laghodet, UTENFOR ScrollView-en i
+     KalenderScreen; bare agendaen ruller. Ingen sticky header, ingen
+     festeterskel (navTop/navHeight er borte), ingen scroll-away-tittel
+     («Kalender» + undertekst er FJERNET — fanen heter Kalender, måneden er
+     chromens tittel). Chromen er gjennomsiktig innhold på dagslysgrunnen:
+     ingen flate, ingen kant. Alt blekk i chromen er stadionblekk
+     (CalendarNav-tittel, statusrad).
+   · UKERADEN: `DayCell` har fått `tone?: 'light' | 'stadium'` (default
+     light = datovelgeren, URØRT). WeekStrip sender `tone="stadium"`:
+     frostplate per dag (`STADIUM_CELL`: stadionblekk 0,08 + hårlinje 0,16,
+     6 pt luft i WeekStrip), ukedag stadionblekk 0,8 (helg ×0,78), tall
+     stadionblekk, «i dag»/«valgt» Heia-neon (valgt + neonramme + heiaSoft),
+     turneringsprikk = gull (goldInk forsvinner på mørkt), «annet» dempet
+     stadionblekk. Valgt av Brage blant fem riggede varianter (kun blekk /
+     hårlinjer / frostplater / mørke chips / grunnlinje) — plater vant:
+     «definisjon, rytme og avgrensning uten å bli bokser».
+   · Runde 1 (sticky blokk som pikselriktig grunnvindu m/ native Animated)
+     ble bygget og riggverifisert, men ERSTATTET av den permanente chromen
+     i runde 2 — ingen spor i treet. Ikke bygg den igjen.
+   · Tester: `__tests__/dayCellStadium.test.tsx` (17) måler blekket der det
+     faktisk står (ukedag mot #143126–#0B412E, tall/neon mot #143126–#00593C).
+   · Pillene («I dag»/«Måned»/«+ Ny», hvit flate) er IKKE rørt — de står nå
+     som hvite piller på mørk grunn. Den blå treningsprikken (#2F66DB) er
+     den svakeste på mørkt — Brage har ikke kommentert den.
+
+2. ARKENE I GLASS — BYGGET, UKOMMITTERT, venter telefondom (Brage
+   2026-09-03: «månedskalenderen skal ikke være en flat hvit sheet … tungt
+   glass/opalmateriale … behold stor radius og drag-handle … ikke egne
+   glassbokser per dato … samme for +Ny og Ny kamp fra Sesongen … FJERN den
+   svarte scrimen»; tre referansebilder: mørk kalender-app m/ datovelger-ark,
+   reiseapp m/ frostede kort på foto, one.com-annonse m/ frostet
+   kalenderpanel over foto):
+   · `GLASS.sheet` (LiquidGlassSurface): rgba(244,246,245,0,80), sheen 0,10,
+     ikke interaktiv — den tyngste perlen i familien, fortsatt gjennomsiktig
+     (grunnen farger arket: lys mint over neon, kjølig perle over teal).
+     Solid fallback `sheetSolid` #EFF3F1 + heiaDeep-kant 0,12 (Android /
+     Reduce Transparency / iOS < 26). Ekte systemglass på iOS 26 via
+     eksisterende HeiaLiquidGlassView (uniform cornerRadius — INGEN native
+     endring).
+   · MonthSheet: INGEN scrim (bakflaten er gjennomsiktig men fortsatt
+     trykkbar for å lukke — Emil: «dim to focus, separate to keep flow»,
+     månedsvelgeren er et parallelt panel). Arket er
+     `<LiquidGlassSurface variant="sheet">`, radius.xl, handle 36×5 i
+     OPAL.inkTertiary 0,35, MonthGrid `plain` (ingen bokser per dato),
+     fottekst OPAL.inkSecondary. Arket strekker seg ETT radius-mål under
+     skjermkanten (marginBottom −radius.xl + ekstra paddingBottom) så de
+     nedre hjørnene aldri synes, heller ikke på Android.
+   · NewEventScreen («+ Ny» på Kalender OG «Ny kamp»/«Ny turnering» fra
+     Sesongen — samme modal, `newEventOptions` i AppNavigator): native
+     modal beholdt (ingen transparentModal — tastaturet ville åpnet hele
+     arkproblemet igjen). Headeren er reisens mørke start (`headerStyle`
+     HEIA_BRIDGE #143126, hvitt blekk, ingen hårlinje, `contentStyle` =
+     broen som fallback, «Avbryt» i `headerActionOnDark`); skjermen har
+     `<DaylightGround />` (ikke masthead) bak, og HELE skjemaet ligger på
+     ÉTT `GLASS.sheet`-panel (margin spacing.md) i ScrollView-en. Felt og
+     chips: `FIELD` = hvit 0,55 + blekk-hårlinje 0,12 (innfelt i glasset,
+     ikke hvite kort oppå; aldri to lyse translusente flater oppå
+     hverandre). Blekk på glasset: OPAL.inkSecondary for etiketter, noter,
+     chip-tekst og PLASSHOLDERE (inkTertiary faller til 4,1 over reisens
+     mørkeste). DateField/TimeField/Button er urørt.
+   · Tester: `__tests__/glassSheet.test.tsx` (tint-vekt, blekk over seks
+     grunner fra #143126 til opal, ingen scrim, variant + handle + plain).
+   · TELEFONRUNDE 1 (Brage 2026-09-03, «Ser bra ut!» + seks punkter),
+     ALLE BYGGET, venter runde 2:
+     (a) «grønn kant på toppen» → headeren er GJENNOMSIKTIG
+         (`headerTransparent`, `statusBarStyle: 'light'`), grunnen starter
+         i statuslinja; skjermen legger `useHeaderHeight()` (fra
+         @react-navigation/elements, transitiv dep) som topp-padding.
+     (b) «dekke sidene som kommentarseksjonen» → `presentation:
+         'fullScreenModal'` + `animation: 'slide_from_bottom'` (ingen
+         kortstabel; swipe-ned-lukking er borte, «Avbryt» er veien ut).
+     (c) «Kamp hopper alt under boksene» → `chooseType` kjører
+         `LayoutAnimation.create(220, easeInEaseOut, opacity)` før
+         `setType` (Reduce Motion = hopp).
+     (d) «Dag skal gi samme glass som Måned» → utfoldingen i DateField er
+         FJERNET; ny `DateSheet` (MonthGrid plain + fotnote på
+         GlassSheetSurface) rendres i skjermroten. DateField er kontrollert
+         (`open`/`onOpen`), grensene (daysBack/monthsAhead/minDate) bor i
+         DateSheet.
+     (e) «Klokkeslett henger i flere sekunder» → ROTÅRSAK: TimeSheet var en
+         RN `Modal` presentert fra en skjerm som selv er native modal.
+         Ny `InlineSheet` (GlassSheet.tsx): absolutt overflate i
+         skjermroten, gjennomsiktig trykkbar bakflate, translateY på native
+         driver (260/200 ms), `accessibilityViewIsModal`, Keyboard.dismiss
+         ved åpning, avmonteres etter utglidning. TimeField er kontrollert.
+         MonthSheet på Kalender bruker fortsatt `Modal` (må dekke tab-baren)
+         men samme `GlassSheetSurface`.
+     (f) «Hjulet stopper hakkete» → ROTÅRSAK: `contentOffset`-propen ble
+         regnet av `value` per render, og `value` settes ved drag-slipp →
+         ny offset midt i momentumet. Nå frosset per montering
+         (`initialOffset` i useRef). Vokter: inlineSheets.test.
+     (g) «se alt uten å bla» → field paddingTop lg→md, beskjed 96→72 pt,
+         saveRow 2xl→lg, bunnpadding = safe area (ikke tab-barhøyden).
+     Tester: `__tests__/inlineSheets.test.tsx` (7): ingen Modal, glass
+     sheet, ingen scrim, frosset offset, Ferdig sender hjulets verdi,
+     datoarket plain + grenser + velg-og-lukk.
+   · TELEFONRUNDE 2 (Brage 2026-09-03, «Funksjonaliteten er godkjent», men
+     SKARPT: «legg til hendelse skal komme opp som kommentarfeltet og dekke
+     hele bredden — det viktigste; ingen hvit boks over den; oppføre seg
+     som et kommentarfelt man kan dra ned»). BYGGET, venter runde 3:
+     · Ny `src/components/FormSheet.tsx`: kommentararkets mekanikk
+       (ExpandableCommentSheet) som skjema-ark — full bredde, glir opp
+       OVER skjermen du står på, animert `top` på JS-driver, drag i hodet
+       (fanger ved BEVEGELSE så «Avbryt» får trykket), 28 % / 0,5 px/ms,
+       `closeTiming` = feedarkets utglidning, Heia-blekk-scrim 0,24,
+       `ref.dismiss()` = utglidning → `onDismissed` (goBack). Selve arket ER
+       glasset (`LiquidGlassSurface variant="sheet" fill`) — ingen panel
+       oppå. Konstantene er kopiert fra CommentSheet, ikke importert.
+     · AppNavigator `newEventOptions`: `presentation: 'transparentModal'`,
+       `animation: 'none'`, `headerShown: false`, transparent contentStyle.
+       Ingen native header, ingen fullScreenModal, ingen useHeaderHeight.
+     · NewEventScreen: root = FormSheet → ScrollView
+       (`automaticallyAdjustKeyboardInsets`, ingen KAV) → feltene rett på
+       glasset. DaylightGround og glasspanelet er FJERNET fra skjermen. Alle
+       fire `navigation.goBack()` går via `dismiss()` (utglidning først).
+       Dato-/klokkeslettarkene (InlineSheet) ligger i skjermroten over
+       FormSheet. Laste-/feiltilstanden ved redigering ligger også i arket.
+     · Tester: `__tests__/formSheet.test.tsx` (6): glass = arket, scrim,
+       Avbryt/bakflate/ref via utglidning, idempotent, closeTiming.
+     · Android-tilbake popper ruta uten utglidning (akseptert). Swipe-ned
+       er draget i hodet, ikke systemgesten.
+     På telefonen i runde 3: (1) arket dekker HELE bredden og kommer opp
+     over Kalender/Sesongen som kommentararket, (2) ingen boks/kant, (3)
+     drag i hodet ned lukker, kast lukker raskt, (4) Dag/Klokkeslett åpner
+     glassark umiddelbart, hjulet ruller jevnt, (5) tastatur: feltet du
+     skriver i holdes synlig (ScrollView eier innsettingen), (6) Kamp/
+     Trening glir.
+
+3. VERIFISERT (etter punkt 2): full suite 1052/1052 grønn (2 skipped);
+   eslint = kun kjente baseline-funn (KalenderScreen exhaustive-deps ~175,
+   AppNavigator nested-component-warning); prettier ren på alle berørte
+   filer unntatt de to bevisst urene HEAD-stedene i KalenderScreen; tsc
+   IKKE kjørt (Brages regel). Ingen `zz_`-filer i treet (riggene ligger
+   som .bak i sesjonens scratchpad).
+
+▶️ NESTE (i denne rekkefølgen):
+  A. Telefondom på arkene → ÉN commit («design: arkene i glass …»), så
+     denne seksjonen → historikk.
+  B. VARSLER-HANDLINGEN «Merk alle som lest» (#087A5A på mørk topp, 2,2:1)
+     + «Varsler»-tittelen (heading1 = textPrimary på #143126, ~1,1:1 — samme
+     feil Kalender hadde). Trolig samme grep: liten, fast chrome i
+     stadionblekk, ingen stor scroll-away-tittel (Brage: «skjermen skal
+     alltid leses mer som bilde 2 enn bilde 1»).
+  C. PROFIL-HEADER (masthead-anatomi) — se historikken under.
+  D. FeedCard mer glass (Brage: «senere skal vi også endre feedcard til å se
+     mer glass ut, så må være en slags helhet») — GLASS.sheet/FIELD-språket
+     er startpunktet; retningsfaden i REFERENCE-NOTES.md står.
+  E. Opprydding (prune DaylightGround-varianter) — FØRST når designsporet
+     er ferdig (Brage 2026-09-03: DaylightGround skal være helt urørt).
+  Pillene i kalenderchromen (hvite på mørkt) og den blå treningsprikken er
+  åpne småpunkter — nevn dem når Brage ser Kalender neste gang.
+
+## (historikk) START HER 2026-09-03 natt — DAGSLYSGRUNN «E-atmosphere» + MASTHEAD-LAGHODE TELEFONGODKJENT OG COMMITTET
 
 ✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
 native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-03

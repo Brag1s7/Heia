@@ -4,6 +4,8 @@
 
 **Neste samtale starter i §13.** Alle referansebildene må legges ved på nytt (de er ikke i repoet).
 
+**Oppdatering 2026-09-03:** Statuslinja over er HISTORISK. Retningen ble valgt av Brage etter dette dokumentet (Liquid Glass-materialet, dagslysgrunnen «E-atmosphere», masthead-laghodet, tab-bar-kapselen, kalenderchromen — alle telefongodkjente og committet). `docs/STATUS-HANDOFF.md` sin START HER-seksjon er nå den eneste inngangen; dette dokumentet er referanse for brief, nordstjerne, forbudsliste (§13) og referansesettet.
+
 Dette dokumentet er den eneste inngangen til neste samtale. Les det i sin helhet før noe tegnes. `docs/STATUS-HANDOFF.md` er fortsatt produktets tekniske handoff og er ikke oppdatert for designsporet — dette dokumentet gjelder foran den for alt visuelt.
 
 ---
