@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useBottomContentPadding} from '../useBottomContentPadding';
 import {useIsFocused} from '@react-navigation/native';
 import {matchColors, radius, spacing} from '../../theme';
 import {MatchPhotoRail} from '../MatchPhotoRail';
@@ -108,7 +108,7 @@ export function FinishedMatch({
   onPressPhoto,
   onEdit,
 }: FinishedMatchProps) {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const isFocused = useIsFocused();
 
   const home = event.score?.home ?? 0;
@@ -145,7 +145,7 @@ export function FinishedMatch({
       />
 
       <Animated.ScrollView
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        contentContainerStyle={{paddingBottom: bottomPad}}
         onScroll={topBar.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}>

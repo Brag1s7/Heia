@@ -9,10 +9,9 @@ import {
   Linking,
   RefreshControl,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, type NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
-import {BackBar, Button, HeroSurface, Skeleton} from '../components';
+import {BackBar, Button, HeroSurface, Skeleton, useBottomContentPadding} from '../components';
 import {useActiveTeam, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {profilEntry} from '../navigation/profilEntry';
@@ -64,7 +63,7 @@ const UNKNOWN_SUB = Symbol('unknown-subscription');
  * laget») — tallene er DATA fra offeringen, aldri hardkodet.
  */
 export function LagkassaScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
   const {profile} = useAuth();
@@ -185,7 +184,7 @@ export function LagkassaScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         refreshControl={
           <RefreshControl

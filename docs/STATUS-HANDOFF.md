@@ -1,6 +1,273 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-03 natt — HELE GLASS-SPORET TELEFONGODKJENT OG COMMITTET; NESTE = TAB-BAREN i NY samtale)
+## ▶️▶️ START HER (oppdatert 2026-09-03 — TAB-BAR-SKIVA LUKKET: telefongodkjent og committet; NESTE SKIVE = KOMMENTARARK FRA HJEM (gjenbruk `CommentSheet`) i NY samtale)
+
+✅ TAB-BAR-SKIVA ER LUKKET (Brage 2026-09-03, telefongodkjent i sin helhet:
+plassering, diffusjonsfelt, design, farge, størrelse, faner, KAMP-knapp og
+alle tilstander, trykkrespons). Committet i ÉN commit (se `git log -1`),
+IKKE pushet. Hele skiva er JS/TS bak `TAB_BAR_GLASS_AB` — ingen native
+endring.
+
+ENDELIG GEOMETRI (`src/shared/tabBarLayout.ts`): flytende kapsel 12 pt inn
+fra sidene, 64 pt høy, radius 32; bunnavstand `capsuleBottomGap(inset) =
+max(10, inset − 6)` (iPhone m/ indikator: 28 pt; uten: 10 pt);
+`tabBarTotalHeight = 64 + gap`; skjermene reserverer via
+`useBottomContentPadding` (safe area telles én gang, inne i barhøyden).
+MATERIALET (`LiquidGlassSurface` `bar`/`barMatch` + `TabBarGlass`): lys
+perle rgba(244,246,245,0,34)/sheen 0,06 — kampsiden arenaBottom
+rgba(29,70,51,0,62); solid fallbacks for Android/RT/iOS<26. Haze rundt
+kapselen = boxShadow-par (perlehaze blur 30 + grønn grunnskygge).
+DIFFUSJONSLØSNINGEN (LÅST): `DiffusionField` i `TabBarGlass.tsx` — SVG-
+frostgradient, hele bredden, fra 28 pt over kapselen til skjermbunnen,
+lyst #F0F6F3 0→0,16→0,34→0,42, kamp #143024 0→0,22→0,46→0,56,
+pointerEvents none. Native maskert backdrop-blur er AVLYST av Brage —
+gradienten ER løsningen (og RT-/Android-fallbacken).
+TRYKKRESPONSEN (`src/components/TabButton.tsx`, egen `tabBarButton`):
+Pressable som eier onPressIn/onPressOut → én Animated.Value (native
+driver): inn 90 ms ease-out, ut fjær (320/22/0,8). Vanlig fane 0,95,
+KAMP 0,96 (`renderMatchTabButton`), aktiv mintmarkør squash 0,90/1,04 via
+`useTabPress()` i `TabIconWrap`. Reduce Motion = opacity-crossfade. Ingen
+haptikk (krever native modul — egen skive om ønsket).
+DESIGNREFERANSENE (LAGRET, bekreftet med filoppslag 2026-09-03): fire PNG
+1179×2556 i `docs/Heia_Design_Master/references/inspiration/` +
+`REFERENCE-NOTES.md`. Kun docs — ingen import fra src/, ikke i bundelen
+(DaylightGround nevner docs kun i kommentarer).
+VERIFISERT VED LUKKING: full suite 969/969 grønn, eslint = kun den kjente
+baseline-feilen (KalenderScreen:183) + warnings; tsc: 8 feil = nøyaktig
+HEAD-baselinen (Lagkassa-feilene er linjeforskjøvet, ingen nye).
+
+▶️ NESTE SKIVE = KOMMENTARARK FRA HJEM. Start i NY samtale med inspeksjon
+og avgrenset forslag FØR kode. Gjenbruk `src/components/match/
+CommentSheet.tsx` (Modal + egen Animated/PanResponder, i dag brukt fra
+EventDetailScreen). Mål: kommentarer fra vanlige FeedCard åpnes i et
+ekspanderbart bunnark (åpner ~65–70 %, dras til full, utvides ved
+tastatur, swipe ned lukker); Kommenter på kampkort åpner samme ark; trykk
+på selve kampkortet åpner fortsatt kampen; feedposisjonen bevares; tab-
+baren forblir montert bak arket UTEN hide/show-overgang (i dag skjules
+den på `Comments`-ruta via TAB_BAR_HIDDEN_ROUTES — arket erstatter ruta
+fra Hjem, ruta beholdes for varsler/deeplinks); ingen ny pakke, ingen
+redesign av CommentThread uten uttrykkelig behov. Kjent risiko:
+PanResponder-capture i arkhodet vs. scroll i tråden ved delvis høyde.
+IKKE bland inn: bakgrunnsfaden (DaylightGround) og retningsfaden i
+FeedCard — lagret som senere retning (REFERENCE-NOTES.md).
+
+## (historikk) START HER 2026-09-03 — TAB-BAR RUNDE 3 (før lukking)
+
+✅ TELEFONGODKJENT OG LÅST (Brage 2026-09-03): tab-barens design, farge,
+størrelse, faner, KAMP-knapp, tilstander, funksjonalitet og
+berøringsanimasjon (TabButton). Skal IKKE endres.
+
+🧭 RUNDE 3 — KUN PLASSERING + DIFFUSJON (bygget, venter telefon):
+• PLASSERING: `CAPSULE.lift` er ERSTATTET av `capsuleBottomGap(inset) =
+  max(10, inset − 6)` i `tabBarLayout.ts` (iPhone m/ indikator: 34 → 28 pt
+  fra kanten = 8 pt lenger ned enn før; indikatorens topp ≈ 13 pt → ingen
+  kollisjon; uten indikator 10 pt). `tabBarTotalHeight = 64 + gap`;
+  containerens paddingBottom = gap. Høyde 64/radius 32/inset 12/intern
+  geometri/tint/animasjon urørt. Innholdspaddingen følger automatisk
+  (`useBottomContentPadding` leser bibliotekets målte barhøyde; testen i
+  tabBarLayout beviser «siste innhold ett pust over ny kapseltopp»).
+• DIFFUSJONSFELTET (`DiffusionField` i `TabBarGlass.tsx`, `DIFFUSION`):
+  lag 2 i rekkefølgen feed → felt → kapsel → faner. Hele bredden, fra 28 pt
+  OVER containeren (bleedAbove) til skjermbunnen inkl. safe area,
+  pointerEvents none + a11y-skjult. Vertikal SVG-gradient: lyst = perle
+  #F0F6F3 alfa 0 → 0,16 (kapseltopp) → 0,34 (kapselbunn) → 0,42 (bunn);
+  kamp = arena #143024 0 → 0,22 → 0,46 → 0,56. Aldri opak, ingen kant.
+  ⚠️ DETTE ER JS-FALLBACKEN — INGEN EKTE BLUR. Innholdet under blir dempet
+  og mykere, ikke optisk uskarpt. EKTE MASKERT BACKDROP-BLUR KREVER NATIVE:
+  ny `HeiaFrostFieldView` (UIVisualEffectView m/ UIBlurEffect
+  systemUltraThin(Dark) + CAGradientLayer som `layer.mask` + tint-gradient,
+  props fadeStart/tint/dark) + manager, registrert i pbxproj via samme
+  interop-mønster som HeiaLiquidGlassView → .h/.m + Cmd+R. Gradienten over
+  blir da Reduce Transparency-/Android-/iOS<26-fallbacken. BRAGE AVGJØR.
+  Hazen (boxShadow-paret rundt kapselen) fra runde 2 står.
+• Verifisert: tabBar 17, tabBarLayout 15, matchButtonGeometry — grønne;
+  eslint rent (kun gammel tabBarIcon-warning). Full suite IKKE kjørt (etter
+  telefon, punkt 5).
+📱 TELEFONBILDE: (1) kapselen 8 pt lavere — ligger den naturlig nær bunnen
+uten å treffe indikatoren? (2) feltet under/rundt kapselen: gli inn, ingen
+stripe, ingen ny flate, grunnens farger synes; (3) kampsiden mørk variant.
+Justering: `DIFFUSION.*.stops`/`bleedAbove`, `CAPSULE.minGap/gapIntoInset`.
+
+🖼️ REFERANSEBILDENE — IKKE LAGRET (blokkert): de fire bildene finnes kun i
+chatten, ikke som filer på disk (søkt Downloads/Desktop/tmp/cache).
+Brage må legge PNG-ene her, med nøyaktig disse navnene:
+  /Users/bragelotheweium/Developer/Heia Prod/docs/Heia_Design_Master/references/inspiration/
+    tab-bar-ambient-blur.png · background-vertical-fade.png ·
+    dark-glass-depth.png · directional-glass-fade.png
+`REFERENCE-NOTES.md` ligger der og beskriver hva vi henter. Referansene
+regnes som lagret FØRST når `ls` viser fire PNG-er. Kun i docs — aldri
+importert fra src/, aldri i bundelen.
+
+📐 SENERE DESIGNRETNING (LÅST 2026-09-03, dokumentert i REFERENCE-NOTES.md,
+IKKE bygget): (a) `DaylightGround`: én stor vertikal fargereise — lys/neon
+mint øverst og i midten, via aqua, til gradvis dypere og dempet teal/
+smaragd nederst; ikke oransje, ikke svart. (b) Vanlige FeedCard: nøytralt
+perlegrått Liquid Glass med subtil intern retningsfade — lysere/tettere
+øverst til venstre, mer transparent/røykgrått nederst til høyre; ikke
+ensfarget mintglass. (c) Mørke kampkort: mørkt Heia-/stadionglass med
+tilsvarende kontrollert retningslys og tonal dybde. Ikke bakgrunn,
+FeedCard eller kommentarark i tab-bar-økta.
+
+▶️ PUNKT 5 (ETTER telefongodkjenning av plassering + diffusjon): full
+suite + eslint → sluttstatus her → ÉN commit for hele tab-bar-skiva (ikke
+push) → commit-ID + rent tre → NESTE SKIVE = KOMMENTARARK FRA HJEM
+(forslaget står under) → ny samtale.
+
+## (historikk) START HER 2026-09-03 — TAB-BAR: TRYKKRESPONS + HAZE BYGGET
+
+🧭 **RUNDE 2 PÅ TAB-BAREN (Brage 2026-09-03, fire referansebilder):**
+• Referanser: `docs/Heia_Design_Master/references/inspiration/` opprettet
+  med `REFERENCE-NOTES.md` (hva vi henter fra hvert bilde + status). ⚠️ DE
+  FIRE PNG-ENE MÅ LEGGES INN AV BRAGE — de kom som bilder i chatten, ikke
+  som filer på disk (søkt Downloads/Desktop/tmp: ingen). Navnene er avtalt:
+  tab-bar-ambient-blur.png, background-vertical-fade.png,
+  dark-glass-depth.png, directional-glass-fade.png. Aldri inn i bundelen.
+• `GLASS.bar` sto allerede på 0,34 og `CAPSULE.lift` på 2 (sluttrunden i
+  forrige økt) — bekreftet, ikke endret. Høyde 64 / radius 32 / inset 12 /
+  `barMatch` urørt.
+• HAZE (`TabBarGlass`, `CAPSULE_HAZE`): kapselens ytterboks har nå to
+  `boxShadow`-lag i stedet for shadows.elevated: (1) perlehaze
+  rgba(240,246,243,0,42), blur 30, spread 2, null offset — diffus, ikke
+  hvit glød; (2) grønn grunnskygge rgba(11,59,42,0,16), offsetY 8, blur 20.
+  Kampsiden: samme geometri i arenatoner (29,70,51 / 5,20,14). Testet i
+  tabBarLayout-testen (perle ≠ hvit, alfa ≤ 0,5, grønn grunn, mørk kamp).
+• TRYKKRESPONS — HVA SOM FAKTISK ANIMERES: bottom-tabs v7 gir en egen
+  `tabBarButton` KUN `onPress`/`onLongPress` (+ aria-*, role, style,
+  children — BottomTabItem.tsx:332). Standardknappen (PlatformPressable,
+  pressOpacity 1) ga derfor ingen respons. NY `src/components/TabButton.tsx`
+  er en Pressable som eier `onPressIn`/`onPressOut` selv og driver ÉN
+  `Animated.Value press` (native driver): pressIn → 1 på 90 ms ease-out;
+  pressOut → `Animated.spring` (stiffness 320, damping 22, mass 0,8 ≈
+  dempning 0,7 — kontrollert liten overshoot). Det som beveger seg:
+  (a) hele faneinnholdet (Animated.View rundt `children`) scale 1 → 0,95;
+  (b) KAMP-fanen får `compress={0,96}` via `renderMatchTabButton`
+  (MatchTabButton selv er urørt: geometri, alle tilstander, nudge, puls);
+  (c) den AKTIVE mintmarkøren: `TabIconWrap` i AppNavigator leser samme
+  `press` via `useTabPress()` og squasher scaleX 0,90 / scaleY 1,04 —
+  samme fjær som knappen. Reduce Motion: ingen transform, opacity-
+  crossfade til 0,72. Ingen loop. Kapselen (`TabBarGlass`) er fortsatt
+  pointerEvents none. `accessibilityState.selected` settes eksplisitt
+  (VoiceOver + tabBar-testen). Alle tall i `TAB_PRESS`.
+• ⛔ SELECTION-HAPTIC ER IKKE LAGT: ekte haptikk krever en native modul
+  (låst funn: `Vibration` er 400 ms brumming på iOS). Krever pod + Cmd+R →
+  egen skive om Brage vil (react-native-haptic-feedback).
+• Verifisert: tabBar 17/17, tabBarLayout 14/14, matchButtonGeometry grønn,
+  eslint rent (kun den gamle tabBarIcon-warningen). Full suite IKKE kjørt
+  (Brage: først etter telefon).
+📱 TELEFONBILDE: trykk på Kalender/Profil (hele fanen krymper), hold på
+den aktive fanen (pillen squasher og fjærer), trykk KAMP (roligere
+kompresjon), og se hazen rundt kapselen over Hjem (skal gli inn, ingen
+hvit glød) og på kampsiden (mørk). Justering: `TAB_PRESS` + `CAPSULE_HAZE`.
+
+📝 PUNKT 3 — KOMMENTARER SOM BUNNARK FRA HJEM: FORSLAG LEVERT (se
+samtalen/under), INGEN KODE. Kjerne: gjenbruk `components/match/
+CommentSheet` (Modal + egen Animated/PanResponder, allerede i EventDetail)
+fra TeamHomeScreen med state `commentPostId`; utvid arket med snappunkter
+(åpner ~68 %, dras til full), tastatur via eksisterende
+KeyboardAvoidingView; `Comments`-ruta beholdes for varsler/deeplinks.
+Berørte filer: TeamHomeScreen.tsx, match/CommentSheet.tsx, (FeedCard
+urørt), tabBarLayout.ts (TAB_BAR_HIDDEN_ROUTES beholdes for ruta).
+Risiko: PanResponder-capture i arkhodet vs. scroll i tråden ved delvis
+høyde; Modal ligger over tab-baren (den forblir montert, dempes av scrim).
+
+📐 PUNKT 4 — SENERE DESIGNRETNING (dokumentert i REFERENCE-NOTES.md, IKKE
+bygget): DaylightGround får én stor vertikal fargereise (lys/neon mint
+øverst+midt → aqua → dypere teal/smaragd i bunnen; ikke oransje, ikke
+svart); vanlige glasskort får subtil intern retningsfade (lysere/tettere
+perle øverst til venstre → mer transparent/røykgrå nederst til høyre);
+mørke kampkort beholder mørkt Heia-glass med tilsvarende tonal dybde.
+
+## (historikk) START HER 2026-09-03 — TAB-BAREN SOM FLYTENDE GLASSKAPSEL: KODET, SUITE 967 GRØNN, UKOMMITTERT, VENTER TELEFONDOM
+
+🧭 **TAB-BAR-SKIVA (Brage godkjente alternativ A, den flytende kapselen —
+kant-til-kant skal IKKE bygges).** Bygget JS-only, INGEN .m-endring →
+Metro-reload holder (ingen Cmd+R). Alt bak `TAB_BAR_GLASS_AB` i
+`src/shared/tabBarLayout.ts` (false = dagens solide bar + skjermene
+pikselidentiske).
+
+BYGGET, punkt for punkt mot godkjenningen:
+• `GLASS.bar` rgba(244,246,245,0,30) / sheen 0,06 / interactive false, og
+  `GLASS.barMatch` rgba(29,70,51,0,62) = arenaBottom (mørkt stadionglass,
+  JS-only via eksisterende `glassTint`). Solid fallbacks `barSolid` #EFF3F1
+  og `barMatchSolid` #1D4633 (Android/Reduce Transparency/iOS < 26) tegnes
+  av `LiquidGlassSurface` selv (ny `SOLID`-tabell, ny `fill`-prop).
+• Kapselen: `TabBarGlass` (rendres som `tabBarBackground`), 12 pt inn,
+  64 pt høy, radius 32 (= full; native cornerRadius tåler ikke 9999), bunn
+  = safe area + 6, `shadows.elevated` på ytterboksen. Containeren i
+  `AppNavigator` er absolutt/gjennomsiktig, høyde = 64 + 6 + safe area,
+  paddingBottom = safe area + 6, paddingHorizontal 12, paddingTop 4
+  (sentrerer ikon+etikett; biblioteket legger dem fra toppen — JUSTERBAR).
+• TO MILJØER, ÉN GEOMETRI: `inMatch` (NY i MatchButtonContext = presence
+  !== null = kampskjermen fokusert OG kampen i gang) bytter kun tint +
+  blekk (aktiv `matchColors.text`, inaktiv `matchColors.dim`); lyst miljø:
+  aktiv `textPrimary`, inaktiv `OPAL.inkSecondary` (var textTertiary, som
+  ikke holder over blur). Mintpillen, badgen og alle SKIN-tilstander urørt.
+  tabBar-testen beviser identisk stilobjekt lys/mørk og i alle 8 tilstander.
+• Skjult på `Comments` (Hjem- og Varsler-stacken) via
+  `getFocusedRouteNameFromRoute` + `tabBarHiddenFor` → `{display:'none'}`.
+  Komponeringslinja i CommentThread er urørt (insets.bottom + sm), tastatur
+  og tilbakeflyt som før. Bunnarket i kampskjermen er urørt.
+• SAFE AREA ÉN GANG: ny hook `useBottomContentPadding(pust = spacing.lg)`
+  = `bottomContentPadding(barhøyde fra BottomTabBarHeightContext,
+  insets.bottom, pust)`: bar montert → barhøyde + pust (safe area er INNE i
+  barhøyden); ingen bar/skjult/utenfor tabs → safe area + pust. Kaster ALDRI
+  (leser konteksten rått, ikke `useBottomTabBarHeight`). 19 skjermer +
+  LiveMatch (pust 3xl + dokkhøyde) + FinishedMatch bruker den; ingen skjerm
+  legger insets.bottom oppå barhøyden lenger. Bevist i
+  `__tests__/tabBarLayout.test.ts` (siste innhold lander nøyaktig ett pust
+  over kapselens overkant; 34 pt tomrom borte).
+• Reporterdokken: `useTabBarOverlap()` løfter `bottom` barhøyden, og lukket
+  offset = dokkhøyde + løft (ellers sto en stripe igjen under kapselen).
+• Kampknappen: `matchButtonGeometry(..., itemsWidth)` — typen følger
+  fortsatt VINDUET (393 → 13,5), budsjettet måles mot kapselbredden
+  (vindu − 24) i både `MatchTabButton` og navigatorens ikonslott. På 320 pt
+  fikk trinn 2 ett luftsteg til (5 pt) — HEIA!/HEIET lå 0,15 pt over
+  budsjettet. Geometritesten kjører nå alle etiketter × bredder × skalaer
+  MOT kapselen. Treffområdet er fortsatt hele faneelementet (~74 × 64 pt).
+VERIFISERT: full suite 967/967 grønn, eslint rent i alle skivefiler (de to
+gamle funnene i KalenderScreen:183 og AppNavigator tabBarIcon-warning
+finnes på HEAD, ikke våre). Prettier kjørt med --no-bracket-spacing
+--bracket-same-line; TeamMembers/TeamSettings ble revertert og patchet for
+hånd (de var ikke prettier-rene fra før).
+
+📱 TELEFONBILDE (Brage, Metro-reload holder, Light + Dark) — INGEN COMMIT
+FØR DOM:
+ 1. Hjem over DaylightGround: kapselen skal lese som tynt lyst glass som
+    grunnen beveger seg gjennom ved scroll; det dype hjørnet skal nå synes
+    UNDER kapselens høyre ende (grunnen løper helt ned). ⚠️ KJENT ÅPENT
+    PUNKT: den flate kontrastmodellen gir ~2,1:1 for inaktivt blekk over det
+    dype hjørnet ved 0,30 — samme sted feedkortene (0,34, samme blekk) ble
+    godkjent fordi UIGlassEffect lysner adaptivt. Les Profil-etiketten
+    nederst til høyre: er den for svak, er knappen `GLASS.bar`-alfa (0,30 →
+    0,38/0,45) — porten i tabBarLayout-testen sier fra når hjørnet kan
+    flyttes inn i porten.
+ 2. Kalender (flat lys grunn): kapselen leser som nesten solid lys perle —
+    forventet til Kalender får grunnen i egen skive.
+ 3. Kampsiden (kampen må være i gang: live/pause): kapselen skal bli mørkt
+    stadionglass med opalhvite etiketter. ⚠️ OM DEN BLIR MELKEHVIT (tvungen
+    light appearance i `HeiaLiquidGlassView.m` slår gjennom mørk tint):
+    STOPP OG RAPPORTER — ikke opakt overlay. Neste steg ville vært en
+    `appearance`-prop i .m (Cmd+R), og det er Brages kall.
+ 4. CommentThread (fra feeden og fra Varsler): baren skal være BORTE,
+    komponeringslinja i bunnen som før, tastatur som før, tilbake viser
+    baren igjen.
+ 5. Kampknappen i alle tilstander inne i den smalere kapselen (KAMP, 2–1,
+    PAUSE 2–1, HEIA!, HEIET, RAPPORTER, LUKK): ingen klipping, ingen
+    naboberøring, pillen stikker opp over kapselkanten (løft −10 urørt).
+ 6. Ingen skjerm hopper når kampstatus endres (baren har samme stilobjekt).
+ 7. Reporter: dokken (RAPPORTER) skal lande OVER kapselen, og være helt
+    borte når lukket.
+JUSTERINGSKNAPPER: `CAPSULE` (inset/height/lift) og `tabBarGlass.paddingTop`
+(vertikal sentrering) i tabBarLayout/AppNavigator; `GLASS.bar`/`barMatch`
+tint-alfa; `shadows.elevated`. Ikke bygget med vilje: minimering ved scroll.
+
+Etter dom: commit (ikke push). Så: bryter-opprydding + token-promotering i
+egen skive; Kalender/Sesongen/Varsler/Profil får DaylightGround i egne
+skiver (kapselen viser først da forskjell der).
+
+---
+
+## (historikk) START HER 2026-09-03 natt — HELE GLASS-SPORET TELEFONGODKJENT OG COMMITTET; NESTE VAR TAB-BAREN
 
 ✅ KAMPKORTET RUNDE 3 TELEFONGODKJENT (Brage: «veldig bra») + kommentar-
 tråden viser SAMME kampkort for kampinnlegg (FeedCard i CommentThread,

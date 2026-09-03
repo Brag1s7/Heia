@@ -8,11 +8,10 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {errorMessage} from '../shared/errorMessage';
-import {BackBar, Button, Skeleton} from '../components';
+import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
 import {
   AlertTriangle,
   Ban,
@@ -124,7 +123,7 @@ function supporterLine(n: number): string {
 }
 
 export function ClubPaymentsScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
 
   const [clubs, setClubs] = useState<ClubPaymentsClub[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -644,7 +643,7 @@ export function ClubPaymentsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         refreshControl={

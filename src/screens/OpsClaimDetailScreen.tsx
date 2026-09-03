@@ -9,7 +9,6 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   useFocusEffect,
   useRoute,
@@ -17,7 +16,7 @@ import {
 } from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {errorMessage} from '../shared/errorMessage';
-import {BackBar, Button, Skeleton} from '../components';
+import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
 import {
   getOpsClaim,
   opsApproveClaim,
@@ -87,7 +86,7 @@ function FactRow({label, value}: {label: string; value: string}) {
 }
 
 export function OpsClaimDetailScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const route = useRoute<Route>();
   const {claimId} = route.params;
 
@@ -175,7 +174,7 @@ export function OpsClaimDetailScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>

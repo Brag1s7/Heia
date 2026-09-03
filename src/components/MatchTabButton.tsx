@@ -15,6 +15,7 @@ import {
   matchButtonGeometry,
   MIN_FONT_SCALE,
 } from '../shared/matchButtonGeometry';
+import {tabBarItemsWidth} from '../shared/tabBarLayout';
 import {
   matchButtonHasGlyph,
   shouldNudge,
@@ -92,6 +93,9 @@ export function MatchTabButton({focused = false}: MatchTabButtonProps) {
     // ⚠️ SAMME KILDE SOM `renderGlyph` under. Lot vi geometrien gjette på
     // ordlengde, ville den regnet med et ikon komponenten aldri tegnet.
     matchButtonHasGlyph(state.kind),
+    // Glasskapselen er 2 × 12 pt smalere enn vinduet — budsjettet måles mot
+    // bredden fanene FAKTISK deler. Samme tall som navigatorens ikonslott.
+    tabBarItemsWidth(width),
   );
   const skin = SKIN[state.kind];
 

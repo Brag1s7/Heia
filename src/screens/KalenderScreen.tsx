@@ -16,7 +16,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   useFocusEffect,
   useNavigation,
@@ -37,6 +36,7 @@ import {
   TournamentDayCard,
   WeekStrip,
   useReducedMotion,
+  useBottomContentPadding,
 } from '../components';
 import {useActiveTeam, useCalendarFocus} from '../context';
 import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
@@ -119,7 +119,7 @@ type ScrollOrigin =
   | 'opprettet';
 
 export function KalenderScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const {activeTeamSpaceId, activeRole} = useActiveTeam();
@@ -648,7 +648,7 @@ export function KalenderScreen() {
         onScrollEndDrag={handleScrollEnd}
         onMomentumScrollEnd={handleMomentumEnd}
         contentContainerStyle={{
-          paddingBottom: insets.bottom + spacing['5xl'],
+          paddingBottom: bottomPad,
         }}
         refreshControl={
           <RefreshControl

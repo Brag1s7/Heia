@@ -9,11 +9,16 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {Avatar, BackBar, ListRowSkeleton, Skeleton} from '../components';
+import {
+  Avatar,
+  BackBar,
+  ListRowSkeleton,
+  Skeleton,
+  useBottomContentPadding,
+} from '../components';
 import {MoreHorizontal} from '../components/icons';
 import {useAuth, useActiveTeam} from '../context';
 import {isTeamAdmin, ROLE_LABELS} from '../shared/roles';
@@ -61,7 +66,7 @@ function subtitleFor(member: TeamMember): string {
 }
 
 export function TeamMembersScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const {session} = useAuth();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
@@ -336,7 +341,7 @@ export function TeamMembersScreen() {
     <View style={styles.screen}>
       <BackBar title="Lagoversikt" />
       <ScrollView
-      contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+      contentContainerStyle={{paddingBottom: bottomPad}}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}

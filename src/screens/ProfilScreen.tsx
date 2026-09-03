@@ -37,6 +37,7 @@ import {
   ListRowSkeleton,
   ProfileHeader,
   TeamBadge,
+  useBottomContentPadding,
 } from '../components';
 import {
   Bell,
@@ -142,6 +143,7 @@ function supportStatusLine(item: MySupportItem): string {
 
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const {session, profile, signOut, refreshProfile} = useAuth();
   const {
     activeTeamSpaceId,
@@ -556,7 +558,7 @@ export function ProfilScreen() {
         style={styles.screen}
         contentContainerStyle={{
           paddingTop: spacing.lg,
-          paddingBottom: insets.bottom + spacing['3xl'],
+          paddingBottom: bottomPad,
         }}>
 
         {/* Dine lag — lagkortene OG de to lag-handlingene. Handlingene lå

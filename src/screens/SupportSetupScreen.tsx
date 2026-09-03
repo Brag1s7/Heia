@@ -13,11 +13,10 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Button, Skeleton} from '../components';
+import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
 import {useActiveTeam, useAuth} from '../context';
 import {
   getSupportActivationStatus,
@@ -55,7 +54,7 @@ import type {ProfilStackParamList} from '../shared/types';
 /** Kontaktkanalen når en nominasjon har gått i stå (II.6). */
 const CONTACT = 'hello@heiaapp.no';
 export function SupportSetupScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation =
     useNavigation<NativeStackNavigationProp<ProfilStackParamList>>();
   const {activeTeamSpaceId, activeTeam} = useActiveTeam();
@@ -771,7 +770,7 @@ export function SupportSetupScreen() {
         style={styles.screen}
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         refreshControl={

@@ -8,11 +8,10 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Button, Skeleton, TeamBadge} from '../components';
+import {BackBar, Button, Skeleton, TeamBadge, useBottomContentPadding} from '../components';
 import {Check} from '../components/icons';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {lookupInviteCode, getMyTeamHistory} from '../lib/api/teams';
@@ -38,7 +37,7 @@ const ROLES: {key: JoinRole; label: string; description: string}[] = [
 ];
 
 export function JoinTeamCodeScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const {session} = useAuth();
@@ -204,7 +203,7 @@ export function JoinTeamCodeScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>

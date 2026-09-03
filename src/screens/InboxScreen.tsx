@@ -9,7 +9,6 @@ import {
   RefreshControl,
   LayoutAnimation,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   useFocusEffect,
   useIsFocused,
@@ -23,6 +22,7 @@ import {
   NotificationRow,
   SectionHeader,
   TeamHeader,
+  useBottomContentPadding,
 } from '../components';
 import {Ball, Megaphone} from '../components/icons';
 import {useActiveTeam, useNotifications} from '../context';
@@ -54,7 +54,7 @@ type InboxBlock =
 const blockKeyExtractor = (block: InboxBlock) => block.key;
 
 export function InboxScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace} = useActiveTeam();
   const {unreadCount, refreshUnread, markRead, markAllRead, inboxNonce} =
@@ -606,7 +606,7 @@ export function InboxScreen() {
         }
         onEndReached={loadOlder}
         onEndReachedThreshold={0.3}
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        contentContainerStyle={{paddingBottom: bottomPad}}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

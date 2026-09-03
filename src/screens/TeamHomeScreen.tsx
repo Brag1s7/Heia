@@ -12,7 +12,6 @@ import {
   Alert,
   type AlertButton,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
   useFocusEffect,
@@ -34,6 +33,7 @@ import {
   FeedCardSkeleton,
   DaylightGround,
   DAYLIGHT_GROUND_AB,
+  useBottomContentPadding,
 } from '../components';
 import {LiquidGlassSurface, OPAL} from '../components';
 import {Camera, Check} from '../components/icons';
@@ -239,7 +239,7 @@ type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
 
 export function TeamHomeScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const composeRef = useRef<TextInput>(null);
@@ -888,7 +888,7 @@ export function TeamHomeScreen() {
           // Ingen horisontal padding her — karusellen i headeren er full
           // bredde; radene har sin egen (cardWrap).
           contentContainerStyle={{
-            paddingBottom: insets.bottom + spacing['3xl'],
+            paddingBottom: bottomPad,
           }}
           refreshControl={
             <RefreshControl

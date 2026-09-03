@@ -51,7 +51,12 @@ export const FEED_LIQUID_GLASS_AB = true;
  *              bærer aksenten; INGEN uniform gullkant (leser som annonse/
  *              advarsel — Brage). Ikke mørkt, ikke cardSun-papir.
  */
-export type GlassVariant = 'card' | 'control' | 'important';
+export type GlassVariant =
+  | 'card'
+  | 'control'
+  | 'important'
+  | 'bar'
+  | 'barMatch';
 
 export const GLASS = {
   card: {tint: 'rgba(233, 235, 234, 0.34)', sheen: 0.18, interactive: true},
@@ -62,6 +67,21 @@ export const GLASS = {
     interactive: true,
   },
   /**
+   * TAB-BAREN (Brage 2026-09-03, godkjent; sluttrunde: 0,30 → 0,34, samme
+   * nøytrale perle): lys perle — tykkere enn
+   * kontrollglasset (den bærer tekst nederst over det dype hjørnet), tynnere
+   * enn kortet (chrome skal ikke eie minten). Nesten ingen sheen: chrome
+   * skinner ikke. Fanene er kontrollene — ingen trykkrespons i glasset.
+   */
+  bar: {tint: 'rgba(244, 246, 245, 0.34)', sheen: 0.06, interactive: false},
+  /**
+   * SAMME BAR PÅ KAMPSIDEN: mørkt, transparent stadionglass — arenaBottom
+   * som tint (designregelen: mørkt glass kjennetegner kamp). JS-only
+   * første forsøk: kun tinten byttes, geometrien er identisk. Blekket i
+   * baren er opalhvitt (`matchColors.text`/`dim`) i denne varianten.
+   */
+  barMatch: {tint: 'rgba(29, 70, 51, 0.62)', sheen: 0.06, interactive: false},
+  /**
    * Solid varm perle for `important` uten glass (Android / Reduce
    * Transparency / eldre iOS): tinten over lysfelt-grunnen regnet ut til én
    * flat farge, så materialretningen beholdes — IKKE det mettede
@@ -69,7 +89,23 @@ export const GLASS = {
    */
   importantSolid: '#F4F1E6',
   importantSolidEdge: 'rgba(92, 74, 0, 0.14)',
+  /** Solid perle for baren uten glass (= OPAL.solid) + svak heiaDeep-kant. */
+  barSolid: '#EFF3F1',
+  barSolidEdge: 'rgba(8, 57, 46, 0.1)',
+  /** Solid arena for kampbaren uten glass + svak opalhvit kant. */
+  barMatchSolid: '#1D4633',
+  barMatchSolidEdge: 'rgba(234, 255, 246, 0.16)',
 } as const;
+
+/**
+ * Flat fallback per variant (Android / Reduce Transparency / eldre iOS).
+ * Kort og kontrollglass går til `OpalSurface`; disse tre er én flat View.
+ */
+const SOLID: Partial<Record<GlassVariant, {fill: string; edge: string}>> = {
+  important: {fill: GLASS.importantSolid, edge: GLASS.importantSolidEdge},
+  bar: {fill: GLASS.barSolid, edge: GLASS.barSolidEdge},
+  barMatch: {fill: GLASS.barMatchSolid, edge: GLASS.barMatchSolidEdge},
+};
 
 interface NativeProps extends ViewProps {
   cornerRadius: number;
@@ -102,6 +138,12 @@ interface LiquidGlassSurfaceProps {
   variant?: GlassVariant;
   /** Hjørneradius — kort = radius.xl (default), kantlinjer/bar = 0. */
   cornerRadius?: number;
+  /**
+   * Fyll forelderen (absoluteFill) i stedet for å måle seg etter barna.
+   * Tab-barens kapsel: glasset er bakgrunnen, fanene legges ut av
+   * biblioteket OVER den.
+   */
+  fill?: boolean;
   children?: React.ReactNode;
 }
 
@@ -110,15 +152,29 @@ export function LiquidGlassSurface({
   pressed = false,
   variant = 'card',
   cornerRadius = radius.xl,
+  fill = false,
   children,
 }: LiquidGlassSurfaceProps) {
   const {reduceTransparency} = useMaterialAccessibility();
   const glass = GLASS[variant];
+  const fillStyle = fill ? StyleSheet.absoluteFill : null;
   if (!FEED_LIQUID_GLASS_AB || !NativeGlass || reduceTransparency) {
-    if (variant === 'important') {
+    const solid = SOLID[variant];
+    if (solid) {
       return (
         <View
-          style={[styles.importantSolid, {borderRadius: cornerRadius}, style]}>
+          testID={`glass-solid-${variant}`}
+          style={[
+            styles.solid,
+            variant === 'important' && shadows.cardResting,
+            {
+              borderRadius: cornerRadius,
+              backgroundColor: solid.fill,
+              borderColor: solid.edge,
+            },
+            fillStyle,
+            style,
+          ]}>
           {children}
         </View>
       );
@@ -131,13 +187,19 @@ export function LiquidGlassSurface({
   }
   return (
     <NativeGlass
-      style={[styles.glass, {borderRadius: cornerRadius}]}
+      style={[styles.glass, {borderRadius: cornerRadius}, fillStyle]}
       cornerRadius={cornerRadius}
       glassTint={glass.tint}
       sheenOpacity={glass.sheen}
       interactive={glass.interactive}
       pressed={pressed}>
-      <View style={[styles.surface, {borderRadius: cornerRadius}, style]}>
+      <View
+        style={[
+          styles.surface,
+          {borderRadius: cornerRadius},
+          fillStyle,
+          style,
+        ]}>
         {children}
       </View>
     </NativeGlass>
@@ -154,12 +216,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  // Solid varm perle (important-fallback). Samme padding-boks: 1 pt kant.
-  importantSolid: {
+  // Flat fallback (important/bar/barMatch). Samme padding-boks: 1 pt kant.
+  // Fyll og kant settes per variant fra `SOLID`.
+  solid: {
     borderRadius: radius.xl,
     borderWidth: 1,
-    borderColor: GLASS.importantSolidEdge,
-    backgroundColor: GLASS.importantSolid,
-    ...shadows.cardResting,
   },
 });

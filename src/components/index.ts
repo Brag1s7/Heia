@@ -60,6 +60,12 @@ export {
   GLASS,
 } from './LiquidGlassSurface';
 export {useMaterialAccessibility} from './useMaterialAccessibility';
+export {
+  useBottomContentPadding,
+  useTabBarOverlap,
+} from './useBottomContentPadding';
+export {TabBarGlass, type TabBarEnvironment} from './TabBarGlass';
+export {TabButton, TAB_PRESS, useTabPress} from './TabButton';
 export {BootScreen} from './BootScreen';
 export {HeroSurface} from './HeroSurface';
 // Dagslysgrunnen (skive 1A, statisk bakgrunnstest på Hjem) + A/B-bryteren

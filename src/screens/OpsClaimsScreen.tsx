@@ -7,11 +7,10 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Skeleton} from '../components';
+import {BackBar, Skeleton, useBottomContentPadding} from '../components';
 import {listOpsClaims, type OpsClaim} from '../lib/api';
 import type {ProfilStackParamList} from '../shared/types';
 
@@ -40,7 +39,7 @@ function formatDate(iso: string): string {
 }
 
 export function OpsClaimsScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
 
   const [claims, setClaims] = useState<OpsClaim[] | null>(null);
@@ -114,7 +113,7 @@ export function OpsClaimsScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

@@ -46,7 +46,11 @@
  */
 export const MATCH_BUTTON_FONT_CAP = 1.3;
 
-/** Barens høyde. Samme verdi som `styles.tabBar` — P4: ikke rør den. */
+/**
+ * Den SOLIDE barens høyde (`styles.tabBar`, `TAB_BAR_GLASS_AB = false`).
+ * Glasskapselen har sin egen, faste geometri i `tabBarLayout.ts`; begge er
+ * konstante på tvers av kampknappens tilstander — det er P4-poenget.
+ */
 export const TAB_BAR_HEIGHT = 88;
 
 /** Antall faner. Pillen deler bredde likt med de fire andre. */
@@ -140,18 +144,28 @@ export function matchButtonGeometry(
   label: string,
   shortLabel?: string,
   hasGlyph = true,
+  itemsWidth = width,
 ): MatchButtonGeometry {
-  const full = fitLabel(width, rawFontScale, label, hasGlyph);
+  const full = fitLabel(width, rawFontScale, label, hasGlyph, itemsWidth);
   // Fikk den fulle etiketten plass uten å bli en hvisking? Da vinner den.
   if (!shortLabel || !full.tooSmall) return full;
-  return fitLabel(width, rawFontScale, shortLabel, hasGlyph);
+  return fitLabel(width, rawFontScale, shortLabel, hasGlyph, itemsWidth);
 }
 
+/**
+ * @param width       vinduets bredde — velger kompresjonstrinnet (typen
+ *                    følger telefonklassen, som prototypen)
+ * @param itemsWidth  bredden fanene FAKTISK deler. Glasskapselen er 2 × 12 pt
+ *                    smalere enn vinduet (`tabBarItemsWidth`), og budsjettet
+ *                    måles mot den — ellers hadde pillen trodd den hadde
+ *                    4,8 pt mer plass enn den har.
+ */
 function fitLabel(
   width: number,
   rawFontScale: number,
   label: string,
   hasGlyph: boolean,
+  itemsWidth: number,
 ): MatchButtonGeometry & {tooSmall: boolean} {
   const fs = Math.min(Math.max(rawFontScale, 1), MATCH_BUTTON_FONT_CAP);
 
@@ -160,7 +174,7 @@ function fitLabel(
   //   0: 390 pt og opp   1: 375-389   2: under 375
   const step = width < 375 ? 2 : width < 390 ? 1 : 0;
 
-  const itemWidth = width / TAB_COUNT;
+  const itemWidth = itemsWidth / TAB_COUNT;
   const maxWidth = itemWidth + OVERFLOW_BUDGET * 2;
 
   // Prototypens uttrykk, klemt av Dynamic Type. Dette er TAKET — tilpasseren
@@ -174,7 +188,15 @@ function fitLabel(
 
   // Finn den STØRSTE typen som får plass. Luften gir etter først: en
   // trangere pille med lesbart ord slår en luftig pille med en hvisking.
-  const candidates = [[16, 13, 12][step], ...PADDING_STEPS];
+  // Trinn 2 (under 375 pt) får ETT luftsteg til: i glasskapselen er en
+  // fanecelle på 320 pt 59 pt bred, og «HEIA!» med 👏 lå 0,15 pt over
+  // budsjettet med 6 pt luft. Luften gir etter, ikke budsjettet (og ikke
+  // typen — den står allerede på MIN_FONT der).
+  const candidates = [
+    [16, 13, 12][step],
+    ...PADDING_STEPS,
+    ...(step === 2 ? [5] : []),
+  ];
   let best = {fontSize: 0, paddingH: candidates[candidates.length - 1]};
   for (const paddingH of candidates) {
     const avail = maxWidth - paddingH * 2 - glyph;

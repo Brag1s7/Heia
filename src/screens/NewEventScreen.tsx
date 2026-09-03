@@ -11,11 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
-import {Button, DateField, TimeField} from '../components';
+import {Button, DateField, TimeField, useBottomContentPadding} from '../components';
 import {useActiveTeam} from '../context';
 import {
   createEvent,
@@ -86,7 +85,7 @@ const TYPE_LABEL: Record<EventType, string> = {
 };
 
 export function NewEventScreen({navigation, route}: Props) {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const {activeTeamSpaceId} = useActiveTeam();
 
   // Skjermen er TOSIDIG (Brage 2026-08-07). `eventId` = redigering av det
@@ -537,7 +536,7 @@ export function NewEventScreen({navigation, route}: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={{
-          paddingBottom: insets.bottom + spacing['3xl'],
+          paddingBottom: bottomPad,
         }}
         keyboardShouldPersistTaps="handled">
         {/* Typen kan ikke endres på et arrangement som finnes: en trening som

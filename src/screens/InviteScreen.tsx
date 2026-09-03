@@ -1,16 +1,15 @@
 import React from 'react';
 import {Text, ScrollView, StyleSheet, View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useRoute, type RouteProp} from '@react-navigation/native';
 import {colors, typography, spacing} from '../theme';
-import {BackBar, InviteCodeCard} from '../components';
+import {BackBar, InviteCodeCard, useBottomContentPadding} from '../components';
 import {useActiveTeam} from '../context';
 import type {HomeStackParamList} from '../shared/types';
 
 type InviteRoute = RouteProp<HomeStackParamList, 'Invite'>;
 
 export function InviteScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const route = useRoute<InviteRoute>();
   const firstTime = route.params?.firstTime ?? false;
   const {activeTeamSpace} = useActiveTeam();
@@ -23,7 +22,7 @@ export function InviteScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}>
       <Text style={styles.title}>
         {firstTime ? 'Laget er klart! 🎉' : 'Inviter til laget'}
