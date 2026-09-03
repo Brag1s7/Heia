@@ -13,11 +13,15 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {inkOnTeamColor} from '../shared/teamColors';
 import type {ProfilStackParamList} from '../shared/types';
-import {BackBar, Button, TeamColorPicker} from '../components';
+import {
+  BackBar,
+  Button,
+  TeamColorPicker,
+  useBottomContentPadding,
+} from '../components';
 import {ChevronRight, HandHeart, Wallet} from '../components/icons';
 import {useActiveTeam} from '../context';
 import {pickLogoImage} from '../lib/media';
@@ -75,7 +79,7 @@ function LogoCircle({
 type Nav = NativeStackNavigationProp<ProfilStackParamList, 'TeamSettings'>;
 
 export function TeamSettingsScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace, activeTeam, refreshMemberships} =
     useActiveTeam();
@@ -221,7 +225,7 @@ export function TeamSettingsScreen() {
         style={styles.screen}
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>

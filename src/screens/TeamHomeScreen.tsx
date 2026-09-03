@@ -10,9 +10,9 @@ import {
   StyleSheet,
   TextInput,
   Alert,
+  Keyboard,
   type AlertButton,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
   useFocusEffect,
@@ -32,8 +32,14 @@ import {
   MatchPhotoGallery,
   Avatar,
   FeedCardSkeleton,
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
+  useBottomContentPadding,
 } from '../components';
+import {LiquidGlassSurface, OPAL} from '../components';
 import {Camera, Check} from '../components/icons';
+import {CommentSheet} from '../components/match/CommentSheet';
+import {WRITING_SCROLL_PROPS} from '../components/keyboard';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {isSystemMatchPost} from '../shared/matchEngagement';
@@ -75,6 +81,31 @@ import type {
   HomeStackParamList,
   RootTabParamList,
 } from '../shared/types';
+
+/**
+ * LOKAL BRYTER (Brage 2026-09-02, godkjent forslag): `true` = compose-boksen
+ * tegnes i glass-varianten `control` («tynt, lyst og nøytralt kontrollglass»,
+ * tint 0,20, halv sheen, ingen trykkrespons på boksen) med feltet som
+ * blekkvask og placeholder i opalblekk; `false` = helhvit boks som før.
+ */
+const COMPOSE_GLASS_AB = true;
+
+/**
+ * Compose-flaten. Modulnivå (ikke nestet) så elementet i `listHeader`
+ * beholder typen mellom rendere — TextInput-en mister ellers fokus.
+ */
+function ComposeSurface({children}: {children: React.ReactNode}) {
+  if (!COMPOSE_GLASS_AB) {
+    return <View style={styles.composeCard}>{children}</View>;
+  }
+  return (
+    <View style={styles.composeWrap}>
+      <LiquidGlassSurface variant="control" style={styles.composeGlass}>
+        {children}
+      </LiquidGlassSurface>
+    </View>
+  );
+}
 
 /** Valgt bilde i compose-boksen: preview-uri + payload for opplasting. */
 type SelectedImage = PickedImage;
@@ -155,6 +186,8 @@ interface FeedRowProps {
   onComment: (item: FeedItem) => void;
   onUnpin: (item: FeedItem) => void;
   onMore: (item: FeedItem) => void;
+  /** Lagfargen — refleksen i kampkortets stadionglass. */
+  teamColor?: string;
 }
 
 /**
@@ -173,13 +206,18 @@ const FeedRow = React.memo(function FeedRow({
   onComment,
   onUnpin,
   onMore,
+  teamColor,
 }: FeedRowProps) {
   const matchId = openableMatchId(item);
   return (
     <View style={styles.cardWrap}>
       <FeedCard
         item={item}
-        onPress={matchId ? () => onOpenMatch(matchId) : undefined}
+        // Kortet åpner SAMTALEN — også kampkortet (Brage 2026-09-03):
+        // feedinnlegg åpner kommentarene, den eksplisitte «Se kampen ›»-
+        // kontrollen åpner kampen. Samme mål som Kommenter-pillen.
+        onPress={() => onComment(item)}
+        onOpenMatch={matchId ? () => onOpenMatch(matchId) : undefined}
         onExpandImage={item.media ? () => onExpandImage(item) : undefined}
         onHeia={() => onHeia(item)}
         onComment={() => onComment(item)}
@@ -189,6 +227,7 @@ const FeedRow = React.memo(function FeedRow({
           canBroadcast && item.isPinned ? () => onUnpin(item) : undefined
         }
         onMore={() => onMore(item)}
+        teamColor={teamColor}
       />
     </View>
   );
@@ -204,7 +243,7 @@ type Nav = NativeStackNavigationProp<HomeStackParamList, 'TeamHome'>;
 type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
 
 export function TeamHomeScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const composeRef = useRef<TextInput>(null);
@@ -273,6 +312,13 @@ export function TeamHomeScreen() {
   );
   const [posting, setPosting] = useState(false);
   const [fullscreenItem, setFullscreenItem] = useState<FeedItem | null>(null);
+  // Kommentararket fra Hjem (2026-09-03): samtalen kommer opp OVER feeden i
+  // stedet for å navigere til `Comments`-ruta — feedposisjonen bevares og
+  // tab-baren står. Ruta lever videre for varsler og deeplinks.
+  const [commentTarget, setCommentTarget] = useState<{
+    postId: string;
+    teamSpaceId: string;
+  } | null>(null);
   // «Varsle hele laget» — festes øverst i feeden + gir alle et varsel.
   const [broadcast, setBroadcast] = useState(false);
 
@@ -444,6 +490,9 @@ export function TeamHomeScreen() {
       setComposeText('');
       setSelectedImage(null);
       setBroadcast(false);
+      // Publisert = ferdig: tastaturet ned, feeden fram (kommentaren i
+      // tråden er motsatt — der beholdes fokus for rask videre skriving).
+      Keyboard.dismiss();
       await refetchFeed();
     } catch (e: any) {
       // Dev-bygg viser årsaken rett i alerten (upload-helperen legger
@@ -577,15 +626,9 @@ export function TeamHomeScreen() {
     setFullscreenItem(item);
   }, []);
 
-  const handleComment = useCallback(
-    (item: FeedItem) => {
-      navigation.navigate('Comments', {
-        postId: item.id,
-        teamSpaceId: item.teamSpaceId,
-      });
-    },
-    [navigation],
-  );
+  const handleComment = useCallback((item: FeedItem) => {
+    setCommentTarget({postId: item.id, teamSpaceId: item.teamSpaceId});
+  }, []);
 
   const renderFeedItem = useCallback(
     ({item}: {item: FeedItem}) => (
@@ -598,9 +641,11 @@ export function TeamHomeScreen() {
         onComment={handleComment}
         onUnpin={handleUnpin}
         onMore={handlePostActions}
+        teamColor={activeTeamSpace?.color}
       />
     ),
     [
+      activeTeamSpace?.color,
       canBroadcast,
       handleOpenMatch,
       handleExpandImage,
@@ -688,7 +733,7 @@ export function TeamHomeScreen() {
           permanensen som gjorde det forsvarlig å fjerne den generiske
           «+»-knappen fra tab-baren til fordel for kampknappen. Flytter du
           den inn i en tilstand, mister laget sin eneste vei til å skrive. */}
-      <View style={styles.composeCard}>
+      <ComposeSurface>
         <View style={styles.composeRow}>
           <Avatar
             name={profile?.displayName ?? 'Du'}
@@ -696,14 +741,20 @@ export function TeamHomeScreen() {
             color={profile?.avatarColor}
             size="md"
           />
-          <View style={styles.composeField}>
+          <View
+            style={[
+              styles.composeField,
+              COMPOSE_GLASS_AB && styles.composeFieldGlass,
+            ]}>
             <TextInput
               ref={composeRef}
               style={styles.composeInput}
               value={composeText}
               onChangeText={setComposeText}
               placeholder="Del noe med laget …"
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={
+                COMPOSE_GLASS_AB ? OPAL.inkTertiary : colors.textTertiary
+              }
               multiline
               editable={!posting}
               // Placeholder leses av VoiceOver, men den er en oppfordring —
@@ -775,7 +826,7 @@ export function TeamHomeScreen() {
             />
           </View>
         )}
-      </View>
+      </ComposeSurface>
     </>
   );
 
@@ -819,39 +870,54 @@ export function TeamHomeScreen() {
           Hjem, Hjem forblir valgt, og «tilbake» fører til Hjem. Et fanebytte
           her ville vært en tilbakeknapp som teleporterer — nettopp det
           modellen forbyr. */}
+        {/* MASTHEAD (Brage 2026-09-03): ÉTT lerret bak HELE skjermen —
+            toppstripe, lagets lys, reisen og buene — og laghodet er
+            gjennomsiktig innhold oppå. Kroppens reise starter ved laghodets
+            underkant (mastheadHeight). Av med DAYLIGHT_GROUND_AB = false. */}
+        {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
         <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
-        <FlatList
-          data={feed}
-          renderItem={renderFeedItem}
-          keyExtractor={feedKeyExtractor}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={listEmpty}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <ActivityIndicator
-                style={styles.feedFooter}
-                color={colors.heia}
+        {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
+        <View style={styles.body}>
+          <FlatList
+            data={feed}
+            renderItem={renderFeedItem}
+            keyExtractor={feedKeyExtractor}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={listEmpty}
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <ActivityIndicator
+                  style={styles.feedFooter}
+                  color={colors.heia}
+                />
+              ) : null
+            }
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
+            // Ingen horisontal padding her — karusellen i headeren er full
+            // bredde; radene har sin egen (cardWrap).
+            contentContainerStyle={{
+              paddingBottom: bottomPad,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.heia}
               />
-            ) : null
-          }
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.5}
-          // Ingen horisontal padding her — karusellen i headeren er full
-          // bredde; radene har sin egen (cardWrap).
-          contentContainerStyle={{
-            paddingBottom: insets.bottom + spacing['3xl'],
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.heia}
-            />
-          }
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={7}
-        />
+            }
+            initialNumToRender={6}
+            maxToRenderPerBatch={6}
+            windowSize={7}
+            // TASTATURET (keyboard.tsx): lista er ENESTE eier. Komponisten
+            // ligger inni lista, så RN sin innebygde inset (vindusbasert,
+            // ruller det fokuserte feltet fram) gjør jobben på iOS; Android
+            // krymper vinduet (adjustResize). Publiser-knappen beholder
+            // første trykk, drag skjuler tastaturet interaktivt.
+            automaticallyAdjustKeyboardInsets
+            {...WRITING_SCROLL_PROPS}
+          />
+        </View>
       </View>
 
       {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
@@ -859,6 +925,16 @@ export function TeamHomeScreen() {
         photos={fullscreenItem ? toGalleryPhoto(fullscreenItem) : []}
         initialPhotoId={fullscreenItem?.id ?? null}
         onClose={() => setFullscreenItem(null)}
+      />
+
+      {/* Kommentararket — vanlige kort og Kommenter (også på kampkort) åpner
+          det; kampkortets hovedflate åpner fortsatt kampen (FeedRow). */}
+      <CommentSheet
+        variant="feed"
+        postId={commentTarget?.postId ?? null}
+        teamSpaceId={commentTarget?.teamSpaceId ?? ''}
+        onClose={() => setCommentTarget(null)}
+        onOpenMatch={handleOpenMatch}
       />
     </>
   );
@@ -868,6 +944,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  /** Kroppen under laghodet — grunnen og scrollflaten deler denne ramma. */
+  body: {
+    flex: 1,
   },
   section: {
     paddingHorizontal: spacing.lg,
@@ -890,6 +970,16 @@ const styles = StyleSheet.create({
     borderColor: colors.borderSubtle,
     gap: spacing.md,
   },
+  // Kontrollglass: marg på wrapperen, padding/gap på innerboksen (glasset
+  // eier kant, radius og materiale — som cardWrap/cardOpal for feedkortet).
+  composeWrap: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  composeGlass: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   composeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -902,6 +992,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     justifyContent: 'center',
+  },
+  // Blekkvask i stedet for solid surfaceMuted: aldri en lys solid flate oppå
+  // lyst glass (Emil-linsa). Samme vask som komponeringslinja på
+  // kommentarsiden.
+  composeFieldGlass: {
+    backgroundColor: 'rgba(8, 57, 46, 0.06)',
   },
   composeInput: {
     ...typography.input,

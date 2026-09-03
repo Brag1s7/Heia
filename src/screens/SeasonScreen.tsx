@@ -22,6 +22,7 @@ import {
   Skeleton,
   StadiumSurface,
   StatusPill,
+  useBottomContentPadding,
 } from '../components';
 import {Plus, Trophy} from '../components/icons';
 import {useActiveTeam} from '../context';
@@ -192,6 +193,7 @@ function MatchProgramme({
 
 export function SeasonScreen() {
   const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
   const isAdmin = isTeamAdmin(activeRole);
@@ -298,7 +300,7 @@ export function SeasonScreen() {
       {pushet && <BackBar />}
 
       <ScrollView
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}
+        contentContainerStyle={{paddingBottom: bottomPad}}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

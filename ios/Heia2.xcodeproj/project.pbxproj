@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		42DC9FA8F39E4C328CCD7A22 /* HeiaLiquidGlassViewManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 93B5FBD4BB164C7987CC9B65 /* HeiaLiquidGlassViewManager.m */; };
+		B94F1E920D124DBC898F0000 /* HeiaLiquidGlassView.m in Sources */ = {isa = PBXBuildFile; fileRef = ECFC6E0CF2134252934D1011 /* HeiaLiquidGlassView.m */; };
 		0C80B921A6F3F58F76C31292 /* libPods-Heia2.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Heia2.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		25385F3DA5FA4C2DBC3E0322 /* Nunito-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = B5124E28E624437C8D2248D0 /* Nunito-Bold.ttf */; };
@@ -18,6 +20,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		93B5FBD4BB164C7987CC9B65 /* HeiaLiquidGlassViewManager.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = HeiaLiquidGlassViewManager.m; path = Heia2/HeiaLiquidGlassViewManager.m; sourceTree = "<group>"; };
+		ECFC6E0CF2134252934D1011 /* HeiaLiquidGlassView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = HeiaLiquidGlassView.m; path = Heia2/HeiaLiquidGlassView.m; sourceTree = "<group>"; };
+		DE93B31FED264B048C00521B /* HeiaLiquidGlassView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HeiaLiquidGlassView.h; path = Heia2/HeiaLiquidGlassView.h; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* Heia2.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Heia2.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Heia2/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Heia2/Info.plist; sourceTree = "<group>"; };
@@ -48,6 +53,9 @@
 		13B07FAE1A68108700A75B9A /* Heia2 */ = {
 			isa = PBXGroup;
 			children = (
+				DE93B31FED264B048C00521B /* HeiaLiquidGlassView.h */,
+				ECFC6E0CF2134252934D1011 /* HeiaLiquidGlassView.m */,
+				93B5FBD4BB164C7987CC9B65 /* HeiaLiquidGlassViewManager.m */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
@@ -306,6 +314,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B94F1E920D124DBC898F0000 /* HeiaLiquidGlassView.m in Sources */,
+				42DC9FA8F39E4C328CCD7A22 /* HeiaLiquidGlassViewManager.m in Sources */,
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				D770F1A3F0AD3E5C83E1B21C /* ExpoModulesProvider.swift in Sources */,
 			);

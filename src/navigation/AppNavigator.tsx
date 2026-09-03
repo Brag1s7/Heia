@@ -1,26 +1,28 @@
-import React, {useEffect} from 'react';
+import React, {useCallback, useEffect, useMemo} from 'react';
 import {
   Alert,
-  Dimensions,
+  Animated,
   Linking,
-  Pressable,
-  Text,
   StyleSheet,
-  View,
+  useWindowDimensions,
 } from 'react-native';
+import type {BottomTabBarButtonProps} from '@react-navigation/bottom-tabs';
 import {
   NavigationContainer,
   DefaultTheme,
+  getFocusedRouteNameFromRoute,
   useNavigation,
   type NavigationProp,
+  type RouteProp,
   type Theme,
 } from '@react-navigation/native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import {
   createNativeStackNavigator,
   type NativeStackNavigationOptions,
 } from '@react-navigation/native-stack';
-import {colors, typography, spacing, shadows} from '../theme';
+import {colors, matchColors, typography, spacing, shadows} from '../theme';
 import {
   useAuth,
   useActiveTeam,
@@ -30,8 +32,27 @@ import {
 import {useMatchButton} from '../context/MatchButtonContext';
 import {matchButtonHasGlyph} from '../shared/matchButton';
 import {matchButtonGeometry} from '../shared/matchButtonGeometry';
-import {BootScreen, MatchTabButton, NotificationBanner} from '../components';
+import {
+  CAPSULE,
+  TAB_BAR_GLASS_AB,
+  tabBarHiddenFor,
+  tabBarItemsWidth,
+  tabBarTotalHeight,
+  capsuleBottomGap,
+} from '../shared/tabBarLayout';
+import {
+  BootScreen,
+  MatchTabButton,
+  NotificationBanner,
+  DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
+} from '../components';
 import {Bell, Calendar, House, User} from '../components/icons';
+// Direkte filstier, ikke `../components`: tabBar-testen mocker hele
+// index-modulen med tre stubber, og glasset/blekket skal rendres ekte der.
+import {TabBarGlass, type TabBarEnvironment} from '../components/TabBarGlass';
+import {TabButton, TAB_PRESS, useTabPress} from '../components/TabButton';
+import {OPAL} from '../components/OpalSurface';
 import {
   navigationRef,
   flushPendingDeepLink,
@@ -125,30 +146,32 @@ const stackScreenOptions: NativeStackNavigationOptions = {
   contentStyle: {backgroundColor: colors.background},
 };
 
+/**
+ * Skjermene som har dagslysgrunnen (Hjem, Kalender, Varsler): kortet bak
+ * skjermen males i grunnens dominante mint, ellers blinker krem i kantene
+ * under push/pop (samme grep som EventDetail gjør for kampens grunn).
+ * Følger A/B-bryteren, så «av» er nøyaktig som før.
+ */
+const daylightGroundOptions: NativeStackNavigationOptions | undefined =
+  DAYLIGHT_GROUND_AB
+    ? {contentStyle: {backgroundColor: DAYLIGHT_GROUND_FALLBACK}}
+    : undefined;
+
 // ---------------------------------------------------------------------------
 // «Ny hendelse»-modalen — registrert i alle tre stackene som har EventDetail,
 // slik at «Ny kamp» på en turneringsside virker uansett hvilken fane
 // turneringen ble åpnet fra.
 // ---------------------------------------------------------------------------
-const newEventOptions = ({
-  navigation,
-  route,
-}: any): NativeStackNavigationOptions => ({
-  // Samme modal, to jobber (2026-08-07). Tittelen er det eneste stedet
-  // brukeren ser forskjellen før feltene er fylt ut.
-  title: route?.params?.eventId ? 'Rediger' : 'Ny hendelse',
-  presentation: 'modal',
-  // Modalen beholder native header og vertikal systemanimasjon —
-  // `simple_push` fra fellesinnstillingene ville gjort den horisontal.
-  headerShown: true,
-  animation: 'default',
-  // Modaler har ingen tilbake-knapp — brukeren trenger en vei ut.
-  headerLeft: () => (
-    <Pressable onPress={navigation.goBack} hitSlop={8}>
-      <Text style={styles.headerAction}>Avbryt</Text>
-    </Pressable>
-  ),
-});
+const newEventOptions: NativeStackNavigationOptions = {
+  // SKJEMA-ARKET (Brage 2026-09-03): «Ny hendelse» oppfører seg som
+  // kommentararket. Ruta er GJENNOMSIKTIG (skjermen bak står synlig), uten
+  // header og uten egen animasjon — `FormSheet` i skjermen eier glasset,
+  // scrimmet, innglidningen, draget og utglidningen (så `goBack`).
+  presentation: 'transparentModal',
+  animation: 'none',
+  headerShown: false,
+  contentStyle: {backgroundColor: 'transparent'},
+};
 
 // ---------------------------------------------------------------------------
 // Home stack (Hjem-tab med push-navigasjon)
@@ -156,7 +179,12 @@ const newEventOptions = ({
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={stackScreenOptions}>
-      <HomeStack.Screen name="TeamHome" component={TeamHomeScreen} />
+      {/* Skive 1A: dagslysgrunnen — se `daylightGroundOptions`. */}
+      <HomeStack.Screen
+        name="TeamHome"
+        component={TeamHomeScreen}
+        options={daylightGroundOptions}
+      />
       <HomeStack.Screen name="EventDetail" component={EventDetailScreen} />
       <HomeStack.Screen
         name="NewEvent"
@@ -206,7 +234,11 @@ function KampStackNavigator() {
 function KalenderStackNavigator() {
   return (
     <KalenderNav.Navigator screenOptions={stackScreenOptions}>
-      <KalenderNav.Screen name="KalenderList" component={KalenderScreen} />
+      <KalenderNav.Screen
+        name="KalenderList"
+        component={KalenderScreen}
+        options={daylightGroundOptions}
+      />
       <KalenderNav.Screen name="EventDetail" component={EventDetailScreen} />
       <KalenderNav.Screen
         name="NewEvent"
@@ -224,7 +256,11 @@ function KalenderStackNavigator() {
 function InboxStackNavigator() {
   return (
     <InboxNav.Navigator screenOptions={stackScreenOptions}>
-      <InboxNav.Screen name="InboxList" component={InboxScreen} />
+      <InboxNav.Screen
+        name="InboxList"
+        component={InboxScreen}
+        options={daylightGroundOptions}
+      />
       <InboxNav.Screen name="EventDetail" component={EventDetailScreen} />
       <InboxNav.Screen name="Comments" component={CommentsScreen} />
       {/* Klubbdør-varslene åpnes HER, ikke i Profil-fanen: et varsel skal
@@ -327,11 +363,126 @@ const tabIcons: Record<
  * stubbede skjermer og beviser at de fire andre fanene står uendret i ALLE
  * kampknappens tilstander — påstanden skive 10 hviler på.
  */
+/**
+ * Fanens knapp med fysisk trykkrespons (Brage 2026-09-03) — se TabButton.
+ * Modulnivå (ikke inline i render), så biblioteket ser samme type hver gang.
+ */
+const renderTabButton = (props: BottomTabBarButtonProps) => (
+  <TabButton {...props} />
+);
+/** KAMP: egen, roligere kompresjon rundt kampknappens egen geometri. */
+const renderMatchTabButton = (props: BottomTabBarButtonProps) => (
+  <TabButton {...props} compress={TAB_PRESS.compressMatch} />
+);
+
+/**
+ * Ikonets mintmarkør. Den AKTIVE markøren squasher svakt horisontalt på
+ * trykk og fjærer tilbake — samme `press`-verdi som knappen (useTabPress),
+ * så knapp og markør beveger seg i ett. Reduce Motion: ingen transform.
+ */
+function TabIconWrap({
+  focused,
+  children,
+}: {
+  focused: boolean;
+  children: React.ReactNode;
+}) {
+  const tabPress = useTabPress();
+  const squash =
+    focused && tabPress && !tabPress.reducedMotion
+      ? {
+          transform: [
+            {
+              scaleX: tabPress.press.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, TAB_PRESS.squashX],
+              }),
+            },
+            {
+              scaleY: tabPress.press.interpolate({
+                inputRange: [0, 1],
+                outputRange: [1, TAB_PRESS.squashY],
+              }),
+            },
+          ],
+        }
+      : null;
+  return (
+    <Animated.View
+      style={[styles.iconWrap, focused && styles.iconWrapOn, squash]}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export function MainTabs() {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
   const {activeTeamSpaceId} = useActiveTeam();
   const {unreadCount, refreshUnreadIfStale} = useNotifications();
-  const {state: matchButton, press: pressMatch} = useMatchButton();
+  const {state: matchButton, press: pressMatch, inMatch} = useMatchButton();
+  const insets = useSafeAreaInsets();
+  const {width: windowWidth} = useWindowDimensions();
+
+  /**
+   * TAB-BAREN SOM FLYTENDE GLASSKAPSEL (Brage 2026-09-03, alternativ A).
+   *
+   * Baren er absolutt: skjerminnholdet og DaylightGround løper under den,
+   * og skjermene reserverer plassen med `useBottomContentPadding` (som leser
+   * biblioteket sin målte barhøyde — safe area telles én gang, inne i den).
+   * Containeren er kapsel + løft + safe area høy med bunnpadding = safe
+   * area + løft, så innholdsboksen fanene legges ut i ER kapselens 64 pt.
+   *
+   * TO MILJØER, ÉN GEOMETRI: `inMatch` (du står inne i en pågående kamp)
+   * bytter tint til mørkt stadionglass og blekket til opalhvitt. Ingenting
+   * annet endres — verken høyde, bredde, løft eller kampknappens tilstand.
+   * Det er en tint, ikke en «stadionvariant av baren» (P4-poenget om
+   * reflow står: stilobjektet er det samme i alle kampknappens tilstander).
+   */
+  const environment: TabBarEnvironment = inMatch ? 'match' : 'light';
+  const tabBarStyle = useMemo(
+    () =>
+      TAB_BAR_GLASS_AB
+        ? [
+            styles.tabBarGlass,
+            {
+              height: tabBarTotalHeight(insets.bottom),
+              paddingBottom: capsuleBottomGap(insets.bottom),
+            },
+          ]
+        : styles.tabBar,
+    [insets.bottom],
+  );
+  const renderTabBarBackground = useCallback(
+    () =>
+      TAB_BAR_GLASS_AB ? (
+        <TabBarGlass
+          environment={environment}
+          containerHeight={tabBarTotalHeight(insets.bottom)}
+        />
+      ) : null,
+    [environment, insets.bottom],
+  );
+  /**
+   * Skjult på kommentarsiden (Brage): komponeringslinja skal ikke ligge over
+   * en synlig glassbar. Per stack, fordi biblioteket leser `tabBarStyle` fra
+   * den fokuserte FANENS options — `undefined` rutenavn = stacken har ikke
+   * rendret ennå = roten = synlig.
+   */
+  const stackTabBarStyle = useCallback(
+    (route: RouteProp<RootTabParamList>) =>
+      tabBarHiddenFor(getFocusedRouteNameFromRoute(route))
+        ? styles.tabBarHidden
+        : tabBarStyle,
+    [tabBarStyle],
+  );
+  const inactiveInk =
+    environment === 'match'
+      ? matchColors.dim
+      : TAB_BAR_GLASS_AB
+      ? OPAL.inkSecondary
+      : colors.textTertiary;
+  const activeInk =
+    environment === 'match' ? matchColors.text : colors.textPrimary;
 
   // Et varsel-trykk ved kaldstart kommer mens onboarding/lasting står fremme,
   // og da finnes ikke HjemStack ennå. Fanene er første øyeblikk målet faktisk
@@ -419,9 +570,15 @@ export function MainTabs() {
           headerShown: false,
           // A v2: aktiv fane = mørk tekst + mint-pille bak ikonet.
           // (#02FFAB som tekstfarge på lyst brøt kontrastkravet.)
-          tabBarActiveTintColor: colors.textPrimary,
-          tabBarInactiveTintColor: colors.textTertiary,
-          tabBarStyle: styles.tabBar,
+          // Glass: inaktivt blekk er OPAL.inkSecondary (kontrastporten over
+          // blur), på kampsiden opalhvitt dim/text.
+          tabBarActiveTintColor: activeInk,
+          tabBarInactiveTintColor: inactiveInk,
+          tabBarStyle,
+          tabBarBackground: renderTabBarBackground,
+          // Egen knapp: biblioteket gir kun onPress — pressIn/pressOut og
+          // responsen bor i TabButton.
+          tabBarButton: renderTabButton,
           tabBarLabelStyle: styles.tabLabel,
           // Standard-slotten er ~30 px bred og klipper alt bredere — pillen
           // trenger hele bredden sin, ellers kuttes glyfen til en strimmel.
@@ -436,20 +593,23 @@ export function MainTabs() {
             }
             const IconGlyph = tabIcons[route.name];
             return (
-              <View style={[styles.iconWrap, focused && styles.iconWrapOn]}>
+              <TabIconWrap focused={focused}>
                 <IconGlyph
                   size={21}
                   color={focused ? colors.heiaDeep : color}
                   strokeWidth={focused ? 2.2 : 2}
                 />
-              </View>
+              </TabIconWrap>
             );
           },
         })}>
         <Tab.Screen
           name="HjemStack"
           component={HomeStackNavigator}
-          options={{tabBarLabel: 'Hjem'}}
+          options={({route}) => ({
+            tabBarLabel: 'Hjem',
+            tabBarStyle: stackTabBarStyle(route),
+          })}
         />
         <Tab.Screen
           name="KalenderStack"
@@ -477,17 +637,20 @@ export function MainTabs() {
             // like brede som før.
             tabBarIconStyle: {
               width: matchButtonGeometry(
-                Dimensions.get('window').width,
+                windowWidth,
                 1,
                 matchButton.label,
                 matchButton.shortLabel,
                 matchButtonHasGlyph(matchButton.kind),
+                // Samme kapselbredde som `MatchTabButton` måler mot.
+                tabBarItemsWidth(windowWidth),
               ).maxWidth,
               height: 32,
             },
             // Hele setningen, ikke bare ordet. Uten den ville VoiceOver lest
             // «2–1» og ingenting om at det er en live kamp du kan åpne.
             tabBarAccessibilityLabel: matchButton.a11yLabel,
+            tabBarButton: renderMatchTabButton,
           }}
           listeners={{
             tabPress: e => {
@@ -499,8 +662,9 @@ export function MainTabs() {
         <Tab.Screen
           name="InboxStack"
           component={InboxStackNavigator}
-          options={{
+          options={({route}) => ({
             tabBarLabel: 'Varsler',
+            tabBarStyle: stackTabBarStyle(route),
             // undefined = ingen badge. 99+ så tallet ikke sprenger prikken.
             tabBarBadge:
               unreadCount > 0
@@ -509,7 +673,7 @@ export function MainTabs() {
                   : unreadCount
                 : undefined,
             tabBarBadgeStyle: styles.tabBadge,
-          }}
+          })}
         />
         <Tab.Screen
           name="ProfilStack"
@@ -618,12 +782,31 @@ export function AppNavigator() {
 // Stiler
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
+  // Den solide baren (TAB_BAR_GLASS_AB = false). Urørt.
   tabBar: {
     backgroundColor: '#FCFDF8',
     borderTopColor: colors.borderSubtle,
     borderTopWidth: StyleSheet.hairlineWidth,
     height: 88,
     paddingTop: spacing.sm,
+  },
+  // Glasskapselens CONTAINER: gjennomsiktig, absolutt, uten kant — selve
+  // kapselen tegnes av `TabBarGlass` i `tabBarBackground`. Høyde og
+  // bunnpadding settes per safe area i `MainTabs`. `paddingTop` sentrerer
+  // ikon + etikett (biblioteket legger dem fra toppen) i de 64 punktene.
+  tabBarGlass: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingTop: 4,
+    paddingHorizontal: CAPSULE.inset,
+    backgroundColor: 'transparent',
+    borderTopWidth: 0,
+    elevation: 0,
+  },
+  tabBarHidden: {
+    display: 'none',
   },
   tabLabel: {
     fontSize: 11,

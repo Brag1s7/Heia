@@ -1,10 +1,19 @@
 import React from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {
+  colors,
+  matchColors,
+  typography,
+  spacing,
+  radius,
+  shadows,
+} from '../theme';
 import {ChevronRight, MapPin} from './icons';
 import {StadiumSurface} from './StadiumSurface';
+import {StadiumGlass} from './StadiumGlass';
 import {StatusPill, type PillKind} from './StatusPill';
+import {useActiveTeam} from '../context';
 import type {HeiaEvent, EventType} from '../shared/types';
 
 interface NextEventHeroProps {
@@ -25,6 +34,15 @@ const typePill: Record<EventType, {kind: PillKind; label: string}> = {
   sosialt: {kind: 'sosialt', label: 'Sosialt'},
   annet: {kind: 'neutral', label: 'Hendelse'},
 };
+
+/**
+ * A/B-BRYTER FOR MATERIALPROTOTYPEN — MIDLERTIDIG (Brage 2026-09-02).
+ * `true` = kommende KAMP på Hjem tegnes i rolig stadionglass (`StadiumGlass`)
+ * med lagfargerefleks; `false` = kamp-grenen nøyaktig som før (global
+ * `StadiumSurface`). Rører KUN kamp-grenen — trening/sosialt/annet er
+ * uendret uansett. Fjernes når materialet er avgjort på fysisk telefon.
+ */
+export const NEXT_MATCH_GLASS_AB = true;
 
 function formatTime(date: Date): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(
@@ -50,6 +68,52 @@ function dayLabel(d: Date): string {
 }
 
 /**
+ * Tynn, hvit glasspill — «KAMP» i StatusPills stemme (11/800/0,8 versal),
+ * men uten coral: coral betyr LIVE og ingenting annet. Samme ytre geometri
+ * som StatusPill (paddingen er trukket 1 pt for kanten), så kicker-linja
+ * ikke flytter seg med bryteren. Turneringsetiketten får samme pill.
+ */
+function GlassPill({label}: {label: string}) {
+  return (
+    <View style={styles.glassPill}>
+      <View style={styles.glassPillDot} />
+      <Text style={styles.glassPillText} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * Kamp-grenen bak NEXT_MATCH_GLASS_AB. Egen komponent av én grunn:
+ * lagfargen leses fra TeamContext, og den hooken skal bare kalles når
+ * glasset faktisk tegnes — trening/sosialt-heroen (og testene som rendrer
+ * karusellen uten TeamProvider) rører ikke konteksten.
+ */
+function GlassMatchHero({
+  onPress,
+  accessibilityLabel,
+  children,
+}: {
+  onPress: () => void;
+  accessibilityLabel: string;
+  children: React.ReactNode;
+}) {
+  const {activeTeamSpace} = useActiveTeam();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={({pressed}) => [pressed && styles.pressed]}>
+      <StadiumGlass style={styles.glassHero} teamColor={activeTeamSpace?.color}>
+        {children}
+      </StadiumGlass>
+    </Pressable>
+  );
+}
+
+/**
  * Hjem-heroen (A v2): dagens hovedøyeblikk når ingen kamp er live. Lys mint
  * med varmt kremdrag og banesirkel — hverdagens svar på stadion-heroen.
  * Hele kortet åpner hendelsen; RSVP-svaret gis der (én kilde til sannhet).
@@ -68,6 +132,20 @@ export function NextEventHero({
   // 2026-07-31) — samme uttrykk som kalenderens kampkort: ringen, mint
   // avspark, men UTEN flomlys (det er live-kampens dramatikk).
   const stadium = event.type === 'kamp';
+  // Materialprototypen: kamp-grenen i stadionglass bak den lokale bryteren.
+  const glass = stadium && NEXT_MATCH_GLASS_AB;
+  // Blekket på glasset: hvit hovedtekst/chevron, `matchColors.dim` for dag og
+  // sted — ALDRI `colors.stadiumDim` på arenafamilien (kontrastfella i tokens).
+  const chevronColor = glass
+    ? matchColors.text
+    : stadium
+    ? colors.stadiumDim
+    : '#41604F';
+  const metaColor = glass
+    ? matchColors.dim
+    : stadium
+    ? colors.stadiumDim
+    : '#41604F';
   // Pillen sier alt «Kamp» — standardtittelen strammes til «Mot Lyn».
   const title =
     stadium && event.opponent && event.title === `Kamp mot ${event.opponent}`
@@ -78,12 +156,21 @@ export function NextEventHero({
     <>
       <View style={styles.kicker}>
         <View style={styles.kickerLeft}>
-          <StatusPill
-            kind={tournamentTitle ? 'turnering' : pill.kind}
-            label={tournamentTitle ?? pill.label}
-            withDot
-          />
-          <Text style={[styles.day, stadium && styles.dayStadium]}>
+          {glass ? (
+            <GlassPill label={tournamentTitle ?? pill.label} />
+          ) : (
+            <StatusPill
+              kind={tournamentTitle ? 'turnering' : pill.kind}
+              label={tournamentTitle ?? pill.label}
+              withDot
+            />
+          )}
+          <Text
+            style={[
+              styles.day,
+              stadium && styles.dayStadium,
+              glass && styles.dayGlass,
+            ]}>
             {dayLabel(event.startTime)}
           </Text>
         </View>
@@ -98,18 +185,18 @@ export function NextEventHero({
           numberOfLines={2}>
           {title}
         </Text>
-        <ChevronRight
-          size={22}
-          color={stadium ? colors.stadiumDim : '#41604F'}
-          strokeWidth={2.2}
-        />
+        <ChevronRight size={22} color={chevronColor} strokeWidth={2.2} />
       </View>
 
       {event.location && (
         <View style={styles.metaRow}>
-          <MapPin size={13} color={stadium ? colors.stadiumDim : '#41604F'} />
+          <MapPin size={13} color={metaColor} />
           <Text
-            style={[styles.meta, stadium && styles.metaStadium]}
+            style={[
+              styles.meta,
+              stadium && styles.metaStadium,
+              glass && styles.metaGlass,
+            ]}
             numberOfLines={1}>
             {event.location}
           </Text>
@@ -119,7 +206,13 @@ export function NextEventHero({
       {total > 0 && (
         <View style={styles.rsvpRow}>
           <View style={[styles.rsvpTrack, stadium && styles.rsvpTrackStadium]}>
-            <View style={[styles.rsvpFill, {width: `${fillPct}%`}]} />
+            <View
+              style={[
+                styles.rsvpFill,
+                glass && styles.rsvpFillGlass,
+                {width: `${fillPct}%`},
+              ]}
+            />
           </View>
           <Text style={[styles.rsvpText, stadium && styles.rsvpTextStadium]}>
             {coming} kommer
@@ -128,6 +221,18 @@ export function NextEventHero({
       )}
     </>
   );
+
+  if (glass) {
+    return (
+      <GlassMatchHero
+        onPress={onPress}
+        accessibilityLabel={`${title}, ${dayLabel(
+          event.startTime,
+        )} ${formatTime(event.startTime)}`}>
+        {inner}
+      </GlassMatchHero>
+    );
+  }
 
   if (stadium) {
     return (
@@ -189,6 +294,46 @@ const styles = StyleSheet.create({
   stadiumHero: {
     padding: spacing.xl,
     ...shadows.cardResting,
+  },
+  // Glassgrenen — samme padding; skyggen eier StadiumGlass selv.
+  glassHero: {
+    padding: spacing.xl,
+  },
+  dayGlass: {
+    color: matchColors.dim,
+  },
+  metaGlass: {
+    color: matchColors.dim,
+  },
+  // Hvitt fyll, ikke neon: avsparkstiden skal være den eneste neonaksenten
+  // i kommende tilstand (Brage 2026-09-02).
+  rsvpFillGlass: {
+    backgroundColor: 'rgba(255, 255, 255, 0.55)',
+  },
+  glassPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: spacing.md - 3,
+    paddingVertical: spacing.xs - 1,
+    borderRadius: radius.full,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  glassPillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: radius.full,
+    backgroundColor: matchColors.text,
+  },
+  glassPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    color: matchColors.text,
   },
   dayStadium: {
     color: colors.stadiumDim,

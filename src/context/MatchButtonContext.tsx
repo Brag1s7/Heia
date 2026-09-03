@@ -57,6 +57,12 @@ interface MatchButtonContextValue {
    * der. `BootScreen` står allerede der i de hundredelene det tar.
    */
   bootReady: boolean;
+  /**
+   * Du står INNE i en pågående kamp (kampskjermen er fokusert og kampen er
+   * i gang). Tab-baren leser den for å bytte MILJØ — mørkt stadionglass over
+   * kampens grunn — aldri for å endre geometri eller kampknappens tilstand.
+   */
+  inMatch: boolean;
   enterMatch: (presence: MatchPresence) => void;
   leaveMatch: (eventId: string) => void;
   /**
@@ -214,6 +220,7 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
     [presence, liveMatch, known, activeTeamSpace?.displayName],
   );
 
+  const inMatch = presence !== null;
   const value = useMemo(
     () => ({
       state,
@@ -221,6 +228,7 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
       // én gang, og onboarding/dormant-flatene slipper å vente på et kall
       // som aldri kommer.
       bootReady: !activeTeamSpaceId || known || bootTimedOut,
+      inMatch,
       enterMatch,
       leaveMatch,
       press,
@@ -230,6 +238,7 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
       activeTeamSpaceId,
       known,
       bootTimedOut,
+      inMatch,
       enterMatch,
       leaveMatch,
       press,

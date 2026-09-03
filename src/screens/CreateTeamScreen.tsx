@@ -10,11 +10,10 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button, Skeleton, TeamColorPicker} from '../components';
+import {BackBar, Button, Skeleton, TeamColorPicker, useBottomContentPadding} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
 import {TEAM_COLORS} from '../shared/teamColors';
@@ -57,7 +56,7 @@ function ClubBadge({name, logoUrl}: {name: string; logoUrl: string | null}) {
 }
 
 export function CreateTeamScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const {session} = useAuth();
   const {userMemberships} = useActiveTeam();
@@ -227,7 +226,7 @@ export function CreateTeamScreen() {
         style={styles.screen}
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>

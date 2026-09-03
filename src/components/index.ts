@@ -17,7 +17,12 @@ export {CalendarNav} from './calendar/CalendarNav';
 export {DayCell, DOT_COLOR} from './calendar/DayCell';
 export {useReducedMotion} from './useReducedMotion';
 export {TournamentDayCard} from './TournamentDayCard';
-export {FeedCard} from './FeedCard';
+export {
+  FeedCard,
+  FEED_OPAL_AB,
+  PINNED_GLASS_AB,
+  MATCH_GLASS_AB,
+} from './FeedCard';
 export {StatusPill} from './StatusPill';
 export {TeamBadge} from './TeamBadge';
 export {ScoreChip} from './ScoreChip';
@@ -44,8 +49,32 @@ export {InviteCodeCard} from './InviteCodeCard';
 export {NotificationRow} from './NotificationRow';
 export {NotificationBanner} from './NotificationBanner';
 export {StadiumSurface} from './StadiumSurface';
+// Stadionglasset — materialprototype (kamp-grenen i NextEventHero bak
+// NEXT_MATCH_GLASS_AB) + systembryterne materialet svarer på.
+export {StadiumGlass} from './StadiumGlass';
+export {OpalSurface, OPAL} from './OpalSurface';
+export {
+  LiquidGlassSurface,
+  FEED_LIQUID_GLASS_AB,
+  LIQUID_GLASS_SUPPORTED,
+  GLASS,
+} from './LiquidGlassSurface';
+export {useMaterialAccessibility} from './useMaterialAccessibility';
+export {
+  useBottomContentPadding,
+  useTabBarOverlap,
+} from './useBottomContentPadding';
+export {TabBarGlass, type TabBarEnvironment} from './TabBarGlass';
+export {TabButton, TAB_PRESS, useTabPress} from './TabButton';
 export {BootScreen} from './BootScreen';
 export {HeroSurface} from './HeroSurface';
+// Dagslysgrunnen (skive 1A, statisk bakgrunnstest på Hjem) + A/B-bryteren
+// og fallback-fargen navigatoren deler med den.
+export {
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
+} from './DaylightGround';
 export {MatchPhotoSheet} from './MatchPhotoSheet';
 export {MatchPhotoRail} from './MatchPhotoRail';
 export {MatchPhotoGallery} from './MatchPhotoGallery';

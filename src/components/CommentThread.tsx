@@ -1,5 +1,7 @@
 import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {
+  Animated,
+  Keyboard,
   View,
   Text,
   Pressable,
@@ -12,6 +14,9 @@ import {
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar} from './Avatar';
+import {LiquidGlassSurface} from './LiquidGlassSurface';
+import {FeedCard} from './FeedCard';
+import {OPAL} from './OpalSurface';
 import {Button} from './Button';
 import {Skeleton} from './Skeleton';
 import {MediaImage} from '../lib/media/MediaImage';
@@ -30,6 +35,7 @@ import {adjustFeedItemCounts} from '../lib/queries/feed';
 import {adjustMatchEngagement} from '../lib/queries/eventDetail';
 import {promptReport} from '../lib/moderation';
 import {avatarRef} from '../lib/media/avatar';
+import {WRITING_SCROLL_PROPS, useKeyboardLift} from './keyboard';
 import type {FeedComment, FeedItem} from '../shared/types';
 
 /**
@@ -59,6 +65,13 @@ interface CommentThreadProps {
   teamSpaceId: string;
   /** Innlegget ble slettet — tråden finnes ikke lenger. Verten lukker seg. */
   onPostDeleted: () => void;
+  /**
+   * Kampinnlegg vises som SAMME kampkort som i feeden (Brage 2026-09-02:
+   * «må vise samme kort her og»). Settes av kommentarsiden, som kan åpne
+   * kampen; bunnarket i kampskjermen står allerede i kampen og utelater den
+   * — da er kortet ikke trykkbart og «Se kampen ›» skjules.
+   */
+  onOpenMatch?: (eventId: string) => void;
 }
 
 function timeAgo(date: Date): string {
@@ -77,10 +90,17 @@ export function CommentThread({
   postId,
   teamSpaceId,
   onPostDeleted,
+  onOpenMatch,
 }: CommentThreadProps) {
   const insets = useSafeAreaInsets();
+  // Tastaturet (keyboard.tsx): dokken LØFTES med en native-drevet transform,
+  // lista får native inset. Ingen layout-animasjon, ingen KAV i verten.
+  const lift = useKeyboardLift(insets.bottom);
+  // Lista ligger BAK dokken (glass) og reserverer dokkens høyde nederst —
+  // så siste kommentar aldri skjules, med og uten tastatur.
+  const [dockHeight, setDockHeight] = useState(0);
   const {session} = useAuth();
-  const {activeTeamSpaceId, activeRole} = useActiveTeam();
+  const {activeTeamSpace, activeTeamSpaceId, activeRole} = useActiveTeam();
 
   const myId = session?.user?.id;
   // Tråden hører alltid til aktivt lag i praksis, men rollen gjelder KUN
@@ -89,6 +109,11 @@ export function CommentThread({
 
   const [post, setPost] = useState<FeedItem | null>(null);
   const [comments, setComments] = useState<FeedComment[]>([]);
+  // SE DET DU SENDTE (Brage 2026-09-03): med tastaturet oppe er lista kort,
+  // og innlegget øverst kan skyve den nyeste kommentaren under kanten.
+  // Etter sending rulles lista til der kommentarene begynner.
+  const listRef = useRef<ScrollView>(null);
+  const commentsTop = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
@@ -274,6 +299,14 @@ export function CommentThread({
       adjustMatchEngagement(post?.eventId, postId, {comments: 1});
       setText('');
       await load();
+      // Etter commit: nyeste kommentar ligger øverst i seksjonen — rull dit,
+      // så den er synlig UTEN å lukke tastaturet.
+      requestAnimationFrame(() => {
+        listRef.current?.scrollTo({
+          y: Math.max(0, commentsTop.current - spacing.sm),
+          animated: true,
+        });
+      });
     } catch {
       Alert.alert('Kunne ikke sende', 'Prøv igjen om litt.');
     } finally {
@@ -282,13 +315,44 @@ export function CommentThread({
   }, [teamSpaceId, postId, post?.eventId, text, sending, load]);
 
   return (
-    <>
+    <View style={styles.thread}>
       <ScrollView
+        ref={listRef}
         style={styles.list}
-        contentContainerStyle={styles.listContent}>
-        {/* Innlegget tråden hører til — konteksten et varsel ikke gir. */}
-        {post && (
-          <View style={styles.postCard}>
+        contentContainerStyle={[
+          styles.listContent,
+          {paddingBottom: dockHeight + spacing.lg},
+        ]}
+        // NATIVE tastatur-inset (vindusbasert, i tastaturets egen
+        // animasjon): lista slutter i skjermbunnen bak dokken, så insetten
+        // = tastaturet, og dokkens høyde ligger alt i paddingen over.
+        automaticallyAdjustKeyboardInsets
+        // ÉN regel for trykk, hold og drag: berøring utenfor feltet lukker
+        // tastaturet ved BERØRINGSSTART. Knapper i lista beholder første
+        // trykk (persistTaps «handled»).
+        onTouchStart={Keyboard.dismiss}
+        {...WRITING_SCROLL_PROPS}>
+        {/* Innlegget tråden hører til — konteksten et varsel ikke gir.
+            Kampinnlegg = feedens kampkort (mørkt stadionglass), samme
+            komponent, samme heia/⋯-handlinger — i `thread`-varianten:
+            ingen Kommenter (du er her), kortet er IKKE trykkbart, og
+            «Se kampen ›» er eneste vei til kampen (Brage 2026-09-03). */}
+        {post && isSystemMatchPost(post.type) && (
+          <FeedCard
+            item={post}
+            variant="thread"
+            onHeia={handleHeia}
+            onMore={handlePostActions}
+            onOpenMatch={
+              onOpenMatch && post.eventId
+                ? () => onOpenMatch(post.eventId as string)
+                : undefined
+            }
+            teamColor={activeTeamSpace?.color}
+          />
+        )}
+        {post && !isSystemMatchPost(post.type) && (
+          <LiquidGlassSurface style={styles.postCard}>
             <View style={styles.postHeader}>
               <Avatar
                 name={post.author.name}
@@ -309,7 +373,7 @@ export function CommentThread({
                   styles.more,
                   pressed && styles.morePressed,
                 ]}>
-                <MoreHorizontal size={18} color={colors.textTertiary} />
+                <MoreHorizontal size={18} color={OPAL.inkTertiary} />
               </Pressable>
             </View>
             {post.content.trim().length > 0 && (
@@ -358,13 +422,13 @@ export function CommentThread({
                 </Pressable>
               </View>
             )}
-          </View>
+          </LiquidGlassSurface>
         )}
 
         {loading ? (
           <>
             {/* Innleggskortet + et par replikker — samme former som lastes. */}
-            <View style={styles.postCard}>
+            <LiquidGlassSurface style={styles.postCard}>
               <View style={styles.postHeader}>
                 <Skeleton width={32} height={32} round />
                 <View style={styles.skeletonHeaderText}>
@@ -374,7 +438,7 @@ export function CommentThread({
               </View>
               <Skeleton height={13} />
               <Skeleton width="60%" height={13} />
-            </View>
+            </LiquidGlassSurface>
             <View style={styles.comment}>
               <Skeleton width={32} height={32} round />
               <View style={styles.skeletonBubbleWrap}>
@@ -395,80 +459,120 @@ export function CommentThread({
             Ingen kommentarer ennå. Vær den første!
           </Text>
         ) : (
-          comments.map(c => (
-            <View key={c.id} style={styles.comment}>
-              <Avatar
-                name={c.author.name}
-                size="sm"
-                media={avatarRef(c.author.avatarPath)}
-                color={c.author.avatarColor}
-              />
-              {/* Boble per kommentar — uten flate fløt kommentarene rett på
+          // NYESTE ØVERST (Brage 2026-09-03): composeren står i bunnen, så
+          // det du nettopp sendte skal dukke opp rett under innlegget.
+          // API-et leverer stigende; sorteringen bor her. Wrapperen måler
+          // hvor seksjonen begynner (scroll-målet etter sending).
+          <View
+            style={styles.commentsSection}
+            onLayout={e => {
+              commentsTop.current = e.nativeEvent.layout.y;
+            }}>
+            {[...comments]
+              .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+              .map(c => (
+                <View key={c.id} style={styles.comment}>
+                  <Avatar
+                    name={c.author.name}
+                    size="sm"
+                    media={avatarRef(c.author.avatarPath)}
+                    color={c.author.avatarColor}
+                  />
+                  {/* Boble per kommentar — uten flate fløt kommentarene rett på
                   kremen og så uferdige ut ved siden av innleggskortet. */}
-              <View style={styles.commentBubble}>
-                <View style={styles.commentHeader}>
-                  <Text style={styles.commentName}>{c.author.name}</Text>
-                  <Text style={styles.commentTime}>{timeAgo(c.createdAt)}</Text>
-                  <Pressable
-                    onPress={() => handleCommentActions(c)}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Flere valg"
-                    style={({pressed}) => [
-                      styles.more,
-                      styles.commentMore,
-                      pressed && styles.morePressed,
-                    ]}>
-                    <MoreHorizontal size={16} color={colors.textTertiary} />
-                  </Pressable>
+                  <View style={styles.commentBubble}>
+                    <View style={styles.commentHeader}>
+                      <Text style={styles.commentName}>{c.author.name}</Text>
+                      <Text style={styles.commentTime}>
+                        {timeAgo(c.createdAt)}
+                      </Text>
+                      <Pressable
+                        onPress={() => handleCommentActions(c)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Flere valg"
+                        style={({pressed}) => [
+                          styles.more,
+                          styles.commentMore,
+                          pressed && styles.morePressed,
+                        ]}>
+                        <MoreHorizontal size={16} color={OPAL.inkTertiary} />
+                      </Pressable>
+                    </View>
+                    <Text style={styles.commentText}>{c.content}</Text>
+                  </View>
                 </View>
-                <Text style={styles.commentText}>{c.content}</Text>
-              </View>
-            </View>
-          ))
+              ))}
+          </View>
         )}
       </ScrollView>
 
-      <View
-        style={[
-          styles.composeBar,
-          {paddingBottom: insets.bottom + spacing.sm},
-        ]}>
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={setText}
-          placeholder="Skriv en kommentar…"
-          placeholderTextColor={colors.textTertiary}
-          multiline
-          editable={!sending}
-        />
-        <Button
-          title="Send"
-          onPress={handleSend}
-          disabled={text.trim().length === 0}
-          loading={sending}
-        />
-      </View>
-    </>
+      {/* DOKKEN — glass over lista, forankret i skjermbunnen. Løftes med
+          native transform (keyboard.tsx) så hele raden følger tastaturet
+          opp og ned i tastaturets egen bevegelse (forslagslinja inkludert).
+          Safe area ligger i paddingen her og telles én gang (løftet
+          trekker den fra). Send står UTENFOR lista, så første trykk
+          treffer alltid. */}
+      <Animated.View
+        style={[styles.composeDock, {transform: [{translateY: lift}]}]}
+        onLayout={e => setDockHeight(e.nativeEvent.layout.height)}>
+        <LiquidGlassSurface
+          cornerRadius={0}
+          style={[
+            styles.composeBar,
+            {paddingBottom: insets.bottom + spacing.sm},
+          ]}>
+          {/* ⚠️ Ikke `editable={!sending}`: å slå av editable RESIGNERER
+            feltet på iOS — tastaturet forsvant etter hver sending. Dobbel-
+            sending stoppes i handleSend (`sending`-vakten). Return gir
+            linjeskift (multiline); Send publiserer. Etter sending tømmes
+            feltet og beholder fokus, for rask videre kommentering. */}
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={setText}
+            placeholder="Skriv en kommentar…"
+            placeholderTextColor={OPAL.inkTertiary}
+            multiline
+          />
+          <Button
+            title="Send"
+            onPress={handleSend}
+            disabled={text.trim().length === 0}
+            loading={sending}
+          />
+        </LiquidGlassSurface>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  list: {
+  thread: {
     flex: 1,
+  },
+  // Bak dokken, helt til skjermbunnen (native inset regner mot bunnen).
+  list: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  composeDock: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   listContent: {
     padding: spacing.lg,
     gap: spacing.lg,
   },
+  // Samme luft mellom kommentarene som lista ellers har.
+  commentsSection: {
+    gap: spacing.lg,
+  },
+  // Materialet (glass/opal) eies av LiquidGlassSurface — bare paddingen her.
   postCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
     padding: spacing.lg,
     gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
   },
   postHeader: {
     flexDirection: 'row',
@@ -485,7 +589,7 @@ const styles = StyleSheet.create({
   },
   postTime: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   postContent: {
     ...typography.body,
@@ -515,7 +619,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   // Delt stemme — se `typography.action`.
-  reactText: typography.action,
+  reactText: {...typography.action, color: OPAL.inkSecondary},
   reactTextOn: {
     color: colors.heiaInk,
   },
@@ -532,7 +636,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
     marginTop: spacing.xl,
   },
@@ -543,13 +647,16 @@ const styles = StyleSheet.create({
   },
   // Chat-hjørnet (lite radius oppe til venstre, mot avataren) gjør boblen til
   // en replikk, ikke et kort til.
+  // Replikkene er IKKE glass (ett blur-lag per boble er dyrt i en lang tråd,
+  // og lyse translusente flater skal ikke stables): lys frost uten blur på
+  // grunnen, med lys kant — innlegget er hero, replikkene er samtale.
   commentBubble: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.62)',
     borderRadius: radius.lg,
     borderTopLeftRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.borderSubtle,
+    borderColor: 'rgba(255, 255, 255, 0.78)',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     gap: 2,
@@ -565,7 +672,7 @@ const styles = StyleSheet.create({
   },
   commentTime: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   more: {
     padding: 2,
@@ -580,15 +687,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     lineHeight: 22,
   },
+  // Materialet eies av LiquidGlassSurface (cornerRadius 0).
   composeBar: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    backgroundColor: colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
   },
   input: {
     ...typography.input,
@@ -599,7 +704,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    backgroundColor: colors.surfaceMuted,
+    // Blekkvask i glasset, samme språk som reaksjonspillene.
+    backgroundColor: 'rgba(17, 36, 27, 0.06)',
     borderRadius: radius.lg,
     textAlignVertical: 'top',
   },

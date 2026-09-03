@@ -1,6 +1,1160 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-01 — S3c IMPLEMENTERT: feed+varsler+kampknapp → broadcast bak flaggene, 60 s-pollingen gates av; SKALERINGSSPORET PARKERES ETTER TELEFONTEST — NESTE ER DESIGNSPORET)
+## ▶️▶️ START HER (oppdatert 2026-09-04 — KALENDER-CHROMEN (35ae050) OG ARKENE I GLASS + «NY HENDELSE» SOM KOMMENTARARK TELEFONGODKJENT, COMMITTET OG PUSHET; NESTE = andre skjermer (Varsler-handlingen/-tittelen, Profil-header) i NY samtale)
+
+✅ TREET ER RENT OG PUSHET (2026-09-04). Brage: «Veldig bra! Commit og
+push». Header og DaylightGround er URØRT (visuelt låst av Brage
+2026-09-03 — «lar dem være helt urørt til designsporet er ferdig»).
+Ingen native endring i noen av skivene — Metro-reload holder.
+NY SAMTALE ER TRYGG: Brage vil se på andre skjermer (design og elementer).
+Anbefalt start: Varsler (tittel + «Merk alle som lest» i mørk topp — samme
+grep som Kalender: liten fast chrome i stadionblekk), deretter
+Profil-header (masthead-anatomi), deretter FeedCard mer glass
+(GLASS.sheet/FIELD-språket er startpunktet). Glassarkfamilien som skal
+gjenbrukes: `GlassSheetSurface` (flaten), `InlineSheet` (ark inne i en
+skjerm), `FormSheet` (ark som kommentararket over en transparentModal-rute),
+`MonthSheet` (Modal — må dekke tab-baren).
+
+1. KALENDER-CHROMEN — LUKKET, telefongodkjent («Det ser veldig bra ut og er
+   godkjent!»), commit 35ae050:
+   · Chromen (CalendarNav: måned + «I dag»/«Måned»/«+ Ny», WeekStrip,
+     statusrad) ligger FAST under laghodet, UTENFOR ScrollView-en i
+     KalenderScreen; bare agendaen ruller. Ingen sticky header, ingen
+     festeterskel (navTop/navHeight er borte), ingen scroll-away-tittel
+     («Kalender» + undertekst er FJERNET — fanen heter Kalender, måneden er
+     chromens tittel). Chromen er gjennomsiktig innhold på dagslysgrunnen:
+     ingen flate, ingen kant. Alt blekk i chromen er stadionblekk
+     (CalendarNav-tittel, statusrad).
+   · UKERADEN: `DayCell` har fått `tone?: 'light' | 'stadium'` (default
+     light = datovelgeren, URØRT). WeekStrip sender `tone="stadium"`:
+     frostplate per dag (`STADIUM_CELL`: stadionblekk 0,08 + hårlinje 0,16,
+     6 pt luft i WeekStrip), ukedag stadionblekk 0,8 (helg ×0,78), tall
+     stadionblekk, «i dag»/«valgt» Heia-neon (valgt + neonramme + heiaSoft),
+     turneringsprikk = gull (goldInk forsvinner på mørkt), «annet» dempet
+     stadionblekk. Valgt av Brage blant fem riggede varianter (kun blekk /
+     hårlinjer / frostplater / mørke chips / grunnlinje) — plater vant:
+     «definisjon, rytme og avgrensning uten å bli bokser».
+   · Runde 1 (sticky blokk som pikselriktig grunnvindu m/ native Animated)
+     ble bygget og riggverifisert, men ERSTATTET av den permanente chromen
+     i runde 2 — ingen spor i treet. Ikke bygg den igjen.
+   · Tester: `__tests__/dayCellStadium.test.tsx` (17) måler blekket der det
+     faktisk står (ukedag mot #143126–#0B412E, tall/neon mot #143126–#00593C).
+   · Pillene («I dag»/«Måned»/«+ Ny», hvit flate) er IKKE rørt — de står nå
+     som hvite piller på mørk grunn. Den blå treningsprikken (#2F66DB) er
+     den svakeste på mørkt — Brage har ikke kommentert den.
+
+2. ARKENE I GLASS — BYGGET, UKOMMITTERT, venter telefondom (Brage
+   2026-09-03: «månedskalenderen skal ikke være en flat hvit sheet … tungt
+   glass/opalmateriale … behold stor radius og drag-handle … ikke egne
+   glassbokser per dato … samme for +Ny og Ny kamp fra Sesongen … FJERN den
+   svarte scrimen»; tre referansebilder: mørk kalender-app m/ datovelger-ark,
+   reiseapp m/ frostede kort på foto, one.com-annonse m/ frostet
+   kalenderpanel over foto):
+   · `GLASS.sheet` (LiquidGlassSurface): rgba(244,246,245,0,80), sheen 0,10,
+     ikke interaktiv — den tyngste perlen i familien, fortsatt gjennomsiktig
+     (grunnen farger arket: lys mint over neon, kjølig perle over teal).
+     Solid fallback `sheetSolid` #EFF3F1 + heiaDeep-kant 0,12 (Android /
+     Reduce Transparency / iOS < 26). Ekte systemglass på iOS 26 via
+     eksisterende HeiaLiquidGlassView (uniform cornerRadius — INGEN native
+     endring).
+   · MonthSheet: INGEN scrim (bakflaten er gjennomsiktig men fortsatt
+     trykkbar for å lukke — Emil: «dim to focus, separate to keep flow»,
+     månedsvelgeren er et parallelt panel). Arket er
+     `<LiquidGlassSurface variant="sheet">`, radius.xl, handle 36×5 i
+     OPAL.inkTertiary 0,35, MonthGrid `plain` (ingen bokser per dato),
+     fottekst OPAL.inkSecondary. Arket strekker seg ETT radius-mål under
+     skjermkanten (marginBottom −radius.xl + ekstra paddingBottom) så de
+     nedre hjørnene aldri synes, heller ikke på Android.
+   · NewEventScreen («+ Ny» på Kalender OG «Ny kamp»/«Ny turnering» fra
+     Sesongen — samme modal, `newEventOptions` i AppNavigator): native
+     modal beholdt (ingen transparentModal — tastaturet ville åpnet hele
+     arkproblemet igjen). Headeren er reisens mørke start (`headerStyle`
+     HEIA_BRIDGE #143126, hvitt blekk, ingen hårlinje, `contentStyle` =
+     broen som fallback, «Avbryt» i `headerActionOnDark`); skjermen har
+     `<DaylightGround />` (ikke masthead) bak, og HELE skjemaet ligger på
+     ÉTT `GLASS.sheet`-panel (margin spacing.md) i ScrollView-en. Felt og
+     chips: `FIELD` = hvit 0,55 + blekk-hårlinje 0,12 (innfelt i glasset,
+     ikke hvite kort oppå; aldri to lyse translusente flater oppå
+     hverandre). Blekk på glasset: OPAL.inkSecondary for etiketter, noter,
+     chip-tekst og PLASSHOLDERE (inkTertiary faller til 4,1 over reisens
+     mørkeste). DateField/TimeField/Button er urørt.
+   · Tester: `__tests__/glassSheet.test.tsx` (tint-vekt, blekk over seks
+     grunner fra #143126 til opal, ingen scrim, variant + handle + plain).
+   · TELEFONRUNDE 1 (Brage 2026-09-03, «Ser bra ut!» + seks punkter),
+     ALLE BYGGET, venter runde 2:
+     (a) «grønn kant på toppen» → headeren er GJENNOMSIKTIG
+         (`headerTransparent`, `statusBarStyle: 'light'`), grunnen starter
+         i statuslinja; skjermen legger `useHeaderHeight()` (fra
+         @react-navigation/elements, transitiv dep) som topp-padding.
+     (b) «dekke sidene som kommentarseksjonen» → `presentation:
+         'fullScreenModal'` + `animation: 'slide_from_bottom'` (ingen
+         kortstabel; swipe-ned-lukking er borte, «Avbryt» er veien ut).
+     (c) «Kamp hopper alt under boksene» → `chooseType` kjører
+         `LayoutAnimation.create(220, easeInEaseOut, opacity)` før
+         `setType` (Reduce Motion = hopp).
+     (d) «Dag skal gi samme glass som Måned» → utfoldingen i DateField er
+         FJERNET; ny `DateSheet` (MonthGrid plain + fotnote på
+         GlassSheetSurface) rendres i skjermroten. DateField er kontrollert
+         (`open`/`onOpen`), grensene (daysBack/monthsAhead/minDate) bor i
+         DateSheet.
+     (e) «Klokkeslett henger i flere sekunder» → ROTÅRSAK: TimeSheet var en
+         RN `Modal` presentert fra en skjerm som selv er native modal.
+         Ny `InlineSheet` (GlassSheet.tsx): absolutt overflate i
+         skjermroten, gjennomsiktig trykkbar bakflate, translateY på native
+         driver (260/200 ms), `accessibilityViewIsModal`, Keyboard.dismiss
+         ved åpning, avmonteres etter utglidning. TimeField er kontrollert.
+         MonthSheet på Kalender bruker fortsatt `Modal` (må dekke tab-baren)
+         men samme `GlassSheetSurface`.
+     (f) «Hjulet stopper hakkete» → ROTÅRSAK: `contentOffset`-propen ble
+         regnet av `value` per render, og `value` settes ved drag-slipp →
+         ny offset midt i momentumet. Nå frosset per montering
+         (`initialOffset` i useRef). Vokter: inlineSheets.test.
+     (g) «se alt uten å bla» → field paddingTop lg→md, beskjed 96→72 pt,
+         saveRow 2xl→lg, bunnpadding = safe area (ikke tab-barhøyden).
+     Tester: `__tests__/inlineSheets.test.tsx` (7): ingen Modal, glass
+     sheet, ingen scrim, frosset offset, Ferdig sender hjulets verdi,
+     datoarket plain + grenser + velg-og-lukk.
+   · TELEFONRUNDE 2 (Brage 2026-09-03, «Funksjonaliteten er godkjent», men
+     SKARPT: «legg til hendelse skal komme opp som kommentarfeltet og dekke
+     hele bredden — det viktigste; ingen hvit boks over den; oppføre seg
+     som et kommentarfelt man kan dra ned»). BYGGET, venter runde 3:
+     · Ny `src/components/FormSheet.tsx`: kommentararkets mekanikk
+       (ExpandableCommentSheet) som skjema-ark — full bredde, glir opp
+       OVER skjermen du står på, animert `top` på JS-driver, drag i hodet
+       (fanger ved BEVEGELSE så «Avbryt» får trykket), 28 % / 0,5 px/ms,
+       `closeTiming` = feedarkets utglidning, Heia-blekk-scrim 0,24,
+       `ref.dismiss()` = utglidning → `onDismissed` (goBack). Selve arket ER
+       glasset (`LiquidGlassSurface variant="sheet" fill`) — ingen panel
+       oppå. Konstantene er kopiert fra CommentSheet, ikke importert.
+     · AppNavigator `newEventOptions`: `presentation: 'transparentModal'`,
+       `animation: 'none'`, `headerShown: false`, transparent contentStyle.
+       Ingen native header, ingen fullScreenModal, ingen useHeaderHeight.
+     · NewEventScreen: root = FormSheet → ScrollView
+       (`automaticallyAdjustKeyboardInsets`, ingen KAV) → feltene rett på
+       glasset. DaylightGround og glasspanelet er FJERNET fra skjermen. Alle
+       fire `navigation.goBack()` går via `dismiss()` (utglidning først).
+       Dato-/klokkeslettarkene (InlineSheet) ligger i skjermroten over
+       FormSheet. Laste-/feiltilstanden ved redigering ligger også i arket.
+     · Tester: `__tests__/formSheet.test.tsx` (6): glass = arket, scrim,
+       Avbryt/bakflate/ref via utglidning, idempotent, closeTiming.
+     · Android-tilbake popper ruta uten utglidning (akseptert). Swipe-ned
+       er draget i hodet, ikke systemgesten.
+     På telefonen i runde 3: (1) arket dekker HELE bredden og kommer opp
+     over Kalender/Sesongen som kommentararket, (2) ingen boks/kant, (3)
+     drag i hodet ned lukker, kast lukker raskt, (4) Dag/Klokkeslett åpner
+     glassark umiddelbart, hjulet ruller jevnt, (5) tastatur: feltet du
+     skriver i holdes synlig (ScrollView eier innsettingen), (6) Kamp/
+     Trening glir.
+
+3. VERIFISERT (etter punkt 2): full suite 1052/1052 grønn (2 skipped);
+   eslint = kun kjente baseline-funn (KalenderScreen exhaustive-deps ~175,
+   AppNavigator nested-component-warning); prettier ren på alle berørte
+   filer unntatt de to bevisst urene HEAD-stedene i KalenderScreen; tsc
+   IKKE kjørt (Brages regel). Ingen `zz_`-filer i treet (riggene ligger
+   som .bak i sesjonens scratchpad).
+
+▶️ NESTE (i denne rekkefølgen):
+  A. Telefondom på arkene → ÉN commit («design: arkene i glass …»), så
+     denne seksjonen → historikk.
+  B. VARSLER-HANDLINGEN «Merk alle som lest» (#087A5A på mørk topp, 2,2:1)
+     + «Varsler»-tittelen (heading1 = textPrimary på #143126, ~1,1:1 — samme
+     feil Kalender hadde). Trolig samme grep: liten, fast chrome i
+     stadionblekk, ingen stor scroll-away-tittel (Brage: «skjermen skal
+     alltid leses mer som bilde 2 enn bilde 1»).
+  C. PROFIL-HEADER (masthead-anatomi) — se historikken under.
+  D. FeedCard mer glass (Brage: «senere skal vi også endre feedcard til å se
+     mer glass ut, så må være en slags helhet») — GLASS.sheet/FIELD-språket
+     er startpunktet; retningsfaden i REFERENCE-NOTES.md står.
+  E. Opprydding (prune DaylightGround-varianter) — FØRST når designsporet
+     er ferdig (Brage 2026-09-03: DaylightGround skal være helt urørt).
+  Pillene i kalenderchromen (hvite på mørkt) og den blå treningsprikken er
+  åpne småpunkter — nevn dem når Brage ser Kalender neste gang.
+
+## (historikk) START HER 2026-09-03 natt — DAGSLYSGRUNN «E-atmosphere» + MASTHEAD-LAGHODE TELEFONGODKJENT OG COMMITTET
+
+✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
+native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-03
+(«Nå ser det riktig ut!»). Ca. 12 telefonrunder og én lokal rigg ligger bak.
+
+1. DAGSLYSGRUNNEN (`src/components/DaylightGround.tsx`) — FROSSET:
+   `DAYLIGHT_VERTICAL_VARIANT = 'E-atmosphere'` (E-clean-rampen + ETT
+   diffust stadionlys fra venstre, kalibreringsstyrke 0,3 — Brage ville se
+   ideen først; kan tunes ned). `'E-clean'` er fallback via samme konstant.
+   E-clean = 26 stopp samplet hver 4 % fra en jevn OKLCH-kurve gjennom
+   #143126 → #02FFAB (57 %) → #F3F4EC, skew 60 (6 % venstre først).
+   Ankerne står i filkommentaren. A/D (masterrom) og E/F (runde 1–3)
+   ligger igjen som døde varianter — PRUNE i egen opprydding.
+   Masthead-modus (`<DaylightGround masthead />` på Hjem/Kalender/Varsler):
+   grunnen fyller HELE skjermen (skjermroten, første barn), reisen starter i
+   #0E211A i statuslinja og treffer broen #143126 nøyaktig ved laghodets
+   underkant (`journeyStops` + `bodyTop`-mapping i SpatialGround), lagets
+   IDENTITETSFELT og BUENE tegnes her. Comments bruker `<DaylightGround />`
+   uten masthead (som før). De to store krittsirklene er fjernet;
+   banelinjene og prikken står.
+2. LAGHODET (`src/components/TeamHeader.tsx`) — MASTHEAD, LÅST:
+   GJENNOMSIKTIG innhold (logo, navn, metadata, «Sesongen») i flyten, oppå
+   lerretet. Statuslinja alltid `light-content` (hvite ikoner på #0E211A på
+   ALLE lag). Blekk mot ren lagfarge (`teamSpotlight` i teamColors.ts —
+   erstatter `teamHeaderSurface`): gul/lyseblå/oransje mørkt, resten hvitt,
+   alle 12 palettfarger beholder seg selv. Logoplate som materiale (0,94
+   hvit, kant, skygge), undertekst 0,72, chip alltid `bordered`. Høyde
+   uendret 113 pt (insets.top + 42 + 12 = `mastheadHeight`).
+   IDENTITETSFELTET (`src/shared/masthead.ts`, ren modul): avrundet form
+   åpen mot venstre, radius 24, 4 pt luft over/under raden, høyre ende ved
+   66 % av bredden, full lagfarge til 85 % av feltet, så `darkenSameHue`
+   0,86 mot den runde enden. Hårlinje-kantlys i stadiumText 0,22 med åpne
+   sider (topplinje fader mot høyre, nedre hjørne fader oppover). Lagnavnet
+   klippes ved 55 % (`nameMaxWidth`) — innenfor full lagfarge, så mørkt
+   blekk aldri faller under 4,5:1 (oransje ligger på nøyaktig 4,5).
+   Buene: ÉN familie — sirkelparet (r 100/68, senter 30 pt inn, 10 pt over
+   laghodets underkant) i stadiumText, konstant gjennom laghodet, fadet ut
+   over 12 % av kroppen (`ArcFamily` i DaylightGround). Laghodet tegner ikke
+   egne buer. ProfileHeader er IKKE rørt (fortsatt gammel solid header).
+3. AVVIST UNDERVEIS — IKKE PRØV IGJEN uten ny beslutning: (a) lagfargen som
+   lys/glød/bleed over toppen («sprayflaske»), (b) opak mørkne-først-fade
+   (ga brent kant), (c) rektangel-lapper, (d) scroll-kant-bånd i toppen av
+   kroppen (mørkt bånd i hvile), (e) FLYTENDE laghode m/ slør som innholdet
+   ruller under («Nå ødela du alt!» — Brage vil ha laghodet i flyten og
+   innholdet klippet under det). Brages ord: «kun endre bunnen på header».
+4. VERKTØY: `__tests__/masthead.test.ts` (27) vokter blekk, felt, kontrast
+   og reisen. Lokal rigg (jest → HTML → headless Chrome) ligger som
+   `zz_mastheadRender.test.ts.bak` i sesjonens scratchpad — gjenskap ved
+   behov (oppskrift i memory «visual-render-harness»). Ingen `zz_`-filer i
+   repoet.
+
+VERIFISERT VED LUKKING: full suite (se commit-melding for tall); eslint =
+kun den kjente baseline-feilen (KalenderScreen exhaustive-deps, nå linje
+~185 fordi importen fikk linjer) + kjente warnings; tsc IKKE kjørt (Brages
+regel: typer sjekkes i editoren). Prettier ren på alle berørte filer unntatt
+KalenderScreen, som var uren i HEAD på to steder (importen øverst og
+`ScrollOrigin`-unionen) — de er bevisst latt stå.
+
+▶️ NESTE (anbefaling, i NY samtale), i denne rekkefølgen:
+  A. KALENDER-BLOKKEN: den klebrige `navBlock` (månedsvelger + ukerad +
+     status) er en KREM-flate som nå skjærer gjennom den mørke toppen av
+     kroppen, og innholdet klippes hardt under laghodet på Kalender. Må inn
+     i sekvensen (glass/mørk stadionflate el.l.). Se KalenderScreen
+     `navBlock`-kommentaren: bakgrunnen MÅ være ugjennomsiktig (agendaen
+     ruller bak). Ren visuell skive, telefonrunde.
+  B. VARSLER-HANDLINGEN «Merk alle som lest» (#087A5A) står i den mørke
+     toppen (2,2:1) → glass-chip eller lyst blekk. Samme for tomtekster/
+     seksjonstitler som havner i 15–35 %-sonen (mellomtone der verken mørk
+     eller hvit tekst holder 4,5). Liten skive.
+  C. PROFIL-HEADER: gi ProfileHeader samme masthead-anatomi (universell
+     base + Heia-mørkegrønt identitetsfelt) så fanebytte ikke bytter modell.
+  D. OPPRYDDING: prune A/D/E/F-variantene og `MasterGround` når E-atmosphere
+     står; vurder å tune stadionlyset ned (0,3 → ~0,18); promoter #143126/
+     #0E211A/#02FFAB-ankrene til tokens (teamColors `HEIA_BRIDGE`,
+     `HEADER_BASE` duplikerer colors.stadium — test vokter likheten).
+  E. Spinnere: RefreshControl/ActivityIndicator er neon (#02FFAB) på neon
+     grunn — nesten usynlige under lasting. Bytt til stadiumText/ink.
+Alternativ hvis Brage heller vil framover i produkt: pre-launch-pakken
+S5/S6/S8 (se historikken) eller betaling fase 6.
+
+## (historikk) START HER 2026-09-03 kveld — KOMMENTARARK FRA HJEM + TASTATURSYSTEM + TAB-BAR RUNDE 5: ALT TELEFONGODKJENT OG COMMITTET; NESTE = DESIGNRETNINGEN SOM ER LAGRET, i NY samtale)
+
+✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
+native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-03:
+
+1. TAB-BAR RUNDE 5 (`src/components/TabBarGlass.tsx`): diffusjonsfeltet
+   starter 40 pt over kapselen på 0, er 0,04 (lys)/0,06 (kamp) ved
+   kapseltoppen, 0,12/0,16 midt, 0,30/0,40 bunn, 0,42/0,56 skjermbunn.
+   INGEN klipping (runde 4 med hard kant + klippeboks ble avvist: synlig
+   rektangelkant). Kapsel, haze, geometri, trykkrespons urørt.
+2. KOMMENTARARK FRA HJEM (`src/components/match/CommentSheet.tsx`):
+   `variant="feed"` = EGEN komponent (`ExpandableCommentSheet`): hviler på
+   68 %, dras i hodet til full (safe area + 8), tastatur snapper til full,
+   swipe ned lukker; animert `top` (JS-driver, godkjent på telefon med lang
+   tråd); Heia-blekk-scrim rgba(8,57,46,0,24). Lukking ved drag:
+   `feedCloseTiming` — sakte slipp = samme 210 ms ease-in som bakgrunns-
+   trykk, kast = fingerfart, tak 240 ms. Kamparket (`FixedCommentSheet`,
+   78 %) er URØRT. Berøring av hodet lukker tastaturet (grant).
+   TeamHomeScreen: `commentTarget`-state + `<CommentSheet variant="feed">`
+   ved siden av MatchPhotoGallery; `Comments`-ruta lever for varsler/
+   deeplinks (TAB_BAR_HIDDEN_ROUTES uendret).
+3. FEEDREGEL (`FeedCard.tsx`, FeedRow): ALLE feedinnlegg åpner SAMTALEN —
+   også kampkort (label «Åpne kommentarer»); «Se kampen ›» er egen
+   Pressable (label «Se kampen», ≥ 44 pt via hitSlop) og ENESTE vei til
+   kampen. Konsekvens: kampbilder/manuelle resultater åpner nå også
+   kommentarer (ingen lenke der — si fra om ønsket). `variant="thread"`
+   i tråden: ingen Kommenter, ikke trykkbart, strammere luft (sm).
+4. TRÅDEN (`CommentThread.tsx`): nyeste ØVERST; etter sending scrollTo
+   kommentarseksjonen (onLayout-målt) så den nye er synlig med tastaturet
+   oppe; feltet beholder fokus (IKKE `editable={!sending}` — resignerer
+   feltet på iOS); Return = linjeskift, Send publiserer.
+5. TASTATURSYSTEMET (`src/components/keyboard.tsx`) — tre avviste runder
+   før dette, LES FØR DU RØRER TASTATUR:
+   · ROTÅRSAK 1: KeyboardAvoidingView regner `frame.y` fra onLayout
+     RELATIVT TIL FORELDEREN → 0 inne i et absolutt ark → ~70 pt der
+     tastaturet dekket ~340. Alle KAV-er i CommentSheet ×2 og
+     CommentsScreen er FJERNET.
+   · ROTÅRSAK 2: LayoutAnimation/`Keyboard.scheduleLayoutAnimation` med
+     type «keyboard» faller til LINEÆR på Fabric (`animations/utils.cpp`),
+     og alt går via JS per frame → «sakte/hakkete». FORBUDT for tastatur.
+   · LØSNINGEN: dokken løftes med NATIVE-DREVET translateY
+     (`useKeyboardLift(safeBottom)`: keyboardWillChangeFrame + WillHide,
+     like verdier ignoreres, tastaturets varighet, bezier 0.38/0.7/0.125/1,
+     Reduce Motion = hopp); lista ligger absolutt BAK glassdokken til
+     skjermbunnen med `automaticallyAdjustKeyboardInsets` (native, i
+     tastaturets animasjon) og paddingBottom = dokkhøyde + lg. Safe area
+     én gang (i dokkens padding; løftet = tastatur − safe area).
+   · Feeden («Del noe med laget»): FlatList eier det selv —
+     `automaticallyAdjustKeyboardInsets` + `WRITING_SCROLL_PROPS`
+     (persistTaps «handled», dismiss «on-drag»); `Keyboard.dismiss()`
+     etter vellykket publisering.
+   · ÉN LUKKEREGEL: `onTouchStart={Keyboard.dismiss}` på lista + grant på
+     arkhodet → trykk, hold og drag oppfører seg likt (ved berøringsstart).
+   · Android: adjustResize eier det (løft = 0). Ingen pakke, ingen native.
+   · NESTE STEG hvis Brage vil ha Instagram-nivå: native
+     UIKeyboardLayoutGuide — IKKE flere JS-varianter.
+
+VERIFISERT VED LUKKING: full suite 1002/1002 grønn (2 skipped); eslint =
+kun den kjente baseline-feilen (KalenderScreen:183) + 12 warnings; tsc
+(`npx tsc --noEmit -p tsconfig.json`): 8 feil = nøyaktig HEAD-baselinen
+(Lagkassa ×2, netMetrics, media ×3, TimeSheet, DaylightGround), ingen nye.
+Referanse-PNG-ene (4 stk) bekreftet med filoppslag.
+Tester som vokter dette: `keyboardSystem`, `commentThreadKeyboard`,
+`commentsScreen`, `commentSheet` (19), `feedOpal` (6 flyttester),
+`feedRefetch` (2 tastaturtester), `tabBarLayout`.
+
+▶️ NESTE (anbefaling, i NY samtale): DESIGNRETNINGEN SOM ER LAGRET —
+`docs/Heia_Design_Master/references/inspiration/REFERENCE-NOTES.md`, tre
+skiver i denne rekkefølgen, én per telefonrunde:
+  A. DaylightGround = én vertikal fargereise (lys/neon mint øverst og i
+     midten → aqua → gradvis dypere teal/smaragd nederst).
+  B. Vanlige FeedCard (`GLASS.card`): nøytralt perlegrått glass med subtil
+     INTERN retningsfade (lysere/tettere øverst til venstre, røykgrått og
+     mer transparent nederst til høyre).
+  C. Kampkortene: kontrollert retningslys + tonal dybde i StadiumGlass,
+     aksent #02FFAB/coral. Designregelen «mørkt glass = kamp» står.
+Arbeidsmåte: BEGGE designskillene (apple-hig-designer + emilkowalski),
+inspiser → forslag → godkjenning → kode, ingen rigg før telefonbilde,
+lukkeritual som over. Alternativ hvis Brage heller vil framover i
+produkt: pre-launch-pakken S5/S6/S8 (se historikken) eller betaling fase 6.
+
+## (historikk) START HER 2026-09-03 — TAB-BAR-SKIVA LUKKET; kommentararket planlagt (bygget og lukket samme dag, se over)
+
+✅ TAB-BAR-SKIVA ER LUKKET (Brage 2026-09-03, telefongodkjent i sin helhet:
+plassering, diffusjonsfelt, design, farge, størrelse, faner, KAMP-knapp og
+alle tilstander, trykkrespons). Committet i ÉN commit (se `git log -1`),
+IKKE pushet. Hele skiva er JS/TS bak `TAB_BAR_GLASS_AB` — ingen native
+endring.
+
+ENDELIG GEOMETRI (`src/shared/tabBarLayout.ts`): flytende kapsel 12 pt inn
+fra sidene, 64 pt høy, radius 32; bunnavstand `capsuleBottomGap(inset) =
+max(10, inset − 6)` (iPhone m/ indikator: 28 pt; uten: 10 pt);
+`tabBarTotalHeight = 64 + gap`; skjermene reserverer via
+`useBottomContentPadding` (safe area telles én gang, inne i barhøyden).
+MATERIALET (`LiquidGlassSurface` `bar`/`barMatch` + `TabBarGlass`): lys
+perle rgba(244,246,245,0,34)/sheen 0,06 — kampsiden arenaBottom
+rgba(29,70,51,0,62); solid fallbacks for Android/RT/iOS<26. Haze rundt
+kapselen = boxShadow-par (perlehaze blur 30 + grønn grunnskygge).
+DIFFUSJONSLØSNINGEN (LÅST): `DiffusionField` i `TabBarGlass.tsx` — SVG-
+frostgradient, hele bredden, fra 28 pt over kapselen til skjermbunnen,
+lyst #F0F6F3 0→0,16→0,34→0,42, kamp #143024 0→0,22→0,46→0,56,
+pointerEvents none. Native maskert backdrop-blur er AVLYST av Brage —
+gradienten ER løsningen (og RT-/Android-fallbacken).
+TRYKKRESPONSEN (`src/components/TabButton.tsx`, egen `tabBarButton`):
+Pressable som eier onPressIn/onPressOut → én Animated.Value (native
+driver): inn 90 ms ease-out, ut fjær (320/22/0,8). Vanlig fane 0,95,
+KAMP 0,96 (`renderMatchTabButton`), aktiv mintmarkør squash 0,90/1,04 via
+`useTabPress()` i `TabIconWrap`. Reduce Motion = opacity-crossfade. Ingen
+haptikk (krever native modul — egen skive om ønsket).
+DESIGNREFERANSENE (LAGRET, bekreftet med filoppslag 2026-09-03): fire PNG
+1179×2556 i `docs/Heia_Design_Master/references/inspiration/` +
+`REFERENCE-NOTES.md`. Kun docs — ingen import fra src/, ikke i bundelen
+(DaylightGround nevner docs kun i kommentarer).
+VERIFISERT VED LUKKING: full suite 969/969 grønn, eslint = kun den kjente
+baseline-feilen (KalenderScreen:183) + warnings; tsc: 8 feil = nøyaktig
+HEAD-baselinen (Lagkassa-feilene er linjeforskjøvet, ingen nye).
+
+⚠️ TAB-BAR RUNDE 4/5 (2026-09-03, ÅPEN — venter telefondom): Brage ville
+ha alt OVER kapselen klart. Runde 4 (hard kant på overkanten + klippeboks
+rundt hazen) ga en synlig rektangelkant og ble AVVIST. Runde 5 = kun
+diffusjonsfeltet endret: masken starter 40 pt over kapselen på 0, er 0,04
+(lys)/0,06 (kamp) ved kapseltoppen, bygger seg i nedre halvdel (0,12/0,16
+midt, 0,30/0,40 bunn) og er sterkest mot skjermbunnen (0,42/0,56). Ingen
+klipping, kapsel/haze/trykkrespons urørt. Akseptanse: umulig å peke på
+hvor feltet begynner. tabBarLayout + tabBar-testene grønne (32/32);
+UKOMMITTERT til Brage godkjenner bildet.
+
+▶️ NESTE SKIVE = KOMMENTARARK FRA HJEM (NY High-effort-samtale). Inspeksjon
+er GJORT 2026-09-03; forslaget er godkjent med disse BESLUTNINGENE (Brage):
+  1. IKKE rør kampskjermens telefongodkjente 78 %-ark. `CommentSheet` får
+     en variant/prop: Hjem = 68 % → full høyde (dra i hodet / tastatur),
+     kamp = dagens faste 78 %. Felles geometri vurderes SENERE.
+  2. Scrim: Hjem bruker en lettere, nøytral Heia-ink-scrim rundt 0,24.
+     Kamp beholder det grønne 0,32.
+  3. Full høyde stopper ved safe area + 8 pt.
+  4. Animert `top` (JS-driver, layout per frame) er OK i prototypen, men
+     MÅ testes på fysisk telefon med lang tråd, rask dragging, scrolling og
+     tastatur. Hakker den: IKKE commit; foreslå UI-thread/native løsning
+     før videre arbeid.
+  5. Vanlig FeedCard-trykk og Kommenter åpner arket. Kampkortets hovedflate
+     åpner fortsatt kampen; Kommenter på kampkortet åpner arket.
+  6. `Comments`-ruta beholdes for varsler og deeplinks (og
+     TAB_BAR_HIDDEN_ROUTES uendret) til arket er bevist.
+Inspeksjonsfunn: filer = `src/components/match/CommentSheet.tsx` (ny
+geometri + valgfri `onOpenMatch` videre til `CommentThread`, som allerede
+har prop-en), `src/screens/TeamHomeScreen.tsx` (`handleComment` setter
+`commentPostId`-state i stedet for `navigate('Comments')`; arket monteres
+ved siden av `MatchPhotoGallery`; «Se kampen» = lukk + navigate
+EventDetail), `__tests__/commentSheet.test.tsx`. FeedRow skiller allerede
+korttrykk (kamp) fra Kommenter — FeedCard urørt. Urørt: CommentThread,
+CommentsScreen, AppNavigator, deepLink, InboxScreen, tabBarLayout.
+Mekanikk: samme Animated-verdi styrer arkets `top` (0 = full, 32 % = hvile,
+skjermhøyde = lukket) så skrivefeltet alltid er i synlig bunn;
+`keyboardWillShow` animerer til full; slipp snapper til nærmeste med
+fartsbias; lukketerskler uendret (28 % / 0,5 px/ms). Pan-gesten KUN på
+hodet (tråden scroller fritt ved delvis høyde). Feedposisjon bevares
+(ingen navigasjon); tab-baren står montert bak Modal-en uten hide/show.
+Ingen ny pakke, ingen CommentThread-redesign. Ingen rigg/full suite før
+telefonen har godkjent det visuelle.
+IKKE bland inn: bakgrunnsfaden (DaylightGround) og retningsfaden i
+FeedCard — lagret som senere retning (REFERENCE-NOTES.md).
+
+## (historikk) START HER 2026-09-03 — TAB-BAR RUNDE 3 (før lukking)
+
+✅ TELEFONGODKJENT OG LÅST (Brage 2026-09-03): tab-barens design, farge,
+størrelse, faner, KAMP-knapp, tilstander, funksjonalitet og
+berøringsanimasjon (TabButton). Skal IKKE endres.
+
+🧭 RUNDE 3 — KUN PLASSERING + DIFFUSJON (bygget, venter telefon):
+• PLASSERING: `CAPSULE.lift` er ERSTATTET av `capsuleBottomGap(inset) =
+  max(10, inset − 6)` i `tabBarLayout.ts` (iPhone m/ indikator: 34 → 28 pt
+  fra kanten = 8 pt lenger ned enn før; indikatorens topp ≈ 13 pt → ingen
+  kollisjon; uten indikator 10 pt). `tabBarTotalHeight = 64 + gap`;
+  containerens paddingBottom = gap. Høyde 64/radius 32/inset 12/intern
+  geometri/tint/animasjon urørt. Innholdspaddingen følger automatisk
+  (`useBottomContentPadding` leser bibliotekets målte barhøyde; testen i
+  tabBarLayout beviser «siste innhold ett pust over ny kapseltopp»).
+• DIFFUSJONSFELTET (`DiffusionField` i `TabBarGlass.tsx`, `DIFFUSION`):
+  lag 2 i rekkefølgen feed → felt → kapsel → faner. Hele bredden, fra 28 pt
+  OVER containeren (bleedAbove) til skjermbunnen inkl. safe area,
+  pointerEvents none + a11y-skjult. Vertikal SVG-gradient: lyst = perle
+  #F0F6F3 alfa 0 → 0,16 (kapseltopp) → 0,34 (kapselbunn) → 0,42 (bunn);
+  kamp = arena #143024 0 → 0,22 → 0,46 → 0,56. Aldri opak, ingen kant.
+  ⚠️ DETTE ER JS-FALLBACKEN — INGEN EKTE BLUR. Innholdet under blir dempet
+  og mykere, ikke optisk uskarpt. EKTE MASKERT BACKDROP-BLUR KREVER NATIVE:
+  ny `HeiaFrostFieldView` (UIVisualEffectView m/ UIBlurEffect
+  systemUltraThin(Dark) + CAGradientLayer som `layer.mask` + tint-gradient,
+  props fadeStart/tint/dark) + manager, registrert i pbxproj via samme
+  interop-mønster som HeiaLiquidGlassView → .h/.m + Cmd+R. Gradienten over
+  blir da Reduce Transparency-/Android-/iOS<26-fallbacken. BRAGE AVGJØR.
+  Hazen (boxShadow-paret rundt kapselen) fra runde 2 står.
+• Verifisert: tabBar 17, tabBarLayout 15, matchButtonGeometry — grønne;
+  eslint rent (kun gammel tabBarIcon-warning). Full suite IKKE kjørt (etter
+  telefon, punkt 5).
+📱 TELEFONBILDE: (1) kapselen 8 pt lavere — ligger den naturlig nær bunnen
+uten å treffe indikatoren? (2) feltet under/rundt kapselen: gli inn, ingen
+stripe, ingen ny flate, grunnens farger synes; (3) kampsiden mørk variant.
+Justering: `DIFFUSION.*.stops`/`bleedAbove`, `CAPSULE.minGap/gapIntoInset`.
+
+🖼️ REFERANSEBILDENE — IKKE LAGRET (blokkert): de fire bildene finnes kun i
+chatten, ikke som filer på disk (søkt Downloads/Desktop/tmp/cache).
+Brage må legge PNG-ene her, med nøyaktig disse navnene:
+  /Users/bragelotheweium/Developer/Heia Prod/docs/Heia_Design_Master/references/inspiration/
+    tab-bar-ambient-blur.png · background-vertical-fade.png ·
+    dark-glass-depth.png · directional-glass-fade.png
+`REFERENCE-NOTES.md` ligger der og beskriver hva vi henter. Referansene
+regnes som lagret FØRST når `ls` viser fire PNG-er. Kun i docs — aldri
+importert fra src/, aldri i bundelen.
+
+📐 SENERE DESIGNRETNING (LÅST 2026-09-03, dokumentert i REFERENCE-NOTES.md,
+IKKE bygget): (a) `DaylightGround`: én stor vertikal fargereise — lys/neon
+mint øverst og i midten, via aqua, til gradvis dypere og dempet teal/
+smaragd nederst; ikke oransje, ikke svart. (b) Vanlige FeedCard: nøytralt
+perlegrått Liquid Glass med subtil intern retningsfade — lysere/tettere
+øverst til venstre, mer transparent/røykgrått nederst til høyre; ikke
+ensfarget mintglass. (c) Mørke kampkort: mørkt Heia-/stadionglass med
+tilsvarende kontrollert retningslys og tonal dybde. Ikke bakgrunn,
+FeedCard eller kommentarark i tab-bar-økta.
+
+▶️ PUNKT 5 (ETTER telefongodkjenning av plassering + diffusjon): full
+suite + eslint → sluttstatus her → ÉN commit for hele tab-bar-skiva (ikke
+push) → commit-ID + rent tre → NESTE SKIVE = KOMMENTARARK FRA HJEM
+(forslaget står under) → ny samtale.
+
+## (historikk) START HER 2026-09-03 — TAB-BAR: TRYKKRESPONS + HAZE BYGGET
+
+🧭 **RUNDE 2 PÅ TAB-BAREN (Brage 2026-09-03, fire referansebilder):**
+• Referanser: `docs/Heia_Design_Master/references/inspiration/` opprettet
+  med `REFERENCE-NOTES.md` (hva vi henter fra hvert bilde + status). ⚠️ DE
+  FIRE PNG-ENE MÅ LEGGES INN AV BRAGE — de kom som bilder i chatten, ikke
+  som filer på disk (søkt Downloads/Desktop/tmp: ingen). Navnene er avtalt:
+  tab-bar-ambient-blur.png, background-vertical-fade.png,
+  dark-glass-depth.png, directional-glass-fade.png. Aldri inn i bundelen.
+• `GLASS.bar` sto allerede på 0,34 og `CAPSULE.lift` på 2 (sluttrunden i
+  forrige økt) — bekreftet, ikke endret. Høyde 64 / radius 32 / inset 12 /
+  `barMatch` urørt.
+• HAZE (`TabBarGlass`, `CAPSULE_HAZE`): kapselens ytterboks har nå to
+  `boxShadow`-lag i stedet for shadows.elevated: (1) perlehaze
+  rgba(240,246,243,0,42), blur 30, spread 2, null offset — diffus, ikke
+  hvit glød; (2) grønn grunnskygge rgba(11,59,42,0,16), offsetY 8, blur 20.
+  Kampsiden: samme geometri i arenatoner (29,70,51 / 5,20,14). Testet i
+  tabBarLayout-testen (perle ≠ hvit, alfa ≤ 0,5, grønn grunn, mørk kamp).
+• TRYKKRESPONS — HVA SOM FAKTISK ANIMERES: bottom-tabs v7 gir en egen
+  `tabBarButton` KUN `onPress`/`onLongPress` (+ aria-*, role, style,
+  children — BottomTabItem.tsx:332). Standardknappen (PlatformPressable,
+  pressOpacity 1) ga derfor ingen respons. NY `src/components/TabButton.tsx`
+  er en Pressable som eier `onPressIn`/`onPressOut` selv og driver ÉN
+  `Animated.Value press` (native driver): pressIn → 1 på 90 ms ease-out;
+  pressOut → `Animated.spring` (stiffness 320, damping 22, mass 0,8 ≈
+  dempning 0,7 — kontrollert liten overshoot). Det som beveger seg:
+  (a) hele faneinnholdet (Animated.View rundt `children`) scale 1 → 0,95;
+  (b) KAMP-fanen får `compress={0,96}` via `renderMatchTabButton`
+  (MatchTabButton selv er urørt: geometri, alle tilstander, nudge, puls);
+  (c) den AKTIVE mintmarkøren: `TabIconWrap` i AppNavigator leser samme
+  `press` via `useTabPress()` og squasher scaleX 0,90 / scaleY 1,04 —
+  samme fjær som knappen. Reduce Motion: ingen transform, opacity-
+  crossfade til 0,72. Ingen loop. Kapselen (`TabBarGlass`) er fortsatt
+  pointerEvents none. `accessibilityState.selected` settes eksplisitt
+  (VoiceOver + tabBar-testen). Alle tall i `TAB_PRESS`.
+• ⛔ SELECTION-HAPTIC ER IKKE LAGT: ekte haptikk krever en native modul
+  (låst funn: `Vibration` er 400 ms brumming på iOS). Krever pod + Cmd+R →
+  egen skive om Brage vil (react-native-haptic-feedback).
+• Verifisert: tabBar 17/17, tabBarLayout 14/14, matchButtonGeometry grønn,
+  eslint rent (kun den gamle tabBarIcon-warningen). Full suite IKKE kjørt
+  (Brage: først etter telefon).
+📱 TELEFONBILDE: trykk på Kalender/Profil (hele fanen krymper), hold på
+den aktive fanen (pillen squasher og fjærer), trykk KAMP (roligere
+kompresjon), og se hazen rundt kapselen over Hjem (skal gli inn, ingen
+hvit glød) og på kampsiden (mørk). Justering: `TAB_PRESS` + `CAPSULE_HAZE`.
+
+📝 PUNKT 3 — KOMMENTARER SOM BUNNARK FRA HJEM: FORSLAG LEVERT (se
+samtalen/under), INGEN KODE. Kjerne: gjenbruk `components/match/
+CommentSheet` (Modal + egen Animated/PanResponder, allerede i EventDetail)
+fra TeamHomeScreen med state `commentPostId`; utvid arket med snappunkter
+(åpner ~68 %, dras til full), tastatur via eksisterende
+KeyboardAvoidingView; `Comments`-ruta beholdes for varsler/deeplinks.
+Berørte filer: TeamHomeScreen.tsx, match/CommentSheet.tsx, (FeedCard
+urørt), tabBarLayout.ts (TAB_BAR_HIDDEN_ROUTES beholdes for ruta).
+Risiko: PanResponder-capture i arkhodet vs. scroll i tråden ved delvis
+høyde; Modal ligger over tab-baren (den forblir montert, dempes av scrim).
+
+📐 PUNKT 4 — SENERE DESIGNRETNING (dokumentert i REFERENCE-NOTES.md, IKKE
+bygget): DaylightGround får én stor vertikal fargereise (lys/neon mint
+øverst+midt → aqua → dypere teal/smaragd i bunnen; ikke oransje, ikke
+svart); vanlige glasskort får subtil intern retningsfade (lysere/tettere
+perle øverst til venstre → mer transparent/røykgrå nederst til høyre);
+mørke kampkort beholder mørkt Heia-glass med tilsvarende tonal dybde.
+
+## (historikk) START HER 2026-09-03 — TAB-BAREN SOM FLYTENDE GLASSKAPSEL: KODET, SUITE 967 GRØNN, UKOMMITTERT, VENTER TELEFONDOM
+
+🧭 **TAB-BAR-SKIVA (Brage godkjente alternativ A, den flytende kapselen —
+kant-til-kant skal IKKE bygges).** Bygget JS-only, INGEN .m-endring →
+Metro-reload holder (ingen Cmd+R). Alt bak `TAB_BAR_GLASS_AB` i
+`src/shared/tabBarLayout.ts` (false = dagens solide bar + skjermene
+pikselidentiske).
+
+BYGGET, punkt for punkt mot godkjenningen:
+• `GLASS.bar` rgba(244,246,245,0,30) / sheen 0,06 / interactive false, og
+  `GLASS.barMatch` rgba(29,70,51,0,62) = arenaBottom (mørkt stadionglass,
+  JS-only via eksisterende `glassTint`). Solid fallbacks `barSolid` #EFF3F1
+  og `barMatchSolid` #1D4633 (Android/Reduce Transparency/iOS < 26) tegnes
+  av `LiquidGlassSurface` selv (ny `SOLID`-tabell, ny `fill`-prop).
+• Kapselen: `TabBarGlass` (rendres som `tabBarBackground`), 12 pt inn,
+  64 pt høy, radius 32 (= full; native cornerRadius tåler ikke 9999), bunn
+  = safe area + 6, `shadows.elevated` på ytterboksen. Containeren i
+  `AppNavigator` er absolutt/gjennomsiktig, høyde = 64 + 6 + safe area,
+  paddingBottom = safe area + 6, paddingHorizontal 12, paddingTop 4
+  (sentrerer ikon+etikett; biblioteket legger dem fra toppen — JUSTERBAR).
+• TO MILJØER, ÉN GEOMETRI: `inMatch` (NY i MatchButtonContext = presence
+  !== null = kampskjermen fokusert OG kampen i gang) bytter kun tint +
+  blekk (aktiv `matchColors.text`, inaktiv `matchColors.dim`); lyst miljø:
+  aktiv `textPrimary`, inaktiv `OPAL.inkSecondary` (var textTertiary, som
+  ikke holder over blur). Mintpillen, badgen og alle SKIN-tilstander urørt.
+  tabBar-testen beviser identisk stilobjekt lys/mørk og i alle 8 tilstander.
+• Skjult på `Comments` (Hjem- og Varsler-stacken) via
+  `getFocusedRouteNameFromRoute` + `tabBarHiddenFor` → `{display:'none'}`.
+  Komponeringslinja i CommentThread er urørt (insets.bottom + sm), tastatur
+  og tilbakeflyt som før. Bunnarket i kampskjermen er urørt.
+• SAFE AREA ÉN GANG: ny hook `useBottomContentPadding(pust = spacing.lg)`
+  = `bottomContentPadding(barhøyde fra BottomTabBarHeightContext,
+  insets.bottom, pust)`: bar montert → barhøyde + pust (safe area er INNE i
+  barhøyden); ingen bar/skjult/utenfor tabs → safe area + pust. Kaster ALDRI
+  (leser konteksten rått, ikke `useBottomTabBarHeight`). 19 skjermer +
+  LiveMatch (pust 3xl + dokkhøyde) + FinishedMatch bruker den; ingen skjerm
+  legger insets.bottom oppå barhøyden lenger. Bevist i
+  `__tests__/tabBarLayout.test.ts` (siste innhold lander nøyaktig ett pust
+  over kapselens overkant; 34 pt tomrom borte).
+• Reporterdokken: `useTabBarOverlap()` løfter `bottom` barhøyden, og lukket
+  offset = dokkhøyde + løft (ellers sto en stripe igjen under kapselen).
+• Kampknappen: `matchButtonGeometry(..., itemsWidth)` — typen følger
+  fortsatt VINDUET (393 → 13,5), budsjettet måles mot kapselbredden
+  (vindu − 24) i både `MatchTabButton` og navigatorens ikonslott. På 320 pt
+  fikk trinn 2 ett luftsteg til (5 pt) — HEIA!/HEIET lå 0,15 pt over
+  budsjettet. Geometritesten kjører nå alle etiketter × bredder × skalaer
+  MOT kapselen. Treffområdet er fortsatt hele faneelementet (~74 × 64 pt).
+VERIFISERT: full suite 967/967 grønn, eslint rent i alle skivefiler (de to
+gamle funnene i KalenderScreen:183 og AppNavigator tabBarIcon-warning
+finnes på HEAD, ikke våre). Prettier kjørt med --no-bracket-spacing
+--bracket-same-line; TeamMembers/TeamSettings ble revertert og patchet for
+hånd (de var ikke prettier-rene fra før).
+
+📱 TELEFONBILDE (Brage, Metro-reload holder, Light + Dark) — INGEN COMMIT
+FØR DOM:
+ 1. Hjem over DaylightGround: kapselen skal lese som tynt lyst glass som
+    grunnen beveger seg gjennom ved scroll; det dype hjørnet skal nå synes
+    UNDER kapselens høyre ende (grunnen løper helt ned). ⚠️ KJENT ÅPENT
+    PUNKT: den flate kontrastmodellen gir ~2,1:1 for inaktivt blekk over det
+    dype hjørnet ved 0,30 — samme sted feedkortene (0,34, samme blekk) ble
+    godkjent fordi UIGlassEffect lysner adaptivt. Les Profil-etiketten
+    nederst til høyre: er den for svak, er knappen `GLASS.bar`-alfa (0,30 →
+    0,38/0,45) — porten i tabBarLayout-testen sier fra når hjørnet kan
+    flyttes inn i porten.
+ 2. Kalender (flat lys grunn): kapselen leser som nesten solid lys perle —
+    forventet til Kalender får grunnen i egen skive.
+ 3. Kampsiden (kampen må være i gang: live/pause): kapselen skal bli mørkt
+    stadionglass med opalhvite etiketter. ⚠️ OM DEN BLIR MELKEHVIT (tvungen
+    light appearance i `HeiaLiquidGlassView.m` slår gjennom mørk tint):
+    STOPP OG RAPPORTER — ikke opakt overlay. Neste steg ville vært en
+    `appearance`-prop i .m (Cmd+R), og det er Brages kall.
+ 4. CommentThread (fra feeden og fra Varsler): baren skal være BORTE,
+    komponeringslinja i bunnen som før, tastatur som før, tilbake viser
+    baren igjen.
+ 5. Kampknappen i alle tilstander inne i den smalere kapselen (KAMP, 2–1,
+    PAUSE 2–1, HEIA!, HEIET, RAPPORTER, LUKK): ingen klipping, ingen
+    naboberøring, pillen stikker opp over kapselkanten (løft −10 urørt).
+ 6. Ingen skjerm hopper når kampstatus endres (baren har samme stilobjekt).
+ 7. Reporter: dokken (RAPPORTER) skal lande OVER kapselen, og være helt
+    borte når lukket.
+JUSTERINGSKNAPPER: `CAPSULE` (inset/height/lift) og `tabBarGlass.paddingTop`
+(vertikal sentrering) i tabBarLayout/AppNavigator; `GLASS.bar`/`barMatch`
+tint-alfa; `shadows.elevated`. Ikke bygget med vilje: minimering ved scroll.
+
+Etter dom: commit (ikke push). Så: bryter-opprydding + token-promotering i
+egen skive; Kalender/Sesongen/Varsler/Profil får DaylightGround i egne
+skiver (kapselen viser først da forskjell der).
+
+---
+
+## (historikk) START HER 2026-09-03 natt — HELE GLASS-SPORET TELEFONGODKJENT OG COMMITTET; NESTE VAR TAB-BAREN
+
+✅ KAMPKORTET RUNDE 3 TELEFONGODKJENT (Brage: «veldig bra») + kommentar-
+tråden viser SAMME kampkort for kampinnlegg (FeedCard i CommentThread,
+«Se kampen ›» → EventDetail fra kommentarsiden; i kampskjermens bunnark
+uten onOpenMatch → ikke trykkbart, lenken skjult). COMMITTET (se git log).
+Tre commits på Brage, ikke pushet: 89e52e7 (Liquid Glass), fa8b107
+(control/important), og denne (StadiumGlass compact + kampkortet +
+kommentartråd). DESIGNREGEL LÅST: mørkt glass kjennetegner kamp.
+
+▶️ NESTE SAMTALE = TAB-BAREN (Brages neste designskive — ikke startet).
+Start med begge designskillene (apple-hig-designer + emilkowalski
+`skills/apple-design/SKILL.md` via curl raw), inspiser dagens tab-bar
+(`AppNavigator.tsx` MainTabs + `MatchTabButton`), foreslå → godkjenning →
+kode → telefon. Liquid Glass-tab-bar på iOS 26 er nativt mulig via samme
+interop-mønster som `HeiaLiquidGlassView` (krever da Cmd+R).
+Åpne rester (uendret): bryter-opprydding (`DAYLIGHT_GROUND_AB`/
+`NEXT_MATCH_GLASS_AB`/`FEED_OPAL_AB`/`FEED_LIQUID_GLASS_AB`/
+`PINNED_GLASS_AB`/`MATCH_GLASS_AB`/`COMPOSE_GLASS_AB`) + token-promotering
+i egen skive; Android/RT-fallback for komponeringslinja; «Varsle hele
+laget»-raden inni compose er fortsatt solid surfaceMuted.
+
+---
+
+## (historikk) START HER 2026-09-02 sen kveld — LIQUID GLASS
+
+🫧 **LIQUID GLASS-PROTOTYPEN — `LiquidGlassSurface` (JS) + `HeiaLiquidGlassView`
+(native ObjC, `UIGlassEffect`) bak `FEED_LIQUID_GLASS_AB = true`. BYGGET
+2026-09-02 (sen kveld), UKOMMITTERT, ALDRI KJØRT PÅ TELEFON.** Brage
+opphevet blur-sperren for AKKURAT denne flaten etter opal runde 2 (kjølig
+perlegrå, 0,92/0,87, kantpar, diagonal sheen — også ukommittert, ligger i
+`OpalSurface.tsx`): telefonen leste fortsatt «lys mint/hvit flate, ikke
+Liquid Glass». Ingen flere SVG-varianter — dommen er at flat SVG-maling
+ikke kan gi blur/refraksjon.
+
+FORUTSETNINGENE (sjekket): Xcode 26.6, iOS-SDK 26.5, Brages iPhone 15 på
+iOS 26.6, RN 0.83.1 med `RCTLegacyViewManagerInteropComponentView` i Pods →
+en legacy `RCTViewManager` går gjennom interop-laget UTEN codegen, UTEN ny
+pakke og UTEN pod install. Native-filene (syntaks-sjekket mot iOS 26.5-SDK +
+Pods-headere med clang -fsyntax-only: begge OK, `UIGlassEffect`-API-et
+kompilerer).
+
+FILENE: NYE `ios/Heia2/HeiaLiquidGlassView.h/.m` (UIView med
+`UIVisualEffectView` + `UIGlassEffect` iOS 26, `tintColor` = nøytral
+grå/mint rgba(214,232,224,0,32), `interactive` = systemets trykkrespons,
+AV under Reduce Motion; ÉN delt `CAGradientLayer`-sheen hvit 0,18→0
+diagonalt som glir 10/6 pt + demper til 0,7 ved press, 280 ms ease-out,
+kun opacity under Reduce Motion; ingen loop; RN-barna holdes over glasset
+via `didUpdateReactSubviews`/`didAddSubview`), `HeiaLiquidGlassViewManager.m`
+(`RCT_EXPORT_MODULE(HeiaLiquidGlassView)`, props cornerRadius/glassTint/
+pressed), registrert i `project.pbxproj` (Heia2-gruppa + Sources, plutil
+OK). NY `src/components/LiquidGlassSurface.tsx`: `requireNativeComponent`
+KUN når iOS-major ≥ 26; ellers og under Reduce Transparency →
+`OpalSurface` (solid fallback). Padding-boks identisk (1 pt gjennomsiktig
+kant + radius xl). ENDRET `FeedCard.tsx`: opal-grenen bruker
+`LiquidGlassSurface` (blekket er fortsatt OPAL.ink*, inkl. nytt
+`inkTertiary` på tidsstempel/⋯), `index.ts` eksporterer. Urørt: bakgrunn
+(LÅST), layout, innhold, tokens, StadiumGlass, compose, Lagkassa.
+Verifisert: feedOpal 16/16, eslint rent. Ikke kjørt: full suite, tsc.
+
+RUNDE 2 (Brage etter telefon: «veldig nærme, men stabelen for mintgrønn og
+monokrom — bakgrunnen eier minten»): tint byttet fra mint
+rgba(214,232,224,0,32) til nesten fargeløs perlegrå rgba(233,235,234,0,26)
+(`GLASS.tint` + native default), glasset LÅST til lys appearance
+(`overrideUserInterfaceStyle` på view + effectView) så Dark Mode ikke gjør
+glasset mørkt under mørkt blekk. Sjekket: ingen OpalSurface-base eller
+FeedCard-bakgrunn bak/over glasset (`cardOpal` = kun padding). Skal testes
+i lys OG Dark Mode på telefonen.
+
+RUNDE 3 (Brage etter telefon: «veldig nærme, men fortsatt for mye
+mint/neon, leser som mintfarget plast»): KUN tint-alfa, samme nøytrale
+perlegrå: 0,26 → 0,34 (`GLASS.tint` + native default). Brage ba om «øk
+til 0,26», men 0,26 sto allerede i treet fra runde 2 — så 0,34 er det
+reelle neste steget; om telefonen viste en eldre bundle, sett tilbake til
+0,26. Ingen andre lag rørt. Mål i hvile: ~75 % perle / 25 % grunn, grunnen
+beveger seg fortsatt gjennom ved scroll. Test lys + Dark Mode.
+
+✅ TINT 0,34 TELEFONGODKJENT (Brage 2026-09-02 kveld). RUNDE 4 = TRYKK-
+RESPONSEN (Brage: «merkes ikke på fysisk iPhone»). ÅRSAK FUNNET, to lag:
+(1) `UIGlassEffect.interactive` får aldri touch — RN-barna dekker flaten,
+hit-testen stopper i RN-viewet, effektviewet har userInteractionEnabled NO,
+og Apple har ingen API for å utløse responsen; (2) `pressed`-propen fra JS
+finnes bare på kort med Pressable, og `TeamHomeScreen` gir FeedCard
+`onPress` KUN for kampposter (matchId) — vanlige poster har ingen
+Pressable, så sheen-responsen kjørte aldri der, og på kampkortene var den
+for svak (sheen 0,18 × 0,7). LØSNING (kun `HeiaLiquidGlassView.m`, ingen
+JS-endring): én `UILongPressGestureRecognizer` med minimumPressDuration 0
+på native-viewet (RN sin RCTSurfaceTouchHandler har cancelsTouchesInView
+NO og canPreventGestureRecognizer NO → piller/⋯/kommentar virker som før;
+delegate sier ja til samtidig gjenkjenning med ScrollView-pan). Touch-down
+→ 120 ms: `_lightView` (hvit) alfa 0 → 0,12 + sheen glir 14/8 pt;
+bevegelse > 12 pt (scroll) eller slipp/avbrudd → 260 ms tilbake. UIView-
+animasjon med BeginFromCurrentState = avbrytbar. Reduce Motion → kun lyset
+(opacity), ingen gliding. Ingen loop, ingen haptikk. JS-`pressed`
+(kampkortene) OR-es inn i samme tilstand. Syntaks-sjekket OK. KJENT
+BIVIRKNING (bevisst, vurderes på telefon): et trykk på en pille inne i
+kortet lyser også glasset svakt — touchen er fysisk på glasset.
+RUNDE 5 (Brage: responsen synes, men «altfor svakt»): lys 0,12 → 0,28,
+sheen-gliding 14/8 → 26/16 pt, NYTT innoverskyv 0,975 som
+`self.layer.sublayerTransform` (skalerer glass + RN-barn rundt senter uten
+å røre viewets frame som interop-laget eier), slipp 0,26 → 0,30 s. Reduce
+Motion → fortsatt kun lyset.
+RUNDE 6 (Brage: «fremdeles nesten ikke synlig, boksen burde bevege seg»):
+skala 0,96 + 2 pt ned (sublayerTransform), lys 0,30. HUSK: .m-endringer
+krever Cmd+R i Xcode — Metro-reload tar dem IKKE med. Om det fortsatt er
+svakt ETTER nativt bygg, virker ikke sublayerTransform under interop-laget
+→ flytt skalaen til `self.transform` (RN setter frame kun ved relayout).
+RUNDE 7 (Brage hadde glemt nativt bygg; runde 6 sett ekte = «altfor mye»):
+lys 0,16, skala 0,98, 1 pt ned, sheen 18/10. sublayerTransform VIRKER under
+interop-laget (bevist av runde 6). Alle tallene er `kPress*` øverst i
+`HeiaLiquidGlassView.m`.
+✅ RUNDE 7 TELEFONGODKJENT (Brage: «funker veldig bra»).
+
+KORT-TRYKK = KOMMENTARTRÅDEN (Brage: glassresponsen lover en side):
+`TeamHomeScreen` gir nå FeedCard `onPress` for ALLE poster — kampposter →
+kampen som før, alle andre → `Comments` (samme mål som «Kommenter»-pillen).
+
+KOMMENTARSIDEN I SAMME VERDEN (Brage: «detaljsiden fra griden, ikke egen
+skive»): `CommentsScreen` legger `DaylightGround` bak; `CommentThread`
+(delt med bunnarket i kampskjermen!) tegner innlegget i `LiquidGlassSurface`
+(ikke trykkbart), replikkene som lys frost UTEN blur (hvit 0,62 + hvit kant
+0,78, chat-hjørnet beholdt — ett blur-lag per boble er dyrt og lyse
+translusente flater skal ikke stables), komponeringslinja som glass med
+`cornerRadius={0}` (ny valgfri prop på LiquidGlassSurface, sendes til
+native), feltet som blekkvask 0,06, OPAL.ink* på tid/⋯/pilletekst/tom-
+tekst. Send-knappen er den delte `Button`. ÅPENT: bunnarket i kampskjermen
+får samme glass/frost over sin egen bakgrunn — sjekk der også; Android/RT
+får komponeringslinja som OpalSurface med radius xl (fallback, ikke
+telefontestet).
+
+✅ KOMMENTARSIDEN TELEFONGODKJENT (Brage 2026-09-02 sen kveld: «ser
+veldig bra ut»). HELE GLASS-SKIVA ER DERMED TELEFONGODKJENT — men
+UKOMMITTERT, og zz-riggfilene ligger fortsatt i treet.
+
+✅ STEG 1 GJORT (2026-09-02 natt): zz-riggfilene slettet, suite 937/937
+grønn, eslint rent i skivefilene (to GAMLE feil i `__tests__/tabBar.test.tsx`
+og `KalenderScreen.tsx` er urørt og ikke våre), HELE glass-skiva committet
+som 89e52e7 på Brage. IKKE pushet. emilkowalski-skillen ligger på
+`skills/apple-design/SKILL.md` i repoet (den flate stien gir 404).
+
+✅ STEG 2 TELEFONGODKJENT (Light + Dark) OG COMMITTET fa8b107 (ikke pushet).
+
+🏟️🔒 DESIGNREGEL LÅST (Brage 2026-09-02): MØRKT GLASS KJENNETEGNER KAMP I
+HEIA. Kommende-kamp-heroen og kampinnleggene deler SAMME material-DNA
+(`StadiumGlass`). Vanlige innlegg og VIKTIG er lyst glass og urørt.
+
+🏟️ KAMPKORTET RUNDE 3 (samme natt) — TELEFONGODKJENT OG COMMITTET
+(tidligere: KODET, JS-ONLY, VENTER TELEFONBILDE). Runde 2 (mellomgrønn vask over lyst glass) AVVIST: «havner
+mellom lyst perleglass og mørkt stadionglass, ser flat ut». Bygget:
+• `StadiumGlass` utvidet med `compact` (lettere skygge 0/4/16 0,18 — alle
+  andre lag identiske med heroen: base 0,96 arenaTop→arenaBottom→timeline,
+  aqua-opptak øverst til venstre, lagfargerefleks, neon nederst til høyre,
+  høylys, kant, buer) og `pressed` (hvitt lys 0,10 inn i glasset). Heroen
+  er uendret (stadiumGlass-testen beviser samme lag-id-er, kun skyggen
+  skiller).
+• `FeedCard` kampkortet (samme layout som runde 2: forfatterheader, FRA
+  KAMPEN, kontekstkapsel, pulslinje, HEIA/Kommenter, «Se kampen ›») bruker
+  nå `<StadiumGlass compact pressed teamColor>` — ALDRI LiquidGlassSurface,
+  ingen vask; `LiquidGlassSurface.tsx` er tilbake i fa8b107-tilstand (kun
+  card/control/important). Trykk: lys i glasset + 0,98/1 pt ned via
+  Pressable-stil (samme tall som native). Blekk: `MATCH_INK` = {text:
+  matchColors.text opalhvit, dim: matchColors.dim lys mintgrå, accent:
+  #02FFAB kun på FRA KAMPEN}; live-kapselen coral som før. Rollepill =
+  opalhvit 0,14-lag; reaksjonspillene = hvit 0,10 + 1 pt hvit 0,16 kant
+  (ikke blekkvask); kapselen i egen ramme (opalhvit 0,28 kant + hvit 0,06)
+  så den ikke forsvinner i flaten; pulslinje neon 0,55, punkt dim/neon.
+• `TeamHomeScreen` sender `teamColor={activeTeamSpace?.color}` gjennom
+  FeedRow → FeedCard (refleksen i hjørnet, som heroen).
+• Kontrastport (feedOpal-testen) på alle tre arenastopp: hovedtekst ≥ 7:1,
+  dim/neon ≥ 4,5:1, hovedtekst ≥ 4,5:1 inne i pill-/rollelagene, aldri
+  sort. Suite 951 grønn, eslint rent. INGEN native endring, INGEN Cmd+R.
+TELEFONBILDE (Brage, Light + Dark, Metro-reload holder): kampkortet skal
+lese som «kamp» ved første blikk og som SAMME materiale som heroen over;
+sjekk at kapselen har nok ramme, at reaksjonslagene er tynne og lyse, at
+lagfargerefleksen ikke blir en flekk, og at trykket merkes (lys + skala).
+INGEN COMMIT før dom. Justeringsknapper: `GLASS.shadowCompact`/`pressLight`
+i StadiumGlass, `matchChipFrame`/`reactPillMatch`/`matchPulse*` i FeedCard.
+
+🏟️ (historikk) KAMPKORTET RUNDE 2 — AVVIST (mellomgrønn vask). Runde 1 (kun røykperle-tint) ble AVVIST av Brage: «0′ alene
+oppe til høyre er ikke akseptabelt», kortet må umiddelbart lese som
+kamphendelse som åpner kampen. Brages spesifikasjon, bygget punkt for punkt
+i SAMME FeedCard bak `MATCH_GLASS_AB` (kun match_start/_event/_end, ikke
+festet; «resultat» = card; festet kamp = important):
+ 1. forfatterheaderen øverst, uendret (uten kapsel i headeren);
+ 2. `match`-glass = SAMME card-tint 0,34 + klippet blekkvask
+    rgba(8,57,46,0,20) som absoluteFill INNI innerboksen (radius xl−1,
+    pointerEvents none) i `LiquidGlassSurface`; solid fallback #C4D0CC
+    (= vasken over opalens solid);
+ 3. «FRA KAMPEN»-etikett (10/800/1,1) + kapselen (ScoreChip) på samme rad
+    over hovedhendelsen. KAPSELEN BÆRER ALLTID KONTEKST via `matchChip()`:
+    «MÅL · 3′» / «MÅL IMOT · 3′», «LIVE · 1–0» (label «Live ·» + score),
+    «PAUSE», «SLUTT · 1–1», «AVSPARK» (ferdig kamp), ellers type + minutt
+    (Kort/Bytte/2. omgang/Kamp); ukjent type → «Kamp». Aldri rått «0′».
+ 4. Heia-pulslinje: 10 pt kolonne til venstre for hovedteksten, 2 pt
+    mintlinje (heia 0,7) + ett 10 pt hendelsespunkt øverst (live → neon
+    m/ heiaDeep-ring, ellers heiaInk m/ heiaTint-ring);
+ 5. HEIA + Kommenter urørt (samme gate `feedAllowsHeia`);
+ 6. «Se kampen ›» (typography.action, heiaDeep) nederst til høyre i
+    reaksjonsraden — ren tekst, IKKE egen Pressable;
+ 7. hele kortet = eksisterende onPress fra TeamHomeScreen (kampposter →
+    kampen), accessibilityLabel «Åpne kampen»; Kommenter → tråden.
+KONTRASTPORTEN TVANG ET BLEKKBYTTE: under vasken over svakeste grunn
+faller OPAL.inkSecondary til ~3,9:1, så ALT sekundært/tertiært/aksent-
+blekk på kampkortet er `MATCH_INK = colors.heiaDeep` (#08392E): rolle,
+tid, pilletekst, FRA KAMPEN, Se kampen. Målt i feedOpal-testen mot alle
+tre grunner: ≥ 4,5:1 på flaten, i pillevasken og på rollefyllet;
+primærtekst ≥ 7:1. Vanlige kort, datamodell, navigasjon, ScoreChip-
+komponenten og OpalSurface er URØRT.
+Verifisert: feedOpal 28/28 inkl. kapsel-matrisen (9 tilfeller, aldri
+bare minutt), full suite grønn, eslint rent.
+TELEFONBILDE (Brage, Light + Dark; Metro-reload holder): les om kortet
+umiddelbart er en kamphendelse; om vasken 0,20 er «tydelig dypere» uten å
+bli mørkt hero-kort; om pulslinja/punktet og «Se kampen ›» er diskrete nok;
+om «LIVE · 1–0» leser riktig med chipens gap. INGEN COMMIT før dom.
+Justeringsknapper: `GLASS.match.wash`-alfa (0,20), `matchPulse*`-stiler,
+`matchEyebrow`. Blir vasken svakere enn ~0,12 må blekkporten måles på nytt
+(da kan opalblekket holde igjen).
+
+🏟️ (historikk) MATCH-VARIANTEN runde 1 — AVVIST. Brages ramme: kun farge/material på eksisterende FeedCard
+for automatiske kampinnlegg; ingen layout/innhold/knapper/datamodell, ingen
+ny MatchEventCard, ingen buer, ingen neonrefleks. Godkjent med justering:
+RØYKPERLE `rgba(205,216,213,0,40)` (ikke den grønnere 198/216/210 —
+grunnen gir allerede mint gjennom glasset). Bygget: `GLASS.match` i
+`LiquidGlassSurface.tsx` (sheen 0,18, interactive — som card), solid
+fallback `matchSolid` #D5DEDA + heiaDeep-kant 0,14 (Android/Reduce
+Transparency; ingen SVG — samme flate View-mønster som important, nå
+generalisert i en `SOLID`-tabell). FeedCard: `MATCH_GLASS_AB = true` →
+variantvalg pinned → important, ellers isMatchType (match_start/
+match_event/match_end) → match, ellers card. Manuelt «resultat» beholder
+card. ScoreChip (mørk kapsel) urørt = eneste mørke element = signaturen.
+Verifisert: suite 943 grønn, eslint rent; feedOpal-testen har mintplast-
+vakt (kanalspredning ≤ 12, g ≥ b ≥ r), «dypere enn opal-solid» og
+kontrastport ≥ 4,5:1 for OPAL.ink* på matchSolid.
+TELEFONTEST (Brage, Light + Dark; Metro-reload holder, ingen .m-endring):
+kampinnlegg skal lese tydelig dypere/kjøligere enn vanlige kort, fortsatt
+lyst, ikke mint. BLIR FORSKJELLEN FOR LITEN: gjør flaten DYPERE (mørkere
+kanaler, evt. alfa 0,40 → 0,46), IKKE grønnere. Etter dom: commit (ikke
+push). Så: token-promotering / bryter-opprydding er fortsatt egen skive.
+
+🫧 (historikk) STEG 2 KODET (2026-09-02 natt):
+Brage godkjente forslaget med tre presiseringer: (1) compose = control-
+glass tint 0,20, halv sheen, ingen kortrespons; (2) VIKTIG = varm perle
+0,52 + eksisterende gullpill, INGEN uniform gullkant (leser som annonse/
+advarsel) — startet UTEN ekstra gullrefleks, materialet og pillen bærer
+hierarkiet; (3) Android/Reduce Transparency får én SOLID varm perle, ikke
+cardSun-papir. Kampinnlegg er IKKE rørt (egen MatchEventCard-variant
+kommer ETTER denne skiva: samme FeedCard-glass + FRA KAMPEN + Heia-
+pulslinje/hendelsespunkt + faste hendelsesikoner + dagens mørke minutt-/
+scorekapsel + diskret «Se kampen ›». Ingen mørk kortflate.)
+BYGGET: `GLASS` i `LiquidGlassSurface.tsx` er nå tre varianter valgt med
+`variant`-prop — card rgba(233,235,234,0,34)/sheen 0,18/interactive;
+control rgba(244,246,245,0,20)/sheen 0,09/IKKE interactive; important
+rgba(246,240,226,0,52)/sheen 0,18/interactive; `importantSolid` #F4F1E6 +
+goldInk-kant 0,14 som flat View-fallback (ingen ny SVG). NATIVE: to nye
+props `sheenOpacity` (CGFloat, skalerer sheen-stigen) og `interactive`
+(BOOL, slår av gjenkjenneren + UIGlassEffect.interactive) i
+`HeiaLiquidGlassView.{h,m}` + manager — clang -fsyntax-only OK mot iOS
+26.5-SDK. ⚠️ KREVER Cmd+R I XCODE (Metro-reload tar ikke .m). FeedCard:
+`PINNED_GLASS_AB = true` → festede kort i `important`, OPAL.ink* på dem
+også. TeamHomeScreen: `COMPOSE_GLASS_AB = true` → `ComposeSurface`
+(modulnivå, så TextInput beholder identiteten) i `control`-glass med
+wrapper-marg + innerpadding, feltet som blekkvask rgba(8,57,46,0,06),
+placeholder i OPAL.inkTertiary; kameraknappen beholder solid heiaTint.
+Verifisert: full suite grønn (feedOpal utvidet med GLASS-variant-tester
++ important-fallback-kontrast ≥ 4,5:1), eslint rent i alle rørte filer.
+TELEFONTEST (Brage, Cmd+R, Light OG Dark Mode): (a) compose leser som
+tynnere/lysere enn feedkortene, ikke hvit boks, og lyser IKKE ved trykk
+på boksen — men feltet får fokus og kameraknappen virker; (b) VIKTIG-
+kortet leser som varmere og mer solid enn feedkortene uten å bli krem/
+papir, gullpillen bærer aksenten; (c) trykkresponsen på vanlige kort er
+uendret (runde 7); (d) Reduce Transparency → VIKTIG = flat varm perle.
+Kjent, ikke rørt: «Varsle hele laget»-raden inni compose er fortsatt solid
+surfaceMuted/heiaSoft (vises kun mens man skriver). Om VIKTIG leser for
+flat: eneste tillatte tillegg er en svært svak gullrefleks øverst til
+venstre (retningsbestemt, ikke kant). Etter dom: commit (ikke push).
+
+▶️ **NESTE SAMTALE — START HER:**
+1. FØRST: `git status` → slett `__tests__/zz_opal_rig.test.tsx` og
+   `src/components/zz_FeedCardHead.tsx` → commit HELE skiva (lysfelt-grunn,
+   opal runde 2, LiquidGlassSurface + native HeiaLiquidGlassView + pbxproj,
+   trykkrespons, kort-trykk → kommentarer, kommentarsiden i glass, handoff).
+   Full suite + eslint før commit (ikke kjørt siden riggen). Ikke push uten
+   at Brage sier det.
+2. SÅ, to flater i samme materialsystem (Brages retning, ordrett):
+   • **Compose-boksen** («Del noe med laget …»): «tynt, lyst og nøytralt
+     kontrollglass». Den er i dag HELHVIT og skriker mellom glasskortene.
+     Tynnere enn feedglasset: lavere tint-alfa / evt. `.clear`-stil, ingen
+     trykkrespons på boksen (feltet og kameraknappen er kontrollene).
+   • **Festet VIKTIG-kort**: «varmere og mer solid opalglass med gul aksent —
+     ikke mørkt og ikke identisk med vanlige feedkort». Solid = høyere
+     tint-alfa i en VARM perle (ikke krem-fyll), gul aksent = VIKTIG-pillen +
+     evt. varm kantlys; fortsatt glass, ikke `cardSun`-papir.
+   Metode: inspiser → foreslå tall (tint/alfa per flate som egne
+   `GLASS`-varianter, ikke nye komponenter) → Brage godkjenner → kode →
+   fysisk iPhone i lys + Dark Mode. Skillene: `apple-hig-designer` +
+   emilkowalski/skills `apple-design` (curl raw) FØR forslaget. Ingen rigg.
+3. Åpne rester: bunnarket i kampskjermen deler `CommentThread` (sjekk der);
+   Android/RT-fallback for komponeringslinja; skygge under feedglasset og
+   vekt-bump på tekst (Emil-linsa); token-promotering + fjerning av
+   `DAYLIGHT_GROUND_AB`/`NEXT_MATCH_GLASS_AB`/`FEED_OPAL_AB`/
+   `FEED_LIQUID_GLASS_AB` i egen skive.
+
+▶️ **(historikk) NESTE (Brage, fysisk iPhone):** native kode krever NATIVT BYGG — Metro-
+reload holder ikke. Åpne `ios/Heia2.xcworkspace`, velg iPhone, Cmd+R (ingen
+pod install nødvendig). Sjekk: (1) at kortet faktisk viser blur/refraksjon
+av lysfeltet under (scroll — grunnen skal flytte seg BAK glasset); (2)
+tekst lesbar i tekstsonen; (3) press på kortet: systemets glassrespons +
+sheen som glir; (4) Reduce Transparency → opal solid; Reduce Motion →
+ingen gliding; (5) reaksjonspiller/⋯/kommentar trykkbare. FEIL-SCENARIER:
+«Unimplemented component: HeiaLiquidGlassView» = interop-laget fant ikke
+view manageren (sjekk at .m-filene er i target Heia2 → Build Phases →
+Compile Sources); glasset usynlig = barna dekker det (sjekk
+`didUpdateReactSubviews`); dobbel trykkrespons = sett `interactive = NO` i
+`makeEffect`. Deretter: dom → tune tint/sheen i `HeiaLiquidGlassView.m` +
+`GLASS.tint` → SLETT `zz_opal_rig.test.tsx` og `zz_FeedCardHead.tsx` →
+commit (opal runde 2 + glass sammen). emilkowalski/skills `apple-design` (BRAGE 2026-09-02: SKAL ALLTID BRUKES
+SAMMEN MED `apple-hig-designer` i hver designskive — hent rått fra main med
+curl; eldre «kun review/AVVIS»-dom lenger ned er OVERSTYRT): vibrancy over glass = mørkere, litt tyngre
+tekst (vi har OPAL.ink*; vekt-bump er åpen), større flater = tykkere
+materiale + dypere skygge (skygge under glass er ikke lagt — åpen),
+aldri to lyse translusente flater oppå hverandre (pillene er blekkvask,
+OK), ingen langsomme løkker (ingen).
+
+---
+
+## 🎨 Opalskiva runde 1 (tidligere START HER 2026-09-02 natt — riggverk-rendret, overkjørt av runde 2 + Liquid Glass over)
+
+🎨 **OPALSKIVA — `OpalSurface` på ikke-festede FeedCards bak
+`FEED_OPAL_AB = true`. BYGGET 2026-09-02 (natt), UKOMMITTET. De sju
+riggbildene er levert Brage (SendUserFile + scratchpad/opal/lever-*.png).
+Ingen telefontest ennå. Arbeidstreet er IKKE rent — se lista under.**
+
+Filer: NYE `src/components/OpalSurface.tsx` (én konsument, `OPAL`-konstant
+med alle tall) og `__tests__/feedOpal.test.tsx` (16: kontrastvakt mot MÅLT
+svakeste grunn, bryter, padding-boks, Android-vakt, RT/IC). ENDRET
+`FeedCard.tsx` (bryteren; opal-gren for ikke-festede kort; lokalt blekk
+`OPAL.inkSecondary` på pilletekst + kommentarikon og `OPAL.inkAccent` på
+rolle-pillen) og `index.ts` (eksporter). MIDLERTIDIG — SLETTES FØR COMMIT:
+`__tests__/zz_opal_rig.test.tsx` (RN→HTML-riggen) og
+`src/components/zz_FeedCardHead.tsx` (HEAD-kopi av FeedCard = ekte «før»
+uten testkroker i produktkoden). Urørt: compose, Lagkassa, HeroSurface,
+Card, StadiumSurface, tokens, typografi, layout, laghodet, tab-baren.
+Festede VIKTIG-kort er solide (cardSun) som før. Verifisert: suite 938/938
+(inkl. riggen), eslint rent, prettier husstil (timeAgo-blokken i FeedCard
+er tilbakestilt til HEAD-format så diffen er kun opal).
+
+Materialet (`OPAL`): base lineær #FBF9F0 → #F7F5E9 (0,55) → #F4F5E8 ved
+opasitet 0,90 (Reduce Transparency → 1 + solid #F7F5E9-bunn); sheen hvit
+0,22 radial fra øvre venstre; neon-opptak 0,05 nederst høyre; 1 pt
+topphøylys 0,55; KANTLYS = 1 pt ring UTENFOR border-boksen (egen svg med
+−1 pt innrykk, strøk 2 pt sentrert på svg-kanten, rx 25) hvit 0,85 → 0,30
+→ 0 nederst — riggen beviste at en hvit linje INNENFOR en L* 96-flate er
+usynlig på lys grunn (ΔL* ≈ 3), så lyset må ligge på kanten mot grunnen;
+Increase Contrast → uniform blekk-hårlinje #08392E 0,35, høylys av, halve
+reflekser; `boxShadow` 0/8/24 rgba(11,59,42,0.20) på ytterboksen, INGEN
+elevation/shadow*. Padding-boksen er identisk med `styles.card` (innerboks
+1 pt gjennomsiktig kant + padding xl). 0,90 mot 0,92 = ΔL* 0,3, ikke synlig
+— 0,90 anbefalt. Trykk = heiaSoft på innerboksen som før.
+
+KONTRASTPORTEN (målt på riggpiksler; svakeste grunn = #0E6656 nederst til
+høyre rett over tab-baren): flaten #D6E8D9 → inkSecondary 5,29 /
+textPrimary 12,7; inne i reaksjonspillen #D3E8D7 → 5,25; pillen hypotetisk
+i mørkeste hjørne 4,72; rolle-pill (heiaSoft) → inkAccent 5,02. Tokenene
+ville gitt 4,0 (flate) / 3,6 (pill) for textSecondary og 4,05 for heiaInk
+→ derfor lokalt blekk (#4C6054, #066A4E), ETTER at materialet var justert
+først (lysere base øverst, opptak ned til 0,05). Vakten «det lokale blekket
+finnes av én grunn» feiler den dagen tokenene holder selv. ÅPENT (ikke i
+porten Brage navnga, ikke rørt): `textTertiary` (tidsstempel, ⋯) er 2,7 på
+hvitt i dag og 2,1 på opalen — avgjøres i token-skiva.
+
+RIGGEN (oppskrift, `zz_opal_rig.test.tsx`): rendrer EKTE DaylightGround,
+NextEventHero (glass), SectionHeader og FeedCard før/etter i jest,
+serialiserer RN-treet til HTML/SVG (View→div flex, Text→div/span,
+rn-svg-kompositter→svg-tagger, RadialGradient rx/ry → r +
+gradientTransform, boxShadow→box-shadow, MediaImage mocket til foto-
+stand-in), skriver `opal.html`/`opal-scroll.html`/`opal-b.html`/`opal-f.html`
+i scratchpad/opal. Chrome: `--headless --disable-gpu --hide-scrollbars
+--allow-file-access-from-files --force-device-scale-factor=2
+--window-size=3360,960 --screenshot`; `--dump-dom` gir kortrektangler
+(`<pre id="rects">`); `crop.py`/`measure.py` beskjærer og pikselmåler.
+TRE FELLER: (1) HTML deler svg-id-er på tvers av instanser (RN gjør IKKE —
+hver Svg er egen rot) → id-ene prefikses per svg, ellers klippes alle kort
+til FØRSTE korts form og RT/IC-rammene viser første korts gradient; (2)
+sample aldri i hjørneutskjæringen (radius 24): (371,758) på et kort med
+bunn 764 er grunn, ikke kort; (3) RN-mockens a11y-gettere er delte
+jest.fn — kø Once-verdier KUN når bryteren skal PÅ; et festet kort
+monterer ikke hooken og lar en Once(false) ligge igjen til neste test.
+
+🌫️ **LYSFELT-GRUNNEN (Brage 2026-09-02 natt, UKOMMITTERT, ikke
+telefontestet):** Brages dom på riggbildene var at `DaylightGround` leste
+som «én jevn grønn/cyan-flate». `DaylightGround.tsx` er skrevet om til et
+LYSFELT: mellomtonebase + 16 store, myke, ROTERTE og overlappende radiale
+felt i Heia-familien (lime/mint-lysninger, neon som ett felt, aqua/cyan
+lokalt, emerald/teal-dybder, ett skrått lysbånd), definert som data i
+`FIELDS` (senter/rotasjon/radier/stopp i masterrommet) — banegeometrien
+halvert til ekstralag. Samme koordinatrom, ingen filtre, fargene lokale.
+Kortene er BEVISST ikke rørt (Brage: bakgrunnen først, så vurderes mer
+frost på opalen). Hjem-render levert (scratchpad/opal/home-lysfelt.png).
+Neste beslutning er visuell, Brages.
+
+▶️ **NESTE:** Brage vurderer de sju bildene → fysisk telefon i lyst og
+dempet miljø (sjekkliste: mint venstre/aqua høyre på samme kort; lys linje
+langs toppkanten som dør ut nedover; grønn skygge uten grå halo; pillene
+som blekkvask i materialet; VIKTIG solid mellom opaler; «Kommenter»-
+teksten i sol; RT/IC; ingen blink ved montering) → beslutning (0,90 står;
+små justeringer i `OPAL`) → SLETT zz-filene → commit. Deretter: live-raden
+av stadionglasset; så token-promotering (inkl. mørkere `textSecondary` —
+opalen har bevist behovet) + fjerning av `DAYLIGHT_GROUND_AB`/
+`NEXT_MATCH_GLASS_AB`/`FEED_OPAL_AB` i egen skive. Compose/Lagkassa-opal
+FØRST etter at FeedCard er telefongodkjent.
+
+---
+
+## ✅ Skive 1B StadiumGlass (tidligere START HER 2026-09-02 kveld — telefongodkjent og committet 2618ddb, `NEXT_MATCH_GLASS_AB` PÅ)
+
+🎨 **SKIVE 1B — STADIONGLASSET PÅ KOMMENDE KAMP: TELEFONGODKJENT OG
+COMMITTET 2026-09-02 (kveld).** Brages dom: «klart bedre enn A/B av» —
+`NEXT_MATCH_GLASS_AB` i `NextEventHero.tsx` STÅR PÅ `true`.
+`src/components/StadiumGlass.tsx` har ÉN konsument (kamp-grenen i
+`NextEventHero`, kun Hjem) og rører ikke globale `StadiumSurface`
+(12 konsumenter), `HeroSurface` (5), tokens, FeedCard, ScoreChip,
+NextEventCarousel, TeamHeader eller tab-bar. Geometri, padding, innhold og
+navigasjon er uendret (innerboksen beholder 1 pt gjennomsiktig kant så
+padding-boksen er identisk med StadiumSurface).
+
+Materialet (runde 2, etter visuell dom mot Brages tre referansebilder —
+runde 1 fikk 5/10 «pen mørkegrønn boks», runde 2 6/10): base
+arenaTop → arenaBottom (40 %) → timeline ved opasitet 0,96; aqua-opptak
+(#8FFFE0) 0,05 i øvre venstre hjørne; lagfargerefleks = lagfargen LØFTET
+40 % mot hvitt FØR blanding (`liftTeamColor`), arenaklemmen
+(`arenaLightCap`) målt på den løftede fargen, tak 0,18 — marine 0,18, rød
+0,15, skoggrønn 0,11, gul 0,06, alle TILFØRER luminans (rå marine gjorde
+flaten mørkere; rød løftet er #E88080 som prøve, men leser som varmt lys
+ved 15 % over dyp grønn — bevisst, ikke dempet); neon konsentrert nederst
+høyre 0,16 under banebuene; kantLYS som SVG-gradientstrøk (#D6FFF1
+0,40 → 0,16 → 0,06, 3 pt klippet med ClipPath til nøyaktig 1,5 pt synlig)
++ 1,5 pt indre topphøylys; grønn `boxShadow` (RN 0.83 Fabric) på
+ytterboksen. Tynn hvit KAMP-pill (coral betyr LIVE), hvitt RSVP-fyll 0,55,
+avsparkstiden er eneste neon. Rå tall bor i `GLASS`-konstanten.
+
+`src/components/useMaterialAccessibility.ts`: Reduce Transparency → solid
+base + solid bunn; Increase Contrast → uniform hvit kant 0,45 (samme
+bredde) + halve reflekser. PLATTFORMPORTET MED VILJE: i RN 0.83.1 løser
+`isDarkerSystemColorsEnabled()` på Android og `isHighTextContrastEnabled()`
+på iOS ALDRI (`return Promise.resolve(false)` inne i executoren). Kontrast-
+vakt i `__tests__/stadiumGlass.test.tsx` (32): hjørnelysene måles på
+toppen (ingen brødtekst: 4,5:1 tekst / 3:1 neon) og i tekstsonen
+(sonefaktor 0,35 på både refleks og opptak: 7:1) — `matchColors.text` er
+#EAFFF6, ikke hvitt, så arenaTop alene er 8,1:1 og full opptak-styrke under
+tekst faller under 7. Verifisert: suite 921/921, eslint, prettier husstil,
+`npx tsc --noEmit -p tsconfig.json` = de 7 kjente feilene, 0 nye. Riggverk:
+HTML → headless Chrome før/etter med marine/skoggrønn/rød/gul + IC + RT.
+Materialet har nådd omtrent det det kan ALENE — resten av avstanden til
+referansen er nestet innhold (chips, fotstripe), som er en senere skive.
+
+▶️ **NESTE (NY samtale, IKKE startet): OPALMATERIALET på hverdagsflatene.**
+Lyst opalglass på feed (FeedCard), Lagkassa-siden i karusellen og compose,
+i samme metode som 1A/1B: inspiser → forslag → Brages godkjenning → én
+isolert variant bak lokal bryter → riggverk-render → fysisk telefon.
+Sperrer som står: vanlige feedposter ALDRI mørke; opal = varm krem
+~0,88–0,92, aldri rent hvitt; sekundærlag blekk-tynne på lyse kort; ingen
+blur, ingen pakker; Android: aldri alpha 1 automatisk — `boxShadow` for
+skygge på gjennomskinnelig flate (klipper border-boksen ut); RT/IC bygges
+SAMMEN med materialet (`useMaterialAccessibility` finnes og er eksportert).
+Etter opalen: live-raden av stadionglasset, deretter promotering av farger
+til tokens og fjerning av A/B-bryterne (`DAYLIGHT_GROUND_AB`,
+`NEXT_MATCH_GLASS_AB`) i egen skive.
+
+---
+
+## ✅ Skive 1A + materialhypotesen (tidligere START HER 2026-09-02)
+
+🎨 **SKIVE 1A — DAGSLYSGRUNNEN PÅ HJEM: TELEFONGODKJENT OG LÅST 2026-09-02.**
+`src/components/DaylightGround.tsx` oversetter
+`docs/Heia_Design_Master/Heia_Background_Master.svg` 1:1 i masterens eget
+1290 × 2796-koordinatrom (`xMidYMin slice`: masteren er en hel skjermramme,
+tab-baren dekker det dype hjørnet). Én statisk SVG uten filtre: masterens
+blur-ellipser og beamet er radiale gradienter, kornet er utelatt
+(feTurbulence finnes ikke nativt i react-native-svg 15.15.3). Montert bak
+laghodet og lista i `TeamHomeScreen`, bak A/B-bryteren `DAYLIGHT_GROUND_AB`
+(BEHOLDES som bryter gjennom materialarbeidet); Home-ruten i `AppNavigator`
+har `contentStyle` i grunnens dominante mint (`#26F5AD`) mot kremblink.
+Fargene er LOKALE i komponenten med vilje (Brage): ingen `worldColors`, og
+ALDRI en ny global `heiaInk`/`heiaDeep` med annen verdi enn dagens tokens —
+promotering til tokens skjer i egen skive etter materialene. Bevist på
+fysisk iPhone: de elliptiske `gradientTransform`-radialene rendrer riktig.
+Typecheck (`npx tsc --noEmit -p tsconfig.json`, package.json har ikke noe
+script): 0 nye feil; 7 pre-eksisterende (TimeSheet, media ×3, netMetrics,
+LagkassaScreen ×2) identiske på HEAD, innført 7.–19. aug — tsc har ikke vært
+port siden minst 27. aug.
+
+🧭 **MATERIALHIERARKIET — LEDENDE HYPOTESE (Brage 2026-09-02, skal BEVISES
+før noe gjøres globalt):** B-puls. Kommende kamp = ROLIG mørkt stadionglass
+(dyp Heia-grønn i kampverdenens arenafamilie #25563F→#1D4633→#123325, L*
+21–33 — IKKE dagens nesten sorte StadiumSurface L* 7–18); live = samme
+materialfamilie med høyere intensitet (neon score, coral, HEIA); ferdig kamp
+= LYS feedpost med SOLID resultatkapsel (ingen slutt-hero). Lagkassa, feed,
+compose og hverdagsinformasjon = lyst opalglass (varm krem, ~0,88–0,92,
+aldri rent hvitt). Tynne lyse glasspaneler KUN på mørk flate; på lyse kort
+er sekundærlag blekk-tynne. Solide kontroller: dyp grønn = struktur/standard,
+neon = HEIA/live/mål/score/aktiv. Karusellen bytter materiale KUN etter
+hendelsestype (kamp mørk, alt annet opal), lik geometri på alle sider.
+Skill-linser godkjent som beslutningsgrunnlag: `apple-hig-designer`
+(installert), emilkowalski `apple-design`/`emil-design-eng`/`animate-expo`
+(lest fra main, IKKE installert, kun review). Sperret: backdrop-blur,
+systemfont-default, Reanimated (core `Animated` native driver for eventuell
+bakgrunnsdrift senere; Reduce Motion bygges SAMMEN med bevegelsen).
+
+✅ **GJORT som skive 1B (se øverst) — prototypen: `NextEventHero` for
+KOMMENDE KAMP i rolig stadionintensitet, KUN på Hjem.** Sperrene fra Brage
+sto gjennom hele skiva: ikke rør global
+`StadiumSurface` (12 konsumenter) eller `HeroSurface` (5); lokal/eksplisitt
+variant; ingen endring av layout, høyde, padding, innhold, navigasjon eller
+tilstandslogikk; ingen slutt-hero; ikke FeedCard/ScoreChip/Lagkassa/header/
+tab-bar; ingen pakker, ingen blur; lokal A/B-bryter; Reduce Transparency og
+Increase Contrast støttes i selve materialvarianten. Flyten: forslag →
+godkjenning → bygg → fysisk telefon, FØR live-varianten eller opalkortene
+røres. Android-opal: IKKE alpha 1 automatisk pga. elevation — RN 0.83 har
+`boxShadow` (Fabric) som klipper bort border-box på Android
+(`OutsetBoxShadowDrawable.clipOutPath`), så skyggen ikke blør gjennom
+gjennomskinnelige flater; anbefaling dokumenteres i forslaget.
+
+---
+
+## ✅ Skaleringssporet LUKKET (tidligere START HER 2026-09-01/02)
+
 
 ✅ **S3c (feed + varsler + kampknappen → Broadcast, skaleringsplan v2.1
 §9 S3c) — IMPLEMENTERT 2026-09-01, ÉN ØKT ETTER S3b-MØNSTERET.** Fasit:

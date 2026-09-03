@@ -16,7 +16,6 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   useFocusEffect,
   useNavigation,
@@ -33,10 +32,13 @@ import {
   LiveBadge,
   MonthSheet,
   Skeleton,
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
   TeamHeader,
   TournamentDayCard,
   WeekStrip,
   useReducedMotion,
+  useBottomContentPadding,
 } from '../components';
 import {useActiveTeam, useCalendarFocus} from '../context';
 import {useTeamEvents, teamEventsKey} from '../lib/queries/events';
@@ -74,19 +76,9 @@ const SCROLL_GAP = spacing.sm;
 const EMPTY_EVENTS: never[] = [];
 
 /**
- * ⚠️ Stabil identitet, på modulnivå. `ScrollView` kjører
- * `React.Children.toArray` og mapper indekser mot det resultatet, og et nytt
- * array hver render river den native scroll→Animated-koblingen ned og opp
- * igjen. Indeks 1 er navigatoren, og barnelista er derfor låst til NØYAKTIG
- * tre elementer: tittelblokk, navigator, og ETT fragment med resten.
- * Et fragment teller som ett barn; et array ville blitt flatet ut og flyttet
- * indeksen.
- */
-const STICKY_INDICES = [1];
-
-/**
  * Holder synlig innhold i ro når eldre historikk hentes fram i toppen.
- * Stabil identitet av samme grunn som `STICKY_INDICES`.
+ * Stabil identitet på modulnivå: et nytt objekt hver render ville rørt
+ * ScrollViewens native oppsett unødig.
  */
 const MAINTAIN_POSITION = {minIndexForVisible: 0} as const;
 
@@ -119,7 +111,7 @@ type ScrollOrigin =
   | 'opprettet';
 
 export function KalenderScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const {activeTeamSpaceId, activeRole} = useActiveTeam();
@@ -281,28 +273,11 @@ export function KalenderScreen() {
   /** Seksjonenes y, kun til å finne den øverste synlige dagen etter scroll. */
   const offsets = useRef(new Map<string, number>());
 
-  /**
-   * Navigatorens høyde. Den er festet over toppen av lista, så en dag som
-   * ruller til y = 0 ville lagt seg BAK den.
-   *
-   * Ligger i en ref og ikke i state: verdien brukes bare i regnestykket ved
-   * en scroll, og en render for hver måling ville vært støy. `onLayout` på et
-   * sticky barn kalles av RN med wrapperens mål — samme høyde.
-   */
-  const navHeight = useRef(0);
-
-  /**
-   * Navigatorens egen y i innholdet — og dermed TERSKELEN der den fester seg.
-   *
-   * ⚠️ En sticky header står helt stille til `scrollY` når `layoutY`, og
-   * fester seg først da (verifisert i `ScrollViewStickyHeader.js`). Lander vi
-   * under terskelen, henger baren `layoutY − scrollY` piksler ned — et
-   * forskjellig tall for hver landing. Det var derfor datoraden hoppet opp og
-   * ned når man trykket på ulike datoer i fortiden: en tidligere dato blir
-   * agendaens FØRSTE seksjon, og landingen havnet da så høyt oppe at baren
-   * ikke rakk å feste seg.
-   */
-  const navTop = useRef(0);
+  // ⚠️ KALENDERCHROMEN ER PERMANENT (Brage 2026-09-03, runde 2): måned,
+  // kontroller og ukerad ligger UTENFOR ScrollView-en, over den, og bare
+  // agendaen ruller. Ingen sticky header, ingen festeterskel, ingen
+  // scroll-away-tittel. Det som før het navTop/navHeight er derfor 0:
+  // agendaens y = 0 er første synlige rad rett under chromen.
 
   /** Dagen vi skylder en scroll. Fylles først når seksjonen finnes. */
   const pending = useRef<string | null>(null);
@@ -329,10 +304,9 @@ export function KalenderScreen() {
 
     node.measureLayout(inner, (_x, y) => {
       scrollRef.current?.scrollTo({
-        // Dagen skal lande RETT UNDER navigatoren, ikke bak den — og aldri
-        // høyere enn festeterskelen, ellers får datoraden en ny posisjon for
-        // hver landing. Klemt hit har den nøyaktig én.
-        y: Math.max(navTop.current, y - navHeight.current - SCROLL_GAP),
+        // Dagen skal lande RETT UNDER chromen, med ett pust luft over
+        // dagsoverskriften — og aldri over toppen.
+        y: Math.max(0, y - SCROLL_GAP),
         // Bevisst uanimert (Brage 2026-08-07): landingsposisjonen skal først
         // bevises stabil på telefonen. Animasjonen kan slås på igjen etterpå,
         // og den er ett ord herfra.
@@ -427,9 +401,9 @@ export function KalenderScreen() {
       const list = sections;
       if (list.length === 0) return;
 
-      // Den øverste dagen er den som ligger rett under navigatoren — ikke
-      // den som så vidt er skjult bak den.
-      const y = e.nativeEvent.contentOffset.y + navHeight.current + SCROLL_GAP;
+      // Den øverste dagen er den som ligger rett under chromen — ikke den
+      // som så vidt er rullet ut over toppen.
+      const y = e.nativeEvent.contentOffset.y + SCROLL_GAP;
       let current: DaySection | null = null;
       for (const section of list) {
         const offset = offsets.current.get(section.key);
@@ -618,7 +592,7 @@ export function KalenderScreen() {
   if (!activeTeamSpaceId) return null;
 
   // -------------------------------------------------------------------------
-  // Bildet — alt i vanlig dokumentflyt, ingenting utenfor ScrollView-en.
+  // Bildet — chromen fast over, agendaen i vanlig dokumentflyt under.
   // -------------------------------------------------------------------------
   const isEmpty = loaded && allRows.length === 0;
   const showSkeleton = !loaded && allRows.length === 0;
@@ -626,56 +600,23 @@ export function KalenderScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* MASTHEAD (Brage 2026-09-03): ÉTT lerret bak HELE skjermen —
+          toppstripe, lagets lys, reisen og buene — og laghodet er
+          gjennomsiktig innhold oppå. Av med DAYLIGHT_GROUND_AB = false. */}
+      {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
       {/* Lagheaderen ligger UTENFOR scrollflaten og er alltid stabil. Ingen
-          kalenderinnhold kan tegnes eller bevege seg over den — det finnes
-          ikke lenger noe absolutt posisjonert lag her. */}
+          kalenderinnhold kan tegnes eller bevege seg over den. */}
       <TeamHeader />
 
-      <ScrollView
-        ref={scrollRef}
-        // RN typer denne som en ikke-nullbar RefObject, mens en ref som
-        // starter på null er nettopp det React gir oss. Peker på ScrollViewens
-        // INNHOLDSBEHOLDER — samme koordinatsystem som `scrollTo`.
-        innerViewRef={innerRef as React.RefObject<View>}
-        stickyHeaderIndices={STICKY_INDICES}
-        // ⚠️ Dette er det som gjør at historikk kan settes inn OVER agendaen
-        // uten at synlig innhold flytter seg: iOS kompenserer contentOffset
-        // med rammeforskyvningen til første synlige barn. Uten den ville
-        // innsettingen vært én bevegelse og landingen en til.
-        maintainVisibleContentPosition={MAINTAIN_POSITION}
-        // Ingen `onScroll`: valgt dato beregnes først når brukeren slipper.
-        onScrollBeginDrag={handleDragBegin}
-        onScrollEndDrag={handleScrollEnd}
-        onMomentumScrollEnd={handleMomentumEnd}
-        contentContainerStyle={{
-          paddingBottom: insets.bottom + spacing['5xl'],
-        }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.heia}
-          />
-        }>
-        {/* [0] Overskriften ruller bort som vanlig innhold. */}
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>Kalender</Text>
-          <Text style={styles.subtitle}>Kommende hendelser for laget</Text>
-        </View>
-
-        {/* [1] STICKY. ⚠️ Må være en host-`View` med bakgrunnen på seg:
-            RN flytter barnets `style` over på sin egen wrapper, så en
-            komponent her ville gitt en gjennomsiktig bar med agendaen
-            rullende bak. Høyden er konstant — ukeraden er alltid der, og
-            tomtilstanden ligger utenfor. */}
-        <View
-          style={styles.navBlock}
-          // RN kaller denne med SIN EGEN wrappers mål — derfor får vi både
-          // høyden og festeterskelen fra samme hendelse.
-          onLayout={e => {
-            navHeight.current = e.nativeEvent.layout.height;
-            navTop.current = e.nativeEvent.layout.y;
-          }}>
+      {/* KROPPEN: chromen og scrollflaten er begge gjennomsiktige over
+          lerretet. Chromen ligger OVER ScrollView-en i flyten, så agendaen
+          klippes av sin egen ramme rett under ukeraden — ingen sticky
+          header, ingen egen flate, ingen kant (Brage 2026-09-03, runde 2). */}
+      <View style={styles.body}>
+        {/* KALENDERCHROMEN — kompakt og permanent: måned + kontroller,
+            ukerad, statusrad. Ingen scroll-away-tittel; fanen heter
+            Kalender, og måneden er chromens tittel. */}
+        <View style={styles.chrome}>
           <CalendarNav
             month={addDays(startOfWeek(weekAnchor), 3)}
             onToday={goToToday}
@@ -703,11 +644,10 @@ export function KalenderScreen() {
           )}
 
           {/* ⚠️ FORHÅNDSRESERVERT HØYDE, alltid montert. Raden er tom det
-              meste av tiden og leses da som luft under ukeraden. Poenget er
-              at navigatorens høyde ALDRI endrer seg: kom og gikk denne
-              linja, ville festeterskelen, alle målte posisjoner og
-              scrollposisjonen flyttet seg — nøyaktig det hoppet vi har
-              brukt tre runder på å bli kvitt. */}
+            meste av tiden og leses da som luft under ukeraden. Poenget er
+            at chromens høyde ALDRI endrer seg: kom og gikk denne linja,
+            ville agendaens ramme og alle målte posisjoner flyttet seg —
+            nøyaktig det hoppet vi har brukt tre runder på å bli kvitt. */}
           <View style={styles.statusRow}>
             {emptyNotice !== null && (
               <Text style={styles.statusText} numberOfLines={1}>
@@ -717,52 +657,78 @@ export function KalenderScreen() {
           </View>
         </View>
 
-        {/* [2] ETT fragment med alt annet. Et fragment teller som ett barn i
-            `Children.toArray`, så indeksen over står stille uansett hva som
-            vises her. Et array ville blitt flatet ut. */}
-        <>
-          {error !== null && allRows.length > 0 && (
-            <Pressable
-              onPress={onRefresh}
-              accessibilityRole="button"
-              accessibilityLabel={`${error} Trykk for å prøve igjen.`}
-              style={styles.errorStrip}>
-              <Text style={styles.errorText}>
-                {error} Det du ser er sist hentet. Trykk for å prøve igjen.
-              </Text>
-            </Pressable>
-          )}
-
-          {showSkeleton ? (
-            <AgendaSkeleton />
-          ) : isEmpty ? (
-            <EmptyCalendar canCreate={canCreate} onCreate={newEvent} />
-          ) : failedCold ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Fikk ikke tak i kalenderen</Text>
-              <Text style={styles.emptyText}>Dra ned for å prøve igjen.</Text>
-            </View>
-          ) : sections.length === 0 ? (
-            /* Ingenting den siste måneden, og ingenting som kommer. Eldre
-               historikk finnes kanskje — den ligger bak månedsvelgeren. */
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Ingenting på gang</Text>
-              <Text style={styles.emptyText}>
-                Verken den siste måneden eller i tiden framover. Åpne måneden
-                for å se lenger tilbake.
-              </Text>
-            </View>
-          ) : (
-            <Agenda
-              sections={sections}
-              today={today}
-              registerSection={registerSection}
-              onMeasureSection={measureSection}
-              onOpenEvent={openEvent}
+        <ScrollView
+          ref={scrollRef}
+          // RN typer denne som en ikke-nullbar RefObject, mens en ref som
+          // starter på null er nettopp det React gir oss. Peker på ScrollViewens
+          // INNHOLDSBEHOLDER — samme koordinatsystem som `scrollTo`.
+          innerViewRef={innerRef as React.RefObject<View>}
+          // ⚠️ Dette er det som gjør at historikk kan settes inn OVER agendaen
+          // uten at synlig innhold flytter seg: iOS kompenserer contentOffset
+          // med rammeforskyvningen til første synlige barn. Uten den ville
+          // innsettingen vært én bevegelse og landingen en til.
+          maintainVisibleContentPosition={MAINTAIN_POSITION}
+          // Ingen `onScroll`: valgt dato beregnes først når brukeren slipper.
+          onScrollBeginDrag={handleDragBegin}
+          onScrollEndDrag={handleScrollEnd}
+          onMomentumScrollEnd={handleMomentumEnd}
+          contentContainerStyle={{
+            paddingBottom: bottomPad,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.heia}
             />
-          )}
-        </>
-      </ScrollView>
+          }>
+          {/* Agendaen — alt som ruller. */}
+          <>
+            {error !== null && allRows.length > 0 && (
+              <Pressable
+                onPress={onRefresh}
+                accessibilityRole="button"
+                accessibilityLabel={`${error} Trykk for å prøve igjen.`}
+                style={styles.errorStrip}>
+                <Text style={styles.errorText}>
+                  {error} Det du ser er sist hentet. Trykk for å prøve igjen.
+                </Text>
+              </Pressable>
+            )}
+
+            {showSkeleton ? (
+              <AgendaSkeleton />
+            ) : isEmpty ? (
+              <EmptyCalendar canCreate={canCreate} onCreate={newEvent} />
+            ) : failedCold ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>
+                  Fikk ikke tak i kalenderen
+                </Text>
+                <Text style={styles.emptyText}>Dra ned for å prøve igjen.</Text>
+              </View>
+            ) : sections.length === 0 ? (
+              /* Ingenting den siste måneden, og ingenting som kommer. Eldre
+               historikk finnes kanskje — den ligger bak månedsvelgeren. */
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Ingenting på gang</Text>
+                <Text style={styles.emptyText}>
+                  Verken den siste måneden eller i tiden framover. Åpne måneden
+                  for å se lenger tilbake.
+                </Text>
+              </View>
+            ) : (
+              <Agenda
+                sections={sections}
+                today={today}
+                registerSection={registerSection}
+                onMeasureSection={measureSection}
+                onOpenEvent={openEvent}
+              />
+            )}
+          </>
+        </ScrollView>
+      </View>
 
       {/* Månedsvisningen ligger UTENFOR scrollflaten. Den kan verken endre
           agendaens høyde eller posisjon — å åpne og lukke den er garantert
@@ -915,27 +881,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  titleBlock: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
+  /** Kroppen under laghodet — grunnen og scrollflaten deler denne ramma. */
+  body: {
+    flex: 1,
   },
-  // ⚠️ Bakgrunnen MÅ ligge her. RN flytter dette style-objektet over på sin
-  // egen sticky-wrapper; uten en ugjennomsiktig flate ville agendaen rullet
-  // synlig bak navigatoren.
-  navBlock: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderSubtle,
+  // Chromen er innhold på lerretet: ingen flate, ingen kant. Den står i
+  // reisens mørke topp, så alt blekk i den er stadionblekk (CalendarNav,
+  // DayCell tone «stadium», statusraden).
+  chrome: {
     paddingBottom: spacing.xs,
-  },
-  title: {
-    ...typography.heading1,
-  },
-  subtitle: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: 2,
   },
   stripSkeleton: {
     paddingHorizontal: spacing.md,
@@ -953,7 +907,8 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: colors.stadiumText,
+    opacity: 0.72,
   },
   emptyCard: {
     marginHorizontal: spacing.lg,

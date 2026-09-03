@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Alert,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {
@@ -40,6 +39,7 @@ import {
   MatchTimeline,
   Skeleton,
   SkeletonCard,
+  useBottomContentPadding,
 } from '../components';
 import {FinishedMatch} from '../components/match/FinishedMatch';
 import {LiveMatch} from '../components/match/LiveMatch';
@@ -279,7 +279,7 @@ function applyMyStatus(base: RSVPSummary, myStatus: RSVPStatus): RSVPSummary {
 }
 
 export function EventDetailScreen({route, navigation}: Props) {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const {profile: currentUser} = useAuth();
   const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
   const {eventId} = route.params;
@@ -1419,7 +1419,7 @@ export function EventDetailScreen({route, navigation}: Props) {
     <View style={styles.screen}>
       <BackBar title="Hendelse" />
       <ScrollView
-        contentContainerStyle={{paddingBottom: insets.bottom + spacing['3xl']}}>
+        contentContainerStyle={{paddingBottom: bottomPad}}>
       {isUpcomingMatch && event.opponent ? (
         /* Kampdag (P5B): motstander + avspark fortjener mer enn sort på
            hvitt — en liten stadion-smak, IKKE full ScoreBoard (det er

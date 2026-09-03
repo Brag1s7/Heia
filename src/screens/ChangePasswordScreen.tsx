@@ -9,10 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button} from '../components';
+import {BackBar, Button, useBottomContentPadding} from '../components';
 import {Check} from '../components/icons';
 import {useAuth} from '../context';
 import {authErrorMessage} from '../shared/authErrors';
@@ -44,7 +43,7 @@ type Step = 'change' | 'recovery' | 'done';
  *     `confirmPasswordReset` krever ingen utlogging — de gjenbrukes rett her.
  */
 export function ChangePasswordScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
   const navigation = useNavigation();
   const {session, changePassword, requestPasswordReset, confirmPasswordReset} =
     useAuth();
@@ -150,7 +149,7 @@ export function ChangePasswordScreen() {
         <View
           style={[
             styles.doneWrap,
-            {paddingBottom: insets.bottom + spacing['3xl']},
+            {paddingBottom: bottomPad},
           ]}>
           <View style={styles.doneMark}>
             <Check size={30} color={colors.heiaInk} strokeWidth={3} />
@@ -183,7 +182,7 @@ export function ChangePasswordScreen() {
           styles.content,
           {
             paddingTop: spacing.lg,
-            paddingBottom: insets.bottom + spacing['3xl'],
+            paddingBottom: bottomPad,
           },
         ]}
         keyboardShouldPersistTaps="handled">

@@ -7,6 +7,7 @@ import {
   TAB_COUNT,
 } from '../src/shared/matchButtonGeometry';
 import {matchButtonHasGlyph} from '../src/shared/matchButton';
+import {tabBarItemsWidth} from '../src/shared/tabBarLayout';
 
 /**
  * KAMPKNAPPENS GEOMETRIVAKT.
@@ -82,7 +83,16 @@ describe('ingen etikett spiser naboen', () => {
     for (const scale of SCALES) {
       for (const [label, short, glyf] of LABELS) {
         it(`«${label}» holder budsjettet på ${width} pt × ${scale}`, () => {
-          const g = matchButtonGeometry(width, scale, label, short, glyf);
+          // ⚠️ MÅLT MOT KAPSELEN, som komponenten og navigatoren gjør:
+          // fanene deler vinduet minus 2 × 12 pt (Brage 2026-09-03).
+          const g = matchButtonGeometry(
+            width,
+            scale,
+            label,
+            short,
+            glyf,
+            tabBarItemsWidth(width),
+          );
 
           // ⚠️ SELVE PÅSTANDEN: pillen stikker aldri lenger ut enn budsjettet.
           // Naboens ikonpille har 11 pt fri marg i elementet sitt, så 6 pt
@@ -119,6 +129,19 @@ describe('fanene er og blir like brede', () => {
       // bieffekten skive 10 er forbudt å ha.
       expect(g.itemWidth).toBeCloseTo(width / 5, 5);
       expect(TAB_COUNT).toBe(5);
+    }
+  });
+
+  it('i kapselen deler fanene kapselbredden — fortsatt likt på fem', () => {
+    for (const width of WIDTHS) {
+      const items = tabBarItemsWidth(width);
+      expect(items).toBe(width - 24);
+      const g = matchButtonGeometry(width, 1, 'RAPPORTER', 'RAPPORT', false, items);
+      expect(g.itemWidth).toBeCloseTo(items / 5, 5);
+      // Kompresjonstrinnet (typen) følger fortsatt VINDUET: 393 pt gir
+      // prototypens 13,5 for korte ord selv om slotten er 4,8 pt smalere.
+      const kort = matchButtonGeometry(393, 1, 'KAMP', undefined, true, tabBarItemsWidth(393));
+      expect(kort.fontSize).toBeCloseTo(13.5, 5);
     }
   });
 

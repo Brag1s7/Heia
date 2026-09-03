@@ -18,8 +18,14 @@
 import React from 'react';
 import ReactTestRenderer, {act} from 'react-test-renderer';
 import {NavigationContainer} from '@react-navigation/native';
-import {Text, View} from 'react-native';
+import {Text} from 'react-native';
 import type {MatchButtonState} from '../src/shared/matchButton';
+import {
+  CAPSULE,
+  capsuleBottomGap,
+  tabBarTotalHeight,
+} from '../src/shared/tabBarLayout';
+import {matchColors} from '../src/theme';
 
 // Bare fanenes ROTSKJERMER stubbes: bottom-tabs monterer kun den fokuserte
 // fanen, og testen handler om BAREN, ikke om hva fanene inneholder.
@@ -52,12 +58,15 @@ let mockState: MatchButtonState = {
   a11yLabel: 'Kamp. Åpner Sesongen',
   disabled: false,
 };
+// Miljøet: står du INNE i en pågående kamp, blir kapselen mørkt stadionglass.
+let mockInMatch = false;
 const mockPress = jest.fn();
 
 jest.mock('../src/context/MatchButtonContext', () => ({
   useMatchButton: () => ({
     state: mockState,
     bootReady: true,
+    inMatch: mockInMatch,
     press: mockPress,
     enterMatch: jest.fn(),
     leaveMatch: jest.fn(),
@@ -187,10 +196,38 @@ const TILSTANDER: MatchButtonState[] = [
 ];
 
 afterEach(() => {
+  mockInMatch = false;
   act(() => {
     while (mounted.length) mounted.pop()!.unmount();
   });
 });
+
+/**
+ * SELVE BAREN: containeren rundt `role="tablist"`. Før ble den funnet på
+ * `height === 88`; glasskapselen har en annen, safe-area-avhengig høyde, så
+ * oppslaget går på rollen — påstanden (ett stilobjekt i alle tilstander)
+ * er den samme.
+ */
+/** Host-noder med gitt testID (react-test-renderer gir også composite-
+ *  instansen med samme props — den telles ikke). */
+function hostByTestId(
+  tree: ReactTestRenderer.ReactTestRenderer,
+  testID: string,
+) {
+  return tree.root.findAll(
+    n => typeof n.type === 'string' && n.props?.testID === testID,
+  );
+}
+
+function barStyle(tree: ReactTestRenderer.ReactTestRenderer) {
+  const {StyleSheet} = require('react-native');
+  const tablist = tree.root.findAll(n => n.props?.role === 'tablist')[0];
+  expect(tablist).toBeDefined();
+  return StyleSheet.flatten(tablist.parent!.props.style) as Record<
+    string,
+    unknown
+  >;
+}
 
 describe('de fire andre fanene', () => {
   it.each(TILSTANDER.map(s => [s.kind, s] as const))(
@@ -248,22 +285,67 @@ describe('baren selv', () => {
     const stiler = TILSTANDER.map(state => {
       mockState = state;
       const tree = render();
-      const {StyleSheet} = require('react-native');
-      const bar = tree.root
-        .findAll(n => {
-          const s = StyleSheet.flatten(n.props?.style);
-          return s?.height === 88 && s?.backgroundColor !== undefined;
-        })
-        .map(n => JSON.stringify(StyleSheet.flatten(n.props.style)));
+      const stil = JSON.stringify(barStyle(tree));
       act(() => {
         while (mounted.length) mounted.pop()!.unmount();
       });
-      return bar[0];
+      return stil;
     });
 
     expect(stiler[0]).toBeDefined();
     // Alle åtte tilstandene gir NØYAKTIG samme bar.
     expect(new Set(stiler).size).toBe(1);
+  });
+
+  /**
+   * GLASSKAPSELEN (Brage 2026-09-03): baren er absolutt og gjennomsiktig —
+   * innholdet løper under, kapselen tegnes i `tabBarBackground`. Høyden er
+   * kapsel + løft + safe area (0 i testmiljøet), aldri 88 + noe.
+   */
+  it('er en absolutt, gjennomsiktig container med kapselen bak fanene', () => {
+    mockState = TILSTANDER[0];
+    const tree = render();
+    const stil = barStyle(tree);
+    expect(stil.position).toBe('absolute');
+    expect(stil.backgroundColor).toBe('transparent');
+    expect(stil.height).toBe(tabBarTotalHeight(0));
+    expect(stil.paddingBottom).toBe(capsuleBottomGap(0));
+    expect(hostByTestId(tree, 'tabbar-diffusion-light').length).toBe(1);
+    expect(stil.paddingHorizontal).toBe(CAPSULE.inset);
+    expect(hostByTestId(tree, 'tabbar-capsule-light').length).toBe(1);
+  });
+
+  /**
+   * TO MILJØER, ÉN GEOMETRI (Brage): på kampsiden byttes kapselen til mørkt
+   * stadionglass og blekket til opalhvitt — og INGENTING annet. Stilobjektet
+   * på baren er identisk, og kampknappen får samme tilstand.
+   */
+  it('kampsiden bytter kun tint og blekk — geometrien er identisk', () => {
+    mockState = TILSTANDER[1];
+    const lys = render();
+    const lysStil = JSON.stringify(barStyle(lys));
+    const lysEtiketter = etiketter(lys);
+    act(() => {
+      while (mounted.length) mounted.pop()!.unmount();
+    });
+
+    mockInMatch = true;
+    const kamp = render();
+    expect(JSON.stringify(barStyle(kamp))).toBe(lysStil);
+    expect(etiketter(kamp)).toEqual(lysEtiketter);
+    expect(hostByTestId(kamp, 'tabbar-capsule-match').length).toBe(1);
+    expect(hostByTestId(kamp, 'tabbar-capsule-light').length).toBe(0);
+    // Opalhvitt blekk på inaktive etiketter (ikke lyst-miljøets grønngrå).
+    const {StyleSheet} = require('react-native');
+    const inaktiv = kamp.root
+      .findAllByType(Text)
+      .filter(n => {
+        const c = n.props.children;
+        return c === 'Kalender' || c === 'Varsler' || c === 'Profil';
+      })
+      .map(n => StyleSheet.flatten(n.props.style)?.color);
+    expect(inaktiv.length).toBeGreaterThan(0);
+    for (const farge of inaktiv) expect(farge).toBe(matchColors.dim);
   });
 });
 

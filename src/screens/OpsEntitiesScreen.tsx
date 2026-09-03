@@ -13,11 +13,10 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
 import {errorMessage} from '../shared/errorMessage';
-import {BackBar, Button, Skeleton} from '../components';
+import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -114,7 +113,7 @@ function formatDate(iso: string | null): string {
 }
 
 export function OpsEntitiesScreen() {
-  const insets = useSafeAreaInsets();
+  const bottomPad = useBottomContentPadding();
 
   const [entities, setEntities] = useState<OpsPaymentEntity[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -705,7 +704,7 @@ export function OpsEntitiesScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          {paddingBottom: insets.bottom + spacing['3xl']},
+          {paddingBottom: bottomPad},
         ]}
         keyboardShouldPersistTaps="handled"
         refreshControl={

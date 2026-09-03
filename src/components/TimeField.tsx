@@ -1,8 +1,7 @@
-import React, {useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import {View, Text, Pressable, StyleSheet} from 'react-native';
 import {colors, spacing, radius, fonts} from '../theme';
 import {ChevronDown, Clock} from './icons';
-import {TimeSheet} from './TimeSheet';
 import {parseTime} from '../shared/eventForm';
 
 /**
@@ -14,33 +13,42 @@ import {parseTime} from '../shared/eventForm';
  * i skjemaet, og skal leses som ett par.
  *
  * ⛔ **Ingen utfoldet velger i selve skjemaet.** Runde 1 var et rutenett som
- * foldet seg ut under raden, som `DateField` gjør. Det ble avvist på telefonen
- * (Brage 2026-08-07): 24 timeceller og 12 minuttceller er for mye flate for
- * ÉN verdi — «mer som et kontrollpanel enn Heia». Datoen tåler et utfoldet
- * rutenett fordi en måned ER et rutenett; et klokkeslett er ett tall.
+ * foldet seg ut under raden. Det ble avvist på telefonen (Brage 2026-08-07):
+ * 24 timeceller og 12 minuttceller er for mye flate for ÉN verdi — «mer som
+ * et kontrollpanel enn Heia».
  *
  * ⛔ **Ikke lenger et tekstfelt.** Det maskerte `HH:MM`-feltet er borte, og
  * med det hele «ugyldig klokkeslett»-tilstanden — arket kan bare sende
  * verdier som finnes.
+ *
+ * ⚠️ KONTROLLERT (Brage 2026-09-03): raden eier ikke arket lenger. Arket
+ * (`TimeSheet`) rendres av skjermen, i skjermroten, som et inline glassark —
+ * en RN `Modal` herfra hang i flere sekunder inne i den native modalen.
  */
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
 interface TimeFieldProps {
-  /** «HH:MM». Komponenten sender alltid samme format tilbake. */
+  /** «HH:MM». */
   value: string;
-  onChange: (next: string) => void;
   disabled?: boolean;
+  /** Arket er oppe — raden viser det som valgt. */
+  open: boolean;
+  onOpen: () => void;
 }
 
-export function TimeField({value, onChange, disabled = false}: TimeFieldProps) {
+export function TimeField({
+  value,
+  disabled = false,
+  open,
+  onOpen,
+}: TimeFieldProps) {
   const parsed = useMemo(() => parseTime(value), [value]);
-  const [open, setOpen] = useState(false);
 
   return (
     <View>
       <Pressable
-        onPress={() => setOpen(true)}
+        onPress={onOpen}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityState={{expanded: open, disabled}}
@@ -70,16 +78,6 @@ export function TimeField({value, onChange, disabled = false}: TimeFieldProps) {
           strokeWidth={2.2}
         />
       </Pressable>
-
-      <TimeSheet
-        visible={open}
-        value={value}
-        onCancel={() => setOpen(false)}
-        onDone={next => {
-          onChange(next);
-          setOpen(false);
-        }}
-      />
     </View>
   );
 }

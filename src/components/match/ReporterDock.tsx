@@ -3,6 +3,7 @@ import {Animated, Easing, PanResponder, StyleSheet, View} from 'react-native';
 import {matchColors, radius, spacing} from '../../theme';
 import {ReporterActions, type ReporterActionType} from '../ReporterActions';
 import {useReducedMotion} from '../useReducedMotion';
+import {useTabBarOverlap} from '../useBottomContentPadding';
 
 /** Dokkens høyde, målt. Kampens scroll må gi plass til den når den er åpen. */
 export const REPORTER_DOCK_HEIGHT = 230;
@@ -99,8 +100,15 @@ export function ReporterDock({
   onClose,
 }: ReporterDockProps) {
   const reducedMotion = useReducedMotion();
+  // Glasskapselen ligger OVER kampskjermens bunn: dokken løftes barhøyden,
+  // så den fortsatt lander «rett over baren» — nå over kapselen. 0 med den
+  // solide baren (den er utenfor skjermflaten).
+  const tabBarOverlap = useTabBarOverlap();
+  // Lukket = HELT ute av skjermen: dokkens egen høyde PLUSS løftet. Bare
+  // høyden ville latt løftet stå igjen som en mørk stripe under kapselen.
+  const closedOffset = REPORTER_DOCK_HEIGHT + tabBarOverlap;
   const translateY = useRef(
-    new Animated.Value(open ? 0 : REPORTER_DOCK_HEIGHT),
+    new Animated.Value(open ? 0 : closedOffset),
   ).current;
   // Refen, ikke propen: `PanResponder` bygges én gang, og closuren ville
   // ellers holdt på den aller første `onClose`.
@@ -112,11 +120,11 @@ export function ReporterDock({
       // Ingen glid: dokken er der, eller den er det ikke. Bevegelsen er det
       // som fjernes — aldri handlingen.
       translateY.stopAnimation();
-      translateY.setValue(open ? 0 : REPORTER_DOCK_HEIGHT);
+      translateY.setValue(open ? 0 : closedOffset);
       return;
     }
     const anim = Animated.timing(translateY, {
-      toValue: open ? 0 : REPORTER_DOCK_HEIGHT,
+      toValue: open ? 0 : closedOffset,
       duration: open ? OPEN_MS : CLOSE_MS,
       // Inn: full fart først, myk landing. Ut: ta av, den skal vekk.
       // Samme par som `CommentSheet` — appen skal ha ÉN bevegelse.
@@ -125,7 +133,7 @@ export function ReporterDock({
     });
     anim.start();
     return () => anim.stop();
-  }, [open, translateY, reducedMotion]);
+  }, [open, translateY, reducedMotion, closedOffset]);
 
   const springBack = useRef(() => {
     Animated.spring(translateY, {
@@ -193,6 +201,7 @@ export function ReporterDock({
       pointerEvents={open ? 'auto' : 'none'}
       style={[
         styles.dock,
+        {bottom: tabBarOverlap},
         {
           transform: [{translateY}],
           // ⚠️ DETTE ER FEILEN BAK «rapporter skjermen går stygt ned», og den

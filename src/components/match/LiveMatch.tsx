@@ -1,6 +1,6 @@
 import React, {useMemo} from 'react';
 import {Animated, StatusBar, StyleSheet, Text, View} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {useBottomContentPadding} from '../useBottomContentPadding';
 import {useIsFocused} from '@react-navigation/native';
 import {matchColors, spacing} from '../../theme';
 import {MatchTimeline} from '../MatchTimeline';
@@ -136,7 +136,9 @@ export function LiveMatch({
   toast = null,
   onToastHidden,
 }: LiveMatchProps) {
-  const insets = useSafeAreaInsets();
+  // Kapselen ligger over kampforløpet: barhøyde + pust, safe area telles
+  // én gang (inne i barhøyden). Se `useBottomContentPadding`.
+  const bottomPad = useBottomContentPadding(spacing['3xl']);
   const isFocused = useIsFocused();
 
   const paused = event.matchStatus === 'halfTime';
@@ -182,12 +184,9 @@ export function LiveMatch({
    */
   const scrollPad = useMemo(
     () => ({
-      paddingBottom:
-        insets.bottom +
-        spacing['3xl'] +
-        (isReporter ? REPORTER_DOCK_HEIGHT : 0),
+      paddingBottom: bottomPad + (isReporter ? REPORTER_DOCK_HEIGHT : 0),
     }),
-    [insets.bottom, isReporter],
+    [bottomPad, isReporter],
   );
 
   return (
