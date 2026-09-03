@@ -129,6 +129,9 @@ export function WeekStrip({
                 types={types}
                 weekday={WEEKDAYS_SHORT[day.getDay()]}
                 weekend={index >= 5}
+                // Ukeraden står i kalenderchromen på dagslysgrunnens mørke
+                // topp: stadionblekk + frostplate per dag (Brage 2026-09-03).
+                tone="stadium"
                 onPress={onSelect}
                 accessibilityLabel={dayCellLabel(day, today, note)}
               />
@@ -141,9 +144,11 @@ export function WeekStrip({
 }
 
 const styles = StyleSheet.create({
+  // 6 pt mellom platene: hver dag er sin egen lille flate, og luften mellom
+  // dem er det som gir raden rytme (runde 2). Var 2 da cellene var usynlige.
   page: {
     flexDirection: 'row',
     paddingHorizontal: spacing.md,
-    gap: 2,
+    gap: 6,
   },
 });

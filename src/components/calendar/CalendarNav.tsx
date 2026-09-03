@@ -118,12 +118,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
   },
-  // Måneden er flatens tall-tittel — displayfonten, som klokkeslett og score.
+  // Måneden er chromens tittel — displayfonten, som klokkeslett og score.
+  // Chromen står i dagslysgrunnens mørke topp (Brage 2026-09-03): stadionblekk.
   title: {
     flex: 1,
     fontFamily: fonts.display,
     fontSize: 18,
-    color: colors.textPrimary,
+    color: colors.stadiumText,
   },
   pill: {
     flexDirection: 'row',

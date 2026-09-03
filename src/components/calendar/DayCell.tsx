@@ -16,6 +16,34 @@ export const DOT_COLOR: Record<EventType, string> = {
   annet: colors.textTertiary,
 };
 
+/**
+ * STADION-TONEN (Brage 2026-09-03, Kalender runde 2): ukeraden står i
+ * kalenderchromen på dagslysgrunnens mørke topp (#143126 → #00593C). Der
+ * holder verken det mørke blekket eller de mørke prikkene, og cellene fløt
+ * sammen med grunnen. Hver dag får en subtil frostplate (stadionblekk 0,08
+ * med hårlinje 0,16) — definisjon og rytme uten å bli bokser — og alt blekk
+ * er stadionblekk; «i dag» og «valgt» er Heia-neon, som er valgt-fargen i
+ * hele appen. Turneringsprikken bruker gull i stedet for goldInk (som
+ * forsvinner på mørkt), «annet» stadionblekk dempet. Målt i
+ * `__tests__/dayCellStadium.test.tsx`.
+ */
+export const STADIUM_CELL = {
+  plate: 'rgba(234, 255, 246, 0.08)',
+  plateEdge: 'rgba(234, 255, 246, 0.16)',
+  platePressed: 'rgba(234, 255, 246, 0.16)',
+  weekday: 'rgba(234, 255, 246, 0.8)',
+  /** Helgens ukedagstekst: dempet, men fortsatt ≥ 4,5:1 der den står
+   *  (cellens topp, #143126 → #0B412E). Lavere enn 0,78 faller under. */
+  weekendOpacity: 0.78,
+  number: colors.stadiumText,
+  accent: colors.heia,
+  muted: 'rgba(234, 255, 246, 0.45)',
+  dotAnnet: 'rgba(234, 255, 246, 0.6)',
+  dotTurnering: colors.gold,
+} as const;
+
+export type DayCellTone = 'light' | 'stadium';
+
 /** Prikker det er plass til før det blir grøt. Resten telles i «+N». */
 const MAX_DOTS = 3;
 
@@ -37,6 +65,11 @@ interface DayCellProps {
   weekday?: string;
   /** Lørdag/søndag: dempet ukedagstekst, aldri rød søndag. */
   weekend?: boolean;
+  /**
+   * `light` (standard): på lys flate — datovelgeren. `stadium`: på
+   * dagslysgrunnens mørke topp — ukeraden i kalenderchromen. Se STADIUM_CELL.
+   */
+  tone?: DayCellTone;
   onPress: (day: Date) => void;
   accessibilityLabel: string;
 }
@@ -61,11 +94,19 @@ export function DayCell({
   disabled = false,
   weekday,
   weekend = false,
+  tone = 'light',
   onPress,
   accessibilityLabel,
 }: DayCellProps) {
   const marks = types ?? [];
   const extra = marks.length - MAX_DOTS;
+  const stadium = tone === 'stadium';
+  const dotColor = (type: EventType) =>
+    stadium && type === 'turnering'
+      ? STADIUM_CELL.dotTurnering
+      : stadium && type === 'annet'
+      ? STADIUM_CELL.dotAnnet
+      : DOT_COLOR[type];
 
   return (
     <Pressable
@@ -76,15 +117,25 @@ export function DayCell({
       accessibilityLabel={accessibilityLabel}
       style={({pressed}) => [
         styles.cell,
-        selected && styles.cellSelected,
-        pressed && !selected && !outOfRange && styles.cellPressed,
+        stadium && styles.cellStadium,
+        selected &&
+          (stadium ? styles.cellSelectedStadium : styles.cellSelected),
+        pressed &&
+          !selected &&
+          !outOfRange &&
+          (stadium ? styles.cellPressedStadium : styles.cellPressed),
       ]}>
       {weekday !== undefined && (
         <Text
           style={[
             styles.weekday,
-            weekend && styles.weekdayWeekend,
-            selected && styles.weekdaySelected,
+            stadium && styles.weekdayStadium,
+            weekend &&
+              (stadium ? styles.weekdayWeekendStadium : styles.weekdayWeekend),
+            selected &&
+              (stadium
+                ? styles.weekdaySelectedStadium
+                : styles.weekdaySelected),
           ]}
           maxFontSizeMultiplier={1.4}>
           {weekday}
@@ -94,11 +145,15 @@ export function DayCell({
       <Text
         style={[
           styles.number,
+          stadium && styles.numberStadium,
           // Dempingen først, så «i dag» og «valgt» fortsatt vinner over den.
-          outsideMonth && styles.numberOutside,
-          isToday && styles.numberToday,
-          selected && styles.numberSelected,
-          outOfRange && styles.numberOut,
+          outsideMonth &&
+            (stadium ? styles.numberMutedStadium : styles.numberOutside),
+          isToday &&
+            (stadium ? styles.numberAccentStadium : styles.numberToday),
+          selected &&
+            (stadium ? styles.numberAccentStadium : styles.numberSelected),
+          outOfRange && (stadium ? styles.numberOutStadium : styles.numberOut),
         ]}
         maxFontSizeMultiplier={1.6}>
         {day.getDate()}
@@ -112,13 +167,15 @@ export function DayCell({
             key={i}
             style={[
               styles.dot,
-              {backgroundColor: DOT_COLOR[type]},
+              {backgroundColor: dotColor(type)},
               (outOfRange || outsideMonth) && styles.dotOut,
             ]}
           />
         ))}
         {extra > 0 && (
-          <Text style={styles.dotOverflow} allowFontScaling={false}>
+          <Text
+            style={[styles.dotOverflow, stadium && styles.dotOverflowStadium]}
+            allowFontScaling={false}>
             +{extra}
           </Text>
         )}
@@ -147,6 +204,45 @@ const styles = StyleSheet.create({
   },
   cellPressed: {
     backgroundColor: colors.surfaceMuted,
+  },
+  // STADION: frostplate per dag — samme geometri (radius, 1,5 pt kant) som
+  // den valgte, så ingenting flytter seg når valget bytter celle.
+  cellStadium: {
+    backgroundColor: STADIUM_CELL.plate,
+    borderColor: STADIUM_CELL.plateEdge,
+  },
+  cellSelectedStadium: {
+    backgroundColor: colors.heiaSoft,
+    borderColor: STADIUM_CELL.accent,
+  },
+  cellPressedStadium: {
+    backgroundColor: STADIUM_CELL.platePressed,
+  },
+  weekdayStadium: {
+    color: STADIUM_CELL.weekday,
+  },
+  weekdayWeekendStadium: {
+    opacity: STADIUM_CELL.weekendOpacity,
+  },
+  weekdaySelectedStadium: {
+    color: STADIUM_CELL.accent,
+    opacity: 1,
+  },
+  numberStadium: {
+    color: STADIUM_CELL.number,
+  },
+  numberAccentStadium: {
+    color: STADIUM_CELL.accent,
+  },
+  numberMutedStadium: {
+    color: STADIUM_CELL.muted,
+  },
+  numberOutStadium: {
+    color: STADIUM_CELL.muted,
+    opacity: 0.5,
+  },
+  dotOverflowStadium: {
+    color: STADIUM_CELL.dotAnnet,
   },
   weekday: {
     fontSize: 10.5,
