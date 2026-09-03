@@ -21,6 +21,8 @@ import {
   MatchPulseCard,
   NotificationRow,
   SectionHeader,
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
   TeamHeader,
   useBottomContentPadding,
 } from '../components';
@@ -589,32 +591,41 @@ export function InboxScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* MASTHEAD (Brage 2026-09-03): ÉTT lerret bak HELE skjermen —
+          toppstripe, lagets lys, reisen og buene — og laghodet er
+          gjennomsiktig innhold oppå. Av med DAYLIGHT_GROUND_AB = false. */}
+      {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
       <TeamHeader />
-      <FlatList
-        data={blocks}
-        renderItem={renderBlock}
-        keyExtractor={blockKeyExtractor}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmpty}
-        ListFooterComponent={
-          loadingOlder ? (
-            <ActivityIndicator
-              style={styles.footerSpinner}
-              color={colors.heia}
+      {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
+      <View style={styles.body}>
+        <FlatList
+          data={blocks}
+          renderItem={renderBlock}
+          keyExtractor={blockKeyExtractor}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
+          ListFooterComponent={
+            loadingOlder ? (
+              <ActivityIndicator
+                style={styles.footerSpinner}
+                color={colors.heia}
+              />
+            ) : null
+          }
+          onEndReached={loadOlder}
+          onEndReachedThreshold={0.3}
+          contentContainerStyle={{
+            paddingBottom: bottomPad,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.heia}
             />
-          ) : null
-        }
-        onEndReached={loadOlder}
-        onEndReachedThreshold={0.3}
-        contentContainerStyle={{paddingBottom: bottomPad}}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.heia}
-          />
-        }
-      />
+          }
+        />
+      </View>
     </View>
   );
 }
@@ -623,6 +634,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  /** Kroppen under laghodet — grunnen og lista deler denne ramma. */
+  body: {
+    flex: 1,
   },
   // Luften under headeren kommer fra SectionHeaders eget topp-rom («Nå»
   // osv.); tilstander uten seksjoner bruker `standalone` i stedet.

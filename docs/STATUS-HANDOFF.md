@@ -1,6 +1,87 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-03 kveld — KOMMENTARARK FRA HJEM + TASTATURSYSTEM + TAB-BAR RUNDE 5: ALT TELEFONGODKJENT OG COMMITTET; NESTE = DESIGNRETNINGEN SOM ER LAGRET, i NY samtale)
+## ▶️▶️ START HER (oppdatert 2026-09-03 natt — DAGSLYSGRUNN «E-atmosphere» + MASTHEAD-LAGHODE TELEFONGODKJENT OG COMMITTET; NESTE = KALENDER-BLOKKEN + VARSLER-HANDLINGEN + PROFIL-HEADER, i NY samtale)
+
+✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
+native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-03
+(«Nå ser det riktig ut!»). Ca. 12 telefonrunder og én lokal rigg ligger bak.
+
+1. DAGSLYSGRUNNEN (`src/components/DaylightGround.tsx`) — FROSSET:
+   `DAYLIGHT_VERTICAL_VARIANT = 'E-atmosphere'` (E-clean-rampen + ETT
+   diffust stadionlys fra venstre, kalibreringsstyrke 0,3 — Brage ville se
+   ideen først; kan tunes ned). `'E-clean'` er fallback via samme konstant.
+   E-clean = 26 stopp samplet hver 4 % fra en jevn OKLCH-kurve gjennom
+   #143126 → #02FFAB (57 %) → #F3F4EC, skew 60 (6 % venstre først).
+   Ankerne står i filkommentaren. A/D (masterrom) og E/F (runde 1–3)
+   ligger igjen som døde varianter — PRUNE i egen opprydding.
+   Masthead-modus (`<DaylightGround masthead />` på Hjem/Kalender/Varsler):
+   grunnen fyller HELE skjermen (skjermroten, første barn), reisen starter i
+   #0E211A i statuslinja og treffer broen #143126 nøyaktig ved laghodets
+   underkant (`journeyStops` + `bodyTop`-mapping i SpatialGround), lagets
+   IDENTITETSFELT og BUENE tegnes her. Comments bruker `<DaylightGround />`
+   uten masthead (som før). De to store krittsirklene er fjernet;
+   banelinjene og prikken står.
+2. LAGHODET (`src/components/TeamHeader.tsx`) — MASTHEAD, LÅST:
+   GJENNOMSIKTIG innhold (logo, navn, metadata, «Sesongen») i flyten, oppå
+   lerretet. Statuslinja alltid `light-content` (hvite ikoner på #0E211A på
+   ALLE lag). Blekk mot ren lagfarge (`teamSpotlight` i teamColors.ts —
+   erstatter `teamHeaderSurface`): gul/lyseblå/oransje mørkt, resten hvitt,
+   alle 12 palettfarger beholder seg selv. Logoplate som materiale (0,94
+   hvit, kant, skygge), undertekst 0,72, chip alltid `bordered`. Høyde
+   uendret 113 pt (insets.top + 42 + 12 = `mastheadHeight`).
+   IDENTITETSFELTET (`src/shared/masthead.ts`, ren modul): avrundet form
+   åpen mot venstre, radius 24, 4 pt luft over/under raden, høyre ende ved
+   66 % av bredden, full lagfarge til 85 % av feltet, så `darkenSameHue`
+   0,86 mot den runde enden. Hårlinje-kantlys i stadiumText 0,22 med åpne
+   sider (topplinje fader mot høyre, nedre hjørne fader oppover). Lagnavnet
+   klippes ved 55 % (`nameMaxWidth`) — innenfor full lagfarge, så mørkt
+   blekk aldri faller under 4,5:1 (oransje ligger på nøyaktig 4,5).
+   Buene: ÉN familie — sirkelparet (r 100/68, senter 30 pt inn, 10 pt over
+   laghodets underkant) i stadiumText, konstant gjennom laghodet, fadet ut
+   over 12 % av kroppen (`ArcFamily` i DaylightGround). Laghodet tegner ikke
+   egne buer. ProfileHeader er IKKE rørt (fortsatt gammel solid header).
+3. AVVIST UNDERVEIS — IKKE PRØV IGJEN uten ny beslutning: (a) lagfargen som
+   lys/glød/bleed over toppen («sprayflaske»), (b) opak mørkne-først-fade
+   (ga brent kant), (c) rektangel-lapper, (d) scroll-kant-bånd i toppen av
+   kroppen (mørkt bånd i hvile), (e) FLYTENDE laghode m/ slør som innholdet
+   ruller under («Nå ødela du alt!» — Brage vil ha laghodet i flyten og
+   innholdet klippet under det). Brages ord: «kun endre bunnen på header».
+4. VERKTØY: `__tests__/masthead.test.ts` (27) vokter blekk, felt, kontrast
+   og reisen. Lokal rigg (jest → HTML → headless Chrome) ligger som
+   `zz_mastheadRender.test.ts.bak` i sesjonens scratchpad — gjenskap ved
+   behov (oppskrift i memory «visual-render-harness»). Ingen `zz_`-filer i
+   repoet.
+
+VERIFISERT VED LUKKING: full suite (se commit-melding for tall); eslint =
+kun den kjente baseline-feilen (KalenderScreen exhaustive-deps, nå linje
+~185 fordi importen fikk linjer) + kjente warnings; tsc IKKE kjørt (Brages
+regel: typer sjekkes i editoren). Prettier ren på alle berørte filer unntatt
+KalenderScreen, som var uren i HEAD på to steder (importen øverst og
+`ScrollOrigin`-unionen) — de er bevisst latt stå.
+
+▶️ NESTE (anbefaling, i NY samtale), i denne rekkefølgen:
+  A. KALENDER-BLOKKEN: den klebrige `navBlock` (månedsvelger + ukerad +
+     status) er en KREM-flate som nå skjærer gjennom den mørke toppen av
+     kroppen, og innholdet klippes hardt under laghodet på Kalender. Må inn
+     i sekvensen (glass/mørk stadionflate el.l.). Se KalenderScreen
+     `navBlock`-kommentaren: bakgrunnen MÅ være ugjennomsiktig (agendaen
+     ruller bak). Ren visuell skive, telefonrunde.
+  B. VARSLER-HANDLINGEN «Merk alle som lest» (#087A5A) står i den mørke
+     toppen (2,2:1) → glass-chip eller lyst blekk. Samme for tomtekster/
+     seksjonstitler som havner i 15–35 %-sonen (mellomtone der verken mørk
+     eller hvit tekst holder 4,5). Liten skive.
+  C. PROFIL-HEADER: gi ProfileHeader samme masthead-anatomi (universell
+     base + Heia-mørkegrønt identitetsfelt) så fanebytte ikke bytter modell.
+  D. OPPRYDDING: prune A/D/E/F-variantene og `MasterGround` når E-atmosphere
+     står; vurder å tune stadionlyset ned (0,3 → ~0,18); promoter #143126/
+     #0E211A/#02FFAB-ankrene til tokens (teamColors `HEIA_BRIDGE`,
+     `HEADER_BASE` duplikerer colors.stadium — test vokter likheten).
+  E. Spinnere: RefreshControl/ActivityIndicator er neon (#02FFAB) på neon
+     grunn — nesten usynlige under lasting. Bytt til stadiumText/ink.
+Alternativ hvis Brage heller vil framover i produkt: pre-launch-pakken
+S5/S6/S8 (se historikken) eller betaling fase 6.
+
+## (historikk) START HER 2026-09-03 kveld — KOMMENTARARK FRA HJEM + TASTATURSYSTEM + TAB-BAR RUNDE 5: ALT TELEFONGODKJENT OG COMMITTET; NESTE = DESIGNRETNINGEN SOM ER LAGRET, i NY samtale)
 
 ✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
 native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-03:

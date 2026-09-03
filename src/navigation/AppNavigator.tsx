@@ -148,6 +148,17 @@ const stackScreenOptions: NativeStackNavigationOptions = {
   contentStyle: {backgroundColor: colors.background},
 };
 
+/**
+ * Skjermene som har dagslysgrunnen (Hjem, Kalender, Varsler): kortet bak
+ * skjermen males i grunnens dominante mint, ellers blinker krem i kantene
+ * under push/pop (samme grep som EventDetail gjør for kampens grunn).
+ * Følger A/B-bryteren, så «av» er nøyaktig som før.
+ */
+const daylightGroundOptions: NativeStackNavigationOptions | undefined =
+  DAYLIGHT_GROUND_AB
+    ? {contentStyle: {backgroundColor: DAYLIGHT_GROUND_FALLBACK}}
+    : undefined;
+
 // ---------------------------------------------------------------------------
 // «Ny hendelse»-modalen — registrert i alle tre stackene som har EventDetail,
 // slik at «Ny kamp» på en turneringsside virker uansett hvilken fane
@@ -179,18 +190,11 @@ const newEventOptions = ({
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator screenOptions={stackScreenOptions}>
-      {/* Skive 1A: med dagslysgrunnen på Hjem males kortet bak skjermen i
-          grunnens dominante mint, ellers blinker krem i kantene under
-          push/pop (samme grep som EventDetail gjør for kampens grunn).
-          Følger A/B-bryteren, så «av» er nøyaktig som før. */}
+      {/* Skive 1A: dagslysgrunnen — se `daylightGroundOptions`. */}
       <HomeStack.Screen
         name="TeamHome"
         component={TeamHomeScreen}
-        options={
-          DAYLIGHT_GROUND_AB
-            ? {contentStyle: {backgroundColor: DAYLIGHT_GROUND_FALLBACK}}
-            : undefined
-        }
+        options={daylightGroundOptions}
       />
       <HomeStack.Screen name="EventDetail" component={EventDetailScreen} />
       <HomeStack.Screen
@@ -241,7 +245,11 @@ function KampStackNavigator() {
 function KalenderStackNavigator() {
   return (
     <KalenderNav.Navigator screenOptions={stackScreenOptions}>
-      <KalenderNav.Screen name="KalenderList" component={KalenderScreen} />
+      <KalenderNav.Screen
+        name="KalenderList"
+        component={KalenderScreen}
+        options={daylightGroundOptions}
+      />
       <KalenderNav.Screen name="EventDetail" component={EventDetailScreen} />
       <KalenderNav.Screen
         name="NewEvent"
@@ -259,7 +267,11 @@ function KalenderStackNavigator() {
 function InboxStackNavigator() {
   return (
     <InboxNav.Navigator screenOptions={stackScreenOptions}>
-      <InboxNav.Screen name="InboxList" component={InboxScreen} />
+      <InboxNav.Screen
+        name="InboxList"
+        component={InboxScreen}
+        options={daylightGroundOptions}
+      />
       <InboxNav.Screen name="EventDetail" component={EventDetailScreen} />
       <InboxNav.Screen name="Comments" component={CommentsScreen} />
       {/* Klubbdør-varslene åpnes HER, ikke i Profil-fanen: et varsel skal

@@ -32,6 +32,8 @@ import {
   LiveBadge,
   MonthSheet,
   Skeleton,
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
   TeamHeader,
   TournamentDayCard,
   WeekStrip,
@@ -626,143 +628,154 @@ export function KalenderScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* MASTHEAD (Brage 2026-09-03): ÉTT lerret bak HELE skjermen —
+          toppstripe, lagets lys, reisen og buene — og laghodet er
+          gjennomsiktig innhold oppå. Av med DAYLIGHT_GROUND_AB = false. */}
+      {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
       {/* Lagheaderen ligger UTENFOR scrollflaten og er alltid stabil. Ingen
-          kalenderinnhold kan tegnes eller bevege seg over den — det finnes
-          ikke lenger noe absolutt posisjonert lag her. */}
+          kalenderinnhold kan tegnes eller bevege seg over den. */}
       <TeamHeader />
 
-      <ScrollView
-        ref={scrollRef}
-        // RN typer denne som en ikke-nullbar RefObject, mens en ref som
-        // starter på null er nettopp det React gir oss. Peker på ScrollViewens
-        // INNHOLDSBEHOLDER — samme koordinatsystem som `scrollTo`.
-        innerViewRef={innerRef as React.RefObject<View>}
-        stickyHeaderIndices={STICKY_INDICES}
-        // ⚠️ Dette er det som gjør at historikk kan settes inn OVER agendaen
-        // uten at synlig innhold flytter seg: iOS kompenserer contentOffset
-        // med rammeforskyvningen til første synlige barn. Uten den ville
-        // innsettingen vært én bevegelse og landingen en til.
-        maintainVisibleContentPosition={MAINTAIN_POSITION}
-        // Ingen `onScroll`: valgt dato beregnes først når brukeren slipper.
-        onScrollBeginDrag={handleDragBegin}
-        onScrollEndDrag={handleScrollEnd}
-        onMomentumScrollEnd={handleMomentumEnd}
-        contentContainerStyle={{
-          paddingBottom: bottomPad,
-        }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.heia}
-          />
-        }>
-        {/* [0] Overskriften ruller bort som vanlig innhold. */}
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>Kalender</Text>
-          <Text style={styles.subtitle}>Kommende hendelser for laget</Text>
-        </View>
+      {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. Den klebrige
+          navigatoren beholder sin ugjennomsiktige flate (se `navBlock`) —
+          agendaen skal ikke rulle synlig bak den. */}
+      <View style={styles.body}>
+        <ScrollView
+          ref={scrollRef}
+          // RN typer denne som en ikke-nullbar RefObject, mens en ref som
+          // starter på null er nettopp det React gir oss. Peker på ScrollViewens
+          // INNHOLDSBEHOLDER — samme koordinatsystem som `scrollTo`.
+          innerViewRef={innerRef as React.RefObject<View>}
+          stickyHeaderIndices={STICKY_INDICES}
+          // ⚠️ Dette er det som gjør at historikk kan settes inn OVER agendaen
+          // uten at synlig innhold flytter seg: iOS kompenserer contentOffset
+          // med rammeforskyvningen til første synlige barn. Uten den ville
+          // innsettingen vært én bevegelse og landingen en til.
+          maintainVisibleContentPosition={MAINTAIN_POSITION}
+          // Ingen `onScroll`: valgt dato beregnes først når brukeren slipper.
+          onScrollBeginDrag={handleDragBegin}
+          onScrollEndDrag={handleScrollEnd}
+          onMomentumScrollEnd={handleMomentumEnd}
+          contentContainerStyle={{
+            paddingBottom: bottomPad,
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.heia}
+            />
+          }>
+          {/* [0] Overskriften ruller bort som vanlig innhold. */}
+          <View style={styles.titleBlock}>
+            <Text style={styles.title}>Kalender</Text>
+            <Text style={styles.subtitle}>Kommende hendelser for laget</Text>
+          </View>
 
-        {/* [1] STICKY. ⚠️ Må være en host-`View` med bakgrunnen på seg:
+          {/* [1] STICKY. ⚠️ Må være en host-`View` med bakgrunnen på seg:
             RN flytter barnets `style` over på sin egen wrapper, så en
             komponent her ville gitt en gjennomsiktig bar med agendaen
             rullende bak. Høyden er konstant — ukeraden er alltid der, og
             tomtilstanden ligger utenfor. */}
-        <View
-          style={styles.navBlock}
-          // RN kaller denne med SIN EGEN wrappers mål — derfor får vi både
-          // høyden og festeterskelen fra samme hendelse.
-          onLayout={e => {
-            navHeight.current = e.nativeEvent.layout.height;
-            navTop.current = e.nativeEvent.layout.y;
-          }}>
-          <CalendarNav
-            month={addDays(startOfWeek(weekAnchor), 3)}
-            onToday={goToToday}
-            onOpenMonth={() => setMonthOpen(true)}
-            atToday={selectedKey === dayKey(today)}
-            // P4/skive 10: den PERMANENTE opprettelsen. `newEvent` sender
-            // `presetDate: selectedKey`, altså dagen brukeren faktisk står
-            // på — samme oppførsel som tomtilstandens knapp.
-            onNewEvent={canCreate ? newEvent : undefined}
-          />
-          {showSkeleton ? (
-            <View style={styles.stripSkeleton}>
-              <Skeleton height={58} style={styles.stripBone} />
-            </View>
-          ) : (
-            <WeekStrip
-              anchor={weekAnchor}
-              onChangeAnchor={setWeekAnchor}
-              selected={selected}
-              today={today}
-              onSelect={pickFromWeek}
-              busy={busy}
-              describeDay={describeDay}
+          <View
+            style={styles.navBlock}
+            // RN kaller denne med SIN EGEN wrappers mål — derfor får vi både
+            // høyden og festeterskelen fra samme hendelse.
+            onLayout={e => {
+              navHeight.current = e.nativeEvent.layout.height;
+              navTop.current = e.nativeEvent.layout.y;
+            }}>
+            <CalendarNav
+              month={addDays(startOfWeek(weekAnchor), 3)}
+              onToday={goToToday}
+              onOpenMonth={() => setMonthOpen(true)}
+              atToday={selectedKey === dayKey(today)}
+              // P4/skive 10: den PERMANENTE opprettelsen. `newEvent` sender
+              // `presetDate: selectedKey`, altså dagen brukeren faktisk står
+              // på — samme oppførsel som tomtilstandens knapp.
+              onNewEvent={canCreate ? newEvent : undefined}
             />
-          )}
+            {showSkeleton ? (
+              <View style={styles.stripSkeleton}>
+                <Skeleton height={58} style={styles.stripBone} />
+              </View>
+            ) : (
+              <WeekStrip
+                anchor={weekAnchor}
+                onChangeAnchor={setWeekAnchor}
+                selected={selected}
+                today={today}
+                onSelect={pickFromWeek}
+                busy={busy}
+                describeDay={describeDay}
+              />
+            )}
 
-          {/* ⚠️ FORHÅNDSRESERVERT HØYDE, alltid montert. Raden er tom det
+            {/* ⚠️ FORHÅNDSRESERVERT HØYDE, alltid montert. Raden er tom det
               meste av tiden og leses da som luft under ukeraden. Poenget er
               at navigatorens høyde ALDRI endrer seg: kom og gikk denne
               linja, ville festeterskelen, alle målte posisjoner og
               scrollposisjonen flyttet seg — nøyaktig det hoppet vi har
               brukt tre runder på å bli kvitt. */}
-          <View style={styles.statusRow}>
-            {emptyNotice !== null && (
-              <Text style={styles.statusText} numberOfLines={1}>
-                Ingen hendelser {longDayLabel(emptyNotice, today).toLowerCase()}
-              </Text>
-            )}
+            <View style={styles.statusRow}>
+              {emptyNotice !== null && (
+                <Text style={styles.statusText} numberOfLines={1}>
+                  Ingen hendelser{' '}
+                  {longDayLabel(emptyNotice, today).toLowerCase()}
+                </Text>
+              )}
+            </View>
           </View>
-        </View>
 
-        {/* [2] ETT fragment med alt annet. Et fragment teller som ett barn i
+          {/* [2] ETT fragment med alt annet. Et fragment teller som ett barn i
             `Children.toArray`, så indeksen over står stille uansett hva som
             vises her. Et array ville blitt flatet ut. */}
-        <>
-          {error !== null && allRows.length > 0 && (
-            <Pressable
-              onPress={onRefresh}
-              accessibilityRole="button"
-              accessibilityLabel={`${error} Trykk for å prøve igjen.`}
-              style={styles.errorStrip}>
-              <Text style={styles.errorText}>
-                {error} Det du ser er sist hentet. Trykk for å prøve igjen.
-              </Text>
-            </Pressable>
-          )}
+          <>
+            {error !== null && allRows.length > 0 && (
+              <Pressable
+                onPress={onRefresh}
+                accessibilityRole="button"
+                accessibilityLabel={`${error} Trykk for å prøve igjen.`}
+                style={styles.errorStrip}>
+                <Text style={styles.errorText}>
+                  {error} Det du ser er sist hentet. Trykk for å prøve igjen.
+                </Text>
+              </Pressable>
+            )}
 
-          {showSkeleton ? (
-            <AgendaSkeleton />
-          ) : isEmpty ? (
-            <EmptyCalendar canCreate={canCreate} onCreate={newEvent} />
-          ) : failedCold ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Fikk ikke tak i kalenderen</Text>
-              <Text style={styles.emptyText}>Dra ned for å prøve igjen.</Text>
-            </View>
-          ) : sections.length === 0 ? (
-            /* Ingenting den siste måneden, og ingenting som kommer. Eldre
+            {showSkeleton ? (
+              <AgendaSkeleton />
+            ) : isEmpty ? (
+              <EmptyCalendar canCreate={canCreate} onCreate={newEvent} />
+            ) : failedCold ? (
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>
+                  Fikk ikke tak i kalenderen
+                </Text>
+                <Text style={styles.emptyText}>Dra ned for å prøve igjen.</Text>
+              </View>
+            ) : sections.length === 0 ? (
+              /* Ingenting den siste måneden, og ingenting som kommer. Eldre
                historikk finnes kanskje — den ligger bak månedsvelgeren. */
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>Ingenting på gang</Text>
-              <Text style={styles.emptyText}>
-                Verken den siste måneden eller i tiden framover. Åpne måneden
-                for å se lenger tilbake.
-              </Text>
-            </View>
-          ) : (
-            <Agenda
-              sections={sections}
-              today={today}
-              registerSection={registerSection}
-              onMeasureSection={measureSection}
-              onOpenEvent={openEvent}
-            />
-          )}
-        </>
-      </ScrollView>
+              <View style={styles.emptyCard}>
+                <Text style={styles.emptyTitle}>Ingenting på gang</Text>
+                <Text style={styles.emptyText}>
+                  Verken den siste måneden eller i tiden framover. Åpne måneden
+                  for å se lenger tilbake.
+                </Text>
+              </View>
+            ) : (
+              <Agenda
+                sections={sections}
+                today={today}
+                registerSection={registerSection}
+                onMeasureSection={measureSection}
+                onOpenEvent={openEvent}
+              />
+            )}
+          </>
+        </ScrollView>
+      </View>
 
       {/* Månedsvisningen ligger UTENFOR scrollflaten. Den kan verken endre
           agendaens høyde eller posisjon — å åpne og lukke den er garantert
@@ -914,6 +927,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  /** Kroppen under laghodet — grunnen og scrollflaten deler denne ramma. */
+  body: {
+    flex: 1,
   },
   titleBlock: {
     paddingHorizontal: spacing.lg,

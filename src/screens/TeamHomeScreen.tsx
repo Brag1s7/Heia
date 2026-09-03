@@ -865,57 +865,59 @@ export function TeamHomeScreen() {
         FlatList (B2): kun det synlige vinduet av feeden er montert, og
         onEndReached henter neste side via cursoren. */}
       <View style={styles.screen}>
-        {/* SKIVE 1A — DAGSLYSGRUNNEN (Brage 2026-09-02): statisk bakgrunnstest,
-          KUN på Hjem. Absolutt lag bak laghodet og lista; lista er
-          gjennomsiktig, laghodet dekker sin del. Slås av med
-          DAYLIGHT_GROUND_AB = false, og da er skjermen nøyaktig som før
-          (styles.screen står urørt på colors.background under den). */}
-        {DAYLIGHT_GROUND_AB && <DaylightGround />}
         {/* ⚠️ KILDEBEVARENDE (Brage 2026-08-21): snarveien er en HJEM-inngang
           til den samme `SeasonScreen` som Kamp-fanen har som rot. Du kom fra
           Hjem, Hjem forblir valgt, og «tilbake» fører til Hjem. Et fanebytte
           her ville vært en tilbakeknapp som teleporterer — nettopp det
           modellen forbyr. */}
+        {/* MASTHEAD (Brage 2026-09-03): ÉTT lerret bak HELE skjermen —
+            toppstripe, lagets lys, reisen og buene — og laghodet er
+            gjennomsiktig innhold oppå. Kroppens reise starter ved laghodets
+            underkant (mastheadHeight). Av med DAYLIGHT_GROUND_AB = false. */}
+        {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
         <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
-        <FlatList
-          data={feed}
-          renderItem={renderFeedItem}
-          keyExtractor={feedKeyExtractor}
-          ListHeaderComponent={listHeader}
-          ListEmptyComponent={listEmpty}
-          ListFooterComponent={
-            isFetchingNextPage ? (
-              <ActivityIndicator
-                style={styles.feedFooter}
-                color={colors.heia}
+        {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
+        <View style={styles.body}>
+          <FlatList
+            data={feed}
+            renderItem={renderFeedItem}
+            keyExtractor={feedKeyExtractor}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={listEmpty}
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <ActivityIndicator
+                  style={styles.feedFooter}
+                  color={colors.heia}
+                />
+              ) : null
+            }
+            onEndReached={handleEndReached}
+            onEndReachedThreshold={0.5}
+            // Ingen horisontal padding her — karusellen i headeren er full
+            // bredde; radene har sin egen (cardWrap).
+            contentContainerStyle={{
+              paddingBottom: bottomPad,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.heia}
               />
-            ) : null
-          }
-          onEndReached={handleEndReached}
-          onEndReachedThreshold={0.5}
-          // Ingen horisontal padding her — karusellen i headeren er full
-          // bredde; radene har sin egen (cardWrap).
-          contentContainerStyle={{
-            paddingBottom: bottomPad,
-          }}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.heia}
-            />
-          }
-          initialNumToRender={6}
-          maxToRenderPerBatch={6}
-          windowSize={7}
-          // TASTATURET (keyboard.tsx): lista er ENESTE eier. Komponisten
-          // ligger inni lista, så RN sin innebygde inset (vindusbasert,
-          // ruller det fokuserte feltet fram) gjør jobben på iOS; Android
-          // krymper vinduet (adjustResize). Publiser-knappen beholder
-          // første trykk, drag skjuler tastaturet interaktivt.
-          automaticallyAdjustKeyboardInsets
-          {...WRITING_SCROLL_PROPS}
-        />
+            }
+            initialNumToRender={6}
+            maxToRenderPerBatch={6}
+            windowSize={7}
+            // TASTATURET (keyboard.tsx): lista er ENESTE eier. Komponisten
+            // ligger inni lista, så RN sin innebygde inset (vindusbasert,
+            // ruller det fokuserte feltet fram) gjør jobben på iOS; Android
+            // krymper vinduet (adjustResize). Publiser-knappen beholder
+            // første trykk, drag skjuler tastaturet interaktivt.
+            automaticallyAdjustKeyboardInsets
+            {...WRITING_SCROLL_PROPS}
+          />
+        </View>
       </View>
 
       {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
@@ -942,6 +944,10 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  /** Kroppen under laghodet — grunnen og scrollflaten deler denne ramma. */
+  body: {
+    flex: 1,
   },
   section: {
     paddingHorizontal: spacing.lg,

@@ -39,3 +39,18 @@ export const ARC_OPACITY_INNER = 0.11;
  * uten scrolling) står urørt.
  */
 export const HEADER_CONTENT_HEIGHT = 42;
+
+// ---------------------------------------------------------------------------
+// MASTHEAD (Brage 2026-09-03, LÅST): laghodet er gjennomsiktig innhold oppå
+// ÉTT lerret (DaylightGround i masthead-modus) som spenner fra statuslinja
+// til bunnen. Lagfargen er LYS i toppen — se shared/masthead.ts. Buene er
+// én familie: konstant gjennom laghodet, fadet ut i kroppen.
+// ---------------------------------------------------------------------------
+
+/** Luften under innholdsraden. Laghodets høyde = insets.top + 42 + 12 =
+ *  113 pt på iPhone m/ Dynamic Island — nøyaktig `mastheadHeight`. */
+export const HEADER_FOOT_HEIGHT = 12;
+
+/** Buene fades ut over denne andelen av kroppshøyden under laghodet
+ *  (≈ 89 pt på 739 pt — der den ytre buen uansett slutter). */
+export const ARC_CONTINUATION_FRACTION = 0.12;

@@ -33,25 +33,16 @@ const INK_LIGHT = '#FFFFFF';
 const MIN_CONTRAST = 4.5;
 
 /**
- * Headerens gradient går fra lagets identitet til Heias finish:
- * venstre = lagets faktiske farge, midten = samme familie litt dypere,
- * høyre = tydelig mørkere med et lett drag mot Heias grønn/teal.
- *
- * Teal-ankeret er den lyse enden av stadiongradienten (#143126), IKKE minten
- * (#02FFAB) — minten er handlingsfarge og ville gjort høyresiden flashy.
- * Blandingen er lav nok til at det leses som en mørk, rolig tone, ikke som
- * «grønn».
+ * Heias universelle BRO-TEAL — den lyse enden av stadiongradienten
+ * (StadiumSurface/BootScreen: #0B1912 → #143126). Lagheaderens fot lander i
+ * den, og DaylightGround starter i nøyaktig samme verdi, så alle lagfarger
+ * møter bakgrunnen i én og samme tone. Grunnen arver aldri lagfargen.
  */
-const MID_DARKEN = 0.18;
-const EDGE_DARKEN = 0.32;
-const EDGE_TEAL = '#143126';
-const EDGE_TEAL_MIX = 0.22;
-/**
- * Hvor langt mot høyre teksten realistisk kan rekke før «Sesongen»-chipen
- * (som har sin egen mørke flate). Kontrasten måles der, ikke helt ute i
- * høyre kant der ingen bokstaver står.
- */
-const TEXT_REACH = 0.22;
+export const HEIA_BRIDGE = '#143126';
+/** Headerens universelle base = colors.stadium. Duplisert her (ikke importert
+ *  fra theme) fordi shared/ ikke skal trekke inn theme — samme regel som
+ *  inkOnTeamColor. Vaktes av en test mot tokenet. */
+export const HEADER_BASE = '#0E211A';
 
 type Rgb = [number, number, number];
 
@@ -101,95 +92,70 @@ function mix(a: Rgb, b: Rgb, t: number): Rgb {
   ];
 }
 
-/**
- * Lagfarget toppflate som en horisontal gradient i tre trinn, med garantert
- * lesbar tekst.
- *
- * Laget eier venstresiden — der står den FAKTISKE valgte fargen, ren og uten
- * innblanding, og det er der logo og lagnavn ligger. Midten er samme
- * fargefamilie litt dypere. Høyre kant er tydelig mørkere med et lett drag mot
- * Heias grønn/teal, så finishen kjennes som Heia uten å bli en grønn flate.
- *
- * Holder ikke fargen 4.5:1 mot verken hvit eller mørk tekst (typiske
- * mellomtoner som lyseblå og oransje), skyves valøren trinnvis til den gjør
- * det. Fargetonen beholdes, så laget kjenner seg igjen.
- *
- * Kontrasten måles i flatens verste punkt DER DET FAKTISK STÅR TEKST: for en
- * flate med mørk tekst er det så langt mot høyre navnet kan rekke (TEXT_REACH),
- * ikke ytterkanten bak «Sesongen»-chipen.
- *
- * Dekker begge ytterpunktene uten hardkodede unntak: nesten-sort ligger med
- * hvit tekst, knallgult beholder mørk tekst.
- */
-export function teamHeaderSurface(hex: string): {
-  /** Venstre kant — lagets faktiske farge (evt. kontrastjustert). */
+/** Samme hue, litt mørkere: hver kanal skalert. Identitetsfeltets runde ende. */
+export function darkenSameHue(hex: string, factor: number): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return hex;
+  return toHex(rgb.map(v => v * factor) as Rgb);
+}
+
+export interface TeamSpotlight {
+  /** Den stabile lagfargen bak identitetsblokken (evt. kontrastjustert). */
   surface: string;
-  /** Midtstopp — samme familie, litt dypere. */
-  surfaceMid: string;
-  /** Høyre kant — mørkere, med et lett hint av Heias teal. */
-  surfaceEdge: string;
-  /** Tekst-/ikonfargen som skal brukes oppå flaten. */
+  /** Tekst-/ikonfargen oppå den stabile lagfargen. */
   ink: string;
-  /** Er flaten lys? Styrer statuslinje og kant på logoplate/«Sesongen». */
+  /** Er flaten lys (mørkt blekk)? Styrer logoplatens ring — IKKE statuslinja,
+   *  som alltid er lys på den universelle mørke basen. */
   light: boolean;
-} {
+  /** Hvor mange 6 %-trinn fargen måtte flyttes for å bære blekket. */
+  steps: number;
+  /** Målt kontrast blekk mot stabil flate. */
+  ratio: number;
+}
+
+/**
+ * MASTHEAD-MODELLEN: teksten står i lysets KJERNE, altså på (nesten) ren
+ * lagfarge, så kontrasten måles mot ren farge — ikke, som før, et stykke
+ * inn i en gradient. Det gjør at lyseblå og oransje slipper å mørknes for å bære
+ * hvitt: de får mørkt blekk på sin faktiske farge, som gul alltid har hatt.
+ *
+ * Holder fargen ikke 4,5:1 mot verken hvit eller mørk tekst, skyves valøren
+ * trinnvis (mot hvitt for mørkt blekk, mot sort for hvitt) til den gjør det,
+ * og blekket som krever minst avvik vinner. Uavgjort → hvit.
+ */
+export function teamSpotlight(hex: string): TeamSpotlight {
   const rgb = parseHex(hex);
   if (!rgb) {
-    return {
-      surface: hex,
-      surfaceMid: hex,
-      surfaceEdge: hex,
-      ink: INK_LIGHT,
-      light: false,
-    };
+    return {surface: hex, ink: INK_LIGHT, light: false, steps: 0, ratio: 0};
   }
-
   const darkInk = parseHex(INK_DARK) as Rgb;
   const lightInk = parseHex(INK_LIGHT) as Rgb;
-  const teal = parseHex(EDGE_TEAL) as Rgb;
 
-  const mid = (s: Rgb): Rgb => s.map(v => v * (1 - MID_DARKEN)) as Rgb;
-  const edge = (s: Rgb): Rgb =>
-    mix(s.map(v => v * (1 - EDGE_DARKEN)) as Rgb, teal, EDGE_TEAL_MIX);
-
-  /**
-   * Hvor langt fargen må flyttes for at ÉN av tekstfargene skal klare AA.
-   * Mørk tekst: flaten blir mørkere mot høyre, så tekstens ytterste punkt er
-   * svakest, og fargen må lysnes. Hvit tekst: venstre kant er svakest, og
-   * fargen må mørknes.
-   */
   const solve = (useDarkInk: boolean) => {
     const ink = useDarkInk ? darkInk : lightInk;
-    const worst = (s: Rgb) => (useDarkInk ? mix(mid(s), edge(s), TEXT_REACH) : s);
     let s = rgb;
     let steps = 0;
-    // 14 × 6 % rekker fra hvilken som helst startfarge til nær sort/hvit.
-    while (steps < 14 && contrast(worst(s), ink) < MIN_CONTRAST) {
+    while (steps < 14 && contrast(s, ink) < MIN_CONTRAST) {
       s = useDarkInk
-        ? (s.map(v => v + (255 - v) * 0.06) as Rgb) // mot hvitt
-        : (s.map(v => v * 0.94) as Rgb); // mot sort
+        ? (s.map(v => v + (255 - v) * 0.06) as Rgb)
+        : (s.map(v => v * 0.94) as Rgb);
       steps++;
     }
-    return {surface: s, steps, ok: contrast(worst(s), ink) >= MIN_CONTRAST};
+    const ratio = contrast(s, ink);
+    return {surface: s, steps, ok: ratio >= MIN_CONTRAST, ratio};
   };
 
-  // Velg tekstfargen som krever MINST avvik fra lagets faktiske farge —
-  // ikke bare den som vinner på råfargen. Uten dette ble mellomtoner som
-  // oransje og lyseblå lysnet til blasse pasteller for å redde mørk tekst,
-  // og venstresiden sluttet å ligne lagets valgte farge. Uavgjort → hvit
-  // tekst, som passer gradientens retning mot mørkere høyre.
   const withLight = solve(false);
   const withDark = solve(true);
   const useDarkInk =
     withDark.ok && (!withLight.ok || withDark.steps < withLight.steps);
-  const surface = useDarkInk ? withDark.surface : withLight.surface;
-
+  const chosen = useDarkInk ? withDark : withLight;
   return {
-    surface: toHex(surface),
-    surfaceMid: toHex(mid(surface)),
-    surfaceEdge: toHex(edge(surface)),
+    surface: toHex(chosen.surface),
     ink: useDarkInk ? INK_DARK : INK_LIGHT,
     light: useDarkInk,
+    steps: chosen.steps,
+    ratio: chosen.ratio,
   };
 }
 
