@@ -32,10 +32,19 @@ export type TabBarEnvironment = 'light' | 'match';
 /**
  * DIFFUSJONSFELTET (Brage 2026-09-03, referansen tab-bar-ambient-blur.png):
  * et mykt, maskert felt UTENFOR og BAK kapselen — hele skjermbredden, fra
- * litt over kapselens overkant ned til skjermbunnen (safe area inkl.) —
- * som fader helt transparent oppover og forankrer kapselen til skjermens
- * nederste område. Lagrekkefølge: feed → dette feltet → glasskapselen →
- * fanene. pointerEvents none — rører aldri trykk eller scroll.
+ * kapselens overkant ned til skjermbunnen (safe area inkl.) — som forankrer
+ * kapselen til skjermens nederste område. Lagrekkefølge: feed → dette
+ * feltet → glasskapselen → fanene. pointerEvents none — rører aldri trykk
+ * eller scroll.
+ *
+ * ⚠️ INGEN SYNLIG KANT (Brage 2026-09-03, runde 4 og 5): uklarheten skal
+ * ligge UNDER og MELLOM, og alt over kapselen skal oppleves klart — men
+ * det skal være UMULIG å peke på hvor feltet begynner. Runde 4 (hard kant
+ * på overkanten + klippeboks rundt hazen) ga en synlig rektangelkant og
+ * ble avvist. Derfor: masken begynner 40 pt over kapselen på 0, er nesten
+ * usynlig ved kapseltoppen (0,04), bygger seg først i kapselens nedre
+ * halvdel og er sterkest mellom kapselen og skjermbunnen. Ingen klipping —
+ * hazen (boxShadow) tones ut av seg selv.
  *
  * ⚠️ DETTE ER JS-FALLBACKEN (ingen ekte blur): en vertikal frost-gradient
  * i perle (lyst) / arenatone (kamp). Innholdet under blir dempet og
@@ -47,26 +56,28 @@ export type TabBarEnvironment = 'light' | 'match';
  * hvit, grå eller opak stripe — grunnens farger og former skal synes.
  */
 export const DIFFUSION = {
-  /** Hvor langt feltet starter OVER barcontainerens overkant (fade-inn). */
-  bleedAbove: 28,
+  /** Hvor langt OVER kapseltoppen masken begynner (på 0, helt transparent). */
+  bleedAbove: 40,
   light: {
     color: '#F0F6F3',
-    /** [over kapselen, kapseltopp, kapselbunn, skjermbunn] */
-    stops: [0, 0.16, 0.34, 0.42],
+    /** [40 pt over, kapseltopp, kapselmidt, kapselbunn, skjermbunn] */
+    stops: [0, 0.04, 0.12, 0.3, 0.42],
   },
   match: {
     color: '#143024',
-    stops: [0, 0.22, 0.46, 0.56],
+    stops: [0, 0.06, 0.16, 0.4, 0.56],
   },
 } as const;
 
 /** Stoppene som brøk av feltets høyde (container-høyde + bleed). */
 export function diffusionOffsets(containerHeight: number): number[] {
   const total = containerHeight + DIFFUSION.bleedAbove;
+  const b = DIFFUSION.bleedAbove;
   return [
     0,
-    DIFFUSION.bleedAbove / total,
-    (DIFFUSION.bleedAbove + CAPSULE.height) / total,
+    b / total,
+    (b + CAPSULE.height / 2) / total,
+    (b + CAPSULE.height) / total,
     1,
   ];
 }
@@ -186,6 +197,7 @@ export function TabBarGlass({environment, containerHeight}: TabBarGlassProps) {
 const styles = StyleSheet.create({
   // Hele bredden, fra `bleedAbove` over containeren til skjermbunnen.
   // Containeren (bibliotekets bar) klipper ikke — verifisert i BottomTabBar.
+  // ⚠️ Aldri overflow: hidden rundt kapselen — en klippekant er en kant.
   diffusion: {
     position: 'absolute',
     left: 0,

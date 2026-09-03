@@ -182,7 +182,12 @@ const allTexts = (root: ReactTestRenderer.ReactTestRenderer) =>
 
 type A11y = {rt?: boolean; ic?: boolean};
 
-async function render(item: FeedItem, a11y: A11y = {}, onPress?: () => void) {
+async function render(
+  item: FeedItem,
+  a11y: A11y = {},
+  onPress?: () => void,
+  onOpenMatch?: () => void,
+) {
   // RN-mockens gettere er delte jest.fn — Once, så neste test er uberørt.
   // Kun når bryteren skal PÅ: et festet kort monterer ikke hooken, og en
   // Once(false) i kø der ville blitt lest av NESTE test i stedet.
@@ -205,6 +210,7 @@ async function render(item: FeedItem, a11y: A11y = {}, onPress?: () => void) {
         onComment={() => {}}
         onMore={() => {}}
         onPress={onPress}
+        onOpenMatch={onOpenMatch}
       />,
     );
   });
@@ -354,7 +360,7 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
 
   it('kampkortet: StadiumGlass compact (mørkt), FRA KAMPEN i neon, kapsel i ramme, puls, lyse reaksjonslag, Se kampen ›', async () => {
     const onPress = jest.fn();
-    const root = await render(kampMaal, {}, onPress);
+    const root = await render(kampMaal, {}, onPress, jest.fn());
     // Materialet: kompakt stadionglass — ikke opal, ikke lyst glass.
     expect(root.root.findAllByType(OpalSurface)).toHaveLength(0);
     const glass = root.root.findAllByType(StadiumGlass);
@@ -364,7 +370,8 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     expect(flat(glass[0].props.style).padding).toBe(spacing.xl);
     const views = root.root.findAllByType('View' as never);
     expect(views[0].props.accessibilityRole).toBe('button');
-    expect(views[0].props.accessibilityLabel).toBe('Åpne kampen');
+    // Flaten åpner SAMTALEN (2026-09-03); kampen ligger bak «Se kampen ›».
+    expect(views[0].props.accessibilityLabel).toBe('Åpne kommentarer');
 
     const texts = allTexts(root);
     expect(texts).toContain('FRA KAMPEN');
@@ -591,6 +598,134 @@ describe('Reduce Transparency og Increase Contrast', () => {
       .findAllByType(Stop)
       .find(s => s.props.stopOpacity === OPAL.sheen / 2);
     expect(sheen).toBeDefined();
+    root.unmount();
+  });
+});
+
+/**
+ * KAMPKORTET I FEEDEN: samtale på flaten, kampen bak «Se kampen ›»
+ * (Brage 2026-09-03). Feedinnlegg åpner kommentarene — også automatiske
+ * kampinnlegg — mens den eksplisitte kampkontrollen er den ENESTE veien til
+ * kampen. Inne i kommentararket (`variant="thread"`) finnes ingen Kommenter,
+ * kortet er ikke trykkbart, og HEIA + «Se kampen ›» virker fortsatt.
+ */
+describe('kampkortet: flaten = kommentarer, «Se kampen ›» = kampen', () => {
+  async function mount(props: Partial<React.ComponentProps<typeof FeedCard>>) {
+    let root!: ReactTestRenderer.ReactTestRenderer;
+    await act(async () => {
+      root = ReactTestRenderer.create(<FeedCard item={kampMaal} {...props} />);
+    });
+    await act(async () => {});
+    return root;
+  }
+  const pressable = (
+    root: ReactTestRenderer.ReactTestRenderer,
+    label: string,
+  ) =>
+    // Ytterste node med label + onPress = Pressable-elementet (memo-
+    // wrapperen og den indre funksjonen deler props; deep:false gir én).
+    root.root.findAll(
+      n =>
+        n.props?.accessibilityLabel === label &&
+        typeof n.props?.onPress === 'function',
+      {deep: false},
+    );
+
+  it('1. kortflaten åpner kommentarer', async () => {
+    const onPress = jest.fn();
+    const onOpenMatch = jest.fn();
+    const root = await mount({onPress, onOpenMatch, onComment: jest.fn()});
+    const card = pressable(root, 'Åpne kommentarer');
+    expect(card).toHaveLength(1);
+    act(() => card[0].props.onPress());
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onOpenMatch).not.toHaveBeenCalled();
+    expect(pressable(root, 'Åpne kampen')).toHaveLength(0);
+    root.unmount();
+  });
+
+  it('2. «Kommenter» åpner kommentarer', async () => {
+    const onComment = jest.fn();
+    const onOpenMatch = jest.fn();
+    const root = await mount({onPress: jest.fn(), onComment, onOpenMatch});
+    const pill = pressable(root, 'Kommenter');
+    expect(pill).toHaveLength(1);
+    act(() => pill[0].props.onPress());
+    expect(onComment).toHaveBeenCalledTimes(1);
+    expect(onOpenMatch).not.toHaveBeenCalled();
+    root.unmount();
+  });
+
+  it('3. «Se kampen» åpner BARE kampen — egen Pressable med ≥ 44 pt flate', async () => {
+    const onPress = jest.fn();
+    const onComment = jest.fn();
+    const onOpenMatch = jest.fn();
+    const root = await mount({onPress, onComment, onOpenMatch});
+    const link = pressable(root, 'Se kampen');
+    expect(link).toHaveLength(1);
+    act(() => link[0].props.onPress());
+    expect(onOpenMatch).toHaveBeenCalledTimes(1);
+    expect(onPress).not.toHaveBeenCalled();
+    expect(onComment).not.toHaveBeenCalled();
+    // Trykkflaten: minst 44 × 44 (boks + hitSlop), raden vokser ikke.
+    const box = flat(link[0].props.style({pressed: false}));
+    const slop = link[0].props.hitSlop;
+    expect(
+      (box.minWidth as number) + slop.left + slop.right,
+    ).toBeGreaterThanOrEqual(44);
+    expect(
+      (box.minHeight as number) + slop.top + slop.bottom,
+    ).toBeGreaterThanOrEqual(44);
+    expect(allTexts(root)).toContain('Se kampen ›');
+    // Uten onOpenMatch finnes lenken ikke — ingen død tekst.
+    const bare = await mount({onPress: jest.fn(), onComment: jest.fn()});
+    expect(allTexts(bare)).not.toContain('Se kampen ›');
+    bare.unmount();
+    root.unmount();
+  });
+
+  it('4. trådvarianten rendrer ingen «Kommenter»', async () => {
+    const root = await mount({
+      variant: 'thread',
+      onHeia: jest.fn(),
+      onMore: jest.fn(),
+      onOpenMatch: jest.fn(),
+    });
+    expect(pressable(root, 'Kommenter')).toHaveLength(0);
+    expect(allTexts(root)).not.toContain('Kommenter');
+    // Konteksten er der: forfatter, FRA KAMPEN, hendelsen, ⋯.
+    for (const t of ['Jarle Wik', 'FRA KAMPEN', 'MÅL! 2–1', 'Mål · 41′'])
+      expect(allTexts(root)).toContain(t);
+    expect(pressable(root, 'Flere valg')).toHaveLength(1);
+    root.unmount();
+  });
+
+  it('5. originalkortet inne i arket er ikke trykkbart', async () => {
+    const root = await mount({
+      variant: 'thread',
+      onHeia: jest.fn(),
+      onOpenMatch: jest.fn(),
+    });
+    expect(pressable(root, 'Åpne kommentarer')).toHaveLength(0);
+    expect(pressable(root, 'Åpne kampen')).toHaveLength(0);
+    const views = root.root.findAllByType('View' as never);
+    expect(views[0].props.accessibilityRole).toBeUndefined();
+    expect(views[0].props.onClick).toBeUndefined();
+    root.unmount();
+  });
+
+  it('6. HEIA og «Se kampen» fungerer fortsatt inne i arket', async () => {
+    const onHeia = jest.fn();
+    const onOpenMatch = jest.fn();
+    const root = await mount({variant: 'thread', onHeia, onOpenMatch});
+    const heia = pressable(root, 'Heia');
+    expect(heia).toHaveLength(1);
+    act(() => heia[0].props.onPress());
+    expect(onHeia).toHaveBeenCalledTimes(1);
+    const link = pressable(root, 'Se kampen');
+    expect(link).toHaveLength(1);
+    act(() => link[0].props.onPress());
+    expect(onOpenMatch).toHaveBeenCalledTimes(1);
     root.unmount();
   });
 });

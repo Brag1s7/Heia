@@ -10,6 +10,7 @@ import {
   StyleSheet,
   TextInput,
   Alert,
+  Keyboard,
   type AlertButton,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
@@ -37,6 +38,8 @@ import {
 } from '../components';
 import {LiquidGlassSurface, OPAL} from '../components';
 import {Camera, Check} from '../components/icons';
+import {CommentSheet} from '../components/match/CommentSheet';
+import {WRITING_SCROLL_PROPS} from '../components/keyboard';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {isSystemMatchPost} from '../shared/matchEngagement';
@@ -210,10 +213,11 @@ const FeedRow = React.memo(function FeedRow({
     <View style={styles.cardWrap}>
       <FeedCard
         item={item}
-        // Kortet er trykkbart (glassresponsen lover en side): kampposter
-        // åpner kampen, alle andre åpner kommentartråden — samme mål som
-        // «Kommenter»-pillen, så forventningen innfris.
-        onPress={matchId ? () => onOpenMatch(matchId) : () => onComment(item)}
+        // Kortet åpner SAMTALEN — også kampkortet (Brage 2026-09-03):
+        // feedinnlegg åpner kommentarene, den eksplisitte «Se kampen ›»-
+        // kontrollen åpner kampen. Samme mål som Kommenter-pillen.
+        onPress={() => onComment(item)}
+        onOpenMatch={matchId ? () => onOpenMatch(matchId) : undefined}
         onExpandImage={item.media ? () => onExpandImage(item) : undefined}
         onHeia={() => onHeia(item)}
         onComment={() => onComment(item)}
@@ -308,6 +312,13 @@ export function TeamHomeScreen() {
   );
   const [posting, setPosting] = useState(false);
   const [fullscreenItem, setFullscreenItem] = useState<FeedItem | null>(null);
+  // Kommentararket fra Hjem (2026-09-03): samtalen kommer opp OVER feeden i
+  // stedet for å navigere til `Comments`-ruta — feedposisjonen bevares og
+  // tab-baren står. Ruta lever videre for varsler og deeplinks.
+  const [commentTarget, setCommentTarget] = useState<{
+    postId: string;
+    teamSpaceId: string;
+  } | null>(null);
   // «Varsle hele laget» — festes øverst i feeden + gir alle et varsel.
   const [broadcast, setBroadcast] = useState(false);
 
@@ -479,6 +490,9 @@ export function TeamHomeScreen() {
       setComposeText('');
       setSelectedImage(null);
       setBroadcast(false);
+      // Publisert = ferdig: tastaturet ned, feeden fram (kommentaren i
+      // tråden er motsatt — der beholdes fokus for rask videre skriving).
+      Keyboard.dismiss();
       await refetchFeed();
     } catch (e: any) {
       // Dev-bygg viser årsaken rett i alerten (upload-helperen legger
@@ -612,15 +626,9 @@ export function TeamHomeScreen() {
     setFullscreenItem(item);
   }, []);
 
-  const handleComment = useCallback(
-    (item: FeedItem) => {
-      navigation.navigate('Comments', {
-        postId: item.id,
-        teamSpaceId: item.teamSpaceId,
-      });
-    },
-    [navigation],
-  );
+  const handleComment = useCallback((item: FeedItem) => {
+    setCommentTarget({postId: item.id, teamSpaceId: item.teamSpaceId});
+  }, []);
 
   const renderFeedItem = useCallback(
     ({item}: {item: FeedItem}) => (
@@ -900,6 +908,13 @@ export function TeamHomeScreen() {
           initialNumToRender={6}
           maxToRenderPerBatch={6}
           windowSize={7}
+          // TASTATURET (keyboard.tsx): lista er ENESTE eier. Komponisten
+          // ligger inni lista, så RN sin innebygde inset (vindusbasert,
+          // ruller det fokuserte feltet fram) gjør jobben på iOS; Android
+          // krymper vinduet (adjustResize). Publiser-knappen beholder
+          // første trykk, drag skjuler tastaturet interaktivt.
+          automaticallyAdjustKeyboardInsets
+          {...WRITING_SCROLL_PROPS}
         />
       </View>
 
@@ -908,6 +923,16 @@ export function TeamHomeScreen() {
         photos={fullscreenItem ? toGalleryPhoto(fullscreenItem) : []}
         initialPhotoId={fullscreenItem?.id ?? null}
         onClose={() => setFullscreenItem(null)}
+      />
+
+      {/* Kommentararket — vanlige kort og Kommenter (også på kampkort) åpner
+          det; kampkortets hovedflate åpner fortsatt kampen (FeedRow). */}
+      <CommentSheet
+        variant="feed"
+        postId={commentTarget?.postId ?? null}
+        teamSpaceId={commentTarget?.teamSpaceId ?? ''}
+        onClose={() => setCommentTarget(null)}
+        onOpenMatch={handleOpenMatch}
       />
     </>
   );

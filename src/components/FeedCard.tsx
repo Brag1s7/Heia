@@ -54,7 +54,8 @@ export const PINNED_GLASS_AB = true;
  *   4. kort Heia-pulslinje med ett hendelsespunkt ved hovedteksten,
  *   5. HEIA + Kommenter som tynne lyse/transparente lag (ikke blekkvask),
  *   6. diskret «Se kampen ›» nederst til høyre,
- *   7. hele kortet åpner kampen (TeamHomeScreen), Kommenter åpner tråden.
+ *   7. hele kortet åpner SAMTALEN — også kampkortet (Brage 2026-09-03);
+ *      «Se kampen ›» er en egen Pressable og den ENESTE veien til kampen.
  * Blekk: opalhvit hovedtekst (matchColors.text), dempet lys mintgrå
  * sekundær (matchColors.dim), live i coral (ScoreChip). Kapselen bærer
  * ALLTID hendelseskontekst («MÅL · 3′», «LIVE · 1–0», «PAUSE»,
@@ -157,6 +158,20 @@ interface FeedCardProps {
   onExpandImage?: () => void;
   /** Lagets farge — refleksen i kampkortets hjørne (StadiumGlass). */
   teamColor?: string;
+  /**
+   * «Se kampen ›» (kun kampkort) — den ENESTE veien fra kortet til kampen
+   * (Brage 2026-09-03). Egen Pressable med ≥ 44 pt trykkflate i
+   * reaksjonsraden; den innerste tar trykket, så kortets `onPress`
+   * (samtalen) utløses aldri samtidig.
+   */
+  onOpenMatch?: () => void;
+  /**
+   * `thread`: originalinnlegget øverst i kommentartråden. Ingen Kommenter-
+   * pill (du står allerede i kommentarene) og strammere vertikal luft, så
+   * skrivefeltet og lista kommer tidligere til syne. Materialet er det
+   * samme. Standard `feed`.
+   */
+  variant?: 'feed' | 'thread';
 }
 
 function timeAgo(date: Date): string {
@@ -273,7 +288,10 @@ export function FeedCard({
   onPress,
   onExpandImage,
   teamColor,
+  onOpenMatch,
+  variant = 'feed',
 }: FeedCardProps) {
+  const thread = variant === 'thread';
   const roleLabel = item.author.role === 'trener' ? 'Trener' : undefined;
   const strong = item.isPinned || isMatchType(item) || item.type === 'resultat';
   const heiaCount = item.heiaCount ?? 0;
@@ -328,7 +346,7 @@ export function FeedCard({
   const inner = (
     <>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, thread && styles.headerThread]}>
         <Avatar
           name={item.author.name}
           size="md"
@@ -450,7 +468,7 @@ export function FeedCard({
       )}
 
       {/* Reaksjoner — designede pills, aktiv 👏 er et Heia-øyeblikk */}
-      <View style={styles.reactions}>
+      <View style={[styles.reactions, thread && styles.reactionsThread]}>
         {/* ⚠️ P1: PILLEN RENDRES IKKE PÅ MÅL IMOT — den er ikke disabled.
             En avslått knapp ville sagt «du kan heie hvis du får lov», og det
             er ikke beslutningen: det finnes ingen HEIA der. Kommentarpillen
@@ -478,33 +496,48 @@ export function FeedCard({
             </Text>
           </Pressable>
         )}
-        <Pressable
-          onPress={onComment}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Kommenter"
-          style={({pressed}) => [
-            styles.reactPill,
-            matchCard && styles.reactPillMatch,
-            pressed && styles.reactPillPressed,
-          ]}>
-          <MessageCircle
-            size={14}
-            color={matchCard ? MATCH_INK.text : inkSecondary}
-          />
-          <Text
-            style={[
-              styles.reactText,
-              opal && styles.reactTextOpal,
-              matchCard && styles.textMatch,
+        {/* I tråden finnes ingen Kommenter — du er allerede der. */}
+        {!thread && (
+          <Pressable
+            onPress={onComment}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Kommenter"
+            style={({pressed}) => [
+              styles.reactPill,
+              matchCard && styles.reactPillMatch,
+              pressed && styles.reactPillPressed,
             ]}>
-            {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
-          </Text>
-        </Pressable>
-        {/* Hovednavigasjonen forklart: hele kortet åpner kampen (onPress
-            fra TeamHomeScreen); teksten er ikke sin egen Pressable. */}
-        {matchCard && onPress && (
-          <Text style={styles.matchLink}>Se kampen ›</Text>
+            <MessageCircle
+              size={14}
+              color={matchCard ? MATCH_INK.text : inkSecondary}
+            />
+            <Text
+              style={[
+                styles.reactText,
+                opal && styles.reactTextOpal,
+                matchCard && styles.textMatch,
+              ]}>
+              {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
+            </Text>
+          </Pressable>
+        )}
+        {/* «Se kampen ›» — egen Pressable, den eneste veien til kampen.
+            Trykkflaten er ≥ 44 pt via hitSlop (raden selv er lavere);
+            den innerste Pressable-en vinner, så kortets onPress (samtalen)
+            utløses aldri av dette trykket. */}
+        {matchCard && onOpenMatch && (
+          <Pressable
+            onPress={onOpenMatch}
+            hitSlop={{top: 10, bottom: 10, left: 8, right: 8}}
+            accessibilityRole="button"
+            accessibilityLabel="Se kampen"
+            style={({pressed}) => [
+              styles.matchLinkHit,
+              pressed && styles.matchLinkPressed,
+            ]}>
+            <Text style={styles.matchLink}>Se kampen ›</Text>
+          </Pressable>
         )}
       </View>
     </>
@@ -528,7 +561,7 @@ export function FeedCard({
         <Pressable
           onPress={onPress}
           accessibilityRole="button"
-          accessibilityLabel="Åpne kampen"
+          accessibilityLabel="Åpne kommentarer"
           style={({pressed}) => [pressed && styles.matchPressed]}>
           {({pressed}) => surface(pressed)}
         </Pressable>
@@ -543,7 +576,10 @@ export function FeedCard({
   if (opal) {
     if (onPress) {
       return (
-        <Pressable onPress={onPress} accessibilityRole="button">
+        <Pressable
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel="Åpne kommentarer">
           {({pressed}) => (
             <LiquidGlassSurface
               style={styles.cardOpal}
@@ -569,6 +605,7 @@ export function FeedCard({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
+        accessibilityLabel="Åpne kommentarer"
         style={({pressed}) => [...surfaceStyle, pressed && styles.cardPressed]}>
         {inner}
       </Pressable>
@@ -605,6 +642,10 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.md,
     marginBottom: spacing.md,
+  },
+  // Tråden: strammere luft — skrivefeltet skal komme tidligere til syne.
+  headerThread: {
+    marginBottom: spacing.sm,
   },
   headerText: {
     flex: 1,
@@ -723,9 +764,19 @@ const styles = StyleSheet.create({
   },
   matchLink: {
     ...typography.action,
+    color: MATCH_INK.dim,
+  },
+  // Trykkflaten: 44 bred, 24 høy + hitSlop 10/10 = 44 høy. Raden vokser ikke.
+  matchLinkHit: {
     marginLeft: 'auto',
     alignSelf: 'center',
-    color: MATCH_INK.dim,
+    minWidth: 44,
+    minHeight: 24,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  matchLinkPressed: {
+    opacity: 0.6,
   },
   more: {
     padding: 2,
@@ -771,6 +822,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     marginTop: spacing.lg,
+  },
+  reactionsThread: {
+    marginTop: spacing.sm,
   },
   reactPill: {
     flexDirection: 'row',

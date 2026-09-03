@@ -104,20 +104,31 @@ describe('geometrien er Brages tall', () => {
     expect(tabBarTotalHeight(34)).toBe(92);
   });
 
-  it('diffusjonsfeltet: fader helt transparent oppover, aldri opak stripe, lys perle / mørk arena', () => {
+  it('diffusjonsfeltet: ingen synlig kant — starter på 0 godt over kapselen, nesten usynlig ved toppen, sterkest under; aldri opak', () => {
+    // Brage 2026-09-03 (runde 5): det skal være UMULIG å peke på hvor
+    // feltet begynner. Masken starter 36–48 pt over kapseltoppen på 0, er
+    // 0,03–0,06 ved toppen, bygger seg i nedre halvdel og er sterkest
+    // mellom kapselen og skjermbunnen. Runde 4 (hard kant + klippeboks)
+    // ble avvist.
+    expect(DIFFUSION.bleedAbove).toBeGreaterThanOrEqual(36);
+    expect(DIFFUSION.bleedAbove).toBeLessThanOrEqual(48);
     for (const env of ['light', 'match'] as const) {
       const {stops} = DIFFUSION[env];
       expect(stops[0]).toBe(0); // helt transparent øverst
+      expect(stops[1]).toBeGreaterThanOrEqual(0.03); // kapseltopp: nesten
+      expect(stops[1]).toBeLessThanOrEqual(0.06); // usynlig
       for (let i = 1; i < stops.length; i++)
         expect(stops[i]).toBeGreaterThan(stops[i - 1]);
       expect(stops[stops.length - 1]).toBeLessThanOrEqual(0.6); // aldri opak
+      expect(stops).toHaveLength(diffusionOffsets(92).length);
     }
     expect(DIFFUSION.light.color.toUpperCase()).not.toBe('#FFFFFF');
     const offs = diffusionOffsets(92);
     expect(offs[0]).toBe(0);
-    expect(offs[1]).toBeCloseTo(28 / 120, 5);
-    expect(offs[2]).toBeCloseTo(92 / 120, 5);
-    expect(offs[3]).toBe(1);
+    expect(offs[1]).toBeCloseTo(40 / 132, 5); // kapseltopp
+    expect(offs[2]).toBeCloseTo(72 / 132, 5); // kapselmidt
+    expect(offs[3]).toBeCloseTo(104 / 132, 5); // kapselbunn
+    expect(offs[4]).toBe(1); // skjermbunn
   });
 
   it('hazen: bred myk perlehaze (ikke hvit, ikke glød) + svak grønn grunnskygge; kampsiden mørk', () => {

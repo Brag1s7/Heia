@@ -582,3 +582,56 @@ test('komponisten finnes også når feeden HAR innhold', async () => {
   });
   supabase.rpc.mockReset();
 });
+
+// ---------------------------------------------------------------------------
+// TASTATURET I «DEL NOE MED LAGET» (keyboard.tsx, 2026-09-03): lista er
+// ENESTE eier — RN sin vindusbaserte inset ruller feltet fram, Publiser
+// beholder første trykk, drag skjuler tastaturet interaktivt. Etter
+// vellykket publisering skjules tastaturet (motsatt av tråden).
+// ---------------------------------------------------------------------------
+
+test('feedlista eier tastaturet: innebygd inset, første trykk på Publiser, drag lukker tastaturet straks', async () => {
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+  const {FlatList, KeyboardAvoidingView} = require('react-native');
+  const list = renderer!.root.findByType(FlatList);
+  expect(list.props.automaticallyAdjustKeyboardInsets).toBe(true);
+  expect(list.props.keyboardShouldPersistTaps).toBe('handled');
+  expect(list.props.keyboardDismissMode).toBe('on-drag');
+  // Én eier: ingen KeyboardAvoidingView i tillegg.
+  expect(renderer!.root.findAllByType(KeyboardAvoidingView)).toHaveLength(0);
+  await ReactTestRenderer.act(async () => {
+    renderer!.unmount();
+  });
+});
+
+test('publisering: Publiser virker med tastaturet oppe, og tastaturet skjules ETTER vellykket publisering', async () => {
+  const {Keyboard} = require('react-native');
+  const dismiss = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => {});
+  let renderer: ReturnType<typeof ReactTestRenderer.create> | undefined;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<Harness />);
+  });
+  const felt = komponistFelt(renderer!)[0];
+  await ReactTestRenderer.act(async () => {
+    felt.props.onChangeText('Kamp på lørdag!');
+  });
+  expect(dismiss).not.toHaveBeenCalled();
+  const publiser = renderer!.root.findAll(
+    n =>
+      n.props?.title === 'Publiser' && typeof n.props?.onPress === 'function',
+    {deep: false},
+  );
+  expect(publiser).toHaveLength(1);
+  await ReactTestRenderer.act(async () => {
+    await publiser[0].props.onPress();
+  });
+  expect(dismiss).toHaveBeenCalledTimes(1);
+  expect(komponistFelt(renderer!)[0].props.value).toBe('');
+  await ReactTestRenderer.act(async () => {
+    renderer!.unmount();
+  });
+  dismiss.mockRestore();
+});

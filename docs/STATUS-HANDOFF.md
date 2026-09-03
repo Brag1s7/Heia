@@ -1,6 +1,87 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-03 — TAB-BAR-SKIVA LUKKET: telefongodkjent og committet; NESTE SKIVE = KOMMENTARARK FRA HJEM (gjenbruk `CommentSheet`) i NY samtale)
+## ▶️▶️ START HER (oppdatert 2026-09-03 kveld — KOMMENTARARK FRA HJEM + TASTATURSYSTEM + TAB-BAR RUNDE 5: ALT TELEFONGODKJENT OG COMMITTET; NESTE = DESIGNRETNINGEN SOM ER LAGRET, i NY samtale)
+
+✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
+native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-03:
+
+1. TAB-BAR RUNDE 5 (`src/components/TabBarGlass.tsx`): diffusjonsfeltet
+   starter 40 pt over kapselen på 0, er 0,04 (lys)/0,06 (kamp) ved
+   kapseltoppen, 0,12/0,16 midt, 0,30/0,40 bunn, 0,42/0,56 skjermbunn.
+   INGEN klipping (runde 4 med hard kant + klippeboks ble avvist: synlig
+   rektangelkant). Kapsel, haze, geometri, trykkrespons urørt.
+2. KOMMENTARARK FRA HJEM (`src/components/match/CommentSheet.tsx`):
+   `variant="feed"` = EGEN komponent (`ExpandableCommentSheet`): hviler på
+   68 %, dras i hodet til full (safe area + 8), tastatur snapper til full,
+   swipe ned lukker; animert `top` (JS-driver, godkjent på telefon med lang
+   tråd); Heia-blekk-scrim rgba(8,57,46,0,24). Lukking ved drag:
+   `feedCloseTiming` — sakte slipp = samme 210 ms ease-in som bakgrunns-
+   trykk, kast = fingerfart, tak 240 ms. Kamparket (`FixedCommentSheet`,
+   78 %) er URØRT. Berøring av hodet lukker tastaturet (grant).
+   TeamHomeScreen: `commentTarget`-state + `<CommentSheet variant="feed">`
+   ved siden av MatchPhotoGallery; `Comments`-ruta lever for varsler/
+   deeplinks (TAB_BAR_HIDDEN_ROUTES uendret).
+3. FEEDREGEL (`FeedCard.tsx`, FeedRow): ALLE feedinnlegg åpner SAMTALEN —
+   også kampkort (label «Åpne kommentarer»); «Se kampen ›» er egen
+   Pressable (label «Se kampen», ≥ 44 pt via hitSlop) og ENESTE vei til
+   kampen. Konsekvens: kampbilder/manuelle resultater åpner nå også
+   kommentarer (ingen lenke der — si fra om ønsket). `variant="thread"`
+   i tråden: ingen Kommenter, ikke trykkbart, strammere luft (sm).
+4. TRÅDEN (`CommentThread.tsx`): nyeste ØVERST; etter sending scrollTo
+   kommentarseksjonen (onLayout-målt) så den nye er synlig med tastaturet
+   oppe; feltet beholder fokus (IKKE `editable={!sending}` — resignerer
+   feltet på iOS); Return = linjeskift, Send publiserer.
+5. TASTATURSYSTEMET (`src/components/keyboard.tsx`) — tre avviste runder
+   før dette, LES FØR DU RØRER TASTATUR:
+   · ROTÅRSAK 1: KeyboardAvoidingView regner `frame.y` fra onLayout
+     RELATIVT TIL FORELDEREN → 0 inne i et absolutt ark → ~70 pt der
+     tastaturet dekket ~340. Alle KAV-er i CommentSheet ×2 og
+     CommentsScreen er FJERNET.
+   · ROTÅRSAK 2: LayoutAnimation/`Keyboard.scheduleLayoutAnimation` med
+     type «keyboard» faller til LINEÆR på Fabric (`animations/utils.cpp`),
+     og alt går via JS per frame → «sakte/hakkete». FORBUDT for tastatur.
+   · LØSNINGEN: dokken løftes med NATIVE-DREVET translateY
+     (`useKeyboardLift(safeBottom)`: keyboardWillChangeFrame + WillHide,
+     like verdier ignoreres, tastaturets varighet, bezier 0.38/0.7/0.125/1,
+     Reduce Motion = hopp); lista ligger absolutt BAK glassdokken til
+     skjermbunnen med `automaticallyAdjustKeyboardInsets` (native, i
+     tastaturets animasjon) og paddingBottom = dokkhøyde + lg. Safe area
+     én gang (i dokkens padding; løftet = tastatur − safe area).
+   · Feeden («Del noe med laget»): FlatList eier det selv —
+     `automaticallyAdjustKeyboardInsets` + `WRITING_SCROLL_PROPS`
+     (persistTaps «handled», dismiss «on-drag»); `Keyboard.dismiss()`
+     etter vellykket publisering.
+   · ÉN LUKKEREGEL: `onTouchStart={Keyboard.dismiss}` på lista + grant på
+     arkhodet → trykk, hold og drag oppfører seg likt (ved berøringsstart).
+   · Android: adjustResize eier det (løft = 0). Ingen pakke, ingen native.
+   · NESTE STEG hvis Brage vil ha Instagram-nivå: native
+     UIKeyboardLayoutGuide — IKKE flere JS-varianter.
+
+VERIFISERT VED LUKKING: full suite 1002/1002 grønn (2 skipped); eslint =
+kun den kjente baseline-feilen (KalenderScreen:183) + 12 warnings; tsc
+(`npx tsc --noEmit -p tsconfig.json`): 8 feil = nøyaktig HEAD-baselinen
+(Lagkassa ×2, netMetrics, media ×3, TimeSheet, DaylightGround), ingen nye.
+Referanse-PNG-ene (4 stk) bekreftet med filoppslag.
+Tester som vokter dette: `keyboardSystem`, `commentThreadKeyboard`,
+`commentsScreen`, `commentSheet` (19), `feedOpal` (6 flyttester),
+`feedRefetch` (2 tastaturtester), `tabBarLayout`.
+
+▶️ NESTE (anbefaling, i NY samtale): DESIGNRETNINGEN SOM ER LAGRET —
+`docs/Heia_Design_Master/references/inspiration/REFERENCE-NOTES.md`, tre
+skiver i denne rekkefølgen, én per telefonrunde:
+  A. DaylightGround = én vertikal fargereise (lys/neon mint øverst og i
+     midten → aqua → gradvis dypere teal/smaragd nederst).
+  B. Vanlige FeedCard (`GLASS.card`): nøytralt perlegrått glass med subtil
+     INTERN retningsfade (lysere/tettere øverst til venstre, røykgrått og
+     mer transparent nederst til høyre).
+  C. Kampkortene: kontrollert retningslys + tonal dybde i StadiumGlass,
+     aksent #02FFAB/coral. Designregelen «mørkt glass = kamp» står.
+Arbeidsmåte: BEGGE designskillene (apple-hig-designer + emilkowalski),
+inspiser → forslag → godkjenning → kode, ingen rigg før telefonbilde,
+lukkeritual som over. Alternativ hvis Brage heller vil framover i
+produkt: pre-launch-pakken S5/S6/S8 (se historikken) eller betaling fase 6.
+
+## (historikk) START HER 2026-09-03 — TAB-BAR-SKIVA LUKKET; kommentararket planlagt (bygget og lukket samme dag, se over)
 
 ✅ TAB-BAR-SKIVA ER LUKKET (Brage 2026-09-03, telefongodkjent i sin helhet:
 plassering, diffusjonsfelt, design, farge, størrelse, faner, KAMP-knapp og
@@ -36,18 +117,48 @@ VERIFISERT VED LUKKING: full suite 969/969 grønn, eslint = kun den kjente
 baseline-feilen (KalenderScreen:183) + warnings; tsc: 8 feil = nøyaktig
 HEAD-baselinen (Lagkassa-feilene er linjeforskjøvet, ingen nye).
 
-▶️ NESTE SKIVE = KOMMENTARARK FRA HJEM. Start i NY samtale med inspeksjon
-og avgrenset forslag FØR kode. Gjenbruk `src/components/match/
-CommentSheet.tsx` (Modal + egen Animated/PanResponder, i dag brukt fra
-EventDetailScreen). Mål: kommentarer fra vanlige FeedCard åpnes i et
-ekspanderbart bunnark (åpner ~65–70 %, dras til full, utvides ved
-tastatur, swipe ned lukker); Kommenter på kampkort åpner samme ark; trykk
-på selve kampkortet åpner fortsatt kampen; feedposisjonen bevares; tab-
-baren forblir montert bak arket UTEN hide/show-overgang (i dag skjules
-den på `Comments`-ruta via TAB_BAR_HIDDEN_ROUTES — arket erstatter ruta
-fra Hjem, ruta beholdes for varsler/deeplinks); ingen ny pakke, ingen
-redesign av CommentThread uten uttrykkelig behov. Kjent risiko:
-PanResponder-capture i arkhodet vs. scroll i tråden ved delvis høyde.
+⚠️ TAB-BAR RUNDE 4/5 (2026-09-03, ÅPEN — venter telefondom): Brage ville
+ha alt OVER kapselen klart. Runde 4 (hard kant på overkanten + klippeboks
+rundt hazen) ga en synlig rektangelkant og ble AVVIST. Runde 5 = kun
+diffusjonsfeltet endret: masken starter 40 pt over kapselen på 0, er 0,04
+(lys)/0,06 (kamp) ved kapseltoppen, bygger seg i nedre halvdel (0,12/0,16
+midt, 0,30/0,40 bunn) og er sterkest mot skjermbunnen (0,42/0,56). Ingen
+klipping, kapsel/haze/trykkrespons urørt. Akseptanse: umulig å peke på
+hvor feltet begynner. tabBarLayout + tabBar-testene grønne (32/32);
+UKOMMITTERT til Brage godkjenner bildet.
+
+▶️ NESTE SKIVE = KOMMENTARARK FRA HJEM (NY High-effort-samtale). Inspeksjon
+er GJORT 2026-09-03; forslaget er godkjent med disse BESLUTNINGENE (Brage):
+  1. IKKE rør kampskjermens telefongodkjente 78 %-ark. `CommentSheet` får
+     en variant/prop: Hjem = 68 % → full høyde (dra i hodet / tastatur),
+     kamp = dagens faste 78 %. Felles geometri vurderes SENERE.
+  2. Scrim: Hjem bruker en lettere, nøytral Heia-ink-scrim rundt 0,24.
+     Kamp beholder det grønne 0,32.
+  3. Full høyde stopper ved safe area + 8 pt.
+  4. Animert `top` (JS-driver, layout per frame) er OK i prototypen, men
+     MÅ testes på fysisk telefon med lang tråd, rask dragging, scrolling og
+     tastatur. Hakker den: IKKE commit; foreslå UI-thread/native løsning
+     før videre arbeid.
+  5. Vanlig FeedCard-trykk og Kommenter åpner arket. Kampkortets hovedflate
+     åpner fortsatt kampen; Kommenter på kampkortet åpner arket.
+  6. `Comments`-ruta beholdes for varsler og deeplinks (og
+     TAB_BAR_HIDDEN_ROUTES uendret) til arket er bevist.
+Inspeksjonsfunn: filer = `src/components/match/CommentSheet.tsx` (ny
+geometri + valgfri `onOpenMatch` videre til `CommentThread`, som allerede
+har prop-en), `src/screens/TeamHomeScreen.tsx` (`handleComment` setter
+`commentPostId`-state i stedet for `navigate('Comments')`; arket monteres
+ved siden av `MatchPhotoGallery`; «Se kampen» = lukk + navigate
+EventDetail), `__tests__/commentSheet.test.tsx`. FeedRow skiller allerede
+korttrykk (kamp) fra Kommenter — FeedCard urørt. Urørt: CommentThread,
+CommentsScreen, AppNavigator, deepLink, InboxScreen, tabBarLayout.
+Mekanikk: samme Animated-verdi styrer arkets `top` (0 = full, 32 % = hvile,
+skjermhøyde = lukket) så skrivefeltet alltid er i synlig bunn;
+`keyboardWillShow` animerer til full; slipp snapper til nærmeste med
+fartsbias; lukketerskler uendret (28 % / 0,5 px/ms). Pan-gesten KUN på
+hodet (tråden scroller fritt ved delvis høyde). Feedposisjon bevares
+(ingen navigasjon); tab-baren står montert bak Modal-en uten hide/show.
+Ingen ny pakke, ingen CommentThread-redesign. Ingen rigg/full suite før
+telefonen har godkjent det visuelle.
 IKKE bland inn: bakgrunnsfaden (DaylightGround) og retningsfaden i
 FeedCard — lagret som senere retning (REFERENCE-NOTES.md).
 
