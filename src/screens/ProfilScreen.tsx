@@ -140,18 +140,17 @@ const MENU_ICON_TINT: Record<MenuTone, string> = {
 };
 
 /**
- * VALGT LAG — ringen (Brage 2026-09-04, polish): ren `colors.heia` på 1 pt
- * leste «nesten like sterkt som aktiv fane/CTA». Neon i full styrke er
- * reservert for HANDLING (kampknappen, primærknappen, aktiv fane); et valgt
- * lagkort er en TILSTAND. Dempet til 0,40 — fortsatt tydelig mint mot
- * opalen, men den roper ikke lenger. Selve tilstanden bæres uansett av tre
- * signaler: flaten (heiaSoft), haken og ringen — så ringen trenger ikke
- * gjøre jobben alene (A v2: valgt skifter FLATE).
+ * VALGT LAG — INGEN egen ring (Brage 2026-09-04, runde 2 av polishen:
+ * «trenger ikke en tydelig separat ring. Checkmark + svak team/Heia-tint +
+ * subtil edge er nok»). Neon i full styrke er reservert for HANDLING
+ * (kampknappen, primærknappen, aktiv fane); et valgt lagkort er en TILSTAND,
+ * og en farget ring rundt hele flaten leste CTA-aktig. Runde 1 dempet ringen
+ * til 0,40 — runde 2 fjerner den.
  *
- * Strektykkelsen kan IKKE brukes som demper: opalens padding-boks er
- * nøyaktig 1 pt kant, og endres den, flytter innholdet seg.
+ * Tilstanden bæres nå av tre ting som alle bor I materialet: den svake
+ * Heia-tinten i flaten, haken til høyre, og panelets egen kantfysikk.
+ * Blir den for svak på telefonen, er det TINTEN som løftes — ikke en ny ring.
  */
-const TEAM_CARD_RING = 'rgba(2, 255, 171, 0.4)';
 function MenuIcon({
   children,
   tone = 'ink',
@@ -178,7 +177,7 @@ function RowChevron() {
 // Rolig, strukturert og lesbart der Varsler er levende arkglass: samme
 // Heia-familie, annen karakter. Radene inni er `ListRow material="opal"`.
 function MenuGroup({children}: {children: ReactNode}) {
-  return <OpalSurface>{children}</OpalSurface>;
+  return <OpalSurface variant="panel">{children}</OpalSurface>;
 }
 
 // Siste kjente «Min støtte»-svar — lever over remounts så seksjonen aldri
@@ -505,10 +504,10 @@ export function ProfilScreen() {
       childNames.length === 0
         ? 'Utmeldingen gjelder deg.'
         : childNames.length === 1
-          ? `Utmeldingen gjelder deg og ${childNames[0]}.`
-          : `Utmeldingen gjelder deg og barna dine (${childNames
-              .slice(0, -1)
-              .join(', ')} og ${childNames[childNames.length - 1]}).`;
+        ? `Utmeldingen gjelder deg og ${childNames[0]}.`
+        : `Utmeldingen gjelder deg og barna dine (${childNames
+            .slice(0, -1)
+            .join(', ')} og ${childNames[childNames.length - 1]}).`;
 
     // Levende avtale på DETTE laget: utmeldingen rører den aldri
     // (medlemskap og støtte er separate relasjoner — modell B), men det
@@ -654,10 +653,11 @@ export function ProfilScreen() {
                 accessibilityRole="button"
                 accessibilityState={{selected: isActive}}>
                 {({pressed}) => (
-                  /* Lagkortet på opal: strammere (12 pt luft, 40-merke),
-                     valgt = neonring + heiaSoft-tint i materialet (A v2:
-                     valgt skifter FLATE), trykk = opalens egen respons. */
+                  /* Lagkortet på opalpanelet: stramt (8 pt luft, 40-merke),
+                     valgt = heiaSoft-tint + hake (ingen ring), trykk =
+                     opalens egen respons. */
                   <OpalSurface
+                    variant="panel"
                     style={[styles.teamCard, isActive && styles.teamCardActive]}
                     pressed={pressed}>
                     {/* Logoen når den finnes (lag → klubb), ellers initialer
@@ -1079,10 +1079,7 @@ export function ProfilScreen() {
           onPress={() => setColorSheetOpen(false)}
         />
         <View
-          style={[
-            styles.sheet,
-            {paddingBottom: insets.bottom + spacing.lg},
-          ]}>
+          style={[styles.sheet, {paddingBottom: insets.bottom + spacing.lg}]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Farge på avataren</Text>
 
@@ -1222,12 +1219,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     gap: spacing.md,
   },
-  // Valgt skifter FLATE, ikke bare ramme (A v2-regelen fra RSVP-knappene):
-  // den dempede ringen ligger i opalens gjennomsiktige 1 pt kant, tinten i
-  // flaten, og haken står til høyre. Se TEAM_CARD_RING.
+  // Valgt skifter FLATE, ikke ramme (A v2-regelen fra RSVP-knappene): kun
+  // tinten. Kanten forblir panelets egen (gjennomsiktig 1 pt — opalen tegner
+  // kantlyset selv), og haken står til høyre.
   teamCardActive: {
     backgroundColor: colors.heiaSoft,
-    borderColor: TEAM_CARD_RING,
   },
   teamInfo: {
     flex: 1,

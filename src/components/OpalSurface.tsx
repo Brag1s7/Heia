@@ -125,14 +125,62 @@ export const OPAL = {
   rowPressed: 'rgba(8, 57, 46, 0.06)',
 } as const;
 
+/**
+ * PANEL — Profils grupperte flater (Brage 2026-09-04: «kantene ser fortsatt
+ * for boksete ut … surface with edge physics, ikke white card with border»).
+ *
+ * Samme material, annen KANTFYSIKK. Kortvarianten tenner hele ringen (hvit
+ * 0,85 helt til 45 % av diagonalen), og på en liten flate leser det som en
+ * uniform outline rundt en lys boks. Panelet lar lyset dø ut tidlig, så bare
+ * hjørnet der lyset kommer fra fanger det, mens bunnen og sidene går over i
+ * en dypere blekk-motkant. Toppens specular (`highlight`) er uendret — den
+ * ER lyset Brage ber om, og den skal bære kanten alene.
+ *
+ * Flaten slipper også litt mer av grunnen gjennom (0,89/0,82 mot 0,92/0,87).
+ * Ikke lavere: ved 0,82 over reisens mørkeste under et Profil-panel
+ * (#0B412E) måler inkSecondary 4,8:1 og inkAccent 4,7:1 — under det ryker
+ * kontrastporten. Voktet i `__tests__/opalPanel.test.tsx`.
+ */
+export const OPAL_PANEL = {
+  baseOpacity: 0.89,
+  baseEdgeOpacity: 0.82,
+  edgeTop: 0.5,
+  edgeMid: 0.12,
+  /** Der lyset er dødd ut. Kortet holder det til 0,45 — panelet slipper det
+   *  tidligere, så ringen ikke blir uniform. */
+  edgeMidStop: 0.34,
+  edgeShade: 0.2,
+} as const;
+
+/** Kantfysikken per variant. `card` er dagens verdier, ordrett. */
+const TONE = {
+  card: {
+    baseOpacity: OPAL.baseOpacity,
+    baseEdgeOpacity: OPAL.baseEdgeOpacity,
+    edgeTop: OPAL.edgeTop,
+    edgeMid: OPAL.edgeMid,
+    edgeMidStop: 0.45,
+    edgeShade: OPAL.edgeShade,
+  },
+  panel: OPAL_PANEL,
+} as const;
+
+export type OpalVariant = keyof typeof TONE;
+
 interface OpalSurfaceProps {
   /** Padding/gap — legges oppå flaten (innerboksen). */
   style?: StyleProp<ViewStyle>;
   /** Trykktilstand: samme heiaSoft-tint som dagens `cardPressed`. */
   pressed?: boolean;
   /**
+   * Kantfysikk. `card` (standard) = feedkortets fallback, URØRT. `panel` =
+   * Profils grupperte flater: mykere lys, dypere motkant, litt mer grunn
+   * gjennom. Se `OPAL_PANEL`.
+   */
+  variant?: OpalVariant;
+  /**
    * Tekstsonens opasitet — KUN for riggverk/tuning. Produktet bruker
-   * `OPAL.baseOpacity`; kantopasiteten følger `OPAL.baseEdgeOpacity`.
+   * variantens egen; kantopasiteten følger den også.
    */
   baseOpacity?: number;
   children?: React.ReactNode;
@@ -143,16 +191,19 @@ const FULL = {x: '0', y: '0', width: '100%', height: '100%'} as const;
 export function OpalSurface({
   style,
   pressed = false,
-  baseOpacity = OPAL.baseOpacity,
+  variant = 'card',
+  baseOpacity,
   children,
 }: OpalSurfaceProps) {
   const {reduceTransparency, increaseContrast} = useMaterialAccessibility();
+  const tone = TONE[variant];
   const half = increaseContrast ? 0.5 : 1;
   const sheen = OPAL.sheen * half;
   const uptake = OPAL.uptake * half;
-  const edge = Math.min(baseOpacity, OPAL.baseEdgeOpacity);
+  const core0 = baseOpacity ?? tone.baseOpacity;
+  const edge = Math.min(core0, tone.baseEdgeOpacity);
   // Kjernens alfa slik at base + kjerne = tekstsonens opasitet.
-  const core = reduceTransparency ? 0 : (baseOpacity - edge) / (1 - edge);
+  const core = reduceTransparency ? 0 : (core0 - edge) / (1 - edge);
   const edgeColor = increaseContrast ? OPAL.edgeContrastColor : OPAL.edgeColor;
   const shadeColor = increaseContrast
     ? OPAL.edgeContrastColor
@@ -164,7 +215,9 @@ export function OpalSurface({
         OPAL.edgeContrast,
         OPAL.edgeContrast,
       ]
-    : [OPAL.edgeTop, OPAL.edgeMid, 0, OPAL.edgeShade];
+    : [tone.edgeTop, tone.edgeMid, 0, tone.edgeShade];
+  // Der lyset er dødd ut, og der motkanten begynner (10 % senere).
+  const midStop = increaseContrast ? 0.45 : tone.edgeMidStop;
   // Høylyset er lys; under Increase Contrast er kanten blekk, og et hvitt
   // høylys rett under en mørk hårlinje ville lest som en dobbel strek.
   const highlight = increaseContrast ? 0 : OPAL.highlight;
@@ -256,12 +309,12 @@ export function OpalSurface({
                 stopOpacity={edgeStops[0]}
               />
               <Stop
-                offset="0.45"
+                offset={midStop}
                 stopColor={edgeColor}
                 stopOpacity={edgeStops[1]}
               />
               <Stop
-                offset="0.55"
+                offset={midStop + 0.1}
                 stopColor={shadeColor}
                 stopOpacity={edgeStops[2]}
               />

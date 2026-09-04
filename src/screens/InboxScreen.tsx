@@ -486,9 +486,16 @@ export function InboxScreen() {
       // rader skåret inn i materialet» — arkglasset (GLASS.sheet, den tunge
       // perlen: lesbart, aldri kritthvitt), radene er gjennomsiktig innhold
       // på det. Ikke ett kort per varsel.
+      //
+      // ⚠️ `unbounded` ER IKKE VALGFRITT HER, og skal ikke fjernes. Kjeden
+      // har ingen øvre lengde — `groupByAge` har bare tre bolker, så
+      // «Tidligere» samler alt eldre enn i dag og VOKSER med pagineringen —
+      // og flaten blir tusenvis av punkter høy. Et native backdrop i den
+      // størrelsen faller ut under scroll (rotårsaken bak «glassflaten
+      // forsvinner», Brage 2026-09-04). Se propen i LiquidGlassSurface.
       return (
         <View style={styles.listWrap}>
-          <LiquidGlassSurface variant="sheet" style={styles.list}>
+          <LiquidGlassSurface variant="sheet" unbounded style={styles.list}>
             {item.rows.map((entry, i) => (
               <NotificationRow
                 key={entry.key}
@@ -550,7 +557,7 @@ export function InboxScreen() {
   // stå tom, ikke vise invitasjonskortet.
   const listEmpty = loading ? (
     <View style={[styles.listWrap, styles.standalone]}>
-      <LiquidGlassSurface variant="sheet" style={styles.list}>
+      <LiquidGlassSurface variant="sheet" unbounded style={styles.list}>
         <ListRowSkeleton />
         <ListRowSkeleton />
         <ListRowSkeleton />
@@ -559,7 +566,7 @@ export function InboxScreen() {
     </View>
   ) : error ? (
     <View style={[styles.listWrap, styles.standalone]}>
-      <LiquidGlassSurface variant="sheet" style={styles.emptyCard}>
+      <LiquidGlassSurface variant="sheet" unbounded style={styles.emptyCard}>
         <Text style={styles.emptyText}>{error}</Text>
       </LiquidGlassSurface>
     </View>
@@ -567,7 +574,7 @@ export function InboxScreen() {
     /* Tom skjerm er en invitasjon, ikke en beskjed om ingenting. Samme
        glass og samme ikonkvadrater som radene den lover. */
     <View style={[styles.listWrap, styles.standalone]}>
-      <LiquidGlassSurface variant="sheet" style={styles.emptyCard}>
+      <LiquidGlassSurface variant="sheet" unbounded style={styles.emptyCard}>
         <View style={styles.emptyIcons}>
           <View
             style={[

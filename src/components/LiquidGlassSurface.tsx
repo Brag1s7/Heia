@@ -110,6 +110,14 @@ export const GLASS = {
   /** Solid perle for arkene uten glass (= OPAL.solid) + svak heiaDeep-kant. */
   sheetSolid: '#EFF3F1',
   sheetSolidEdge: 'rgba(8, 57, 46, 0.12)',
+  /**
+   * KANTEN PÅ DEN SCROLL-TRYGGE FLATEN (`unbounded`): en lys hårlinje som
+   * leser som materialets kant, ikke som en ramme, pluss en litt lysere
+   * strek langs toppen — lyset som treffer flaten der den begynner.
+   * Erstatter den optiske kanten UIGlassEffect ellers tegner selv.
+   */
+  unboundedEdge: 'rgba(255, 255, 255, 0.38)',
+  unboundedTop: 'rgba(255, 255, 255, 0.55)',
 } as const;
 
 /**
@@ -160,6 +168,28 @@ interface LiquidGlassSurfaceProps {
    * biblioteket OVER den.
    */
   fill?: boolean;
+  /**
+   * FLATEN KAN BLI VILKÅRLIG HØY (Brage 2026-09-04, kritisk telefonfunn:
+   * «glassflaten på Varsler forsvinner under scroll»).
+   *
+   * ROTÅRSAKEN, ikke symptomet: både `UIGlassEffect` (et backdrop-lag) og
+   * `OpalSurface` (svg) er TEKSTURBASERTE materialer — de må rasteres i
+   * flatens fulle størrelse. Alle andre glassflater i Heia er avgrenset til
+   * omtrent én skjerm (feedkort, ark, tab-bar). Varsler-lista er den første
+   * som IKKE er det: `groupByAge` har bare tre bolker, så «Tidligere» samler
+   * alt eldre enn i dag og VOKSER med pagineringen (50 rader per side). Én
+   * side er ~3400 pt, tre sider ~10200 pt — langt over det et backdrop kan
+   * komponeres inn i (Metals tekstur-tak er 8192 px, og skjermen er 852 pt).
+   * Da faller effekten ut, og radene står igjen rett på grunnen.
+   *
+   * LØSNINGEN beholder materialet, men uten teksturen: flaten tegnes som
+   * gjennomskinnelig tint + kanter, som er gratis i alle høyder. Det koster
+   * ingenting visuelt her, fordi det ikke er noe å blurre: dagslysgrunnen er
+   * en jevn gradient, og den STÅR STILLE bak flaten (radene ruller inni
+   * den). Å blurre en jevn gradient gir den samme gradienten tilbake —
+   * glasskarakteren kommer fra tinten og kantene, ikke fra uskarpheten.
+   */
+  unbounded?: boolean;
   children?: React.ReactNode;
 }
 
@@ -169,11 +199,47 @@ export function LiquidGlassSurface({
   variant = 'card',
   cornerRadius = radius.xl,
   fill = false,
+  unbounded = false,
   children,
 }: LiquidGlassSurfaceProps) {
   const {reduceTransparency} = useMaterialAccessibility();
   const glass = GLASS[variant];
   const fillStyle = fill ? StyleSheet.absoluteFill : null;
+
+  // Se `unbounded`: ingen native backdrop, ingen svg — bare tint og kanter,
+  // så flaten er like stabil på rad 9 som på rad 900.
+  if (unbounded) {
+    const solid = SOLID[variant];
+    return (
+      <View
+        testID={`glass-unbounded-${variant}`}
+        style={[
+          styles.solid,
+          {
+            borderRadius: cornerRadius,
+            backgroundColor:
+              reduceTransparency && solid ? solid.fill : glass.tint,
+            borderColor:
+              reduceTransparency && solid ? solid.edge : GLASS.unboundedEdge,
+          },
+          fillStyle,
+          style,
+        ]}>
+        {children}
+        {/* Lyset langs overkanten — materialets specular, ikke en ramme.
+            Ligger over barna så en rad aldri dekker den, og er klippet av
+            flatens egen radius. */}
+        {!reduceTransparency && (
+          <View
+            testID="glass-unbounded-top"
+            pointerEvents="none"
+            style={styles.unboundedTop}
+          />
+        )}
+      </View>
+    );
+  }
+
   if (!FEED_LIQUID_GLASS_AB || !NativeGlass || reduceTransparency) {
     const solid = SOLID[variant];
     if (solid) {
@@ -232,10 +298,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  // Flat fallback (important/bar/barMatch). Samme padding-boks: 1 pt kant.
-  // Fyll og kant settes per variant fra `SOLID`.
+  // Flat fallback (important/bar/barMatch) OG den scroll-trygge flaten.
+  // Samme padding-boks: 1 pt kant. Fyll og kant settes per variant.
   solid: {
     borderRadius: radius.xl,
     borderWidth: 1,
+  },
+  unboundedTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: GLASS.unboundedTop,
   },
 });

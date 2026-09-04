@@ -1,6 +1,94 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-04 kveld — VARSLER OG PROFIL TELEFONGODKJENT OG COMMITTET (tre runder i én commit); NESTE = seksjonsetikettenes kontrast på Profil, egen liten skive)
+## ▶️▶️ START HER (oppdatert 2026-09-04 kveld, runde 4 — SCROLL-GLITCHEN PÅ VARSLER LØST I ROTEN + PROFIL-MATERIALET POLERT; venter telefondom, så seksjonsetikettene)
+
+⚠️ IKKE TELEFONTESTET ENNÅ. Bygget, riggverifisert og committet oppå
+checkpointet 6e7c88c (Brage: «Commiten kan stå som checkpoint»). Alt er
+JS/TS — ingen native endring, Metro-reload holder.
+
+1. KRITISK: «glassflaten på Varsler forsvinner under scroll» — ROTÅRSAK
+   FUNNET, ikke symptombehandlet:
+   · Både `UIGlassEffect` (et backdrop-lag) og `OpalSurface` (svg) er
+     TEKSTURBASERTE materialer — de må rasteres i flatens FULLE størrelse.
+   · Alle andre glassflater i Heia er avgrenset til omtrent én skjerm
+     (feedkort, ark, tab-bar, kampkort). Varsler-lista er den FØRSTE som
+     ikke er det: `groupByAge` har bare tre bolker («Nå», «I dag»,
+     «Tidligere»), så «Tidligere» samler alt eldre enn i dag OG vokser med
+     pagineringen (50 rader per side). Én side ≈ 3400 pt, tre sider
+     ≈ 10200 pt = 30600 px @3x. Metals tekstur-tak er 8192 px, og skjermen
+     er 852 pt. Backdroppet kan ikke komponeres i den størrelsen, så
+     effekten faller ut under scroll og radene står igjen på grunnen.
+   · LØSNING: ny prop `unbounded` på `LiquidGlassSurface`. Flaten tegnes som
+     gjennomskinnelig tint + kanter (ingen native backdrop, ingen svg), som
+     er gratis i alle høyder. Det koster INGENTING visuelt her: det er ikke
+     noe å blurre — dagslysgrunnen er en jevn gradient og STÅR STILLE bak
+     flaten (radene ruller inni den), og å blurre en jevn gradient gir den
+     samme gradienten tilbake. Glasskarakteren ligger i tinten
+     (`GLASS.sheet.tint`, uendret) og kantene: `GLASS.unboundedEdge` rundt +
+     `GLASS.unboundedTop` som specular langs overkanten. Reduce Transparency
+     → den solide perlen, som ellers i familien.
+   · Alle FIRE arkflatene i InboxScreen (radkjeden, skjelettet, feilkortet,
+     tomtilstanden) sender `unbounded`. Propen er IKKE valgfri der — se
+     kommentaren ved bruksstedet.
+   · Vokter: `__tests__/inboxSurface.test.tsx` (5), inkludert en KILDESJEKK
+     på at InboxScreen faktisk sender propen. Den regresjonen ville ikke
+     vist seg i en render-test — jest har ikke noe backdrop å miste.
+   · ⚠️ SAMME FELLE ANDRE STEDER: enhver ny glass-/opalflate som kan bli
+     høyere enn skjermen må ha `unbounded`. Sjekk høyden FØR du velger
+     material.
+
+2. PROFIL-MATERIALET (Brage: «kantene ser fortsatt for boksete ut … surface
+   with edge physics, ikke white card with border»):
+   · Ny `panel`-variant i `OpalSurface` (`OPAL_PANEL`), brukt av lagkortene,
+     action-gruppa og menygruppene. Kortvarianten er URØRT — feedkortets
+     fallback skal ikke endre seg av dette.
+   · Kantfysikken: lyset er svakere (edgeTop 0,85 → 0,50) og dør TIDLIGERE
+     langs diagonalen (0,45 → 0,34), så bare hjørnet der lyset kommer fra
+     fanger det i stedet for at hele ringen tennes. Motkanten nederst/til
+     sidene er dypere (edgeShade 0,14 → 0,20). Målt i riggen: kantlyset midt
+     på venstre kant faller fra 0,42 til 0,17. Toppens specular
+     (`OPAL.highlight`) er uendret — den ER lyset Brage ber om, og bærer nå
+     kanten alene.
+   · Mer grunn gjennom materialet: 0,92/0,87 → 0,89/0,82. GULVET er 0,82:
+     under det ryker kontrastporten (ved 0,82 over #0B412E måler
+     inkSecondary 4,8:1 og inkAccent 4,7:1).
+   · VALGT LAG: ringen er FJERNET helt (runde 1 dempet den til 0,40, runde 2
+     fjerner den). Tilstanden bæres av heiaSoft-tinten, haken og panelets
+     egen kantfysikk. Blir den for svak på telefonen, løftes TINTEN — ikke
+     en ny ring.
+   · Vokter: `__tests__/opalPanel.test.tsx` (7).
+
+3. VERIFISERT: full suite 1117/1119 grønn (2 skipped); eslint rent; prettier
+   ren på alt berørt unntatt de to kjente HEAD-stedene i ProfilScreen. tsc
+   IKKE kjørt (Brages regel). Riggen (jest → serialisert svg fra
+   OpalSurfaces EGEN utskrift → HTML → headless Chrome) er kjørt på begge
+   endringene og slettet igjen. Ingen `zz_`-filer.
+
+▶️ PÅ TELEFONEN (det som IKKE er verifisert):
+  a. Scroll Varsler helt øverst, halvveis, langt ned, og raskt opp/ned.
+     Flaten skal aldri blinke, forsvinne eller bli transparent. Dette er
+     hele poenget med runden.
+  b. Varsler-flaten kan lese LITT mørkere/grønnere enn før: `UIGlassEffect`
+     gjorde en adaptiv oppklaring for lesbarhet som en flat tint ikke gjør.
+     Fikses med ÉN konstant (`GLASS.sheet.tint`s alfa) hvis Brage ser det.
+  c. Profil: er kanten nå material og ikke ramme? Er valgt lag fortsatt
+     tydelig uten ring?
+
+▶️ NESTE:
+  A. SEKSJONSETIKETTENES KONTRAST — Brages egen lille skive (avtalt
+     2026-09-04). `SectionLabel` uten `tone` står i `colors.textSecondary`
+     (#5F7265) på dagslysrampen: «RIDABU G10», «MIN STØTTE», «KONTO», «OM
+     HEIA» lander ved 35–60 % av kroppen der kontrasten er 1,6–3,9:1. SAMME
+     problem på Kalender-agendaen og Hjems «Siste fra laget». Ingen enkelt
+     blekkfarge holder over hele rampen. Kandidater: posisjonsavhengig
+     blekk, liten frostplate bak etiketten, eller etiketten inn i toppen av
+     gruppa. ÉN skive, alle tre skjermene.
+  B. Kalenderchromens hvite piller vs. Varslers frostpille; den blå
+     treningsprikken.
+  C. FeedCard mer glass. D. Opprydding (prune DaylightGround-varianter,
+     promoter ankerfargene til tokens, spinnere i neon på neon).
+
+## (historikk) START HER 2026-09-04 kveld — VARSLER OG PROFIL TELEFONGODKJENT OG COMMITTET (tre runder i én commit, 6e7c88c)
 
 ✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
 native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-04:
