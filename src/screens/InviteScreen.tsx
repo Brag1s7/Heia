@@ -1,8 +1,12 @@
 import React from 'react';
-import {Text, ScrollView, StyleSheet, View} from 'react-native';
+import {Text, ScrollView, StyleSheet} from 'react-native';
 import {useRoute, type RouteProp} from '@react-navigation/native';
 import {colors, typography, spacing} from '../theme';
-import {BackBar, InviteCodeCard, useBottomContentPadding} from '../components';
+import {
+  ProfilPage,
+  InviteCodeCard,
+  useBottomContentPadding,
+} from '../components';
 import {useActiveTeam} from '../context';
 import type {HomeStackParamList} from '../shared/types';
 
@@ -17,36 +21,29 @@ export function InviteScreen() {
   if (!activeTeamSpace) return null;
 
   return (
-    <View style={styles.screen}>
-      <BackBar title="Inviter" />
+    <ProfilPage title="Inviter">
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}>
-      <Text style={styles.title}>
-        {firstTime ? 'Laget er klart! 🎉' : 'Inviter til laget'}
-      </Text>
-      <Text style={styles.subtitle}>
-        {firstTime
-          ? `${activeTeamSpace.displayName} er opprettet. Inviter foreldre og spillere så blir laget levende.`
-          : `Få flere inn i ${activeTeamSpace.displayName}.`}
-      </Text>
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}>
+        <Text style={styles.title}>
+          {firstTime ? 'Laget er klart! 🎉' : 'Inviter til laget'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {firstTime
+            ? `${activeTeamSpace.displayName} er opprettet. Inviter foreldre og spillere så blir laget levende.`
+            : `Få flere inn i ${activeTeamSpace.displayName}.`}
+        </Text>
 
-      <InviteCodeCard
-        teamName={activeTeamSpace.displayName}
-        inviteCode={activeTeamSpace.inviteCode}
-      />
+        <InviteCodeCard
+          teamName={activeTeamSpace.displayName}
+          inviteCode={activeTeamSpace.inviteCode}
+        />
       </ScrollView>
-    </View>
+    </ProfilPage>
   );
 }
 
+// Overskriften står i reisens mørke topp (ProfilPage) → stadionblekk.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
@@ -54,10 +51,11 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginBottom: spacing.lg,
   },
 });

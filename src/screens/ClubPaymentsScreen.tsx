@@ -9,9 +9,19 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
 import {errorMessage} from '../shared/errorMessage';
-import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
+import {
+  ProfilPage,
+  Button,
+  Skeleton,
+  useBottomContentPadding,
+} from '../components';
 import {
   AlertTriangle,
   Ban,
@@ -167,10 +177,7 @@ export function ClubPaymentsScreen() {
         await fn();
         await load();
       } catch (e) {
-        Alert.alert(
-          'Handlingen feilet',
-          errorMessage(e),
-        );
+        Alert.alert('Handlingen feilet', errorMessage(e));
       } finally {
         setActing(false);
       }
@@ -188,7 +195,10 @@ export function ClubPaymentsScreen() {
           'støtte med en gang.',
         [
           {text: 'Avbryt', style: 'cancel'},
-          {text: 'Godkjenn', onPress: () => run(() => approveTeamSupport(req.id))},
+          {
+            text: 'Godkjenn',
+            onPress: () => run(() => approveTeamSupport(req.id)),
+          },
         ],
       );
     },
@@ -237,7 +247,9 @@ export function ClubPaymentsScreen() {
           {
             text: 'Pause',
             onPress: (text?: string) =>
-              run(() => pauseTeamSupport(team.teamSpaceId, text?.trim() || undefined)),
+              run(() =>
+                pauseTeamSupport(team.teamSpaceId, text?.trim() || undefined),
+              ),
           },
         ],
         'plain-text',
@@ -261,7 +273,10 @@ export function ClubPaymentsScreen() {
             style: 'destructive',
             onPress: (text?: string) =>
               run(() =>
-                deactivateTeamSupport(team.teamSpaceId, text?.trim() || undefined),
+                deactivateTeamSupport(
+                  team.teamSpaceId,
+                  text?.trim() || undefined,
+                ),
               ),
           },
         ],
@@ -279,7 +294,9 @@ export function ClubPaymentsScreen() {
       const n = team.unresolvedCancellations;
       Alert.alert(
         'Fullføre deaktiveringen?',
-        `${n === 1 ? '1 støtteavtale' : `${n} støtteavtaler`} i «${team.teamName}» ` +
+        `${n === 1 ? '1 støtteavtale' : `${n} støtteavtaler`} i «${
+          team.teamName
+        }» ` +
           'ble ikke satt til å avsluttes forrige gang — trolig en midlertidig ' +
           'feil mot betalingsleverandøren. Vi prøver på nytt; de som alt er ' +
           'i orden røres ikke.',
@@ -360,8 +377,7 @@ export function ClubPaymentsScreen() {
   const renderEntity = (club: ClubPaymentsClub) => {
     const accountReady = !!club.account?.chargesEnabled;
     const entityId = club.entity?.id ?? null;
-    const legalName =
-      club.entity?.legalName ?? club.club?.name ?? 'Klubben';
+    const legalName = club.entity?.legalName ?? club.club?.name ?? 'Klubben';
     // Flere aktive klubbrader på samme orgnr = én myndighetskrets, men
     // lagene ligger spredt. Da SKAL det stå hvilke rader som inngår.
     const extraClubs = club.clubs.length > 1 ? club.clubs : [];
@@ -374,7 +390,7 @@ export function ClubPaymentsScreen() {
         )}
         {extraClubs.length > 0 && (
           <Text style={styles.clubMeta}>
-            Klubbsider i Heia: {extraClubs.map((c) => c.name).join(' · ')}
+            Klubbsider i Heia: {extraClubs.map(c => c.name).join(' · ')}
           </Text>
         )}
         {!accountReady && (
@@ -391,11 +407,22 @@ export function ClubPaymentsScreen() {
         {club.requests.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>TIL GODKJENNING</Text>
-            {club.requests.map((req) => (
-              <View key={req.id} style={styles.card}>
+            {club.requests.map(req => (
+              <LiquidGlassSurface
+                key={req.id}
+                variant="sheet"
+                wrapStyle={styles.cardWrap}
+                style={styles.card}>
                 <Text style={styles.cardTitle}>{req.teamName}</Text>
                 <Text style={styles.meta}>
-                  {[req.ageGroup, req.gender === 'female' ? 'jenter' : req.gender === 'male' ? 'gutter' : null]
+                  {[
+                    req.ageGroup,
+                    req.gender === 'female'
+                      ? 'jenter'
+                      : req.gender === 'male'
+                      ? 'gutter'
+                      : null,
+                  ]
                     .filter(Boolean)
                     .join(' · ') || 'Lag i klubben'}
                   {' · '}
@@ -417,14 +444,14 @@ export function ClubPaymentsScreen() {
                   onPress={() => handleReject(req)}
                   disabled={acting}
                 />
-              </View>
+              </LiquidGlassSurface>
             ))}
           </>
         )}
 
         {/* Lagene i klubben med dør-tilstand + handlinger. */}
         <Text style={styles.sectionLabel}>LAGENE</Text>
-        {club.teams.map((team) => {
+        {club.teams.map(team => {
           const meta = STATE_META[team.state];
           const canPause = team.state === 'collecting';
           const canDeactivate =
@@ -432,11 +459,18 @@ export function ClubPaymentsScreen() {
             team.liveSubscriptions > 0;
           const unresolved = team.unresolvedCancellations > 0;
           return (
-            <View key={team.teamSpaceId} style={styles.card}>
+            <LiquidGlassSurface
+              key={team.teamSpaceId}
+              variant="sheet"
+              wrapStyle={styles.cardWrap}
+              style={styles.card}>
               <View style={styles.cardTop}>
                 <Text style={styles.cardTitle}>{team.teamName}</Text>
                 <Text
-                  style={[styles.pill, {backgroundColor: meta.bg, color: meta.fg}]}>
+                  style={[
+                    styles.pill,
+                    {backgroundColor: meta.bg, color: meta.fg},
+                  ]}>
                   {meta.label}
                 </Text>
               </View>
@@ -507,14 +541,17 @@ export function ClubPaymentsScreen() {
                   )}
                 </View>
               )}
-            </View>
+            </LiquidGlassSurface>
           );
         })}
 
         {/* Rolleadmin (II.6) — produksjonsflyt, aldri SQL-runbook. */}
         <Text style={styles.sectionLabel}>BETALINGSANSVARLIGE</Text>
-        <View style={styles.card}>
-          {club.managers.map((m) => (
+        <LiquidGlassSurface
+          variant="sheet"
+          wrapStyle={styles.cardWrap}
+          style={styles.card}>
+          {club.managers.map(m => (
             <View key={m.userId} style={styles.personRow}>
               {m.status === 'active' ? (
                 <UserCheck size={16} color={colors.heiaInk} />
@@ -533,7 +570,7 @@ export function ClubPaymentsScreen() {
 
           {club.invitations.length > 0 && (
             <View style={styles.inviteList}>
-              {club.invitations.map((inv) => (
+              {club.invitations.map(inv => (
                 <View key={inv.id} style={styles.personRow}>
                   <Mail size={16} color={colors.textTertiary} />
                   <View style={styles.personTextWrap}>
@@ -569,7 +606,7 @@ export function ClubPaymentsScreen() {
                   onChangeText={setInviteName}
                   autoCapitalize="words"
                   placeholder="Fullt navn"
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={OPAL.inkTertiary}
                 />
                 <Text style={styles.fieldLabel}>E-post</Text>
                 <TextInput
@@ -580,7 +617,7 @@ export function ClubPaymentsScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholder="Invitasjonen sendes hit"
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={OPAL.inkTertiary}
                 />
                 <Text style={styles.hint}>
                   Invitasjonen kan bare aksepteres av en innlogget Heia-konto
@@ -610,13 +647,16 @@ export function ClubPaymentsScreen() {
               hello@heiaapp.no, så setter vi det opp.
             </Text>
           )}
-        </View>
+        </LiquidGlassSurface>
 
         {/* Loggen — hvem/når/årsak (låst beslutning). */}
         {club.log.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>LOGG</Text>
-            <View style={styles.card}>
+            <LiquidGlassSurface
+              variant="sheet"
+              wrapStyle={styles.cardWrap}
+              style={styles.card}>
               {club.log.map((entry, i) => (
                 <View key={i} style={styles.logRow}>
                   <View style={styles.logIcon}>
@@ -630,7 +670,7 @@ export function ClubPaymentsScreen() {
                   </Text>
                 </View>
               ))}
-            </View>
+            </LiquidGlassSurface>
           </>
         )}
       </View>
@@ -638,13 +678,9 @@ export function ClubPaymentsScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <BackBar />
+    <ProfilPage>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -660,71 +696,79 @@ export function ClubPaymentsScreen() {
         </Text>
 
         {loading ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Skeleton width={120} height={12} />
             <Skeleton height={16} />
             <Skeleton width="60%" height={12} />
-          </View>
+          </LiquidGlassSurface>
         ) : error ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>
               Fikk ikke hentet oversikten — dra ned for å prøve igjen.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : clubs === null || clubs.length === 0 ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>
               Du er ikke betalingsansvarlig for noen klubb.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : (
           clubs.map(renderEntity)
         )}
       </ScrollView>
-    </View>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskrifter og etiketter på grunnen →
+// stadionblekk; kortene er paneler → OPAL-blekk og GLASS_FIELD-felt.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   content: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginBottom: spacing.lg,
   },
   clubName: {
     ...typography.heading2,
+    color: colors.stadiumText,
     marginTop: spacing.lg,
   },
   clubMeta: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: 'rgba(234, 255, 246, 0.8)',
   },
   sectionLabel: {
     ...typography.caption,
     fontWeight: '700',
     letterSpacing: 1,
-    color: colors.textTertiary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
+  cardWrap: {
     marginBottom: spacing.md,
+  },
+  card: {
+    padding: spacing.lg,
     gap: spacing.xs,
-    ...shadows.card,
   },
   cardTop: {
     flexDirection: 'row',
@@ -747,11 +791,11 @@ const styles = StyleSheet.create({
   },
   meta: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   hint: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   cardButton: {
     marginTop: spacing.sm,
@@ -813,8 +857,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: colors.textSecondary,
-    backgroundColor: colors.surfaceMuted,
+    color: OPAL.inkSecondary,
+    backgroundColor: 'rgba(8, 57, 46, 0.08)',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
@@ -823,7 +867,7 @@ const styles = StyleSheet.create({
   inviteList: {
     marginTop: spacing.xs,
     borderTopWidth: 1,
-    borderTopColor: colors.borderSubtle,
+    borderTopColor: OPAL.hairline,
     paddingTop: spacing.xs,
   },
   inviteForm: {
@@ -833,16 +877,16 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   input: {
     ...typography.bodySmall,
-    backgroundColor: colors.background,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
   },
   logRow: {
@@ -858,7 +902,7 @@ const styles = StyleSheet.create({
   },
   logLine: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     flexShrink: 1,
   },
 });

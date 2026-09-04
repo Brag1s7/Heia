@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {StyleSheet, View, useWindowDimensions} from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -822,7 +822,15 @@ export function DaylightGround({
   identity,
 }: DaylightGroundProps) {
   const variant = DAYLIGHT_VERTICAL_VARIANT;
-  const [box, setBox] = useState({w: 0, h: 0});
+  // FØRSTE RAMME (Brage 2026-09-04: «bytter lag og går til profilsiden, så
+  // blinker skjermen»): lagbytte gjør CommonActions.reset, og hele fanen
+  // monteres på nytt. Å vente på onLayout før reisen tegnes ga én ramme med
+  // flat mint-fallback før den mørke toppen — det er blinket. Grunnen fyller
+  // i praksis alltid vinduet (masthead: hele skjermen; ellers en full
+  // skjermrute), så vinduet er riktig gjetning i første ramme; onLayout
+  // korrigerer om containeren er en annen.
+  const window = useWindowDimensions();
+  const [box, setBox] = useState({w: window.width, h: window.height});
   const insets = useSafeAreaInsets();
   const {activeTeamSpace} = useActiveTeam();
   const headerHeight = masthead ? mastheadHeight(insets.top) : 0;

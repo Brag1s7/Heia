@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Platform,
   StyleSheet,
@@ -57,7 +57,8 @@ export type GlassVariant =
   | 'important'
   | 'bar'
   | 'barMatch'
-  | 'sheet';
+  | 'sheet'
+  | 'panel';
 
 export const GLASS = {
   card: {tint: 'rgba(233, 235, 234, 0.34)', sheen: 0.18, interactive: true},
@@ -94,6 +95,17 @@ export const GLASS = {
    */
   sheet: {tint: 'rgba(244, 246, 245, 0.8)', sheen: 0.1, interactive: false},
   /**
+   * PROFILS GRUPPER (Brage 2026-09-04: «kantene ser billige ut og boksene er
+   * for hvite … mer glassaktig, som resten av appen»): lagkortene,
+   * action-gruppa og menygruppene er SAMME glass som feedkortet — samme
+   * perle, samme alfa, samme sheen — så Profil og Hjem er ett materiale.
+   * Eneste forskjell: INGEN trykkrespons i glasset, for radene inni er
+   * kontrollene (samme grunn som `sheet` på Varsler). Lagkortene, som
+   * trykkes som én flate, bruker `card` direkte. Den matte svg-opalen med
+   * kantring (`OpalSurface panel`) er nå bare fallbacken uten glass.
+   */
+  panel: {tint: 'rgba(233, 235, 234, 0.34)', sheen: 0.18, interactive: false},
+  /**
    * Solid varm perle for `important` uten glass (Android / Reduce
    * Transparency / eldre iOS): tinten over lysfelt-grunnen regnet ut til én
    * flat farge, så materialretningen beholdes — IKKE det mettede
@@ -118,6 +130,17 @@ export const GLASS = {
    */
   unboundedEdge: 'rgba(255, 255, 255, 0.38)',
   unboundedTop: 'rgba(255, 255, 255, 0.55)',
+} as const;
+
+/**
+ * FELTFLATEN PÅ GLASS (Brage 2026-09-03, «Ny hendelse»; delt fra 2026-09-04
+ * med Profils undersider): et tekstfelt på et glasspanel er lyst og
+ * halvgjennomsiktig med en svak blekk-kant — ikke en hvit boks. Voktet i
+ * `__tests__/glassSheet.test.tsx` via `NewEventScreen.FIELD`.
+ */
+export const GLASS_FIELD = {
+  fill: 'rgba(255, 255, 255, 0.55)',
+  edge: 'rgba(5, 44, 35, 0.12)',
 } as const;
 
 /**
@@ -157,6 +180,11 @@ const NativeGlass = LIQUID_GLASS_SUPPORTED
 
 interface LiquidGlassSurfaceProps {
   style?: StyleProp<ViewStyle>;
+  /**
+   * Ytre ramme rundt glasset — for MARGER. `style` treffer innerboksen (der
+   * padding hører hjemme); en margin der ville ligget inni glasset.
+   */
+  wrapStyle?: StyleProp<ViewStyle>;
   pressed?: boolean;
   /** Materialvariant — se `GLASS`. Default = feedkortet. */
   variant?: GlassVariant;
@@ -190,18 +218,68 @@ interface LiquidGlassSurfaceProps {
    * glasskarakteren kommer fra tinten og kantene, ikke fra uskarpheten.
    */
   unbounded?: boolean;
+  /**
+   * INNHOLD SOM KOMMER SENT (Brage 2026-09-04: «idrettene kommer opp først
+   * hvis man for eks velger en farge»). Glasset er en legacy native view
+   * gjennom Fabrics interop-lag, og barn som monteres i en SENERE commit enn
+   * glasset selv (asynkrone data: idretter, søketreff) vises ikke før neste
+   * commit som oppdaterer noe under glasset — hvilken som helst prop, som
+   * fargevalget gjorde. Send en verdi som endrer seg når slikt innhold
+   * kommer eller går; flaten planlegger da selv én harmløs oppdatering
+   * under glasset i neste ramme (`GlassNudge`). Statisk innhold trenger
+   * det ikke.
+   */
+  contentVersion?: string | number;
+  /**
+   * INNHOLDET UTENFOR NATIVE-VIEWET (Brage 2026-09-04, «Opprett lag»:
+   * idrettspillene — en flexWrap-rad — var usynlige inne i glasset selv når
+   * de ble montert sammen med det, og dukket opp først ved en senere
+   * oppdatering). Med `detached` er glasset en absolutt bakgrunn BAK
+   * innholdet, og innholdet er vanlige Fabric-views som søsken over — samme
+   * oppsett som feedens tab-bar (`fill`) og det som viste Varsler-radene
+   * feilfritt. Prisen: ingen native trykkrespons (irrelevant for
+   * ikke-interaktive varianter). Bruk det på flater med skjema og dynamisk
+   * innhold. Fallback-grenene er upåvirket (vanlige views uansett).
+   */
+  detached?: boolean;
   children?: React.ReactNode;
 }
 
+/** Se `contentVersion`: én oppdaterings-mutasjon under glasset per endring. */
+function GlassNudge({version}: {version: string | number}) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setTick(t => t + 1));
+    return () => cancelAnimationFrame(id);
+  }, [version]);
+  return (
+    <View
+      testID="glass-nudge"
+      pointerEvents="none"
+      style={[styles.nudge, tick % 2 === 1 && styles.nudgeOdd]}
+    />
+  );
+}
+
 export function LiquidGlassSurface({
+  wrapStyle,
+  ...props
+}: LiquidGlassSurfaceProps) {
+  const node = <GlassSurface {...props} />;
+  return wrapStyle ? <View style={wrapStyle}>{node}</View> : node;
+}
+
+function GlassSurface({
   style,
   pressed = false,
   variant = 'card',
   cornerRadius = radius.xl,
   fill = false,
   unbounded = false,
+  contentVersion,
+  detached = false,
   children,
-}: LiquidGlassSurfaceProps) {
+}: Omit<LiquidGlassSurfaceProps, 'wrapStyle'>) {
   const {reduceTransparency} = useMaterialAccessibility();
   const glass = GLASS[variant];
   const fillStyle = fill ? StyleSheet.absoluteFill : null;
@@ -242,6 +320,14 @@ export function LiquidGlassSurface({
 
   if (!FEED_LIQUID_GLASS_AB || !NativeGlass || reduceTransparency) {
     const solid = SOLID[variant];
+    // Profils grupper uten glass: opalens panel-kantfysikk, ikke kortets.
+    if (variant === 'panel') {
+      return (
+        <OpalSurface variant="panel" style={style} pressed={pressed}>
+          {children}
+        </OpalSurface>
+      );
+    }
     if (solid) {
       return (
         <View
@@ -267,6 +353,29 @@ export function LiquidGlassSurface({
       </OpalSurface>
     );
   }
+  if (detached) {
+    return (
+      <View style={[styles.detached, fillStyle]}>
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <NativeGlass
+            style={[
+              styles.glass,
+              {borderRadius: cornerRadius},
+              StyleSheet.absoluteFill,
+            ]}
+            cornerRadius={cornerRadius}
+            glassTint={glass.tint}
+            sheenOpacity={glass.sheen}
+            interactive={false}
+            pressed={pressed}
+          />
+        </View>
+        <View style={[styles.surface, {borderRadius: cornerRadius}, style]}>
+          {children}
+        </View>
+      </View>
+    );
+  }
   return (
     <NativeGlass
       style={[styles.glass, {borderRadius: cornerRadius}, fillStyle]}
@@ -283,6 +392,9 @@ export function LiquidGlassSurface({
           style,
         ]}>
         {children}
+        {contentVersion !== undefined && (
+          <GlassNudge version={contentVersion} />
+        )}
       </View>
     </NativeGlass>
   );
@@ -303,6 +415,18 @@ const styles = StyleSheet.create({
   solid: {
     borderRadius: radius.xl,
     borderWidth: 1,
+  },
+  // `detached`: rammen måler seg etter innholdet; glasset fyller den bak.
+  detached: {
+    borderRadius: radius.xl,
+  },
+  // GlassNudge: null høyde, aldri synlig — bare en prop som kan endres.
+  nudge: {
+    height: 0,
+    opacity: 1,
+  },
+  nudgeOdd: {
+    opacity: 0.99,
   },
   unboundedTop: {
     position: 'absolute',

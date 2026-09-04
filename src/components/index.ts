@@ -54,6 +54,7 @@ export {StadiumSurface} from './StadiumSurface';
 // NEXT_MATCH_GLASS_AB) + systembryterne materialet svarer på.
 export {StadiumGlass} from './StadiumGlass';
 export {OpalSurface, OPAL} from './OpalSurface';
+export {ProfilPage} from './ProfilPage';
 export {
   LiquidGlassSurface,
   FEED_LIQUID_GLASS_AB,

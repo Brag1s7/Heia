@@ -1,6 +1,303 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-04 kveld, runde 4 — SCROLL-GLITCHEN PÅ VARSLER LØST I ROTEN + PROFIL-MATERIALET POLERT; venter telefondom, så seksjonsetikettene)
+## ▶️▶️ START HER (oppdatert 2026-09-04 ~11:50 — RUNDE 7 COMMITTET; NESTE SAMTALE = FEEDCARD)
+
+✅ Runde 5–7 er committet i ÉN commit oppå d5bb701 (se `git log -1`), på
+Brages ordre etter at Opprett lag-idrettene endelig satt. Ikke pushet.
+Telefonstatus: lagkortene (sheet) godkjent live; idrettene vises med
+`detached`; resten av runde 7 (Varsler rullende ark i biter, blink-fiks,
+undersidene i sheet-glass, dag/uke-bolker) er IKKE eksplisitt bekreftet på
+telefon — Brage gikk videre til FeedCard. Regn dem som «levert, ikke
+telefondømt».
+
+OPPRETT LAG — FASIT (tre lag, alle trengtes):
+  · `detached` på LiquidGlassSurface: glasset er bakgrunn bak innholdet,
+    innholdet er vanlige views over. DET var det som gjorde pillene synlige.
+    Hvorfor akkurat idrettsslotten var usynlig inne i native-viewet (mens
+    fargevelgeren, også flexWrap + Pressable, vistes) er UAVKLART. Regel:
+    skjema/dynamisk innhold på glass → `detached`.
+  · `contentVersion`/GlassNudge: harmløs, beholdes for async innhold i
+    ikke-detached glass — men det var IKKE løsningen.
+  · Idrettscachen varmes ved BOOT i TeamContext (`getSports()` når
+    `!isRefresh`), så pillene står der fra første render på første besøk.
+    Vokter: `createTeamGlass.test` (kildesjekk + versjon + detached).
+
+NESTE SAMTALE — FEEDCARD (Brage 2026-09-04: «se på feedcard»). Start med:
+  1. Les [[liquid_glass_slice]], [[design_rule_dark_glass_match]] og
+     [[opal_feedcard_slice]] i minnet + denne fila. FeedCard står i
+     `GLASS.card` (0,34, interaktivt, LÅST siden 89e52e7) med OPAL-blekk;
+     kampinnlegg i mørkt StadiumGlass (designregel). Punkt C på lista har
+     vært «FeedCard mer glass».
+  2. Lærdommene fra runde 5–7 som gjelder feeden: tynt glass FØLGER grunnen
+     (mørkt mot laghodet); interaktivt glass tenner trykklys ved
+     scroll-start; `contentVersion` for async innhold i glass (bilder,
+     kommentarer, reaksjoner som kommer sent?); `detached` finnes.
+  3. Be Brage om et telefonbilde av Hjem FØR forslag (inspiser → foreslå →
+     godkjenning → kode), og bruk BEGGE designskillene.
+
+▶️ ÅPENT ETTER RUNDE 7 (ikke telefondømt): Varsler (ark i biter, spinner
+   på grunnen), blink ved lagbytte, undersidenes kontrast, dag/uke-bolker.
+   Kjent svakt punkt overalt: etiketter på grunnen midt på rampen (A).
+
+## (historikk) START HER 2026-09-04, runde 7 — FEM RETTELSER ETTER TELEFON
+
+⚠️ IKKE TELEFONTESTET, IKKE COMMITTET. Alt er JS/TS — men gjør en FULL
+RELOAD (Cmd+R / rist), ikke bare Fast Refresh: mange strukturelle edits har
+gått live i samme økt. Full suite 1136/1138 grønn, eslint rent, prettier
+husstil rent, tsc IKKE kjørt (Brages regel). 28 filer i arbeidstreet oppå
+d5bb701.
+
+BRAGES FEM PUNKTER (11:00) OG SVARENE:
+
+1. LAGKORTENE («du hadde fikset lagkortene i stad, men nå er samme feil
+   tilbake»): Brage så `sheet`-versjonen (0,80) live via Fast Refresh og
+   kalte den fikset; mitt bytte til `panel` (0,34, ikke interaktivt)
+   brakte mørkningen tilbake. Konklusjon, ikke gjetning: det var TINTEN,
+   ikke interaktiviteten. Lagkortene står i `sheet`. Trykk = blekk-tint,
+   valgt = TEAM_CARD_SELECTED 0,30 + hake. `profilGlass.test` 2b måler
+   absolutt (≥ 4,5 / ≥ 7) over hele reisen inkl. #0E211A — holder på 0,80.
+
+2. VARSLER («spinner på en hvit side … fiks slik det var med scrolling»):
+   det faste arket (runde 6) er FJERNET. Tilbake til 6e7c88c-strukturen:
+   ark per kjede som ruller med innholdet, oppfrisk-spinneren på grunnen,
+   etikettene på grunnen (standard SectionHeader). NYTT: arkene er EKTE
+   glass igjen (`sheet`, native backdrop — ikke `unbounded`), og for at de
+   aldri blir høyere enn skjermen deles en kjede i biter på maks
+   `MAX_SHEET_ROWS = 10` rader (≈ 600 pt) i `blocks`-useMemo; bitene har
+   8 pt luft (`listWrap.marginBottom`). Dag/uke-bolkene (runde 6) står.
+   `inboxSurface.test` §4: alle tagger er sheet, ingen unbounded, ingen
+   fill, ingen `styles.pane`, chunk-regelen i kilden, FlatList rett under
+   chromen.
+
+3. BLINK VED LAGBYTTE → PROFIL: `handleTeamSwitch` gjør
+   `CommonActions.reset` → hele fanen remonteres. `DaylightGround` ventet
+   på onLayout før reisen ble tegnet → én ramme flat mint-fallback før den
+   mørke toppen. Nå seedes målingen med `useWindowDimensions()` (grunnen
+   fyller alltid vinduet; onLayout korrigerer ellers), og ProfilScreens
+   rot er grunnens fallback (samme mint som navigatorkortet), så det ikke
+   finnes noen krem-ramme heller. Gjelder alle masthead-skjermene.
+   ⚠️ Kan fortsatt blinke hvis det er de 12 native glassflatene som
+   popper inn — det kan ikke ses i jest. Si fra om det fortsatt blinker.
+
+4. IDRETTENE PÅ «OPPRETT LAG» — RUNDE 7b (Brage 11:20: «de kommer opp
+   først hvis man for eks velger en farge»): symptomet er nå presist, og
+   det er Fabric-interop-oppførsel for legacy native views: barn som
+   monteres i en SENERE commit enn glasset selv (asynkrone data) vises
+   ikke før neste commit som oppdaterer noe under glasset — en hvilken
+   som helst prop (fargevalget). FIKS: ny prop `contentVersion` på
+   LiquidGlassSurface; når den endrer seg, planlegger `GlassNudge` (null
+   høyde, inne i innerboksen, kun native-grenen) én harmløs
+   opacity-oppdatering i neste ramme. CreateTeam sender en versjon av
+   idretter/klubbtreff/valgt klubb/feil. Vokter: `glassNudge.test` (5) +
+   `createTeamGlass.test` (versjonen ENDRER seg når idrettene kommer).
+   ⚠️ REGEL VIDERE: asynkront innhold som monteres inne i en ALLEREDE
+   montert glassflate MÅ meldes via `contentVersion`. Flater som monteres
+   sammen med innholdet (Varsler-ark, feedkort, resultatark) trenger det
+   ikke. ⚠️ Mekanismen er utledet fra symptomet, ikke telefonbevist —
+   sjekk Opprett lag først.
+   RUNDE 7c (Brage 11:30: «feilen er der fremdeles hvis man går inn og
+   ut»): med idrettene CACHET monteres pillene i SAMME commit som arket og
+   er likevel usynlige til fargevalget — så commit-rekkefølgen var ikke
+   hele svaret; nudgen består, men er ikke løsningen. Fakta som står:
+   TeamColorPicker er også en flexWrap-rad med Pressables inne i samme ark
+   og VISES; bare innholdet i idrettsslotten (bones OG piller) er usynlig.
+   Jeg kan ikke utlede hvorfor uten telefon. Derfor den robuste veien: ny
+   prop `detached` på LiquidGlassSurface — glasset er en absolutt BAKGRUNN
+   bak innholdet, innholdet er vanlige Fabric-views som søsken over (samme
+   oppsett som Varsler-arket i runde 6, der radene vistes feilfritt).
+   Opprett lag-skjemaet bruker `detached`. Ingen native trykkrespons i den
+   modusen (irrelevant på sheet). ⚠️ Vises idrettene FORTSATT ikke: da er
+   det ikke glasset — send skjermbilde, og test om «Alder / kull»-feltet
+   under også mangler.
+   (Opprinnelig 7a-notat:) rotårsaken var ikke bevist. Fakta: native-viewet sender alltid glasset bakerst
+   (didAddSubview), og pillene er barnebarn av glasset, så de KAN ikke
+   ligge bak det. Skjelettbonene (surfaceMuted) var derimot usynlige på
+   perlen → ventetilstanden så ut som et blankt mellomrom. Nå: bones i
+   blekk-tint (`styles.bone`). Ny `createTeamGlass.test` (3) monterer
+   skjermen med idretter som kommer SENT og krever at pillene står inne på
+   arket, at bonene er synlige, og at arket er ett `sheet`. ⚠️ Er det
+   fortsatt blankt etter FULL RELOAD: send skjermbilde — da er det noe
+   native (mest sannsynlig `getSports` som henger, ikke glasset).
+
+5. KONTRAST PÅ INVITER / BLI MED: alle undersidenes paneler er nå
+   `sheet` (0,80), ikke `panel` (0,34) — 54 flater i 11 skjermer +
+   InviteCodeCard. Målt (naiv modell): ark/grunn 7–10:1 i den mørke toppen
+   (tynt panel: 1,6–2,5), felt på ark m/ kant, OPAL-blekk på felt 6,3:1,
+   placeholder byttet fra textTertiary (2,2:1) til OPAL.inkTertiary
+   (5,3:1) i alle undersidenes felt. Neonknappen leser mot perlen som på
+   hvit flate (hue, ikke luminans — som appens primærknapp alltid har).
+   BLI MED: kodefelt + «Finn lag» på ETT ark, resultatet (lagrad, tekster,
+   «Din rolle», radioradene, «Bli med») på ETT ark — aldri ark i ark.
+   Riggbilde sendt (underside.png).
+
+▶️ PÅ TELEFONEN (FULL RELOAD FØRST):
+  a. Profil: lagkortene lyse og stabile mot headeren; valgt = mint.
+  b. Varsler: dra ned → spinner på grunnen; arkene ruller med; ekte glass;
+     scroll langt ned i en travel måned — bitene skal aldri forsvinne.
+  c. Lagbytte → Profil: blinker det fortsatt?
+  d. Opprett lag: idrettene — FØRST. Blankt? → skjermbilde (og si om
+     «Alder / kull» og fargene under vises).
+  e. Bli med / Inviter: to ark, felt, neonknapper.
+
+▶️ NESTE (uendret): A. etikettkontrast på grunnen (alle skjermer, én
+   skive); B. Kalenderchromens piller; C. FeedCard mer glass; D. opprydding.
+
+## (historikk) START HER 2026-09-04, runde 6 — LAGKORT, VARSLER-ARK + DAG/UKE-BOLKER, PROFILPAGE-MALEN PÅ 11 UNDERSIDER (delvis OVERKJØRT av runde 7: lagkort = sheet, Varsler = rullende ark i biter, undersider = sheet)
+
+⚠️ IKKE TELEFONTESTET, IKKE COMMITTET. Alt er JS/TS — Metro-reload holder,
+ingen native endring, ingen pod install. Full suite 1133/1135 grønn, eslint
+rent, prettier husstil rent, tsc IKKE kjørt (Brages regel). 26 filer i
+arbeidstreet oppå d5bb701 (`git status`).
+
+BRAGES TRE PUNKTER (telefon 10:21 + to meldinger underveis) OG SVARENE:
+
+1. LAGKORTENE PÅ PROFIL («endrer farge rart av seg selv ved scroll … så
+   fort de nærmer seg header så blir de mørke, vil at de oppfører seg likt
+   som resten av kortene under» + «mer fyldig farge på valgt kort»):
+   · Rotårsak: lagkortene sto i feedkortets `card` = INTERAKTIVT
+     UIGlassEffect; gruppene sto i `panel` (samme perle, ikke interaktivt) og
+     oppførte seg fint. Interaktivt glass tilpasser seg innholdet bak seg mer
+     aggressivt → mørkt mot laghodet. Nå: lagkortene i NØYAKTIG gruppenes
+     `panel`. Ett materiale på hele Profil.
+   · Trykk: `card`-glassets native lys tentes også ved scroll-start på et
+     kort. Lagkortene sender ikke lenger `pressed` til glasset; trykk er
+     `OPAL.rowPressed` i flaten (som radene).
+   · Valgt lag: `TEAM_CARD_SELECTED = rgba(2,255,171,0.30)` (var heiaSoft
+     0,12) + hake. Ingen ring. Voktet i `profilGlass.test` (2b): absolutt
+     kontrastport over lys grunn, relativ (tinten skal lyse opp) over mørk.
+
+2. VARSLER («mer glass look på boksene her, men ikke samme design som
+   Profil» + «ser ikke ut som varslinger har noe skille mellom dager og
+   uker»):
+   · ARKET: ÉN fast `LiquidGlassSurface variant="sheet" fill` i en ramme
+     (`styles.pane`: flex 1, sidemarg 16, avrundet topp, overflow hidden)
+     rett under chromen, og FlatList-en ruller INNI den. Glasset stikker
+     24 pt under skjermen (`paneGlass.bottom: -radius.xl`), så bunnkanten
+     aldri synes. Dette er svaret på høydegrensen: et ark som er nøyaktig
+     én skjerm får ekte glass uten å kunne vokse. `unbounded` (runde 4s
+     flate tint) er borte fra InboxScreen — propen består i
+     LiquidGlassSurface for andre flater. Etikettene står nå PÅ arket
+     (`SectionHeader tone="opal"` → OPAL.inkSecondary), kampkort med
+     sidemarg inne på arket, tom-/laste-/feiltilstand rett på arket.
+     STRUKTURENDRING, sagt rett ut: arket ruller ikke bort med innholdet
+     lenger; chrome, tetthet, rader, dividere og hierarki er som før.
+   · BOLKENE: `groupByAge` (shared/inbox.ts) gir Nå · I dag · I går ·
+     Denne uken (mandag–i forgårs) · Forrige uke · måned («Juli»; annet år
+     «Desember 2025»). `startOfDay` via setDate (sommertid-trygt). Tre
+     tester i `inbox.test.ts`, inkl. mandagstilfellet.
+   · Vokter: `inboxSurface.test` §4 er skrevet om: nøyaktig ÉN
+     LiquidGlassSurface i InboxScreen, sheet + fill, aldri unbounded, pane-
+     rammen avgrenset, glasset FØR FlatList i kilden, etiketter i opalblekk.
+
+3. PROFILS UNDERSIDER («fast template vi kan ha på alle sidene der, og vi må
+   legge til bakgrunn på undersidene»):
+   · NY `src/components/ProfilPage.tsx`: `DaylightGround` (SAMME grunn som
+     kommentarsiden — reisen uten laghode/identitetsfelt) + `BackBar
+     variant="stadium"` (nytt: lyst blekk, `colors.stadiumText`) + lys
+     statuslinje m/ fokus-vakt + valgfri `keyboard` (KAV padding rundt hele
+     siden). Skjermen eier selv ScrollView/bunnpadding/RefreshControl.
+   · MATERIALREGLENE på undersidene: kort = `LiquidGlassSurface
+     variant="panel"` (Profil-fanens paneler); `wrapStyle` (ny prop) bærer
+     marger utenfor glasset, `style` = padding inni. Sekundær-/tertiærtekst
+     i panelene = OPAL.inkSecondary/inkTertiary. Felt = `GLASS_FIELD` (ny,
+     én kilde; `NewEventScreen.FIELD` peker dit). Overskrift/undertittel/
+     seksjonsetiketter PÅ GRUNNEN = stadionblekk (hvit / 0,8) — samme åpne
+     etikettproblem som Profil-fanen midt på rampen (NESTE A).
+   · KONVERTERT (11): TeamMembers, TeamSettings, Invite (+ InviteCodeCard
+     er panel), JoinTeamCode, CreateTeam (hele skjemaet på ETT panel),
+     ChangePassword (skjema + kvittering på panel), OpsClaims, ClubPayments,
+     SupportSetup, OpsEntities, OpsClaimDetail. Alle `styles.card` →
+     panel; flate/kant/skygge fjernet fra stilene; `screen`/`flex`-bakgrunn
+     fjernet (ProfilPage eier grunnen). `Modal`-arket i OpsEntities er urørt.
+   · Navigator: ProfilNav får `daylightGroundOptions` på alle ruter; Invite
+     (HomeStack) og SupportSetup/ClubPayments/TeamMembers/Invite (InboxNav)
+     får det per rute — ellers blinker krem i kantene under push.
+
+▶️ PÅ TELEFONEN (i denne rekkefølgen):
+  a. PROFIL: lagkortene skal se ut som gruppene og IKKE bli mørke mot
+     headeren. Valgt lag = tydelig mint. Trykk = svak blekk-tint, ingen
+     lys/skala.
+  b. VARSLER: ett ark, ekte glass (blur/kant), etiketter Nå/I dag/I går/
+     Denne uken/Forrige uke/måned på arket. Scroll øverst, midt, langt ned,
+     raskt — arket skal aldri forsvinne (det er én skjerm høyt). Se etter:
+     ser det rart ut at arket står fast mens innholdet ruller under
+     toppkanten? (Alternativet, ark som følger lista, kan ikke få glass.)
+  c. UNDERSIDER: åpne Lagoversikt, Laginnstillinger, Inviter, Bli med,
+     Opprett lag, Endre passord (+ Ops-sidene hvis du vil). Grunn +
+     lys tilbakelinje + paneler. SE ETTER: etiketter/overskrifter på grunnen
+     midt på rampen (30–45 %) — kjent svakt punkt; felt (GLASS_FIELD) og
+     tastatur på skjemasidene.
+  d. Riggbilder (CSS-tilnærming, undervurderer ekte glass) er sendt:
+     profil.png (før/etter) og varsler.png (arket).
+
+▶️ NESTE (uendret): A. seksjonsetikettenes kontrast på grunnen — nå på
+   Profil, Kalender, Hjem OG undersidene: én skive; B. Kalenderchromens
+   piller; C. FeedCard mer glass; D. opprydding.
+
+## (historikk) START HER 2026-09-04, runde 5 — PROFIL I EKTE GLASS (OVERKJØRT av runde 6 over: lagkortene er nå `panel`, ikke `card`)
+
+⚠️ IKKE TELEFONTESTET, IKKE COMMITTET. Tre filer i arbeidstreet oppå
+d5bb701: `src/components/LiquidGlassSurface.tsx`, `src/screens/ProfilScreen.tsx`,
+`__tests__/profilGlass.test.tsx` (ny). Alt er JS/TS — Metro-reload holder,
+ingen native endring, ingen pod install.
+
+BRAGES DOM PÅ RUNDE 4 (telefonbilde 2026-09-04 10:06): «nå er det verre!
+Kantene ser billige ut og boksene er for hvite … stygge kanter på venstre
+side … vil ha tema som passer resten av appen, så mer glassaktig.»
+Diagnose: `OpalSurface` er en svg-tegnet flate. Kantringen (hvit 0,50 øverst
+til venstre → blekk 0,20 nederst til høyre) ligger langs HELE venstre kant
+fordi gradienten går diagonalt fra hjørnet — på telefonen leser det som en
+lys fals, en Windows-95-bevel. Og 0,82–0,89 av nesten-hvit perle ER en hvit
+boks over mørk grunn. Runde 4s «kantfysikk» polerte feil ting: problemet var
+materialet, ikke tallene i ringen (samme lærdom som [[feedback_design_craft_level]]).
+
+DET SOM ER GJORT (ett grep, én variabel = materialet):
+  · Profil bruker nå SAMME glass som feedkortene på Hjem: `LiquidGlassSurface`
+    (native `UIGlassEffect` — systemets blur, refraksjon og optiske kant).
+    Ny variant `GLASS.panel` = feedkortets perle/alfa/sheen ordrett
+    (rgba(233,235,234,0,34) / 0,18), men `interactive: false` fordi radene
+    inni er kontrollene (samme grunn som `sheet` på Varsler). Menygruppene og
+    action-gruppa bruker `panel`; lagkortene bruker `card` direkte (trykkes
+    som én flate, får glassets egen trykkrespons).
+  · `OpalSurface variant="panel"` (OPAL_PANEL) lever videre KUN som fallback
+    uten glass (Android, eldre iOS, Reduce Transparency) — `LiquidGlassSurface`
+    mapper `panel` → `OpalSurface panel` der. Feedkortets fallback (card) er
+    urørt; `opalPanel.test` står.
+  · `styles.group = {overflow: 'hidden'}` på gruppene så radenes trykk-tint
+    klippes til radiusen (som Varsler-lista). Radene er fortsatt
+    `ListRow material="opal"` — blekket, hårlinja og trykk-tinten er de samme
+    på glass som på opal.
+  · Ingen struktur, luft, ikoner eller tekst er rørt. Valgt lag = heiaSoft-
+    tint + hake, som før.
+  · Vokter: `__tests__/profilGlass.test.tsx` (10): panel = card-glass uten
+    trykk; kildesjekk på at ProfilScreen ikke tegner OpalSurface; gruppene
+    klipper; fallback går til PANEL-kantfysikken. Full suite 1127/1129
+    grønn, eslint rent, prettier husstil rent. tsc IKKE kjørt (Brages regel).
+  · Riggen (CSS backdrop-filter-tilnærming, før/etter side om side) er kjørt:
+    falsen borte, flatene leser som glass. MEN riggen UNDERVURDERER hvor lys
+    ekte UIGlassEffect blir: feedkortets kalibrerte mål på telefonen er ~75 %
+    perle / 25 % grunn (se GLASS.card-kommentaren), riggen viser ~40 %.
+
+▶️ PÅ TELEFONEN:
+  a. Er falsen borte, og leser flatene som glass — samme materiale som
+     feedkortene på Hjem?
+  b. LAGKORTENE står over reisens mørkeste grunn (#0B412E–#014C34, 8–20 %).
+     Kan «2012 · Trener» (OPAL.inkSecondary 13 pt) leses der? Under den
+     naive tint-over-grunn-modellen trenger 4,5:1 alfa ≈ 0,75; ekte glass
+     lander rundt der (~75 % perle), men det er telefonen som avgjør.
+     ÉN KNAPP hvis det er for svakt: alfaen i `GLASS.panel.tint` (og en egen
+     Profil-kortvariant for lagkortene — `card` er LÅST for feeden). Ikke
+     løft blekket globalt, ikke tilbake til opal.
+  c. Scroll: ~12 glassflater i én ScrollView (3 lagkort + action + 8
+     grupper). Feeden har allerede 6–10 per skjerm; skal være fint, men se
+     etter hakk.
+  d. Trykk på et lagkort: glassets lys + 0,98-skala (som feedkortet).
+
+▶️ NESTE (uendret): A. seksjonsetikettenes kontrast (Profil, Kalender, Hjem —
+   én skive); B. Kalenderchromens hvite piller; C. FeedCard mer glass;
+   D. opprydding.
+
+## (historikk) START HER 2026-09-04 kveld, runde 4 — SCROLL-GLITCHEN PÅ VARSLER LØST I ROTEN + PROFIL-MATERIALET POLERT (Profil-delen OVERKJØRT av runde 5 over)
 
 ⚠️ IKKE TELEFONTESTET ENNÅ. Bygget, riggverifisert og committet oppå
 checkpointet 6e7c88c (Brage: «Commiten kan stå som checkpoint»). Alt er

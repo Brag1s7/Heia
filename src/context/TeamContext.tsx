@@ -12,7 +12,11 @@ import {AppState} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useAuth} from './UserContext';
 import {registerTeamSwitcher} from '../navigation/deepLink';
-import {getUserMemberships, getTeamMemberCount} from '../lib/api/teams';
+import {
+  getUserMemberships,
+  getTeamMemberCount,
+  getSports,
+} from '../lib/api/teams';
 import {refreshSessionContext} from '../lib/queries/sessionContext';
 import {
   restorePersistedQueries,
@@ -196,6 +200,15 @@ export function TeamProvider({children}: PropsWithChildren) {
       // forrige økts lagrede valg (boot — orkestratoren leser lagringen).
       // Ved boot avfyres feed/events-prefetchen parallelt (§1.4-trioen).
       // S7b endrer ikke dette: kallet starter umiddelbart uansett frø.
+      //
+      // IDRETTENE (Brage 2026-09-04: «det er bare knapper som alltid skal
+      // være der»): statisk referansedata, cachet for hele økten i
+      // lib/api/teams. Varmes HER ved boot (ikke først når «Opprett lag»
+      // åpnes), så pillene står der fra første render på siden — som alt
+      // annet innhold der. Onboardingen gjør det samme i WelcomeIntent.
+      if (!isRefresh) {
+        getSports().catch(() => {});
+      }
       const ctx = await refreshSessionContext(activeTeamSpaceIdRef.current, {
         bootPrefetchUserId: isRefresh ? undefined : userId,
       });

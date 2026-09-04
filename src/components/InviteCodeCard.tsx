@@ -1,6 +1,8 @@
 import React, {useCallback} from 'react';
 import {View, Text, Pressable, Share, StyleSheet} from 'react-native';
 import {colors, typography, spacing, radius, shadows} from '../theme';
+import {LiquidGlassSurface} from './LiquidGlassSurface';
+import {OPAL} from './OpalSurface';
 
 interface InviteCodeCardProps {
   /** Lagets visningsnavn — brukes i delingsteksten. */
@@ -33,8 +35,12 @@ export function InviteCodeCard({teamName, inviteCode}: InviteCodeCardProps) {
     });
   }, [shareMessage]);
 
+  // Kortet er et ARK (2026-09-04, runde 7): arkets tunge perle på
+  // undersidens dagslysgrunn — tynt glass ga for dårlig kontrast mellom
+  // kort, kodefelt, grunn og neonknapp (Brage). På perlen står mintboksen og
+  // neonknappen tydelig fra hverandre.
   return (
-    <View style={styles.card}>
+    <LiquidGlassSurface variant="sheet" style={styles.card}>
       <Text style={styles.label}>Invitasjonskode</Text>
 
       <View style={styles.codeWrap}>
@@ -64,23 +70,20 @@ export function InviteCodeCard({teamName, inviteCode}: InviteCodeCardProps) {
         ]}>
         <Text style={styles.shareButtonText}>Del invitasjon</Text>
       </Pressable>
-    </View>
+    </LiquidGlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
+  // Flate, kant, radius og skygge eies av glasset — bare luften bor her.
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
     padding: spacing.xl,
     gap: spacing.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    ...shadows.card,
   },
   label: {
     ...typography.label,
+    color: OPAL.inkSecondary,
   },
   codeWrap: {
     backgroundColor: colors.heiaSoft,
@@ -100,7 +103,7 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
     lineHeight: 20,
   },

@@ -39,10 +39,12 @@ import {
   PROFILE_IDENTITY,
   DaylightGround,
   DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
   TeamBadge,
   useBottomContentPadding,
 } from '../components';
-import {OpalSurface, OPAL} from '../components/OpalSurface';
+import {OPAL} from '../components/OpalSurface';
+import {LiquidGlassSurface} from '../components/LiquidGlassSurface';
 import {OPAL_ROW_ICON_SLOT} from '../components/ListRow';
 import {
   Bell,
@@ -144,12 +146,31 @@ const MENU_ICON_TINT: Record<MenuTone, string> = {
  * «trenger ikke en tydelig separat ring. Checkmark + svak team/Heia-tint +
  * subtil edge er nok»). Neon i full styrke er reservert for HANDLING
  * (kampknappen, primærknappen, aktiv fane); et valgt lagkort er en TILSTAND,
- * og en farget ring rundt hele flaten leste CTA-aktig. Runde 1 dempet ringen
- * til 0,40 — runde 2 fjerner den.
+ * og en farget ring rundt hele flaten leste CTA-aktig.
  *
- * Tilstanden bæres nå av tre ting som alle bor I materialet: den svake
- * Heia-tinten i flaten, haken til høyre, og panelets egen kantfysikk.
- * Blir den for svak på telefonen, er det TINTEN som løftes — ikke en ny ring.
+ * Runde 6 (Brage 2026-09-04: «burde være mer tydelig hva man har valgt, for
+ * eks mer fyldig farge på dette kortet»): tinten løftes fra heiaSoft (0,12)
+ * til 0,30 — en tydelig mintflate, fortsatt ikke neon i full styrke. Haken
+ * står. Ingen ring. Kontrastporten på den valgte flaten voktes i
+ * `__tests__/profilGlass.test.tsx`.
+ */
+export const TEAM_CARD_SELECTED = 'rgba(2, 255, 171, 0.3)';
+
+/**
+ * LAGKORTENES GLASS (Brage 2026-09-04, runde 6 → 7): «Dine lag-boksene
+ * endrer farge rart av seg selv ved scroll … så fort de nærmer seg header så
+ * blir de mørke». Et backdrop FØLGER grunnen bak seg, og lagkortene står i
+ * den bratteste delen av reisen (#0E211A → #00845A på 0–28 %). I
+ * feedkortets tynne glass (0,34) bidro grunnen med 66 % — kortene ble mørke
+ * mot laghodet. Brage så det tunge arkglasset (`sheet`, 0,80) på telefonen
+ * og kalte det fikset; et forsøk på gruppenes `panel` (0,34, ikke
+ * interaktivt) brakte feilen tilbake — det var TINTEN, ikke interaktiviteten.
+ * Derfor: lagkortene står i `sheet`. Gruppene lenger ned på reisen står i
+ * `panel`; de er aldri i den mørke sonen uten at brukeren har rullet dit.
+ *
+ * Trykk: `card`-glassets native lys (lys + 0,98-skala på touch-down) tentes
+ * også når en scroll STARTET på et kort. Lagkortene sender derfor ikke
+ * `pressed` til glasset; trykk er en blekk-tint i flaten, som radene.
  */
 function MenuIcon({
   children,
@@ -171,13 +192,22 @@ function RowChevron() {
   return <ChevronRight size={16} color={OPAL.inkTertiary} strokeWidth={2} />;
 }
 
-// MENYGRUPPENE OG LAGKORTENE (Brage 2026-09-04) deler materiale: OpalSurface
-// — den matte, frostede perlen (0,92 i tekstsonen, 0,87 mot kantene),
-// kantlys øverst til venstre, blekk-motkant nederst til høyre, grønn skygge.
-// Rolig, strukturert og lesbart der Varsler er levende arkglass: samme
-// Heia-familie, annen karakter. Radene inni er `ListRow material="opal"`.
+// MENYGRUPPENE OG LAGKORTENE (Brage 2026-09-04, runde 5: «kantene ser billige
+// ut og boksene er for hvite … mer glassaktig, som resten av appen») er SAMME
+// glass som feedkortene på Hjem: ekte `LiquidGlassSurface` — systemets blur,
+// refraksjon og optiske kant — med feedkortets perle og alfa. Den matte
+// svg-opalen med kantring (`OpalSurface panel`) leste som en hvit boks med en
+// lys fals langs venstre/topp; den er nå bare fallbacken uten glass (Android,
+// eldre iOS, Reduce Transparency). Gruppene bruker `panel` (= kortets glass
+// uten trykkrespons, for radene er kontrollene), lagkortene `card` (trykkes
+// som én flate). Radene inni er fortsatt `ListRow material="opal"` — blekk,
+// hårlinje og trykk-tint er de samme på glass som på opal.
 function MenuGroup({children}: {children: ReactNode}) {
-  return <OpalSurface variant="panel">{children}</OpalSurface>;
+  return (
+    <LiquidGlassSurface variant="panel" style={styles.group}>
+      {children}
+    </LiquidGlassSurface>
+  );
 }
 
 // Siste kjente «Min støtte»-svar — lever over remounts så seksjonen aldri
@@ -653,13 +683,17 @@ export function ProfilScreen() {
                 accessibilityRole="button"
                 accessibilityState={{selected: isActive}}>
                 {({pressed}) => (
-                  /* Lagkortet på opalpanelet: stramt (8 pt luft, 40-merke),
-                     valgt = heiaSoft-tint + hake (ingen ring), trykk =
-                     opalens egen respons. */
-                  <OpalSurface
-                    variant="panel"
-                    style={[styles.teamCard, isActive && styles.teamCardActive]}
-                    pressed={pressed}>
+                  /* Lagkortet i arkets tunge glass (se kommentaren ved
+                     TEAM_CARD_SELECTED): stramt (8 pt luft, 40-merke),
+                     valgt = fyldig Heia-tint + hake (ingen ring), trykk =
+                     blekk-tint i flaten. */
+                  <LiquidGlassSurface
+                    variant="sheet"
+                    style={[
+                      styles.teamCard,
+                      isActive && styles.teamCardActive,
+                      pressed && styles.teamCardPressed,
+                    ]}>
                     {/* Logoen når den finnes (lag → klubb), ellers initialer
                         på lagfargen — samme kjede som headeren (P7). */}
                     <TeamBadge
@@ -682,7 +716,7 @@ export function ProfilScreen() {
                     {isActive && (
                       <Check size={18} color={colors.heiaInk} strokeWidth={3} />
                     )}
-                  </OpalSurface>
+                  </LiquidGlassSurface>
                 )}
               </Pressable>
             );
@@ -1169,9 +1203,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
+  // Samme farge som navigatorens kort bak skjermen OG grunnens fallback,
+  // så ingen ramme viser krem mellom dem ved remount (lagbytte gjør
+  // CommonActions.reset → hele fanen monteres på nytt).
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: DAYLIGHT_GROUND_AB
+      ? DAYLIGHT_GROUND_FALLBACK
+      : colors.background,
   },
   /** Kroppen under headeren — gjennomsiktig, grunnen ligger bak. */
   body: {
@@ -1206,7 +1245,12 @@ const styles = StyleSheet.create({
   sectionTitleStadium: {
     color: 'rgba(234, 255, 246, 0.8)',
   },
-  // Lagkortet: flate, kant, radius og skygge eies av OpalSurface — bare
+  // Gruppene: glasset måler seg etter radene; `overflow: hidden` klipper
+  // radenes trykk-tint til radiusen (som Varsler-lista).
+  group: {
+    overflow: 'hidden',
+  },
+  // Lagkortet: flate, kant, radius og skygge eies av glasset — bare
   // luften bor her. Mindre «pølse»: 40-merke, 16 pt navn, og 8 pt luft over
   // og under (Brage 2026-09-04, polish: −8 pt total høyde, 66 → 58, uten at
   // noe annet i raden flyttes). Merket på 40 er fortsatt det høyeste
@@ -1220,10 +1264,14 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   // Valgt skifter FLATE, ikke ramme (A v2-regelen fra RSVP-knappene): kun
-  // tinten. Kanten forblir panelets egen (gjennomsiktig 1 pt — opalen tegner
-  // kantlyset selv), og haken står til høyre.
+  // tinten. Kanten forblir glassets egen (gjennomsiktig 1 pt — systemet
+  // tegner den optiske kanten selv), og haken står til høyre.
   teamCardActive: {
-    backgroundColor: colors.heiaSoft,
+    backgroundColor: TEAM_CARD_SELECTED,
+  },
+  // Trykk = blekk-tint i flaten (samme som radene), ikke native trykklys.
+  teamCardPressed: {
+    backgroundColor: OPAL.rowPressed,
   },
   teamInfo: {
     flex: 1,

@@ -14,6 +14,7 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import type {NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
+import {GLASS_FIELD} from '../components/LiquidGlassSurface';
 import {Button, DateField, TimeField, useReducedMotion} from '../components';
 import {FormSheet, type FormSheetHandle} from '../components/FormSheet';
 import {DateSheet} from '../components/DateSheet';
@@ -876,10 +877,7 @@ function SelectChip({
 // Stiler
 // ---------------------------------------------------------------------------
 /** Feltflaten på glasspanelet: lys perle 0,55 + svak blekk-hårlinje. */
-export const FIELD = {
-  fill: 'rgba(255, 255, 255, 0.55)',
-  edge: 'rgba(5, 44, 35, 0.12)',
-} as const;
+export const FIELD = GLASS_FIELD;
 
 const styles = StyleSheet.create({
   // Ruta er en transparentModal: skjermen bak synes gjennom scrimmet.

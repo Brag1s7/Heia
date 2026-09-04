@@ -7,16 +7,24 @@ import {
   ScrollView,
   Alert,
   AppState,
-  KeyboardAvoidingView,
   Linking,
-  Platform,
   RefreshControl,
   StyleSheet,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
+import {
+  ProfilPage,
+  Button,
+  Skeleton,
+  useBottomContentPadding,
+} from '../components';
 import {useActiveTeam, useAuth} from '../context';
 import {
   getSupportActivationStatus,
@@ -104,7 +112,7 @@ export function SupportSetupScreen() {
   const loadRef = useRef(load);
   loadRef.current = load;
   useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => {
+    const sub = AppState.addEventListener('change', s => {
       if (s === 'active') loadRef.current();
     });
     return () => sub.remove();
@@ -148,7 +156,10 @@ export function SupportSetupScreen() {
         setShowForm(false);
         await load();
       } catch (e: any) {
-        Alert.alert('Kunne ikke sende søknaden', e?.message ?? 'Prøv igjen om litt.');
+        Alert.alert(
+          'Kunne ikke sende søknaden',
+          e?.message ?? 'Prøv igjen om litt.',
+        );
       } finally {
         setSubmitting(false);
       }
@@ -181,7 +192,10 @@ export function SupportSetupScreen() {
       }
       Alert.alert(
         'Fant ikke organisasjonsnummeret',
-        `${orgNumber.replace(/[^0-9]/g, '')} finnes ikke i Brønnøysund­registrene. Sjekk sifrene — nummeret står på klubbens side på brreg.no.`,
+        `${orgNumber.replace(
+          /[^0-9]/g,
+          '',
+        )} finnes ikke i Brønnøysund­registrene. Sjekk sifrene — nummeret står på klubbens side på brreg.no.`,
         buttons,
       );
       setSubmitting(false);
@@ -218,7 +232,10 @@ export function SupportSetupScreen() {
       const {url} = await startStripeOnboarding(activeTeamSpaceId);
       return url;
     } catch (e: any) {
-      Alert.alert('Kunne ikke hente lenken', e?.message ?? 'Prøv igjen om litt.');
+      Alert.alert(
+        'Kunne ikke hente lenken',
+        e?.message ?? 'Prøv igjen om litt.',
+      );
       return null;
     } finally {
       setLinkLoading(false);
@@ -306,20 +323,20 @@ export function SupportSetupScreen() {
 
     if (doorState === 'collecting') {
       return (
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.pillActive}>SAMLER INN</Text>
           <Text style={styles.cardTitle}>Laget samler inn støtte</Text>
           <Text style={styles.body}>
             «Støtt laget» er åpen for alle i laget — foreldre og supportere
             finner den på Hjem og i lagkassa.
           </Text>
-        </View>
+        </LiquidGlassSurface>
       );
     }
 
     if (doorState === 'pending') {
       return (
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.pillPending}>TIL GODKJENNING</Text>
           <Text style={styles.cardTitle}>Venter på klubbens godkjenning</Text>
           <Text style={styles.body}>
@@ -327,7 +344,7 @@ export function SupportSetupScreen() {
               ? `Forespørselen er registrert, og Heia er varslet fordi klubben ikke har en betalingsansvarlig ennå. Du får varsel her når laget er godkjent.`
               : 'Klubbens betalingsansvarlige har fått beskjed og godkjenner laget med ett trykk — du får varsel når det er gjort.'}
           </Text>
-        </View>
+        </LiquidGlassSurface>
       );
     }
 
@@ -337,13 +354,13 @@ export function SupportSetupScreen() {
       doorState === 'deactivated';
 
     return (
-      <View style={styles.card}>
+      <LiquidGlassSurface variant="sheet" style={styles.card}>
         <Text style={styles.cardTitle}>
           {doorState === 'paused'
             ? 'Støtten er satt på pause'
             : doorState === 'deactivated'
-              ? 'Støtten er deaktivert'
-              : 'Siste steg: klubbens godkjenning'}
+            ? 'Støtten er deaktivert'
+            : 'Siste steg: klubbens godkjenning'}
         </Text>
         {approval?.status === 'rejected' && approval.note ? (
           <View style={styles.infoRequestBox}>
@@ -364,8 +381,8 @@ export function SupportSetupScreen() {
         </Text>
         {managerless && (
           <Text style={styles.hint}>
-            Klubben mangler en betalingsansvarlig akkurat nå. Forespørselen
-            din går til Heia, som følger den opp.
+            Klubben mangler en betalingsansvarlig akkurat nå. Forespørselen din
+            går til Heia, som følger den opp.
           </Text>
         )}
         <Button
@@ -374,28 +391,33 @@ export function SupportSetupScreen() {
           loading={requesting}
           style={styles.cardButton}
         />
-      </View>
+      </LiquidGlassSurface>
     );
   };
 
   const renderContent = () => {
     if (loading) {
       return (
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Skeleton width={140} height={12} />
           <Skeleton height={14} />
           <Skeleton width="70%" height={14} />
-        </View>
+        </LiquidGlassSurface>
       );
     }
 
     if (loadError || !status) {
       return (
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.cardTitle}>Fikk ikke hentet statusen</Text>
           <Text style={styles.body}>Sjekk nettet og prøv igjen.</Text>
-          <Button title="Prøv igjen" variant="secondary" onPress={load} style={styles.cardButton} />
-        </View>
+          <Button
+            title="Prøv igjen"
+            variant="secondary"
+            onPress={load}
+            style={styles.cardButton}
+          />
+        </LiquidGlassSurface>
       );
     }
 
@@ -403,7 +425,7 @@ export function SupportSetupScreen() {
       case 'claim_submitted':
       case 'claim_in_review':
         return (
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <Text style={styles.pillPending}>TIL VURDERING</Text>
             <Text style={styles.cardTitle}>Søknaden er sendt</Text>
             <Text style={styles.body}>
@@ -423,16 +445,22 @@ export function SupportSetupScreen() {
               </View>
             )}
             <View style={styles.factBox}>
-              <FactRow label="Organisasjonsnummer" value={status.claim?.orgNumber ?? '—'} />
-              <FactRow label="Juridisk navn" value={status.claim?.legalName ?? '—'} />
+              <FactRow
+                label="Organisasjonsnummer"
+                value={status.claim?.orgNumber ?? '—'}
+              />
+              <FactRow
+                label="Juridisk navn"
+                value={status.claim?.legalName ?? '—'}
+              />
             </View>
-          </View>
+          </LiquidGlassSurface>
         );
 
       case 'claim_rejected':
         if (showForm) break; // ny søknad → skjemaet under
         return (
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <Text style={styles.pillRejected}>IKKE GODKJENT</Text>
             <Text style={styles.cardTitle}>Søknaden ble ikke godkjent</Text>
             {status.claim?.reviewNote ? (
@@ -448,7 +476,7 @@ export function SupportSetupScreen() {
               onPress={() => setShowForm(true)}
               style={styles.cardButton}
             />
-          </View>
+          </LiquidGlassSurface>
         );
 
       // Verifisert klubb UTEN aktiv betalingsansvarlig (v2). Ingen KYC-CTA
@@ -456,7 +484,7 @@ export function SupportSetupScreen() {
       case 'awaiting_manager':
         return (
           <>
-            <View style={styles.card}>
+            <LiquidGlassSurface variant="sheet" style={styles.card}>
               <Text style={styles.pillApproved}>GODKJENT</Text>
               <Text style={styles.cardTitle}>
                 Venter på klubbens betalingsansvarlige
@@ -475,7 +503,7 @@ export function SupportSetupScreen() {
               <Text style={styles.hint}>
                 Stemmer ikke dette? Skriv til {CONTACT}.
               </Text>
-            </View>
+            </LiquidGlassSurface>
             {renderDoorCard(true)}
           </>
         );
@@ -484,7 +512,7 @@ export function SupportSetupScreen() {
       case 'onboarding_started':
       case 'restricted':
         return (
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <Text style={styles.pillApproved}>GODKJENT</Text>
             <Text style={styles.cardTitle}>
               {status.state === 'restricted'
@@ -505,8 +533,8 @@ export function SupportSetupScreen() {
                   style={styles.cardButton}
                 />
                 <Text style={styles.hint}>
-                  Lenken er personlig og varer bare en kort stund — den kan
-                  ikke deles videre.
+                  Lenken er personlig og varer bare en kort stund — den kan ikke
+                  deles videre.
                 </Text>
               </>
             ) : (
@@ -517,12 +545,12 @@ export function SupportSetupScreen() {
                 </Text>
                 <Text style={styles.hint}>
                   Registreringen hos Stripe kan bare gjøres av klubbens
-                  betalingsansvarlige — lenken er personlig og deles aldri.
-                  Står det stille, skriv til {CONTACT}.
+                  betalingsansvarlige — lenken er personlig og deles aldri. Står
+                  det stille, skriv til {CONTACT}.
                 </Text>
               </>
             )}
-          </View>
+          </LiquidGlassSurface>
         );
 
       case 'active': {
@@ -530,16 +558,21 @@ export function SupportSetupScreen() {
         // (port 3, 00047): lagets egen godkjenning fra betalingsansvarlig.
         return (
           <>
-            <View style={styles.card}>
+            <LiquidGlassSurface variant="sheet" style={styles.card}>
               <Text style={styles.pillActive}>AKTIV</Text>
               <Text style={styles.cardTitle}>Klubben er klar for støtte</Text>
               <Text style={styles.body}>
-                {status.entity?.legalName ?? clubName} er koblet til
-                utbetaling.
+                {status.entity?.legalName ?? clubName} er koblet til utbetaling.
               </Text>
               <View style={styles.factBox}>
-                <FactRow label="Organisasjonsnummer" value={status.entity?.orgNumber ?? '—'} />
-                <FactRow label="Mottaker" value={status.entity?.legalName ?? '—'} />
+                <FactRow
+                  label="Organisasjonsnummer"
+                  value={status.entity?.orgNumber ?? '—'}
+                />
+                <FactRow
+                  label="Mottaker"
+                  value={status.entity?.legalName ?? '—'}
+                />
               </View>
               {status.account?.actionNeeded &&
                 (status.canOnboard ? (
@@ -561,12 +594,12 @@ export function SupportSetupScreen() {
                     {waitingForManagerLine}
                   </Text>
                 ))}
-            </View>
+            </LiquidGlassSurface>
 
             {renderDoorCard(false)}
 
             {status.isPaymentManager && (
-              <View style={styles.card}>
+              <LiquidGlassSurface variant="sheet" style={styles.card}>
                 <Text style={styles.cardTitle}>Du er betalingsansvarlig</Text>
                 <Text style={styles.body}>
                   Godkjenn og administrer lagenes støtte i Klubbetalinger.
@@ -577,7 +610,7 @@ export function SupportSetupScreen() {
                   onPress={() => navigation.navigate('ClubPayments')}
                   style={styles.cardButton}
                 />
-              </View>
+              </LiquidGlassSurface>
             )}
           </>
         );
@@ -585,23 +618,23 @@ export function SupportSetupScreen() {
 
       case 'disabled':
         return (
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <Text style={styles.pillRejected}>SPERRET</Text>
             <Text style={styles.cardTitle}>Kontoen er sperret hos Stripe</Text>
             <Text style={styles.body}>
               Ta kontakt med Heia, så hjelper vi klubben videre.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         );
 
       case 'no_club':
         return (
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <Text style={styles.cardTitle}>Laget mangler klubb</Text>
             <Text style={styles.body}>
               Støtte aktiveres for klubben laget hører til.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         );
 
       default:
@@ -611,7 +644,7 @@ export function SupportSetupScreen() {
     // state 'none' (eller «Send ny søknad» etter avslag): intro + skjema.
     return (
       <>
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.cardTitle}>Slik virker det</Text>
           <Text style={styles.body}>
             Med «Støtt laget» kan foreldre og supportere gi et fast månedlig
@@ -619,9 +652,9 @@ export function SupportSetupScreen() {
             godkjennes og kobles til utbetaling først. Heia sjekker
             opplysningene manuelt mot Brønnøysundregistrene.
           </Text>
-        </View>
+        </LiquidGlassSurface>
 
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.label}>Søknad for {clubName}</Text>
 
           <Text style={styles.fieldLabel}>Organisasjonsnummer</Text>
@@ -632,7 +665,7 @@ export function SupportSetupScreen() {
             keyboardType="number-pad"
             maxLength={11}
             placeholder="9 siffer"
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={OPAL.inkTertiary}
           />
 
           <Text style={styles.fieldLabel}>Klubbens juridiske navn</Text>
@@ -642,7 +675,7 @@ export function SupportSetupScreen() {
             onChangeText={setLegalName}
             autoCapitalize="words"
             placeholder="Slik det står i Brønnøysundregistrene"
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={OPAL.inkTertiary}
           />
 
           <Text style={styles.fieldLabel}>Din rolle i klubben</Text>
@@ -651,7 +684,7 @@ export function SupportSetupScreen() {
             value={role}
             onChangeText={setRole}
             placeholder="F.eks. trener, kasserer, styreleder"
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={OPAL.inkTertiary}
           />
 
           <Text style={styles.fieldLabel}>E-post</Text>
@@ -663,7 +696,7 @@ export function SupportSetupScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="Så vi kan kontakte deg om søknaden"
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={OPAL.inkTertiary}
           />
 
           <Text style={styles.fieldLabel}>Telefon (valgfritt)</Text>
@@ -673,7 +706,7 @@ export function SupportSetupScreen() {
             onChangeText={setPhone}
             keyboardType="phone-pad"
             placeholder="Hvis du heller vil ringes"
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={OPAL.inkTertiary}
           />
 
           {/* Nominasjonen (v2, II.2). «En annen» er featureflagget til
@@ -714,7 +747,7 @@ export function SupportSetupScreen() {
                     onChangeText={setNomineeName}
                     autoCapitalize="words"
                     placeholder="Fullt navn, slik det står i registeret"
-                    placeholderTextColor={colors.textTertiary}
+                    placeholderTextColor={OPAL.inkTertiary}
                   />
 
                   <Text style={styles.fieldLabel}>E-post</Text>
@@ -726,7 +759,7 @@ export function SupportSetupScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     placeholder="Invitasjonen sendes hit"
-                    placeholderTextColor={colors.textTertiary}
+                    placeholderTextColor={OPAL.inkTertiary}
                   />
 
                   <Text style={styles.fieldLabel}>Telefon (valgfritt)</Text>
@@ -736,12 +769,12 @@ export function SupportSetupScreen() {
                     onChangeText={setNomineePhone}
                     keyboardType="phone-pad"
                     placeholder="Hvis Heia trenger å ringe"
-                    placeholderTextColor={colors.textTertiary}
+                    placeholderTextColor={OPAL.inkTertiary}
                   />
 
                   <Text style={styles.hint}>
-                    Heia verifiserer personen før invitasjonen sendes. Den
-                    kan bare aksepteres av en innlogget Heia-konto med samme
+                    Heia verifiserer personen før invitasjonen sendes. Den kan
+                    bare aksepteres av en innlogget Heia-konto med samme
                     e-postadresse.
                   </Text>
                 </>
@@ -756,22 +789,16 @@ export function SupportSetupScreen() {
             disabled={!canSubmit}
             style={styles.submitButton}
           />
-        </View>
+        </LiquidGlassSurface>
       </>
     );
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar title="Støtte fra supportere" />
+    <ProfilPage title="Støtte fra supportere" keyboard>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -783,7 +810,7 @@ export function SupportSetupScreen() {
         showsVerticalScrollIndicator={false}>
         {renderContent()}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </ProfilPage>
   );
 }
 
@@ -809,7 +836,8 @@ function ChoiceCard({
         selected && styles.choiceCardSelected,
         pressed && styles.choicePressed,
       ]}>
-      <Text style={[styles.choiceTitle, selected && styles.choiceTitleSelected]}>
+      <Text
+        style={[styles.choiceTitle, selected && styles.choiceTitleSelected]}>
         {title}
       </Text>
       <Text style={styles.choiceSubtitle}>{subtitle}</Text>
@@ -826,11 +854,9 @@ function FactRow({label, value}: {label: string; value: string}) {
   );
 }
 
+// Undersiden (ProfilPage): alt innhold står i paneler → OPAL-blekk og
+// GLASS_FIELD som feltflate.
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   screen: {
     flex: 1,
   },
@@ -840,46 +866,41 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
     padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card,
   },
   label: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   cardTitle: {
     ...typography.heading3,
   },
   body: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   hint: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   fieldLabel: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginBottom: -spacing.xs,
   },
   input: {
     ...typography.input,
-    backgroundColor: colors.background,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
   },
   submitButton: {
@@ -891,10 +912,10 @@ const styles = StyleSheet.create({
   },
   choiceCard: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     gap: 2,
@@ -916,7 +937,7 @@ const styles = StyleSheet.create({
   },
   choiceSubtitle: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   cardButton: {
     alignSelf: 'flex-start',
@@ -935,7 +956,7 @@ const styles = StyleSheet.create({
     color: colors.goldInk,
   },
   factBox: {
-    backgroundColor: colors.background,
+    backgroundColor: 'rgba(8, 57, 46, 0.06)',
     borderRadius: radius.md,
     padding: spacing.md,
     gap: spacing.sm,
@@ -947,7 +968,7 @@ const styles = StyleSheet.create({
   },
   factLabel: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   factValue: {
     ...typography.bodySmall,

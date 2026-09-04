@@ -5,21 +5,23 @@
  * telefonfunn: «glassflaten på Varsler forsvinner under scroll»).
  *
  * ROTÅRSAKEN: både `UIGlassEffect` og `OpalSurface` er TEKSTURBASERTE
- * materialer — de rasteres i flatens fulle størrelse. Varsler-lista er den
- * eneste flaten i Heia som ikke er avgrenset til omtrent én skjerm:
- * `groupByAge` har bare tre bolker, så «Tidligere» samler alt eldre enn i
- * dag og vokser med pagineringen. 50 rader ≈ 3400 pt, 150 rader ≈ 10200 pt —
- * langt over det et backdrop kan komponeres inn i. Da faller effekten ut.
+ * materialer — de rasteres i flatens fulle størrelse. Varsler-lista har
+ * ingen øvre høyde («Tidligere» vokser med pagineringen), så en glassflate
+ * som følger lista faller ut.
+ *
+ * To løsninger finnes, og propen `unbounded` er den ene (tint + kanter, uten
+ * tekstur). Runde 5 (Brage: «mer glass look på boksene her») valgte den
+ * andre for Varsler: ETT fast ark, låst til én skjerm, med lista rullende
+ * inni. Propen består for flater som må følge innholdet.
  *
  * Fire påstander:
  *   1. `unbounded` tegner INGEN teksturbasert flate — ingen svg, ingen
  *      native backdrop — bare tint og kanter;
- *   2. den er fortsatt GLASS: tinten er gjennomskinnelig, så grunnen lever
- *      gjennom flaten (ikke en flat hvit bakgrunn, som var det forbudte
- *      symptomfikset);
+ *   2. den er fortsatt GLASS: tinten er gjennomskinnelig;
  *   3. Reduce Transparency går til den solide perlen, som ellers i familien;
- *   4. InboxScreen sender `unbounded` på ALLE arkflatene sine — propen er
- *      ikke pynt, og den skal ikke kunne forsvinne i en senere opprydding.
+ *   4. InboxScreen har NØYAKTIG ÉN glassflate, og den er låst til skjermen
+ *      (`fill` i en fast ramme) — aldri en glassflate som vokser med lista,
+ *      og aldri `unbounded` (det var runde 4s flate tint uten glass).
  */
 
 import React from 'react';
@@ -29,6 +31,7 @@ import ReactTestRenderer, {act} from 'react-test-renderer';
 import {StyleSheet, Text} from 'react-native';
 import Svg from 'react-native-svg';
 import {GLASS, LiquidGlassSurface} from '../src/components/LiquidGlassSurface';
+import {MAX_SHEET_ROWS} from '../src/screens/InboxScreen';
 
 let mockReduceTransparency = false;
 jest.mock('../src/components/useMaterialAccessibility', () => ({
@@ -121,19 +124,39 @@ describe('3. Reduce Transparency', () => {
   });
 });
 
-describe('4. InboxScreen bruker den', () => {
-  it('sender `unbounded` på hver eneste arkflate', () => {
-    // Kildesjekk med vilje: dette er regresjonen. Fjernes propen, kommer
-    // scroll-glitchen tilbake, og det ville ikke vist seg i noen render-test
-    // (jest har ingen backdrop å miste).
-    const src = fs.readFileSync(
-      path.join(__dirname, '../src/screens/InboxScreen.tsx'),
-      'utf8',
-    );
-    const sheets = src.match(/<LiquidGlassSurface variant="sheet"[^>]*/g) ?? [];
-    expect(sheets.length).toBeGreaterThanOrEqual(4);
-    for (const tag of sheets) {
-      expect(tag).toContain('unbounded');
+describe('4. InboxScreen: rullende ark, ekte glass, aldri høyere enn skjermen', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../src/screens/InboxScreen.tsx'),
+    'utf8',
+  );
+
+  it('hver arkflate er ekte sheet-glass — aldri unbounded, aldri fast fill', () => {
+    // Kildesjekk med vilje: dette er regresjonen i begge retninger. Runde 4
+    // (flat tint) leste ikke som glass; runde 6 (fast ark bak lista) la
+    // oppfrisk-spinneren på en hvit flate og tok bort scrollingen. Ingen
+    // render-test ser noen av delene (jest har ikke noe backdrop).
+    const tags = src.match(/<LiquidGlassSurface[^>]*\/?>/g) ?? [];
+    expect(tags.length).toBeGreaterThanOrEqual(4);
+    for (const tag of tags) {
+      expect(tag).toContain('variant="sheet"');
+      expect(tag).not.toContain('unbounded');
+      expect(tag).not.toMatch(/\bfill\b/);
     }
+    expect(src).not.toContain('styles.pane');
+  });
+
+  it('kjedene deles i biter under én skjerm (MAX_SHEET_ROWS)', () => {
+    expect(MAX_SHEET_ROWS * 60).toBeLessThan(852);
+    expect(src).toMatch(/if \(run\.length >= MAX_SHEET_ROWS\) flushRun\(\);/);
+  });
+
+  it('lista ligger rett i kroppen — spinneren står på grunnen', () => {
+    const chrome = src.indexOf('<InboxChrome');
+    const list = src.indexOf('<FlatList');
+    const glass = src.indexOf('<LiquidGlassSurface', chrome);
+    expect(chrome).toBeGreaterThan(-1);
+    expect(list).toBeGreaterThan(chrome);
+    // Ingen glassflate mellom chromen og FlatList-en i kilden.
+    expect(glass === -1 || glass > list).toBe(true);
   });
 });
