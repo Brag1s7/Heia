@@ -807,16 +807,27 @@ interface DaylightGroundProps {
    * containeren den står i (Comments).
    */
   masthead?: boolean;
+  /**
+   * Identitetsfeltets farge i masthead-modus. Utelatt = det aktive lagets
+   * farge (Hjem/Kalender/Varsler). Profil sender Heias mørkegrønne: den
+   * skjermen er ikke lag-scopet (se ProfileHeader), så lagfargen ville
+   * påstått et scope den ikke har — men anatomien er den samme, så
+   * fanebytte bytter farge, ikke modell.
+   */
+  identity?: string;
 }
 
-export function DaylightGround({masthead = false}: DaylightGroundProps) {
+export function DaylightGround({
+  masthead = false,
+  identity,
+}: DaylightGroundProps) {
   const variant = DAYLIGHT_VERTICAL_VARIANT;
   const [box, setBox] = useState({w: 0, h: 0});
   const insets = useSafeAreaInsets();
   const {activeTeamSpace} = useActiveTeam();
   const headerHeight = masthead ? mastheadHeight(insets.top) : 0;
-  const teamColor = masthead ? activeTeamSpace?.color : undefined;
-  const spot = teamColor ? teamSpotlight(teamColor) : null;
+  const fieldColor = masthead ? identity ?? activeTeamSpace?.color : undefined;
+  const spot = fieldColor ? teamSpotlight(fieldColor) : null;
   return (
     // ATMOSFÆRE, IKKE INNHOLD — skjult for skjermleser og uten trykkflate,
     // samme kontrakt som MatchGround. Fyller KROPPEN den ligger i.

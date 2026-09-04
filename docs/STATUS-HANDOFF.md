@@ -1,6 +1,217 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-04 — KALENDER-CHROMEN (35ae050) OG ARKENE I GLASS + «NY HENDELSE» SOM KOMMENTARARK TELEFONGODKJENT, COMMITTET OG PUSHET; NESTE = andre skjermer (Varsler-handlingen/-tittelen, Profil-header) i NY samtale)
+## ▶️▶️ START HER (oppdatert 2026-09-04 kveld — VARSLER OG PROFIL TELEFONGODKJENT OG COMMITTET (tre runder i én commit); NESTE = seksjonsetikettenes kontrast på Profil, egen liten skive)
+
+✅ LUKKET I ÉN COMMIT (se `git log -1`, IKKE pushet). Alt er JS/TS — ingen
+native endring, Metro-reload holder. Telefongodkjent av Brage 2026-09-04:
+runde 1+2 «Telefonbildene ser klart bedre ut. Hovedretningen på både Varsler
+og Profil er godkjent — ikke redesign noe», med to polish-punkter på Profil
+som ble gjort i runde 3.
+
+Detaljene for hver runde står i historikkseksjonen rett under. Kortversjon:
+
+1. VARSLER: liten fast chrome i stadionblekk (`InboxChrome`: statuslinje som
+   tittel + «Merk alle som lest» som frostpille, fast 48 pt) og lista som ÉN
+   `LiquidGlassSurface variant="sheet"` per radkjede med radene skåret inn i
+   materialet (`NotificationRow`: ikonkvadrat i kategoriens blekk + tint,
+   innfelt hårlinje, blekk-trykk, ulest = vekt + prikk). Brage: behold
+   sheet-glasset, tettheten, dividerne og hierarkiet SLIK DET ER;
+   ikontintene trenger IKKE løftes (de fungerer på telefon); IKKE gjør
+   radene høyere igjen.
+2. PROFIL: samme lerret og masthead-anatomi som de tre andre fanene
+   (`DaylightGround identity` + gjennomsiktig `ProfileHeader`,
+   `PROFILE_IDENTITY` = heiaDeep), og flatene som `OpalSurface`-paneler:
+   lagkort, action-gruppe og åtte menygrupper. Brage: «materialfamilien og
+   forskjellen mellom lagkort, action-gruppe og menygrupper fungerer veldig
+   bra» — ikke rør menygruppene eller action-gruppen videre.
+3. POLISH runde 3 (Brages to punkter, verifisert i riggen før commit):
+   · `TEAM_CARD_RING` = rgba(2, 255, 171, 0.40) på valgt lagkort. Ren
+     `colors.heia` leste «nesten like sterkt som aktiv fane/CTA». Neon i
+     full styrke er reservert for HANDLING; et valgt lag er en TILSTAND, og
+     den bæres av tre signaler (flate heiaSoft + hake + ring), så ringen
+     trenger ikke gjøre jobben alene. Strektykkelsen kan IKKE brukes som
+     demper: opalens padding-boks er nøyaktig 1 pt kant.
+   · Lagkortene: `paddingVertical` spacing.md → spacing.sm (12 → 8), altså
+     −8 pt total høyde, 66 → 58 pt. Merket på 40 er fortsatt det høyeste
+     elementet, så ingenting annet i raden flyttet seg. 58 pt er godt over
+     HIGs 44 pt trykkmål.
+   · Riggen (jest → serialisert svg fra OpalSurfaces EGEN utskrift → HTML →
+     headless Chrome, før/etter side om side på E-clean-rampen) bekreftet
+     begge før commit. Riggfila er slettet.
+
+VERIFISERT VED LUKKING: full suite 1104/1106 grønn (2 skipped); eslint rent
+på alle berørte filer og de fem nye testene; prettier ren på alt berørt
+unntatt ProfilScreen, som er uren i HEAD på to steder (`childNames`-ternæren
+og fargearkets `style=[…]`) — bevisst latt stå. tsc IKKE kjørt (Brages
+regel). Ingen `zz_`-filer i treet.
+
+▶️ NESTE (i denne rekkefølgen):
+  A. SEKSJONSETIKETTENES KONTRAST PÅ PROFIL — Brages egen lille skive
+     (avtalt 2026-09-04: «tar vi som egen liten skive etterpå»).
+     Problemet: `SectionLabel` uten `tone` står i `colors.textSecondary`
+     (#5F7265) på dagslysrampen. «DINE LAG» er løst (tone="stadium"), men
+     «RIDABU G10», «MIN STØTTE», «KONTO», «OM HEIA» lander ved 35–60 % av
+     kroppen der kontrasten er 1,6–3,9:1. SAMME problem på Kalender-agendaen
+     og Hjems «Siste fra laget» (begge telefongodkjent likevel). Ingen
+     enkelt blekkfarge holder over hele rampen — hvitt feiler nederst, mørkt
+     øverst. Kandidater: posisjonsavhengig blekk, liten frostplate bak
+     etiketten (samme materiale som chromen), eller etiketten inn i toppen
+     av gruppa. ÉN skive, alle tre skjermene.
+  B. Kalenderchromens hvite piller («I dag»/«Måned»/«+ Ny») står nå ved
+     siden av Varslers frostpille — vurder samme frostmateriale der. Den blå
+     treningsprikken (#2F66DB) er fortsatt den svakeste på mørkt.
+  C. FeedCard mer glass (Brage: «senere skal vi også endre feedcard til å se
+     mer glass ut, så må være en slags helhet») — GLASS.sheet/FIELD-språket
+     er startpunktet; retningsfaden i REFERENCE-NOTES.md står.
+  D. Opprydding (prune DaylightGround-varianter, promoter #143126/#0E211A/
+     #02FFAB til tokens, spinnere i neon på neon) — FØRST når designsporet
+     er ferdig.
+  Alternativ hvis Brage heller vil framover i produkt: pre-launch-pakken
+  S5/S6/S8 eller betaling fase 6.
+
+## (historikk) START HER 2026-09-04 kveld — VARSLER-CHROMEN + PROFIL PÅ DAGSLYSGRUNNEN (runde 1) OG BOKSENE/FLATENE PÅ BEGGE (runde 2)
+
+Brage 2026-09-04: «fikser vi varsling og profil siden. På profil siden vil
+jeg ha samme header og bakgrunn som resten av sidene, men innholdet i header
+skal være det samme som nå … navn + epost + avatar.» Alt er JS/TS — ingen
+native endring, Metro-reload holder. Header og DaylightGround-rampen er
+fortsatt URØRT (kun én ny prop). Ikke committet: telefondom først, så ÉN
+commit («design: Varsler-chrome i stadionblekk + Profil-masthead på
+dagslysgrunnen (telefongodkjent)»).
+
+1. VARSLER — liten, FAST chrome i stadionblekk (samme grep som Kalender):
+   · Ny `src/components/InboxChrome.tsx`: statuslinje («3 nye fra Stange
+     G10» / «Du er oppdatert» / «Alt som skjer i Stange G10») som chromens
+     tittel (heading3 18 pt, systemfont, stadiumText, header-rolle) +
+     «Merk alle som lest» som FROSTPILLE i ukeradens materiale
+     (`STADIUM_PILL` = DayCell `STADIUM_CELL`: stadionblekk 0,08 + hårlinje
+     0,16, trykket 0,16; kopiert, testvoktet). Pillen finnes kun når
+     unreadCount > 0; raden holder `INBOX_CHROME_HEIGHT` 48 uansett, så lista
+     aldri hopper når alt merkes som lest. Ingen flate, ingen kant.
+   · InboxScreen: chromen ligger i `body` OVER FlatList-en, utenfor lista.
+     Den store «Varsler»-tittelen (heading1, ~1,1:1 på #143126) og
+     heiaInk-handlingen (2,2:1) er FJERNET fra listHeader — fanen heter
+     Varsler. Live-MatchPulseCard er fortsatt listHeader. Stilene header/
+     headerText/title/subtitle/headerAction er borte, `Pressable` er
+     uimportert.
+   · Vokter: `__tests__/inboxChrome.test.tsx` (7): stadionblekk ≥ 4,5:1 på
+     #143126–#0B412E, gammel heiaInk < 3:1 der, pillmaterial = STADIUM_CELL,
+     tekst på platen ≥ 4,5:1, pille kun med uleste, fast minHeight.
+
+2. PROFIL — samme lerret og samme masthead-anatomi som de tre andre fanene:
+   · DaylightGround har fått `identity?: string` (masthead-modus): utelatt =
+     aktiv lagfarge som før; Profil sender `PROFILE_IDENTITY` =
+     `colors.heiaDeep` (#08392E). Fargeregelen fra 2026-08-19 står: Profil er
+     ikke lag-scopet, så feltet er Heias mørkegrønne, ikke lagets. Vokter:
+     `__tests__/daylightIdentity.test.tsx` (3) — feltets gradient bytter
+     farge, lagfargen finnes ikke i lerretet, ingen felt uten masthead.
+   · `ProfileHeader.tsx` er SKREVET OM som gjennomsiktig masthead-innhold:
+     ingen egen gradient/svg, ingen egne buer, ingen hårlinje under;
+     paddingTop = insets.top, paddingBottom = HEADER_FOOT_HEIGHT (høyde =
+     `mastheadHeight`, 113 pt). Innholdet er som før: avatar (40 + ring = 42,
+     inngangen til profilbilde), navn + e-post (midt-ellipsis), rollebadge
+     til høyre. Blekk via `teamSpotlight(PROFILE_IDENTITY)` → hvitt, e-post
+     hvit 0,72; navneblokken klippes med `nameMaxWidth` som lagnavnet.
+     Statuslinje-vakten (light-content ved fokus) står.
+   · ProfilScreen: `<DaylightGround masthead identity={PROFILE_IDENTITY} />`
+     først i roten (bak A/B-bryteren), ScrollView er gjennomsiktig
+     (`styles.body`, ikke `styles.screen`). «Dine lag»-etiketten har fått
+     `tone="stadium"` (stadionblekk 0,8) fordi den ALLTID står i den mørke
+     toppen. Alt annet innhold (hvite lagkort, menykort, footer) er urørt.
+   · Vokter: `__tests__/profileHeader.test.tsx` (7).
+   · ⚠️ FELTET ER STILLE: heiaDeep (#08392E) på basen #0E211A er ~1,3:1 —
+     feltet leses som en svakt lysere avrundet form + kantlys, ikke som
+     lagets vivide felt. Det er meningen (Profil = Heias egen, rolig), men
+     Brage må dømme på telefonen. Hvis for svakt: løft `PROFILE_IDENTITY`
+     (kandidater i samme familie: stadiumEdge #1E4033, HEIA_TEAL_SOFT
+     #1E4B3A) — ÉN linje, alle tester måler mot konstanten.
+
+3. RUNDE 2 SAMME KVELD — BOKSENE/FLATENE (Brage etter telefonbilde av
+   runde 1: «chromen og lerretet kan stå; boksene ser for hvite, generiske
+   og gamle ut … Varsler = én tett premium notification-surface, Profil =
+   roligere grouped account/team-surfaces, IKKE like»). Begge designlinsene
+   brukt (apple-hig-designer + emilkowalski apple-design, curl raw):
+   HIG = grouped lists m/ innfelte skillelinjer fra 60 pt, hierarkisk
+   symbolgjengivelse, konsentriske radier, 44 pt mål; Emil = materialvekt
+   koder hierarki (større flate = tykkere), ALDRI to lyse translusente lag
+   oppå hverandre, vibrancy = tyngre/mørkere blekk på glass, respons på
+   press-ned. Referansen energi-appens «Active Devices»-liste (tintede
+   ikonkvadrater i én myk flate) bekreftet retningen.
+   · VARSLER = ÉN flate: `LiquidGlassSurface variant="sheet"` (GLASS.sheet
+     0,80 — den tunge perlen, ekte blur på iOS 26, solid #EFF3F1 ellers)
+     rundt hver radkjede, skjelett og tomtilstand. Margen ligger på en ytre
+     `listWrap` (stil på LiquidGlassSurface treffer innerboksen).
+     `NotificationRow` er SKREVET OM som gjennomsiktig innhold på glasset:
+     ingen egen flate; ikon = avrundet KVADRAT 36/r11 i 40-slott med
+     kategoriens blekk som glyf OG svak tint (`CATEGORY_INK`/
+     `CATEGORY_TINT`, `inkTint()` — hverdagen er heiaDeep, ikke grå;
+     menneske = sirkel/Avatar); innfelt blekk-hårlinje `OPAL.hairline`
+     fra 68 pt til 16 pt før kanten; trykk = `OPAL.rowPressed` (blekk-tint);
+     ulest = tittel 700 + heiaInk-prikk 7 pt (mintflaten over raden er
+     BORTE — den var en lys flate på glasset); tittel 15/600 textPrimary,
+     body 13,5 og tid 12 i OPAL.inkSecondary (inkTertiary faller til 4,2
+     over #014C34); luft 16 → 12 pt. MatchPulseCard og SectionHeader urørt.
+   · PROFIL = OPAL-PANELER: `OpalSurface` (matt frost 0,92/0,87, kantlys +
+     blekk-motkant, grønn skygge) på lagkortene OG de åtte menygruppene
+     (`MenuGroup`). Samme familie som Varsler, annen fysikk (matt frost vs
+     levende blur). `ListRow` fikk `material="opal"` (innfelt hårlinje fra
+     16+32+12 = 60, undertekst OPAL.inkSecondary, trykk blekk-tint, 52 min)
+     og `tone="action"` (tittel i OPAL.inkAccent — heiaInk faller til 3,9
+     på opalen over #143126). `MenuIcon` = 32-kvadrat r9 med tint per tone:
+     ink (heiaDeep 0,08 + OPAL.inkSecondary-glyf), action (heiaSoft +
+     inkAccent — «Bli med»/«Opprett»), danger (live 0,12 + liveInk — «Slett
+     konto»). Chevron 16/inkTertiary. Lagkortet: 12 pt luft, 40-merke, navn
+     16/700, meta 13 inkSecondary, valgt = neonring i opalens 1 pt kant +
+     heiaSoft-tint, trykk = opalens respons (Pressable render-prop).
+     Standard `ListRow` (Lagoversikt, Sesongen, hendelsen, GoalCorrection)
+     er URØRT — testvoktet.
+   · OPAL fikk to nye konstanter: `hairline` rgba(8,57,46,0.10) og
+     `rowPressed` rgba(8,57,46,0.06) — radenes linje/trykk i materialet.
+   · Tester: `__tests__/notificationRow.test.tsx` (16: gjennomsiktig rad,
+     innfelt linje, kvadrat + blekk-tinter, ulest/lest, kontrastport over
+     sju grunner fra #0B412E til #F3F4EC på GLASS.sheet-tinten, trykk) og
+     `__tests__/listRowOpal.test.tsx` (6: standard urørt, opal-linje,
+     action-blekk, kontrastport på opalen over #143126).
+
+4. VERIFISERT: full suite 1104/1106 grønn (2 skipped) 2026-09-04 kveld;
+   eslint rent på alle berørte filer og de fem nye testene; prettier ren
+   på alt berørt unntatt ProfilScreen, som var uren i HEAD (nå to steder
+   igjen: `childNames`-ternæren og fargearkets `style=[…]`) — bevisst latt
+   stå. tsc IKKE kjørt (Brages regel). Ingen `zz_`-filer. INGEN visuell
+   rigg i noen av rundene — telefonen er første bilde. Kjente risikoer å se
+   etter: (a) ikontintene 0,10–0,12 kan lese for svakt på glasset → løft
+   til 0,14–0,16 i `CATEGORY_TINT`/`MENU_ICON_TINT`; (b) sheet-glasset over
+   de øverste radene (grunn #014C34) blir kjølig grå-perle — det er
+   meningen, men kan oppleves tungt; (c) opalens kantlys er svakt på lys
+   grunn nederst på Profil (kjent fra opalskiva).
+
+▶️ NESTE (i denne rekkefølgen):
+  A. TELEFONDOM på Varsler og Profil (begge runder) → ÉN commit → denne
+     seksjonen til historikk. Se etter: (1) Varsler: statuslinje + frostpille
+     rett under laghodet, lista som ÉN glassflate med stramme rader,
+     ikonkvadrater i blekk-tint, innfelte skillelinjer, ulest = prikk +
+     vekt; (2) Profil: samme reise/buer som de andre, stille mørkegrønt felt
+     bak avatar/navn/e-post, lagkort og menygrupper som matte opalpaneler,
+     «Bli med»/«Opprett» i handlingsblekk med grønne ikonkvadrater, «Slett
+     konto» rødt ikon; (3) fanebytte Hjem→Profil flytter ikke toppflaten en
+     piksel. Brage prioriterte: Varsler-radene > Profils meny-/handlings-
+     bokser > lagkortene.
+  B. MELLOMTONE-SONEN (kjent, nå på TRE skjermer): seksjonsetiketter i
+     `textSecondary` (#5F7265) står på rampen fra #143126 til neon — på
+     Profil lander «Laget»/«Min støtte»/«Konto» ved 35–60 % av kroppen der
+     kontrasten er 1,6–3,9:1; Kalender-agendaen og Hjems «Siste fra laget»
+     har samme problem (telefongodkjent likevel). Ingen enkelt blekkfarge
+     holder over hele rampen (hvitt feiler nederst, mørkt øverst) — egen
+     liten skive: posisjonsavhengig blekk, plate bak etiketten, eller
+     etiketten inn i kortet. IKKE løst her (utenfor Brages bestilling).
+  C. Kalenderchromens hvite piller (I dag/Måned/+ Ny) står nå ved siden av
+     Varslers frostpille — vurder samme frostmateriale der (åpent punkt fra
+     forrige seksjon), pluss den blå treningsprikken.
+  D. FeedCard mer glass (GLASS.sheet/FIELD-språket), så opprydding
+     (DaylightGround-varianter, promoter #143126/#0E211A/#02FFAB til tokens,
+     spinnere i neon på neon).
+
+## (historikk) START HER 2026-09-04 — KALENDER-CHROMEN (35ae050) OG ARKENE I GLASS + «NY HENDELSE» SOM KOMMENTARARK TELEFONGODKJENT, COMMITTET OG PUSHET
 
 ✅ TREET ER RENT OG PUSHET (2026-09-04). Brage: «Veldig bra! Commit og
 push». Header og DaylightGround er URØRT (visuelt låst av Brage

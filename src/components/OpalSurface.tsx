@@ -114,6 +114,15 @@ export const OPAL = {
   inkTertiary: '#506259',
   /** Aksentblekk på opalen (rolle-pillen «Trener» på heiaSoft). */
   inkAccent: '#05604A',
+  /**
+   * RADER I MATERIALET (Brage 2026-09-04 — Varsler-lista og Profil-gruppene):
+   * skillelinja er en innfelt blekk-hårlinje, og trykk på en rad er en
+   * blekk-tint — aldri en lys flate oppå glass/opal (to lyse translusente
+   * lag oppå hverandre ødelegger lesbarheten). Delt av NotificationRow og
+   * ListRow `material="opal"`.
+   */
+  hairline: 'rgba(8, 57, 46, 0.10)',
+  rowPressed: 'rgba(8, 57, 46, 0.06)',
 } as const;
 
 interface OpalSurfaceProps {

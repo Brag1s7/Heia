@@ -4,7 +4,6 @@ import {
   View,
   Text,
   FlatList,
-  Pressable,
   StyleSheet,
   RefreshControl,
   LayoutAnimation,
@@ -23,10 +22,14 @@ import {
   SectionHeader,
   DaylightGround,
   DAYLIGHT_GROUND_AB,
+  InboxChrome,
   TeamHeader,
   useBottomContentPadding,
 } from '../components';
 import {Ball, Megaphone} from '../components/icons';
+import {LiquidGlassSurface} from '../components/LiquidGlassSurface';
+import {OPAL} from '../components/OpalSurface';
+import {CATEGORY_TINT} from '../components/NotificationRow';
 import {useActiveTeam, useNotifications} from '../context';
 import {getNotifications} from '../lib/api/notifications';
 import {buildEntries, groupByAge, mergeNotifications} from '../shared/inbox';
@@ -478,22 +481,28 @@ export function InboxScreen() {
           </View>
         );
       }
-      // Radene samles i ett kort per sammenhengende kjede.
+      // Radene samles i ÉN glassflate per sammenhengende kjede (Brage
+      // 2026-09-04): «én premium notification surface med tydelige, stramme
+      // rader skåret inn i materialet» — arkglasset (GLASS.sheet, den tunge
+      // perlen: lesbart, aldri kritthvitt), radene er gjennomsiktig innhold
+      // på det. Ikke ett kort per varsel.
       return (
-        <View style={styles.list}>
-          {item.rows.map((entry, i) => (
-            <NotificationRow
-              key={entry.key}
-              item={entry.item}
-              actorColor={
-                entry.item.actor
-                  ? authorColors.get(entry.item.actor.id)
-                  : undefined
-              }
-              showBorder={i < item.rows.length - 1}
-              onPress={() => handlePress(entry.item)}
-            />
-          ))}
+        <View style={styles.listWrap}>
+          <LiquidGlassSurface variant="sheet" style={styles.list}>
+            {item.rows.map((entry, i) => (
+              <NotificationRow
+                key={entry.key}
+                item={entry.item}
+                actorColor={
+                  entry.item.actor
+                    ? authorColors.get(entry.item.actor.id)
+                    : undefined
+                }
+                showBorder={i < item.rows.length - 1}
+                onPress={() => handlePress(entry.item)}
+              />
+            ))}
+          </LiquidGlassSurface>
         </View>
       );
     },
@@ -502,35 +511,18 @@ export function InboxScreen() {
 
   if (!activeTeamSpaceId) return null;
 
+  // Chromens statuslinje — det som ER sant nå, og hvilket lag det gjelder,
+  // siden varslene er lag-avgrenset.
+  const status =
+    unreadCount > 0
+      ? `${unreadCount} ${unreadCount === 1 ? 'ny' : 'nye'} fra ${teamName}`
+      : items.length > 0
+      ? 'Du er oppdatert'
+      : `Alt som skjer i ${teamName}`;
+
   // ELEMENT, ikke inline komponent — samme remount-regel som TeamHome.
   const listHeader = (
     <>
-      <View style={styles.header}>
-        <View style={styles.headerText}>
-          <Text style={styles.title}>Varsler</Text>
-          {/* Underteksten skal si det som ER sant nå — og hvilket lag det
-              gjelder, siden varslene er lag-avgrenset. */}
-          <Text style={styles.subtitle}>
-            {unreadCount > 0
-              ? `${unreadCount} ${
-                  unreadCount === 1 ? 'ny' : 'nye'
-                } fra ${teamName}`
-              : items.length > 0
-              ? 'Du er oppdatert'
-              : `Alt som skjer i ${teamName}`}
-          </Text>
-        </View>
-        {unreadCount > 0 && (
-          <Pressable
-            onPress={handleMarkAll}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Merk alle varsler som lest">
-            <Text style={styles.headerAction}>Merk alle som lest</Text>
-          </Pressable>
-        )}
-      </View>
-
       {/* Kampen som pågår — kompakt status, eller det utvidede målkortet
           hvis det nyeste uleste er vårt mål. ÉN stadionflate, aldri to. */}
       {liveMatch && liveItems.length > 0 && (
@@ -557,35 +549,54 @@ export function InboxScreen() {
   // fra «alle varsler bor i live-stripa i headeren» — der skal flaten under
   // stå tom, ikke vise invitasjonskortet.
   const listEmpty = loading ? (
-    <View style={[styles.list, styles.standalone]}>
-      <ListRowSkeleton />
-      <ListRowSkeleton />
-      <ListRowSkeleton />
-      <ListRowSkeleton showBorder={false} />
+    <View style={[styles.listWrap, styles.standalone]}>
+      <LiquidGlassSurface variant="sheet" style={styles.list}>
+        <ListRowSkeleton />
+        <ListRowSkeleton />
+        <ListRowSkeleton />
+        <ListRowSkeleton showBorder={false} />
+      </LiquidGlassSurface>
     </View>
   ) : error ? (
-    <View style={[styles.emptyCard, styles.standalone]}>
-      <Text style={styles.emptyText}>{error}</Text>
+    <View style={[styles.listWrap, styles.standalone]}>
+      <LiquidGlassSurface variant="sheet" style={styles.emptyCard}>
+        <Text style={styles.emptyText}>{error}</Text>
+      </LiquidGlassSurface>
     </View>
   ) : items.length === 0 ? (
-    /* Tom skjerm er en invitasjon, ikke en beskjed om ingenting. */
-    <View style={[styles.emptyCard, styles.standalone]}>
-      <View style={styles.emptyIcons}>
-        <View style={[styles.emptyIcon, {backgroundColor: colors.liveSoft}]}>
-          <Ball size={18} color={colors.liveInk} strokeWidth={2} />
+    /* Tom skjerm er en invitasjon, ikke en beskjed om ingenting. Samme
+       glass og samme ikonkvadrater som radene den lover. */
+    <View style={[styles.listWrap, styles.standalone]}>
+      <LiquidGlassSurface variant="sheet" style={styles.emptyCard}>
+        <View style={styles.emptyIcons}>
+          <View
+            style={[
+              styles.emptyIcon,
+              {backgroundColor: CATEGORY_TINT.match_live},
+            ]}>
+            <Ball size={18} color={colors.liveInk} strokeWidth={2} />
+          </View>
+          <View
+            style={[
+              styles.emptyIcon,
+              {backgroundColor: CATEGORY_TINT.admin_message},
+            ]}>
+            <Megaphone size={18} color={colors.goldInk} strokeWidth={2.1} />
+          </View>
+          <View
+            style={[
+              styles.emptyIcon,
+              {backgroundColor: CATEGORY_TINT.new_reaction},
+            ]}>
+            <Text style={styles.emptyEmoji}>👏</Text>
+          </View>
         </View>
-        <View style={[styles.emptyIcon, {backgroundColor: colors.sun}]}>
-          <Megaphone size={18} color={colors.goldInk} />
-        </View>
-        <View style={[styles.emptyIcon, {backgroundColor: colors.heiaTint}]}>
-          <Text style={styles.emptyEmoji}>👏</Text>
-        </View>
-      </View>
-      <Text style={styles.emptyTitle}>Her blir det liv</Text>
-      <Text style={styles.emptyText}>
-        Mål, kampstart, trenerbeskjeder og applaus fra laget havner her — også
-        når du ikke rakk å se dem.
-      </Text>
+        <Text style={styles.emptyTitle}>Her blir det liv</Text>
+        <Text style={styles.emptyText}>
+          Mål, kampstart, trenerbeskjeder og applaus fra laget havner her — også
+          når du ikke rakk å se dem.
+        </Text>
+      </LiquidGlassSurface>
     </View>
   ) : null;
 
@@ -596,8 +607,17 @@ export function InboxScreen() {
           gjennomsiktig innhold oppå. Av med DAYLIGHT_GROUND_AB = false. */}
       {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
       <TeamHeader />
-      {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
+      {/* KROPPEN: chromen og scrollflaten er begge gjennomsiktige over
+          lerretet — samme grep som Kalender (Brage 2026-09-04): en liten,
+          FAST chrome i stadionblekk under laghodet, og lista ruller under
+          den. Ingen scroll-away-tittel: fanen heter Varsler, statuslinja er
+          chromens tittel, og «Merk alle som lest» er en frostpille som står
+          der så lenge det finnes noe å merke. */}
       <View style={styles.body}>
+        <InboxChrome
+          status={status}
+          onMarkAll={unreadCount > 0 ? handleMarkAll : undefined}
+        />
         <FlatList
           data={blocks}
           renderItem={renderBlock}
@@ -639,55 +659,29 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
-  // Luften under headeren kommer fra SectionHeaders eget topp-rom («Nå»
+  // Luften under chromen kommer fra SectionHeaders eget topp-rom («Nå»
   // osv.); tilstander uten seksjoner bruker `standalone` i stedet.
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
   standalone: {
     marginTop: spacing.xl,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    ...typography.heading1,
-  },
-  subtitle: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
-  },
-  headerAction: {
-    ...typography.bodySmall,
-    color: colors.heiaInk,
-    fontWeight: '600',
   },
   matchSlot: {
     marginTop: spacing.xl,
   },
-  list: {
+  // Glasset måler seg etter innholdet; margen ligger på en ytre ramme så
+  // glasset selv står kant i kant med ramma (stil på LiquidGlassSurface
+  // treffer INNERBOKSEN). `overflow: hidden` klipper radenes trykk-tint til
+  // radiusen.
+  listWrap: {
     marginHorizontal: spacing.lg,
-    borderRadius: radius.xl,
+  },
+  list: {
     overflow: 'hidden',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
   },
   footerSpinner: {
     paddingVertical: spacing.lg,
   },
   emptyCard: {
-    marginHorizontal: spacing.lg,
     padding: spacing.xl,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
     gap: spacing.sm,
     alignItems: 'center',
   },
@@ -699,7 +693,7 @@ const styles = StyleSheet.create({
   emptyIcon: {
     width: 40,
     height: 40,
-    borderRadius: radius.full,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -711,7 +705,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
   },
 });
