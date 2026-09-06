@@ -1,6 +1,895 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (oppdatert 2026-09-04 ~11:50 — RUNDE 7 COMMITTET; NESTE SAMTALE = FEEDCARD)
+## ▶️▶️ START HER (oppdatert 2026-09-06 kveld — FEEDKORTET PÅ HJEM ER LUKKET: PROTOTYPENS FROST-KORT TELEFONGODKJENT, COMMITTET OG PUSHET)
+
+  · VEDTATT OG BYGGET (Brage: «Dette funker bra nå!»): feedkortet er
+    prototypens kort. `FEED_MATERIAL = 'frost'` (glassOptics.ts). Rammen =
+    regular systemglass med blek mintperle (214/244/230) på 0,55 som EGEN
+    farge (hvit tint tok fargen fra grunnen og ble hvitt over krem), sheen
+    0,14, hvit kant rundt (sterkest topp/venstre), skygge INNI det native
+    laget (`cardShadow`) så den krymper med trykket. Rammen bærer bylinen;
+    ÉN PLATE (hvit 0,30, radius 16) bærer tekst, bilde og handlingene.
+    Piller = lys frostpille (0,34, kant 0,6), Heia-pillen har fast bredde
+    (minWidth 108) så Kommenter står stille. Trykklys mint på lyst kort.
+  · KAMPKORTET: som før (StadiumGlass compact) + samme plate som tynt lyst
+    lag (0,07). Trykk = det lyse glassets native fysikk via
+    `GlassPressSensor` (HeiaLiquidGlassView med `glassStyle:'none'`,
+    `interactive` MÅ være true — det er gjenkjennerens bryter; lyset
+    flyttes foran barna i `restack`; `pressColor` hvit × 0,6 ≈ 0,10).
+    JS-fallback `useGlassPress` (StadiumGlass.tsx) for Android/eldre iOS.
+    StadiumGlass måler nå kortet og gir svg-en høyden i PUNKTER (rn-svg-
+    fella: prosent henger på første måling → «bunnen kuttet» i arket).
+  · HJEM: identitetsfeltet (lagfargen) tegnes i et eget lag OVER lista
+    (`MastheadField` + TeamHeader etter kroppen, kroppen har marginTop
+    mastheadHeight) — systemglasset sampler alt bak seg, også litt utenfor
+    egen ramme, og kortene ble røde nær laghodet. Kalender/Varsler/Profil
+    har fortsatt feltet i grunnen (samme grep hvis det viser seg der).
+  · KOMMENTARTRÅDEN: skjelett bare når hentingen tar > 180 ms; tom-
+    tilstanden toner inn (220 ms). Kortet seedes fra feed-cachen
+    (`peekFeedItem`).
+  · IKKE VALGT (tegnet i artifact «Feedkortets anatomi», 3 versjoner):
+    A (én flate), B (prototypens to plater), M2/M3 (samlet kampkort).
+    Kampkortet forblir ett kort per hendelse.
+  · DØD KODE SOM LIGGER IGJEN (egen liten ryddeskive, ikke gjort nå):
+    sølv/perle i LiquidGlassSurface (SILVER*, SilverOptics, PEARL_*),
+    HeiaPearlView i native, arena-laget, bildene silk-*/pearl-card/frost-*
+    (~790 KB, bundles via require). Alt er gatet av bryteren.
+  · TESTER: full suite grønn ved commit (se commit-melding); feedGlass/
+    feedOpal/glassOptics oppdatert til frost-tallene. zz_silver_rig slettet.
+  · NESTE: Brage velger — kampskjermen arver kortets språk (plate, node/
+    minutt/innhold, kritt), eller ryddeskiva over.
+
+---
+
+### Forrige START HER (2026-09-06 ~20:30 — historikk, perlen som ble forkastet)
+
+## (historikk) START HER (oppdatert 2026-09-06 ~20:30 — SØLVGLASSET RUNDE 3: KROPPEN DERIVERES FRA JPEG-EN, SCROLLBEVEGELSE (SHEEN/ENERGI), KANT FØLGER FOLDENE; VENTER Cmd+R OG DOM; IKKE COMMITTET)
+
+  · FUNN (målt på pearl-card.jpeg): snøfølelsen ligger i selve JPEG-en —
+    18 % av pikslene nesten hvitt (L > 0,95), 36 % over 0,92, mintkast
+    (G−R 17/255 i snitt, 31 % med tydelig grønnkast); finkorn er lavt
+    (std 1,2/255). Kompositeringen (soft light/color/screen over neon) la
+    MER mint oppå; arket samplet grunnen bak et solid ark (nå gatet på
+    `refraction`).
+  · KROPPEN DERIVERES nativt fra JPEG-en (originalen urørt), oppskrift 4
+    fra riggen: sølvgrå base som følger de store foldene (σ 36), lokal
+    foldkontrast (σ 5), fin frost begrenset til ±0,02, smale lysrygger =
+    LOKAL kontrast over foldsnittet (ikke absolutt lyshet) med myk glorie,
+    kne mot hvitt (tonekurve), kjølig tint, grønt bare i teksturens pools.
+    Resultat i rig: nesten hvitt 18 % → 3 %, median L 0,87. Flis B (høye
+    kort): svakere rygger/glorie, halv grønn — samme folder, ikke samme
+    lysbuer. Alle ledd = `PEARL_NATIVE.props.material*` (Fast Refresh →
+    ny derivasjon, ingen rebuild). `material: false` = rå JPEG.
+  · BEVEGELSE: energi fra scrollfart (anslag 80 ms, utfading 350 ms via
+    delt CADisplayLink → rolig landing), drift langs foldene; sheen = ryggenes
+    glorie tent av et bredt mykt diagonalt bånd som vandrer med
+    skjermposisjonen (`sheenPeriod`/`sheenBand`), styrke `sheen` +
+    `sheenMotion`·energi; energi øker bøyningen (`motionBend`) og gir
+    bevegelsesblur (`motionBlur`). Fortsatt ÉN CI-render per synlig kort per
+    ramme: overflaten er [grunn | sheen] og fire CA-lag deler den via
+    contentsRect. Redusert bevegelse: energi 0, båndet står.
+  · KANTEN: glimtets maske = diagonal fempunktskurve × foldenes glorie
+    (`edgeFollow`) — lyser der en fold møter kanten, ikke som ring.
+  · IKKE VERIFISERT: bevegelsen (ingen opptak, Brages instruks om tokens);
+    telefonytelse (rammemåler `frameMeter: true`). Simulator: kroppen tegner
+    (final3_crop i scratchpad).
+  · Tester: ikke kjørt på nytt etter runde 3 (kun native + konstanter endret;
+    feedGlass-kildesjekken avgrenser til `updateRefraction`). Scroll-kroken
+    er fjernet. zz_silver_rig SLETTES før commit.
+
+---
+
+### Forrige START HER (2026-09-06 ~18:50 — historikk)
+
+## (historikk) START HER (oppdatert 2026-09-06 ~18:50 — SØLVGLASSET RUNDE 2: KOMPOSITERING UTEN MULTIPLY, GLATTET FELT, RAMMEMÅLER PÅ TELEFON; VENTER Cmd+R OG DOM; IKKE COMMITTET)
+
+  · TELEFONDOM RUNDE 1: multiply i dalene ga store mørke flekkete daler
+    (særlig øverst, mørk grunn) og harde hvite bånd. Native teksturdeling og
+    innlastingsfiksen ble BEHOLDT.
+  · KOMPOSITERINGEN NÅ (HeiaPearlView): den bøyde grunnen rendres én gang
+    per synlig kort per scroll-ramme (uendret CI-arbeid) og deles av TRE
+    CA-lag med hver sin statiske maske:
+      lys    softLightBlendMode — grunnens lys/farge, matematisk begrenset
+             (maks ≈ ±10 % på lys flate); skjermet 70 % på foldekammene
+      farge  colorBlendMode — grunnens kulør på kroppens EGEN lysstyrke;
+             gulv 0,08 + de store dalene (felt 0,55→0,20)
+      glød   screenBlendMode — kun i teksturens grønne lysansamlinger
+    Ingen multiply. Simulator: lys sølv m/ kjølig grønn dybde over mørk sone,
+    mint i foldene over neon, sølvform/glans intakt over lys sone; høylysene
+    bevart (compare_sheet/on2_sheet i scratchpad).
+  · FELTET: luminans glattet σ 36 px (originalskala), normalisert 1/99-pers.
+    — bare de store foldene, ingen frostkorn. Lysansamlinger = grønn kroma
+    ×3, σ 12, rampe 0,15→0,5. Kammer = felt 0,70→0,95.
+  · RAMMEMÅLER (`PEARL_NATIVE.props.frameMeter: true`, Fast Refresh): etikett
+    øverst i vinduet med Hz, tapt tid i hakk (%), antall, verste ramme, snitt
+    CI-encode per kort (maks). CADisplayLink i skjermens egen takt; teller
+    bare når skjermen er i høy takt. Selvhelende (stopper når ingen synlig
+    visning ber om den). Verifisert i simulator (60 Hz, 0 % hakk).
+  · YTELSE — PÅVIST: innlastingsfiksen (teksturen kom 42–67 ms etter kortet
+    med RN Image). IKKE PÅVIST: at scroll-hakkingen på telefon er borte.
+    Simulatortallet (4,2 ms CI-encode/kort) er ikke et resultat.
+    Brage måler: frameMeter PÅ, scroll med flere synlige kort, `ground`
+    true/false, ev. `groundLive:false` (render kun ved scroll-stopp).
+  · Tall: alt i `PEARL_NATIVE.props` (glassOptics.ts). Native-konstanter
+    (σ, ramper for kam/lysansamling, `kPearlCrops`) krever rebuild.
+  · Tester: feedGlass/glassOptics/commentThreadKeyboard 46/46 + de fire
+    kommentarsuitene tidligere 51/51; eslint/prettier rent. zz_silver_rig
+    SLETTES før commit. Scroll-kroken i TeamHomeScreen er fjernet.
+
+---
+
+### Forrige START HER (2026-09-06 ~15:45 — historikk)
+
+## (historikk) START HER (oppdatert 2026-09-06 ~15:45 — SØLVGLASSET ER NATIVT: HeiaPearlView; GRUNNEN I FOLDENE + GLANSKANT BYGGET; VENTER TELEFONBYGG (Cmd+R) OG DOM; IKKE COMMITTET)
+
+  · MATERIALRETNINGEN GODKJENT av Brage (sølv, perlebølger, tydelig effekt).
+  · HAKKINGEN, målt i simulatoren (CDP-scroll + Profiler): JS-kostnaden skilte
+    IKKE kortene (sølvkort 7–11 ms/commit med tekstur, 7–9 uten; kampkort
+    12–31). Påvist: JS-teksturen ga én ekstra commit (onLayout→setState) og
+    bildet kom 42–67 ms ETTER kortet (asynkron RN-Image-lasting per kort) —
+    materialet «poppet» inn under scroll og i arket. Antakelse (ikke målt på
+    telefon): RN dekoder JPEG-en per kort, i release i full 1916×821.
+  · RETTET: `HeiaPearlView` (i HeiaLiquidGlassView.{h,m} + manager) — teksturen
+    dekodes ÉN gang (≤1200 px) og deles som CALayer.contents; ingen onLayout,
+    ingen async bildelasting, ingen svg. Kortet står komplett fra første ramme.
+    JS: `LiquidGlassSurface` velger native via UIManager.hasViewManagerConfig,
+    ellers gammel JS-flising (Android/jest). Alle tall i `PEARL_NATIVE`
+    (glassOptics.ts) er props → Fast Refresh.
+  · GRUNNEN I FOLDENE (steg 2): høydefelt + dalmaske utledes fra JPEG-ens
+    luminans; per scroll-ramme: utsnitt av delt frostet grunn →
+    CIDisplacementDistortion → IOSurface → lag med compositingFilter multiply
+    gjennom dalmasken. Simulator: 4,2 ms encode per synlig kort per render,
+    0 renders med `ground:false`. TELEFONTALL MANGLER — `groundLive:false`
+    er nødbremsen (render kun ved scroll-stopp).
+  · KANTEN (steg 3): 9-delt glansbilde per radius (skarpt 1 pt glimt → 2/4/7
+    pt mykere lag), diagonal maske TL→BR (glimt, svakt, nytt glimt), lokal
+    sølvgrå dybde med radial maske fra nedre høyre. Høye kort: fliser i fast
+    skala, ulike utsnitt, annenhver speilvendt, kryssfadet 56 pt (ingen
+    speilsøm; sjekket i simulator).
+  · KOMMENTARARKET: `peekFeedItem` seeder innlegget synkront fra feed-cachen;
+    skeleton-kortet vises bare når innlegget ikke lå der; feilet henting
+    visker ikke ut det seedede. Bildeboksen var alt reservert (180 pt).
+  · TELEFON: native endret → Cmd+R i Xcode. Sammenlign `ground` true/false
+    og `groundLive`. Simulatorbygget er installert og verifisert.
+  · Tester: commentSheet/commentsScreen/commentThreadKeyboard/feedGlass 51/51;
+    eslint rent på endrede filer. zz_silver_rig SLETTES før commit.
+
+---
+
+### Forrige START HER (2026-09-06 ~15:20 — historikk)
+
+## (historikk) START HER (oppdatert 2026-09-06 ~15:20 — TEKSTURMODUS PÅ: BRAGES JPEG ER MATERIALFLATEN; SCROLL-HAKKING UNDER UTREDNING; NATIVE BØYNING VENTER PÅ TO TELEFONDOMMER; IKKE COMMITTET)
+
+  · `SILVER_MODE = 'texture'` (glassOptics.ts): `src/assets/images/
+    pearl-card.jpeg` (1916×821) tegnes i kortets bredde, ankret topp, som
+    bildeflate bak innholdet; høyere kort får speilvendte kopier under
+    (FORELØPIG — bildekort trenger egen komposisjon). I denne modusen
+    monteres INGEN gamle lag, ingen skygge, INTET systemglass (NativeGlass)
+    på innleggskort — én dekodet JPEG + én svg uten filtre (`PEARL_EDGE`:
+    varierende 1 pt kantlys, to hjørnebuer, sølvgrå dybde TR/BL). 'layers'
+    = R3 for sammenligning.
+  · ADVARSELEN (lest via CDP mot Hermes): «process.env.EXPO_OS is not
+    defined … babel-preset-expo» — fra en expo-avhengighet (ikke materialet).
+  · SCROLL-HAKKING (Brage: innleggskort hakker, kampkort ikke): i 'layers'
+    har hvert innleggskort 1 UIVisualEffectView m/ UIGlassEffect (live
+    backdrop hver ramme), 3 svg m/ 4 Gauss-filtre (CoreImage ved montering),
+    5 Image-lag og 2 uskarpe boxShadow. Kampkort = StadiumGlass (svg uten
+    filtre, ingen effektview). Native KVO/specular er AV for sølv (ingen
+    per-ramme-arbeid der). Simulatoren kan ikke scrolles fra CLI → Brage
+    sammenligner 'texture' mot 'layers' på telefonen.
+  · NESTE (etter Brages dom på materiale + scroll): native bøyning i
+    HeiaLiquidGlassView (CIDisplacementDistortion m/ eget bølgefelt som
+    følger JPEG-ens folder; teksturen får slippe grunnen inn i utvalgte
+    partier). Xcode-bygg godkjent.
+  · Tester: 4 glass-suiter 87/87; eslint rent. zz_silver_rig SLETTES før
+    commit; SILVER_LAYERS fjernes når materialet er godkjent.
+
+---
+
+### Forrige START HER (2026-09-06 ~15:00 — historikk)
+
+ (oppdatert 2026-09-06 ~15:00 — SØLVGLASS: NATIVE-VEIEN VALGT; DEN SVARTE RAMMEN FUNNET OG RETTET I SIMULATOR; STEG 1 (REN TEKSTUR) VENTER PÅ BRAGES PNG; IKKE COMMITTET)
+
+BRAGES BESLUTNINGER (2026-09-06 ~14:45):
+  · Scroll-koblingen bygges NATIVT i `HeiaLiquidGlassView` (delt
+    DaylightGround-tekstur + kortets skjermposisjon + mykt forskyvningsfelt
+    langs materialets bølger). Xcode-bygg er GODKJENT når scroll-steget nås.
+  · Stillbildet først: R3 på telefonen hadde «massiv mørk innvendig ramme og
+    diffuse lysfelt». Referansen = lys frostet kant + tydelige organiske
+    perlebølger. Brage har levert en HELDEKKENDE MATERIALTEKSTUR (PNG) som
+    skal vises RENT bak ekte tekst/knapper på det korte tekstkortet, uten
+    tegnede lag, innvendige skygger eller systemglass. Ikke gjenskap den med
+    generiske bølger; høye bildekort trenger egen komposisjon (ikke strekk/
+    repeter hele motivet).
+  · Første leveranse: ETT faktisk telefonskjermbilde av den korrigerte flaten
+    mot referansen; deretter kort scrollvideo. Korte rapporter, ingen nye
+    testsuiter som mål.
+
+DIAGNOSEN (gjort i iOS-simulatoren, iPhone 17 Pro, som kjører appen mot
+Brages Metro; kontaktark `layers_sheet.png` sendt Brage): lagmasken
+`SILVER_LAYERS` i glassOptics.ts slo lagene på ett og ett. E2 (base +
+rimShade) og E3 (base + rimGlow) ga hver for seg den svarte rammen; E7
+(alt unntatt de to) viste svart ytterkant. ÅRSAK: gradientene fikk
+<Stop>-ene sine via en hjelpekomponent (`<Stops/>`); react-native-svg leser
+bare DIREKTE Stop-barn → null stopp → gradienten tegnes SVART, og blur-
+filteret smurte den ut til en ramme. RETTET: stoppene mappes rett inn i hver
+<LinearGradient> (vaktet i feedGlass.test: alle LinearGradient-barn er Stop).
+Etter rettingen: lys kant, grønn glød nede/venstre, ingen ramme
+(`sim_fixed_crop.png`). Samme feil lå bak R2s «metallramme».
+  · Silkeflisen hadde synlig søm på telefon: RN tolket 840 px uten @2x som
+    840 pt og skalerte `repeat`-flisen til boksen. Rettet: `silk-*@2x.png`
+    (420 pt) + tre stablede, speilvendte `cover`-kopier i stedet for repeat.
+
+STEG 1 — KLAR TIL Å SLÅS PÅ NÅR FILEN LIGGER DER:
+  · `SILVER_MODE` i glassOptics.ts: 'texture' viser
+    `src/assets/images/pearl-card.png` som bildeflate (cover, klippet til
+    radius, INGEN lag/skygger/systemglass); 'layers' = R3. Står på 'layers'.
+  · pearl-card.png er nå en 1×1 GJENNOMSIKTIG PLASSHOLDER. Brage må legge den
+    vedlagte heldekkende teksturen (1920×828-ish) på nøyaktig den stien
+    (samme navn), restarte Metro (ny asset), og `SILVER_MODE` byttes til
+    'texture'. Deretter: simulator-/telefonskjermbilde mot referansen.
+  · Simulatoren kan brukes til skjermbilder: `xcrun simctl io booted
+    screenshot` (appen kjører der mot Metro på 8081).
+
+STEG 2 (etter steg 1): native forskyvning i `HeiaLiquidGlassView.m` —
+`_backdropView` har allerede delt grunntekstur (drawViewHierarchy én gang i
+ro), per-kort utsnitt i skjermkoordinater (KVO contentOffset, ingen JS),
+IOSurface bak glasset. Bytt CIBumpDistortion-linsene med
+CIDisplacementDistortion drevet av et EGET bølgefelt (PNG, laget separat så
+det samsvarer visuelt med foldene i Brages tekstur — teksturen selv er ferdig
+lys/farge, ikke et forskyvningskart), slå `FEED_REFRACTION.enabled` på, og
+la materialet slippe grunnens lys inn i utvalgte partier (tett kropp
+beholdes). Krever Xcode-bygg (godkjent) — gjør det når appen ikke kjører
+på telefonen, og bygg til simulatoren for verifisering.
+
+TESTER: feedGlass/glassOptics/feedOpal/profilGlass grønne; eslint rent.
+Rigg `__tests__/zz_silver_rig.test.tsx` ⚠️ SLETTES FØR COMMIT.
+`SILVER_LAYERS` (diagnose) fjernes når materialet er godkjent.
+
+---
+
+### Forrige START HER (R3 stillstand, 2026-09-06 ~14:30 — historikk)
+
+ (oppdatert 2026-09-06 ~14:30 — SØLVGLASS R3 «SILKEFOLDER»: REFERANSEBILDET GODKJENT, STEG 1 (UTSEENDE I STILLSTAND) LEVERT TIL TELEFON; STEG 2 (SCROLL-KOBLING) VENTER TEKNIKKVALG; IKKE COMMITTET)
+
+Brage godkjente 2026-09-06 et referansebilde som materialmål for feedkortet:
+tett sølvhvit kropp, ORGANISKE LYSBØLGER (silkefolder), varierende frost,
+få fokuserte refleksjoner, Heia-grønne lysansamlinger ved kanten, frostede
+piller. Kun feedkortenes materiale + knappeoverflater er godkjent; andre
+avvik i skissen skal ikke kopieres. Arbeidsrekkefølge fra Brage: (1) utseende
+i stillstand på ekte kort → første sammenligning, (2) bakgrunnspåvirkning +
+scroll, (3) kontroll av kort tekstkort og høyt bildekort.
+
+STEG 1 — HVA SOM ER BYGGET (alt JS + to PNG, Fast Refresh, INTET Xcode-bygg):
+  · MATERIALKART: `src/assets/images/silk-wave.png` (diffuse folder: hvit
+    alfa = lys, sølvgrå alfa = skygge) og `silk-spec.png` (smale høylys på
+    foldtoppene, i segmenter). 420 pt-fliser, SØMLØSE i y, generert
+    deterministisk av scratchpad `silk4.py` (numpy/PIL; varp og folder er
+    periodiske i 420). Tegnes med `resizeMode: 'repeat'` og eget utsnitt per
+    kort → SAMME foldstørrelse på 150 pt og 600 pt kort. Kartene er laget for
+    å bli FORSKYVNINGSFELT i steg 2.
+  · `SilverOptics` (LiquidGlassSurface.tsx) i pikselrom (onLayout): kropp
+    #E6EAED 0,86 → dybde (blur 24) → silk-wave → frost-light-tekstur →
+    Heia-lys ved kanten (blur 14; venstre kant nede, nedre venstre hjørne,
+    svakere TR/HR) → frostflak (blur 14, speilvendt per kort) → MYK SKULDER
+    (frostbånd 12 pt blur 9, mørk skygge BR blur 7, grønn kantglød BL blur 7)
+    → silk-spec → høylyslinje + 1,5 pt lys ytterkant (skarp). R2s
+    metallramme/skulderrampe/leppe og de rette glansstripene er FJERNET.
+  · Spesifikasjonen: `SILVER` i glassOptics.ts. Piller: `SILVER.pill`;
+    aktiv Heia får grønn boxShadow-glød (`reactPillOnFrost`).
+  · Tester: glassOptics/feedGlass/feedOpal/profilGlass 86/86; eslint rent.
+    Rigg `__tests__/zz_silver_rig.test.tsx` ⚠️ SLETTES FØR COMMIT.
+    frost-silver.png er fjernet (ubrukt).
+
+HVA SOM FAKTISK REAGERER PÅ GRUNNEN I DAG: alt under base-alfaen gjennom
+systemets Clear-glass (grunnen lysner/mørkner kortet svakt under scroll).
+Foldene BØYER IKKE grunnen ennå — det er steg 2.
+
+STEG 2 — TEKNIKKVALG (Brage må velge; BEGGE krever Xcode-bygg, som må
+gjøres når appen ikke kjører):
+  A) NATIVE (anbefalt, minst): `HeiaLiquidGlassView.m` har ALLEREDE Brages
+     arkitektur: én delt tekstur av DaylightGround (drawViewHierarchy én
+     gang i ro), per-kort GPU-utsnitt i skjermkoordinater som følger
+     contentOffset via KVO (ingen JS, ingen React-state), rendret asynkront
+     til IOSurface BAK systemglasset. Det som mangler: bytt CIBumpDistortion-
+     linsene med `CIDisplacementDistortion` (eller CIGlassDistortion) med
+     silk-wave.png som forskyvningstekstur (samme utsnitt/offset som JS-laget
+     → grunnen bøyes av de samme foldene), og slå `FEED_REFRACTION.enabled`
+     på. Refleksjonenes scroll-forskyvning: `refractionParallax` finnes.
+     Ingen nye avhengigheter. Reanimated trengs ikke (native følger scroll).
+  B) SKIA: verken @shopify/react-native-skia, react-native-reanimated eller
+     react-native-worklets er installert (package.json/Podfile.lock sjekket
+     2026-09-06). Krever npm + pod install + bygg. Skia kan IKKE lese
+     native-visninger bak seg, så grunnen må regnes i SkSL fra samme
+     definisjon (E_CLEAN_BASE-stoppene + skew 60 + feltene i DaylightGround,
+     bodyTop fra masthead) i skjermkoordinater, drevet av en Reanimated
+     shared value fra FlatList-scrollen. Større, men gir full kontroll.
+
+▶️ PÅ TELEFONEN NÅ (steg 1): full reload (to nye PNG-er → restart Metro om
+foldene mangler). Sammenlign mot referansebildet: silkefolder synlige på
+begge korttyper? Fokuserte høylys synlige? Grønt lys ved venstre kant?
+Pillene? Rapporter avvik per egenskap; kalibrering skjer i `SILVER` +
+`silk4.py`.
+
+---
+
+### Forrige START HER (R2, 2026-09-06 ~13:50 — historikk)
+
+ (oppdatert 2026-09-06 ~13:50 — SØLVGLASS R2: TYKT, FROSTET GLASS I PIKSELROM; VENTER TELEFONDOM; IKKE COMMITTET)
+
+Runde 1 (stretchet 1000-rom) ble AVVIST av Brage som «glatt, lys
+gradientflate». R2 er en ny materialoppbygning bak samme bryter
+(`FEED_MATERIAL = 'silver'` i `src/shared/glassOptics.ts`), alt JS, INTET
+Xcode-bygg. To nye grep: (1) PIKSELROM — `SilverOptics` måler kortet med
+onLayout og tegner skulder (14 pt), glansbånd (170 pt) og frostflak med faste
+radier, ankret i hjørner/kanter; ingenting strekkes med korthøyden. (2)
+USKARPT MOT SKARPT — dybde (sølvgrå basseng, perlelys, Heia-grønne
+lysansamlinger) og frost tegnes gjennom ekte `FeGaussianBlur` (react-native-svg
+15.15, native på iOS); glansen og skulderen tegnes uten blur. Rollemerke og
+handlingspiller har fått samme frostmateriale (`SILVER.pill`, `roleFrost`/
+`reactPillFrost` i FeedCard). Spesifikasjonen: `SILVER` i glassOptics.ts.
+
+Kontrastporten (glassOptics.test) er modellert etter hvor blekket faktisk
+står: primær ≥ 7 rett på bassenget/lommen, sekundær/aksent ≥ 4,5 på en pille
+over bassenget, tertiær ≥ 4,5 i toppfeltet. Sekundærblekk RETT PÅ bassenget
+måler 4,0 — Brage ba om kraftig uttrykk å kalibrere etterpå; første knapp er
+`SILVER.depth[1].alpha` (0,72) / `SILVER_GREY`.
+
+Rigg (bilder sendt Brage): `__tests__/zz_silver_rig.test.tsx` ⚠️ MÅ SLETTES
+FØR COMMIT. glassOptics + feedGlass + feedOpal + profilGlass grønne; eslint
+rent på berørte filer; tsc IKKE kjørt (regel). Full suite ikke kjørt (brief).
+
+▶️ PÅ TELEFONEN: full reload. Se etter: skulderen (lys TL, mørk BR med grønn
+leppe), det skarpe diagonale båndet, melkefrost i ulik tetthet, sølvgrå
+basseng nederst, grønt lys i nedre høyre hjørne — og at bildekortet har SAMME
+skulder/bånd-størrelse som tekstkortet. Ukjent på telefon: hvordan CoreImage-
+blur i RNSVG ser ut mot Chromes, og om filtrene koster noe ved layout.
+
+---
+
+### Forrige START HER (R1, 2026-09-06 ~13:30 — historikk)
+
+ (oppdatert 2026-09-06 ~13:30 — SØLVGLASS: NY MATERIALKANDIDAT BAK A/B-BRYTER MOT V5; IKKE TELEFONTESTET, IKKE COMMITTET)
+
+BRAGES BRIEF (2026-09-06, med GPT-notat): sølvhvitt, lyst, frostet glass med
+tydelige detaljer og myke ujevnheter — egen lys identitet, mens grunnen
+påvirker ENKELTE partier forsiktig under scrolling. Én kandidat bak en
+midlertidig A/B-bryter mot dagens kort (V5 arenaglass). Hjem, grunn, laghode
+og tab-bar urørt; kortenes innhold/plassering/funksjoner urørt. Ingen
+gyro/parallakse. Blur skal ikke slås av under scroll. «En nesten ensfarget
+hvit flate oppfyller ikke målet.»
+
+BRYTEREN: `FEED_MATERIAL` i `src/shared/glassOptics.ts` — `'silver'` (ny
+kandidat, står PÅ) eller `'arena'` (V5, dagens kort). Fast Refresh. Alt
+følger: kroppens tint (`FEED_GLASS`), materiallaget (`GlassOptics` →
+`SilverOptics`/`ArenaOptics`), skyggen, blekket i FeedCard (`FEED_INK_LIGHT`:
+lyst kun på arena) og spekularbåndet (`FEED_SPECULAR`: 0 på sølv).
+
+SØLVGLASSET — HVA SOM ER BYGGET (alt JS + én PNG, Fast Refresh, INTET
+Xcode-bygg — native-viewet og propene er uendret siden V5):
+  · KROPP: systemets Clear-glass UTEN tint (`SILVER_GLASS` alfa 0 →
+    tintColor nil). Systemet gir blur + kantlinse og lar grunnen gjennom
+    uforfalsket; materiallaget alene styrer hvor mye grunn som slipper
+    gjennom hvor. (Regular ble forsøkt seks ganger 09-04 — adaptiv melketint
+    jevnet alt til én plate.)
+  · MATERIALET (`SilverOptics` i LiquidGlassSurface.tsx, tallene i `SILVER`):
+    1. sølvhvit #F3F5F7 ved LOMMENS tetthet 0,86 (base) + feltene i
+       1000-rommet strukket til kortet (DaylightGrounds teknikk, telefonbevist):
+       leseputa (venstre/midt, +0,10 → tekstsonen ≈ 0,96), perlehvitt lysfelt
+       øverst til venstre (hvit 0,55), sølvgrå fordypning nede til høyre
+       (#B0BCC4 0,55), Heia-lomme mot høyre kant (#02FFAB 0,22), hjørnefrost;
+    2. skyer: `frost-silver.png` (NY, = frost-darks alfa i #9AA6AE, laget
+       med recolor.swift) 0,12 + `frost-light.png` 0,08, 190 %, eget utsnitt
+       per kort — mikrostruktur, ikke korn;
+    3. refleksjonen: to elongerte radiale ledd (hvit 0,48 / 0,28) — bred,
+       diffus, svakt diagonal, «buet»;
+    4. i punkter: frost som følger formen (fem nestede strøk 28/20/13/8/4 pt,
+       kumulativt 0,26 ved kanten), høylyslinje 1,5 pt (0,60), mørk motkant
+       nede til høyre (#08392E 0,14), glint øverst til venstre (0,45);
+    5. LYSRING 1 pt UTENFOR boksen (egen View −1 på alle sider, ikke
+       klippet): hvit 0,92 → 0,34 → 0,12 TL→BR + motglans 0,30 i BR.
+  · SKYGGE: to lag på wrapperen (ambient 0/10/28 0,20 + kontakt 0/2/6 0,10,
+    #0B3B2A) — skiller kortet fra LYS grunn der ringen ikke synes.
+  · BLEKK: mørkt (textPrimary + OPAL.ink*) som opalen; kampkortet urørt.
+    VIKTIG (festet) får samme sølvglass; gullpillen bærer aksenten.
+  · Tråden: CommentThreads eget kort + FeedCard thread får samme
+    materiallag (`optics`) — på arket. Ikke sjekket i rigg.
+
+HVA SOM FAKTISK REAGERER PÅ GRUNNEN (ekte, under scroll): alt under
+base-alfaen er grunnen selv — lomma (høyre side, midt i høyden), sonene
+mellom frostringene, og Apples kantlinse i Clear-glasset. Over mørk grunn
+leser lomma som kjølig sølvgrå-teal dybde (rigg: L* 85 mot 89 i tekstsonen),
+over neon får den grønt liv (L* 88, mint), over lys grunn er kortet én
+sølvhvit flate (L* 93,5). TEGNET (statisk per kort, null scrollkostnad):
+feltene, refleksjonen, frosten, skyene, ringen, høylyset, skyggen. Ingen
+bevegelse i materialet i denne runden (spekular = 0).
+
+RIGGEN (scratchpad/rig, session f8b86d06): `__tests__/zz_silver_rig.test.tsx`
+⚠️ MÅ SLETTES FØR COMMIT — rendrer SilverOptics i jest og serialiserer
+komponentens EGEN utskrift (svg + <img>-teksturer) til `silver_home.html`
+(ekte E-atmosphere-rampe m/ masthead 113 pt, tre kort, ekte blekk) og
+`silver_zones.html` (samme kort over #0B412E / #02FFAB / #ECF5E4) →
+headless Chrome 2× → `measure` (Swift) måler L* + kontrast per region.
+Riggens Clear-glass = blur 8 px; Apples kantlinse er IKKE med. Fire runder:
+R1 for grå (L* 82), R2 skyene manglet (CSS-mask laster ikke fra file:// —
+byttet til <img>), R3 for grå (84–91), R4 = levert. Bildene sendt Brage.
+Kontrastporten (glassOptics.test): sek.blekk ≥ 4,5 i lomma og sølvfeltet
+over #11382A (målt 5,2 / 5,2), tertiær i toppfeltet, primær ≥ 7.
+
+TESTER: feedGlass (bryter + arena + sølv, 1b), glassOptics (bryter, arena,
+sølv-spek + kontrastport), feedOpal (ARENA_GLASS), profilGlass, glassSheet,
+glassNudge — 106/106. FULL SUITE 1187/1187 (2 hoppet over). eslint: endrede
+filer rene; `eslint .` har ÉN feil som ligger i HEAD fra før
+(KalenderScreen.tsx:175 exhaustive-deps) — ikke denne skiva. tsc IKKE kjørt
+(regel). Prettier husstil.
+
+▶️ PÅ TELEFONEN: full reload (rist → Reload; ny PNG-asset må serveres —
+mangler skyene mens felt/ring/skygge er der, restart Metro). INTET Xcode-bygg.
+  1. Hjem med `'silver'`: sølvhvit flate som holder seg lys over den mørke
+     toppen? Ser du perlefeltet øverst til venstre, sølvfordypningen nede til
+     høyre, mint-lomma mot høyre kant, frosten mot kantene, ringen, skyggen?
+     Detaljer synlige i normal størrelse? Skyene = myke ujevnheter, ikke
+     flekker/korn?
+  2. Rull: endrer lomma og kantsonene seg mørk → neon → lys mens teksten
+     står skarp? Blur konstant under drag (systemets)?
+  3. Bytt til `'arena'` for sammenligning; tilbake.
+  Knapper (`SILVER` i glassOptics.ts, alle Fast Refresh): for grått/for lyst →
+  `base` (0,80–0,90) og `fields.core`; sølvfeltet → `fields.silverField`
+  stops[0][2] (≥ 0,45 vaktes); lomma → `fields.pocket`; refleksjonen →
+  `reflection`; skyer → `cloud.silver/light`; frost → `frostRings`; ring →
+  `ring.stops`; skygge → `shadow`.
+  → ETT telefonbilde (mørk, neon, lys sone) + ett av `'arena'`. Godkjent:
+    slett zz-riggen, fjern tapende kandidat/bryter (egen beslutning), full
+    suite, eslint, prettier, én commit, handoff, memory.
+
+KJENT USIKKERHET: (a) Apples Clear uten tint kan legge egen dimming/lysning
+over grunnen — leser kortet mørkere/lysere enn riggen, er `base` knappen.
+(b) Ringen ligger 1 pt utenfor native-viewets boks som RN-søsken; forsvinner
+den, klipper interop-viewet — flytt ringen innenfor (inset 0, 1 pt) og si
+fra. (c) Kortets 1000-rom strekkes: på bildekort (høyere) blir feltene
+høyere — vurdér på et kort med bilde. (d) Tråden på arket: sølvglass på
+lys perle 0,80 — sjekk at det ikke leser som plate der.
+
+URØRT: layout, marger, typografi, kampkort (StadiumGlass), laghode,
+grunnen (LÅST), tab-bar, compose, Profil-panel, fallbacken (opal), native.
+
+## (historikk) START HER 2026-09-04 ~18:10 — FEEDGLASS V5: ARENAGLASS, LYS (nå «arena»-siden av A/B-bryteren, se over)
+
+⚠️ LES FØRST — BRAGES DOM (17:38 + referansen): V4.1 var «helt forbanna
+likt» — en lys plate igjen. Referansen hans er Apples iOS 26-widgets over
+et foto: glass som er MØRKERE enn verden bak, verden lever gjennom, lyst
+blekk, lysende rand. Og: «samme fade/stil/lysstyrke som kampkortet, ikke
+like mørkt; nå popper feedcard for mye», «vil ha bevegelser». Han er
+ekstremt frustrert («siste sjanse», «AI slop»). Xcode-bygg og nye
+installasjoner er OK for ham.
+
+INNSIKTEN SOM SNUDDE ALT: hele dagen (A2, V2, V3, V3.1, V4, V4.1) har vært
+LYST glass over en LYS grunn. Det blir alltid en blek plate, uansett
+mekanikk. Apples widgets og kampkortet er MØRKERE enn bakgrunnen — da
+lever bakgrunnen gjennom, og blekket er lyst. Feedkortet er nå kampkortets
+materiale, lysere.
+
+FEEDGLASS V5 — HVA SOM ER BYGGET:
+  · KROPP (native, Fast Refresh): Clear-glass (Apple: Clear over rikt
+    innhold + dimming) med arena-dimming rgba(23,61,45) 0,56
+    (`FEED_GLASS.card`, `ARENA_DIM`, maks 0,70). Regular er én knapp unna
+    (`style`) hvis Clear leser for tynt.
+  · MATERIALET (JS, `GlassOptics` i LiquidGlassSurface, `FEED_FROST`):
+    tonal fade som kampkortet (150°, arenaTop→arenaBottom→timeline, 0,45),
+    mørk Heia Deep-sky 0,24 + lys sky 0,10 (alfa-PNG i src/assets/images,
+    eget utsnitt per kort → ujevnheter), aqua-opptak øvre venstre 0,10,
+    neon-refleks nedre høyre 0,14, høylyslinje 1,5 pt 0,16, kantstrøk
+    aqua-hvitt 0,40→0,16→0,06 (FEED_EDGES = kampkortets), grønn skygge 0,22.
+  · BEVEGELSE (native, `specular` 0,12, KREVER Cmd+R): et mykt diagonalt
+    lysbånd i glasset som glir fra høyre til venstre mens kortet ruller fra
+    bunn til topp — én lagposisjon per scroll-hendelse via den eksisterende
+    KVO-observeren, ingen Core Image. Uten nytt bygg mangler bare båndet.
+  · BLEKK: FeedCard bruker kampkortets LYSE blekk (MATCH_INK.text/dim,
+    reactPillMatch, roleMatch) på alle glasskort når native-glasset tegner
+    (`useLiquidGlassActive()` i LiquidGlassSurface: iOS 26 + AB + ikke
+    Reduce Transparency). Fallbacken (opal) beholder mørkt blekk. Alle
+    `matchCard &&`-STILER er nå `glassInk &&`; STRUKTUREN (eyebrow, puls,
+    «Se kampen», StadiumGlass) er fortsatt `matchCard`.
+  · Riggen `arena.swift` (scratchpad): ekte rampe, tre soner, hvitt blekk,
+    kontrastmåling → `arena_grid.png` sendt Brage. Valgt: kolonne C.
+    Lyst blekk: 5,8 (mørk) / 4,4 (neon) / 4,1 (lys) til 1 ved 0,54; 0,56
+    valgt. Under 4,5 over neon/lys — vurder `alpha` 0,60 hvis Brage vil ha
+    mer lesbarhet; han prioriterte utseendet.
+  · Tester: feedGlass (fyll fade/opptak/neon/høylys, strøk, teksturer,
+    specular-prop og -kilde, Clear), glassOptics (0,56/0,70, FROST_RANGES,
+    kampkortets kant/skygge), feedOpal — 90/90 i seks glass-suiter, feed/
+    kort/tråd-suitene grønne (se under), eslint rent, prettier rent, clang
+    exit 0. FULL SUITE/tsc IKKE kjørt. Ikke commit før telefongodkjenning.
+
+▶️ PÅ TELEFONEN: full reload → Hjem (materialet + blekket). Xcode Cmd+R →
+  spekularbåndet i tillegg.
+  1. Leser kortet som kampkortets familie, lysere — grunnen levende
+     gjennom, tonal dybde, ujevnheter, lysende kant, lyst blekk?
+  2. For mørkt → `FEED_GLASS.card.alpha` ned (0,44–0,50) / `fade` ned.
+     Popper fortsatt → alpha opp (maks 0,70). Flatt → `dark` opp, `neon`/
+     `uptake` opp. For tynt glass → `style: 'regular'`.
+  3. Rull: glir lysbåndet? (`specular` 0–0,2.) Jevnt?
+  → ETT telefonbilde (mørk, neon, lys sone). Godkjent: full suite,
+    eslint, prettier, én commit (JS + native), handoff, memory.
+
+KJENT USIKKERHET: (a) Clear + dimming: hvis Apples Clear over den lyse
+grunnen leser tynnere enn riggen, er `style: 'regular'` knappen. (b) Lyst
+blekk i tråden (CommentsScreen bruker FeedCard variant thread på arket?)
+— sjekk at trådens originalinnlegg fortsatt leser; det er
+CommentThreads egen kortrendering (ikke FeedCard) med `optics`, så det
+får materiallaget men IKKE lyst blekk → hvis det leser feil der, gi
+CommentThread samme `glassInk`-logikk. (c) Tab-barens `bar`-variant og
+Profils paneler er urørt (egne GLASS-varianter).
+
+URØRT: layout, marger, typografi, kampkort, laghode, bakgrunnen (LÅST),
+tab-bar, compose, Profil-panel, fallbacken (opal).
+
+## (historikk) START HER 2026-09-04 ~17:40 — FEEDGLASS V4.1: MATERIALET I JS-LAGET (Brage 17:38: «helt forbanna likt» — lyst glass over lys grunn; erstattet av V5)
+
+⚠️ LES FØRST — BRAGES TILSTAND OG DOM (17:22): han så V4 på telefon som
+en flat, hvit/mint plate («billig AI slop», «tilbake til start», «siste
+sjanse»). Han sa at V3.1 (16:44-bildet: Regular uten tint, gjennom-
+skinnelig, lysende rand, grunnen levende gjennom kortet) var NÆRME, og at
+kampkortet (StadiumGlass) har materialet han vil ha: detaljer, ujevnheter,
+opptak av lys, høylys, kant, skygge. Han vil IKKE ha glatt/klar flate.
+Aldri lever en runde der det eneste synlige er en ny tint-verdi.
+
+HVA SOM GIKK GALT I V4 (min feil, sagt til Brage): (1) 17:22-bildet viser
+Regular + 0,42 tint og INGEN frost — ingen skygge, ingen kant, ingen
+skyer. Det native frostlaget kjørte ikke på telefonen (mest sannsynlig
+ikke bygget på nytt; Fast Refresh tar bare JS, ukjente props ignoreres).
+Igjen sto bare tinten — en flat plate. (2) Jeg la materialet i en
+mekanisme som ikke kunne verifiseres uten bygg. (3) 0,42 tint drepte
+V3.1s translucency og rand.
+
+FEEDGLASS V4.1 — HVA SOM ER GJORT (ALT JS, Fast Refresh, INTET BYGG):
+  · Kroppen tilbake mot V3.1: Regular-glass, perle 0,14 (`FEED_GLASS`).
+  · Materialet bor i `GlassOptics` (LiquidGlassSurface.tsx), over glasset,
+    under innholdet, PÅ via `FEED_OPTICS_EDGES = true`: to frostteksturer
+    som alfa-PNG (`src/assets/images/frost-light.png` hvit, `frost-dark.png`
+    Heia Deep; 640 px, 34 + 22 KB, laget i riggen `tex.swift`: to oktaver
+    støy, normalisert), tegnet 190 % av kortet med speiling/forskyvning per
+    kort (`useRef(Math.random())`) → ujevn tetthet; lysopptak radial i
+    øvre venstre hjørne (0,14); topphøylys (0,22 → 0 ved 75 %); roligere
+    Heia Deep-bunn (0,09 fra 60 %); kantstrøkene (FEED_EDGES); skyggen på
+    wrapperen (FEED_SHADOW). Wrapperen har overflow hidden + radius.
+    StadiumGlass-språket på et lyst kort.
+  · Native frost (V4) står i koden, AV (`FEED_FROST.native = false`).
+    Refraksjon (V3.1) AV. Ingen native endring i denne runden — bygget
+    Brage har, uansett versjon, viser V4.1 riktig etter reload.
+  · Knapper i `src/shared/glassOptics.ts` → `FEED_FROST`: `light` (0,2–
+    0,45), `dark` (0,03–0,1), `uptake`, `top`, `bottom`, `edge`, `shadow`,
+    `scale` (1–2,5); `FEED_GLASS.card.alpha` (0–0,55).
+  · Tester: feedGlass.test (teksturer med opasitet/størrelse, fyll
+    opptak/topp/bunn, strøk, native-gate AV), glassOptics.test (0,14,
+    FROST_RANGES), feedOpal — 89/89 i seks suiter, eslint rent, prettier
+    rent. FULL SUITE/tsc IKKE kjørt.
+
+▶️ PÅ TELEFONEN: full reload (rist → Reload) — INTET Xcode-bygg. Hjem.
+  1. Vanlig kort: ser du frostskyer (ujevn tetthet), lysopptak øverst til
+     venstre, høylys under toppkanten, roligere bunn, kant og skygge — og
+     grunnen levende gjennom kortet som i 16:44-bildet?
+  2. For hvitt → `light` ned / `alpha` ned. For grønt → `light` opp (maks
+     0,45) / `alpha` opp. Grums → `dark` ned. Skyene for små → `scale` opp.
+  → ETT telefonbilde. Godkjent: full suite, eslint, prettier, én commit
+    (JS + native), handoff, memory.
+
+KJENT USIKKERHET: (a) Metro må servere de to nye PNG-ene — ved full reload
+går det av seg selv; hvis kortet mangler skyer men har kant/skygge, er det
+asset-serveringen (restart Metro). (b) Regular-glassets adaptive lyshet
+over mørk sone kan gjøre kroppen lys; knappene dekker det.
+
+URØRT: layout, marger, typografi, kampkort, laghode, bakgrunnen (LÅST),
+tab-bar, compose, Profil-panel, pillene, fallbacken (opal), tråden.
+
+## (historikk) START HER 2026-09-04 ~17:00 — FEEDGLASS V4: FROSTET OPAL I KORTET, NATIVT (Brage så flat plate 17:22 — frosten kjørte ikke; erstattet av V4.1)
+
+⚠️ NATIVE ENDRING: `ios/Heia2/HeiaLiquidGlassView.{h,m}` +
+`HeiaLiquidGlassViewManager.m` har fått frostlaget. Metro-reload tar IKKE
+.m — Brage bygger i Xcode (Cmd+R) én gang (han har sagt ja til bygg).
+Ingen pod install, ingen nye filer i pbxproj, ingen ny pakke. Deretter
+FULL RELOAD. Arbeidstreet: 13 filer oppå 7724ec8. Målrettede suiter grønne
+(feedGlass, glassOptics, feedOpal, profilGlass, glassSheet), eslint rent,
+prettier husstil rent, native syntaks-sjekket med clang mot iOS 26.5-SDK
+(exit 0 — IKKE et bygg). FULL SUITE og tsc IKKE kjørt (Brages ordre).
+Ikke commit før telefongodkjenning.
+
+HVA SOM SKJEDDE I KVELD (les dette før du foreslår noe):
+  · V3.1 (Regular uten tint + refraksjon bak glasset) ble bygget og sett på
+    telefon 16:35: kortene leste fortsatt som flat farge. MÅLT ÅRSAK
+    (Swift/Core Image på Mac mot den EKTE E_CLEAN_BASE-rampen): lokal
+    kontrast bak et kort er 0,04/255; etter hele refraksjonskjeden 3,07/255
+    — under synsterskelen. Med former bak grunnen: 24,9 → 26,5. Glass
+    kan ikke vise blur av noe som ikke har detaljer. Bildet
+    `hvorfor_flatt.png` ble sendt Brage.
+  · Brage: BAKGRUNNEN ER LÅST. Materialet skal bo i kortet. Kriterium:
+    «premium flurry/opal/glass-materiale som lar Heia-bakgrunnen leve
+    gjennom kortet», ikke «grønn boks». Ikke mørke kort, ikke neon-glød,
+    ikke blur-smørje, ikke glass på glass, ikke krittvitt, layout urørt.
+    Referanser: Monobank, «Glass Morphism»-kortet (frostet kropp med ujevn
+    tetthet), fotball-appen (lys frostet kort m/ topphøylys).
+
+FEEDGLASS V4 — HVA SOM ER BYGGET:
+  · KROPP: Regular-glass med perletint 0,42 (`FEED_GLASS.card`, maks 0,55).
+    Riggen viste 0,34 for grønt over neon, 0,54 nesten plate.
+  · FROST (native, `frost`-props, Fast Refresh): `_frostView` i glassets
+    contentView, over sheen, under trykklys og RN-barn. Lag: lys frostsky
+    (hvit, maks alfa 0,36) + mørk teal-sky (0,05) fra DELTE støyteksturer
+    (CIRandomGenerator → to oktaver Gauss → normalisert → premultiplisert
+    farge+alfa, 512 px, laget ÉN gang per prosess) med eget utsnitt per
+    kort (hash av instansen, `frostScale` 1,8 = store skyer; den mørke er
+    speilet) → ujevn tetthet; topphøylys 0,24 (diagonalt fra øvre venstre);
+    roligere teal-bunn 0,09 fra 62 %; kantfysikk som CAGradientLayer
+    maskert av CAShapeLayer-strøk (lys 0,75→0 øvre venstre, mørk 0,28→0
+    nedre høyre, 1 pt); Heia Deep-skygge på self.layer (0,16, 8 pt ned,
+    radius 12, shadowPath). Alt statiske lag — null kostnad under scroll.
+  · REFRAKSJONEN ER AV (`FEED_REFRACTION.enabled = false`): usynlig over
+    grunnen og koster GPU. Koden står; knapp. `FEED_OPTICS_EDGES = false`
+    (SVG-strøkene erstattet av native kant; tråden bruker dem ennå).
+  · Riggen: `opal.swift` i scratchpad (Swift + Core Image + CoreText, ekte
+    Heia-rampe, tilnærmet Regular-glass, tre soner) → `opal_grid.png` (tint
+    0,34/0,44/0,54) og `opal_grid2.png` (skyvarianter). Valgt: mellom B2 og
+    B3 (lyse, store skyer; svak mørk sky — sterk mørk sky ga grums over
+    neon). Begge bildene er sendt Brage.
+  · rn-svg 15.15.3 har IKKE FeTurbulence på iOS (kun blur/blend/matrix/
+    flood/merge/offset/composite i apple/Filters) → teksturen måtte lages
+    nativt. Ingen ny pakke.
+  · Tester: feedGlass.test (frost-props i JS og manager, `frosted`-gaten,
+    teksturer laget én gang, contentsRect per kort, kantmaske, shadowPath,
+    lagrekkefølge sheen→frost→lys, refraksjon AV), glassOptics.test
+    (0,42/0,55, FROST_RANGES), feedOpal/profilGlass oppdatert.
+
+▶️ PÅ TELEFONEN: Xcode Cmd+R → full reload → Hjem. Se på et vanlig kort
+  over mørk, neon og lys sone:
+  1. Leser det som frostet opal med ujevn tetthet (skyer), topphøylys, en
+     roligere bunn og en fin kant — ikke «grønn boks»? Skinner grunnen
+     gjennom (grå-perle over mørk, mint-perle over neon, perle over lys)?
+  2. Er det for hvitt → `FEED_GLASS.card.alpha` ned (0,34–0,38) eller
+     `FEED_FROST.light` ned. For grønt/flatt → alpha opp (maks 0,55) eller
+     `light` opp (maks 0,4). Grums → `dark` ned. Skyene for små/store →
+     `scale` (1–2,5). Kanten for hard → `edge` (0–1). Alt i
+     `src/shared/glassOptics.ts`, Fast Refresh, intet nytt bygg.
+  3. Scroll: skal være som før (statiske lag). Hakker det, si fra.
+  → Send ETT telefonbilde. Godkjent: full suite, eslint, prettier, én
+    commit (JS + native), handoff, memory.
+
+KJENT USIKKERHET: (a) Regular-glassets adaptive lyshet kan gjøre kroppen
+lysere/mørkere enn riggen (riggen er blur + tint, ikke Apples materiale);
+knappene over dekker det. (b) `self.layer.shadow*` på et Fabric-interop-
+view: skulle skyggen mangle, er det interop-laget som klipper — da flyttes
+skyggen til RN (`FEED_OPTICS_EDGES`-wrapperen finnes). (c) Første
+frost-tekstur koster ~50–150 ms én gang ved første kort (CI-kompilering) —
+merkes som et lite hopp ved første Hjem-visning; kan flyttes til
+bakgrunnskø om det sjenerer.
+
+URØRT: layout, marger, typografi, kampkort, laghode, bakgrunnen (LÅST),
+tab-bar, compose, Profil-panel, pillene, fallbacken (opal), tråden.
+
+## (historikk) START HER 2026-09-04 ~18:30 — FEEDGLASS V3.1: REGULAR + GPU-REFRAKSJON BAK GLASSET (telefonsett 16:35: flat farge; erstattet av V4)
+
+⚠️ NATIVE ENDRING: `ios/Heia2/HeiaLiquidGlassView.{h,m}` +
+`HeiaLiquidGlassViewManager.m` er skrevet om (refraksjonsdelen). Metro-
+reload tar IKKE .m — Brage må bygge i Xcode (Cmd+R) én gang. Ingen pod
+install, ingen nye filer i pbxproj, ingen ny pakke; IOSurface/Metal/CoreImage
+autolinkes via modules (CLANG_ENABLE_MODULES = YES). Deretter FULL RELOAD.
+Arbeidstreet: 13 filer oppå 7724ec8. Målrettede suiter grønne (feedGlass,
+glassOptics, feedOpal, profilGlass = 70 tester), eslint rent, prettier
+husstil rent, native syntaks-sjekket med clang mot iOS 26.5-SDK (exit 0 —
+IKKE et bygg). FULL SUITE og tsc IKKE kjørt (Brages ordre).
+
+BRAGES DOM PÅ V3 (telefonbilde 15:55, stripene på): riktig retning (ekte
+sampling og refraksjon), men (1) Clear + 0,08 var «nesten bare en grønn
+kopi av bakgrunnen», (2) effekten satt bare ved kanten, (3) scroll-lag,
+(4) stripene/kalibreringen skulle bort. KORREKSJON samme kveld: IKKE øk en
+manuell hvit tint (→ hvit plate igjen); Clear er trolig feil («Meet Liquid
+Glass»: Clear er permanent gjennomsiktig og uten adaptivitet, krever
+dimming; Regular er standarden med all adaptivitet). Rendererport: A =
+Regular alene, B = profilert V3, velg; Skia-spike KUN hvis Core Image
+fortsatt hakker etter korrekt caching.
+
+RENDERERBESLUTNINGEN (V3.1) — og hvorfor:
+  · KROPP = Regular-glass UTEN tint (JS alfa 0 → `tintColor nil` nativt;
+    VIKTIG 0,06 varm). Apples adaptive frost, lyshet og kantlinse er
+    materialet. Ingen hvit plate malt oppå (Brage).
+  · REFRAKSJONEN LIGGER BAK GLASSET (`_backdropView`, under `_effectView`),
+    ikke i contentView som i V3. Systemglasset frosser, tinter og kant-
+    linser vår deformerte grunn som om den var den ekte → frosten er
+    Apples, verden bak er bøyd. Ingen rim-maske lenger (kantlinsen virker
+    på hele flaten). Innholdet er RN-barn over glasset → deformeres aldri.
+  · CIDisplacementDistortion FORKASTET etter måling på Mac (samme
+    framework): den forskyver etter GRADIENTEN i kartets rødkanal, svakt og
+    ikke-lineært (0,16 px ved skala 20 på en 1/256-rampe; konstante kart gir
+    null). Uegnet som kontrollerbart linsekart. Linsene er parametriske
+    CIBumpDistortion, gjort ELLIPTISKE via affiner (late, faller sammen i
+    kjernen): tre store soner gjennom sentrum + én kantlinse.
+  · RIGGFUNN som endret tallene: over DaylightGrounds jevne gradient er
+    9 pt forskyvning USYNLIG (venstre/høyre-bilde identiske). Skyer krever
+    at prøvepunktet flyttes i gradientens egen skala. Derfor egen prop
+    `refractionZone` (sonene, 30–90, satt 72) ved siden av
+    `refractionStrength` (kantlinsen, 6–12, satt 9). Bildet `zones.png`
+    (sendt Brage) viser 30/50/80 over mørk/neon/lys.
+  · Skia: ikke installert, ikke nødvendig ennå. Skia BackdropFilter leser
+    kun Skia-canvasens egne barn (dok), og «Liquid Glass with RN Skia»
+    noterer begrensninger for native-view-snapshots — så en spike måtte
+    uansett bruke samme snapshot-tekstur som vi har. Kun aktuelt hvis
+    V3.1 fortsatt hakker (se ytelse).
+
+YTELSE (V3s flaskehalser, lest i koden — og rettet):
+  · V3 tok snapshot av HELE grunnen på nytt hvert sekund (TTL 1 s) midt i
+    scrollen: drawViewHierarchy 2× per sekund = sekund-hakk.
+  · V3 kjørte Gauss-blur (σ 14 px) på et 2×-utsnitt per kort per ramme, så
+    `createCGImage` (GPU→CPU-kopi) og lastet CGImage opp igjen som contents.
+  · V3.1: ÉN CIContext (Metal, RGBA8 arbeidsformat, opprettet én gang);
+    ÉN delt frost-tekstur (snapshot 1× → metning 0,8 → Gauss 8 pt,
+    materialisert ÉN gang som CGImage); snapshot ALDRI under drag/
+    deselerasjon, gjentaksplan 0,4/1,5/4 s (grunnen kan være tegnet sent),
+    så TTL 6 s i ro; per kort per ramme kun crop + affin + 4 linser på et
+    kortstort 1×-utsnitt, rendret ASYNKRONT (CIRenderTask) til en av to
+    IOSurfaces som er lagets contents direkte (ingen CGImage, ingen CPU-
+    kopi; vises én runloop senere); hoppes over når kortet har flyttet seg
+    < 0,25 pt eller er utenfor skjermen; koalesert til én oppdatering per
+    runloop. Parallakse = 0 (Brage, mens laggen isoleres).
+  · MAC-BENCHMARK (samme Core Image, M-GPU — relativt, ikke iPhone-tall):
+    V3-kjeden 1,77 ms per kort per ramme; V3.1 0,39 ms. Frost-teksturen
+    290 ms ÉN gang (kald CI-kompilering; deretter ms). IOSurface-
+    orientering bekreftet opprett (rad 0 = topp) med default `flipped`.
+  · JEG KAN IKKE profilere på telefonen (bygger ikke, har ikke enheten).
+    Brages oppskrift: Xcode → Product → Profile (Release) → «Animation
+    Hitches» + «Time Profiler», samme kontrollerte scroll (Hjem, 6–10 kort,
+    ~3 s flick). Mål: hitch rate ≤ 10 ms/s. Hvis Time Profiler viser
+    `-[HeiaLiquidGlassView updateRefraction]` > ~1 ms per kall eller
+    `frostedBackdropFor:` under scroll: si fra med tallene. Knapper for å
+    isolere: `FEED_REFRACTION.live = false` (kun scroll-stopp),
+    `FEED_REFRACTION.enabled = false` (= rendererport A, Regular alene).
+    Hvis Regular alene er jevn og V3.1 hakker etter dette → Skia-spike
+    (én-korts, delt tekstur, SkSL) er neste, ikke mer Core Image-lapping.
+
+HVA SOM ER BYGGET (V3.1):
+  · Native: se toppen av HeiaLiquidGlassView.m. Props: `glassStyle`,
+    `refraction`, `backdropSourceID`, `refractionStrength` (kant, 9),
+    `refractionZone` (soner, 72), `refractionScale` (1,04),
+    `refractionBlur` (8, bakes i delt tekstur), `refractionSaturation`
+    (0,8), `refractionParallax` (0), `refractionLive` (true). Alle fra
+    `glassOptics.ts` `FEED_REFRACTION` → Fast Refresh, intet nytt bygg.
+  · JS: `FEED_GLASS.card` = Regular, alfa 0; `FEED_REFRACTION.enabled`
+    = rendererporten; `FEED_OPTICS_EDGES = false` → feedkortet uten SVG-
+    kantstrøk/skygge (Brage: «ingen malte SVG-optikkfelt»; strøkene finnes
+    fortsatt som `optics` på trådens originalinnlegg og kan slås på igjen).
+  · Kalibreringsstripene er FJERNET helt (kode + spec + tester).
+    DaylightGround-diffen er KUN `nativeID` (+ import) — pikselmessig lik
+    sist godkjente grunn. Laghodet er urørt i diffen.
+  · Tester: feedGlass.test (Regular, tint nil, ytelsesinvariantene i
+    kilden: én context, blur kun i frost-teksturen, IOSurface, aldri
+    createCGImage i per-ramme-kjeden, aldri snapshot under scroll, stripene
+    borte), glassOptics.test (intervallene inkl. zone/saturation),
+    feedOpal/profilGlass oppdatert.
+
+▶️ PÅ TELEFONEN: Xcode Cmd+R → full reload → Hjem.
+  1. Ser du Regular-glasset (gråhvit frostet kropp) med grunnens mørke/
+     neon/lyse soner som store, myke skyer GJENNOM kortet — ikke bare ved
+     kanten, ikke en jevn mint/hvit flate?
+  2. Rull: jevnt? (Se ytelse over for Instruments.) Hvis hakk: prøv
+     `live=false`, så `enabled=false` — rapporter hvilken som ble jevn.
+  3. Rendererport A for øyet: `FEED_REFRACTION.enabled = false` (Fast
+     Refresh) = Regular alene over den ekte grunnen. Sammenlign.
+  4. Knapper: `zone` 30–90 (skyenes styrke), `strength` 6–12 (kant),
+     `saturation` 0,75–0,85, `blur` (frost i teksturen), `scale` 1,03–1,06;
+     `FEED_OPTICS_EDGES` true = kantstrøk + skygge tilbake.
+  → Send ETT telefonbilde (mørk, neon og lys sone) + Instruments-tall.
+    Godkjent: full suite, eslint, prettier, én commit (JS + native),
+    handoff, memory.
+
+KJENT USIKKERHET (ikke bevisbart uten telefon): (a) at Regular-glassets
+backdrop sampler vår IOSurface-view bak seg — det er standard CA-oppførsel
+(alt under effektviewet i vinduet), men aldri sett med akkurat denne
+stabelen; skulle kortet vise grunnen UDEFORMERT, er det dette. (b) Første
+capture kan være tom/for tidlig → gjentaksplanen tar den igjen innen 0,4 s.
+(c) Regular over en lys deformert grunn kan bli LYSERE enn Brage vil;
+knappen er da `saturation`/`blur`, IKKE en hvit tint.
+
+URØRT: layout, marger, typografi, kampkort, laghode, bakgrunnens farger,
+tab-bar, compose, Profil-panel, pillene, fallbacken (opal), tråden.
+
+## (historikk) START HER 2026-09-04 ~16:10 — FEEDGLASS V3 REFRAKTIVT BYGGET (Clear + 0,08; erstattet av V3.1 samme kveld)
+
+⚠️ NATIVE ENDRING: `ios/Heia2/HeiaLiquidGlassView.{h,m}` +
+`HeiaLiquidGlassViewManager.m` er endret. Metro-reload tar IKKE .m — Brage
+må bygge i Xcode (Cmd+R) én gang. Ingen pod install, ingen nye filer i
+pbxproj (samme tre filer som før), ingen ny pakke. Alt JS/TS i tillegg:
+FULL RELOAD etter bygget. Arbeidstreet: 13 filer oppå 7724ec8. Målrettede
+suiter 19/19 (229 tester), eslint rent, prettier husstil rent, native
+syntaks-sjekket med clang mot iOS 26.5-SDK (clang exit 0 — IKKE et bygg).
+FULL SUITE og tsc IKKE kjørt (Brages rekkefølge).
+
+BRAGES DOM PÅ V2 (telefonbilde 15:20 + naturreferansen «Immerse yourself
+in the tranquility of nature»): «Dagens løsning maler perle, aqua,
+leseslør og andre SVG-farger OPPÅ kortet. Det skaper bare en mintflate med
+dekorasjoner. Et SVG-overlay kan ikke lese, forskyve, forstørre eller
+deformere pikslene bak kortet.» Ønsket: refraktivt, frostet Liquid Glass
+som fysisk gjør om bakgrunnen inne i kortet — toppen grønn fordi
+landskapet bak samples/forstørres/blurres/brytes, bunnen nesten hvit fordi
+bakgrunnen der er hvit, lang levende optisk overgang, ingen jevn egenfarge,
+tykkelse, linse, kantlys. Godkjenningsport: stadionlinjer/striper bak
+kortet skal BØYES, forskyves, forstørres svakt, frostes, sterkest mot den
+avrundede kanten. Rette, bare lysere striper = avvist.
+
+TEKNISK SANNHET (les før du vurderer bildet):
+  · Skia finnes ikke i prosjektet (ingen ny pakke uten godkjenning).
+  · Offentlig iOS-API kan IKKE lese og deformere vilkårlige bakgrunns-
+    piksler — det er CABackdropLayer + private CAFilter som
+    UIVisualEffectView bruker. drawViewHierarchy på hele feeden per ramme
+    er for dyrt og upålitelig med nestede effektviews.
+  · MEN: bak feedkortene ligger BARE DaylightGround (kort overlapper aldri
+    hverandre, laghodet er søsken over lista), og grunnen står stille mens
+    kortene ruller. Ett bilde av grunnen, tatt én gang og bufret, ER derfor
+    bakgrunnen bak hvert kort til enhver tid. Alt som tegnes i grunnen
+    (rampen, stadionlyset, krittbuene, kalibreringsstripene) blir samplet
+    og deformert — ekte piksler, ikke malte felt. Det som IKKE samples:
+    ting som ikke er grunnen (finnes ikke bak kort i feeden). I
+    kommentararket ligger kortet på arkets solide bunn → ingen refraksjon
+    der (kun kantfysikk).
+
+FEEDGLASS V3 — HVA SOM ER BYGGET:
+  · KROPP (native): `glassStyle="clear"` → UIGlassEffectStyleClear — klart
+    systemglass uten den melkehvite adaptive tinten; ekte blur + ekte
+    kantlinse av alt bak. Tint 0,08 (aldri > 0,10; `FEED_GLASS_MAX_ALPHA`),
+    sheen 0,06. VIKTIG: samme, varm hue i tinten.
+  · REFRAKSJON (native, `refraction`): viewet finner grunnen i vinduet via
+    Fabric `nativeId == "daylight-ground"` (DaylightGround-roten har
+    `nativeID={BACKDROP_SOURCE_ID}`), tar den som bilde (2×, bufret ≤ 1 s,
+    delt av alle kort), klipper ut kortets rektangel i grunnens
+    koordinater, så: forstørrelse 1,04 om sentrum → tre linsebuler + én
+    kortlinse (CIBumpDistortion: lyssone øvre venstre +k, dypere sone nedre
+    høyre −0,8k, bred brytning nederst +0,6k, kortlinse +0,5k med radius
+    0,85·maks — sterkere mot kanten; k regnet fra `refractionStrength` 9 pt)
+    → frost (Gauss 7 pt) → bildet legges i `_refractionLayer` i
+    contentView, UNDER sheen/lys/RN-barn (innholdet deformeres aldri),
+    maskert med en myk avrundet rekt innrykket 6 pt så systemglassets EGEN
+    kantlinse står igjen i randen. Nærmeste UIScrollView observeres
+    (contentOffset, KVO) → utsnittet følger kortet per scroll-ramme
+    (`refractionLive`), koalesert til én oppdatering per runloop og hoppet
+    over for kort utenfor skjermen; linsefeltet får en svak parallakse
+    (≤ 6 pt, `refractionParallax`). Alle tall er JS-props (glassOptics.ts
+    `FEED_REFRACTION`) → justerbare med Fast Refresh uten nytt Xcode-bygg.
+  · KANT + SKYGGE (JS, `optics`): kun strøk — lys ytterkant topp/venstre,
+    indre høylys (caustic) i hjørnet, mørk/teal indre kant bunn/høyre — og
+    Heia Deep-skygge på wrapper. INGEN felt, INGEN slør, INGEN aqua-vask.
+  · KALIBRERING: `GLASS_CALIBRATION_STRIPES = true` i DaylightGround.tsx
+    tegner diagonale striper (hvit/mørk, 3 pt, hver 28 pt) i GRUNNEN. De er
+    PÅ nå. Slå av (false) for det rene materialet. ALDRI på i en commit.
+  · Tester: `feedGlass.test` (kantlaget rendret; kildesjekk av native-gren,
+    .h/.m/manager-props, FeedCard/CommentThread/DaylightGround),
+    `glassOptics.test` (spesifikasjonen), feedOpal/profilGlass oppdatert.
+
+HVA JEG IKKE HAR KUNNET BEVISE: at stripene bøyes. Det krever
+Core Image på en fysisk iPhone; HTML-riggen kan ikke etterligne det, og jeg
+bygger ikke appen (Brages regel). Beviset er telefonen med stripene PÅ.
+Kjent usikkerhet: (a) første capture kan skje før grunnen er tegnet →
+bufferen fornyes innen 1 s; (b) drawViewHierarchy av rn-svg — skulle
+kortet vise flat fallback-mint, er det capturen som er tom → si fra;
+(c) ytelse ved scroll med 6–10 kort (CI-render ~1–3 ms per kort per ramme,
+2×) — hakker det, sett `FEED_REFRACTION.live = false` (kun ved scroll-
+stopp) eller `blur` ned; (d) klart glass + mørkt blekk over den mørke
+toppen leser svakt — TEKST KOMMER ETTER MATERIALET (Brage), adaptivt blekk
+er neste beslutning.
+
+▶️ PÅ TELEFONEN: Xcode Cmd+R → full reload → Hjem.
+  1. Stripene PÅ: inne i et vanlig kort — bøyes de, forskyves, forstørres
+     svakt, frostes, sterkest mot kanten? Rull: følger utsnittet kortet, og
+     lever linsefeltet svakt med scrollen?
+  2. Stripene AV (`GLASS_CALIBRATION_STRIPES = false`, Fast Refresh): er
+     grunnens mørke/neon/lyse soner tydelig tatt inn og gjort om i kortet?
+     Aldri én jevn mint/hvit flate? Tykk linse med kant?
+  3. Knapper (Fast Refresh): `FEED_REFRACTION.strength` (6–12),
+     `scale` (1,03–1,06), `blur`, `parallax`, `live`; `FEED_GLASS.card.alpha`
+     (0–0,10); `FEED_EDGES`/`FEED_SHADOW`.
+  → Send ETT telefonbilde. Godkjent: full suite, eslint, prettier, stripene
+    AV, én commit (JS + native), handoff, memory.
+
+URØRT: layout, marger, typografi, kampkort, lagheader, bakgrunnens farger,
+tab-bar, compose, Profil-panel, pillene (blekkvask), fallbacken (opal).
+
+## (historikk) START HER 2026-09-04 ~11:50 — RUNDE 7 COMMITTET; NESTE SAMTALE = FEEDCARD
 
 ✅ Runde 5–7 er committet i ÉN commit oppå d5bb701 (se `git log -1`), på
 Brages ordre etter at Opprett lag-idrettene endelig satt. Ikke pushet.

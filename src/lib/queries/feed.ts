@@ -94,6 +94,26 @@ export function prefetchTeamFeedFirstPage(
  * løsne-markør). Kalleren reverterer ved feil med en ny patch — samme
  * funksjonelle mønster som setFeed-map-en den erstatter.
  */
+/**
+ * Innlegget slik feeden ALLEREDE har det — synkront, fra cachen. Kommentar-
+ * tråden seeder kortet sitt med dette (Brage 2026-09-06: materialflaten og
+ * tilgjengelige innleggsdata skal stå fra første ramme; skeleton bare for
+ * det som faktisk mangler). null = ikke i cachen (varsel fra annet lag,
+ * eldre enn lastede sider) — da laster tråden som før.
+ */
+export function peekFeedItem(
+  teamSpaceId: string,
+  postId: string,
+): FeedItem | null {
+  const data = queryClient.getQueryData<FeedData>(queryKeys.feed(teamSpaceId));
+  if (!data) return null;
+  for (const page of data.pages) {
+    const hit = page.find(p => p.id === postId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 export function patchFeedItem(
   teamSpaceId: string,
   postId: string,

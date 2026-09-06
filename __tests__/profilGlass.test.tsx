@@ -94,10 +94,13 @@ const profilSrc = fs.readFileSync(
   'utf8',
 );
 
-describe('1. GLASS.panel er feedkortets glass uten trykkrespons', () => {
-  it('samme perle, alfa og sheen som `card`', () => {
-    expect(GLASS.panel.tint).toBe(GLASS.card.tint);
-    expect(GLASS.panel.sheen).toBe(GLASS.card.sheen);
+describe('1. GLASS.panel er feedkortets perle uten trykkrespons', () => {
+  it('panelet står på sine telefongodkjente tall, frikoblet fra feedkortet', () => {
+    // Feedkortet fikk FeedGlass V2 2026-09-04 (tab-barens perle, sheen
+    // 0,06, optikk i lag). Profils paneler er URØRT (Brage): samme
+    // perlegrå 0,34 og sheen 0,18 som da de ble godkjent.
+    expect(GLASS.panel.tint).toBe('rgba(233, 235, 234, 0.34)');
+    expect(GLASS.panel.sheen).toBe(0.18);
   });
 
   it('ingen trykkrespons i glasset — radene er kontrollene', () => {
@@ -223,7 +226,7 @@ describe('4. fallback uten glass', () => {
     const native = tree.root.find(
       n => typeof n.type === 'string' && n.props?.glassTint !== undefined,
     );
-    expect(native.props.glassTint).toBe(GLASS.card.tint);
+    expect(native.props.glassTint).toBe(GLASS.panel.tint);
     expect(native.props.interactive).toBe(false);
   });
 });

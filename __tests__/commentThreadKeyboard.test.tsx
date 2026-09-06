@@ -69,7 +69,10 @@ jest.mock('../src/lib/api/feed', () => ({
   toggleReaction: jest.fn(),
   deletePost: jest.fn(),
 }));
-jest.mock('../src/lib/queries/feed', () => ({adjustFeedItemCounts: jest.fn()}));
+jest.mock('../src/lib/queries/feed', () => ({
+  adjustFeedItemCounts: jest.fn(),
+  peekFeedItem: () => null,
+}));
 jest.mock('../src/lib/queries/eventDetail', () => ({
   adjustMatchEngagement: jest.fn(),
 }));

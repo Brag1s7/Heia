@@ -12,6 +12,7 @@ import Svg, {
 } from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors} from '../theme';
+import {BACKDROP_SOURCE_ID} from '../shared/glassOptics';
 import {useActiveTeam} from '../context';
 import {HEADER_BASE, darkenSameHue, teamSpotlight} from '../shared/teamColors';
 import {
@@ -807,6 +808,8 @@ interface DaylightGroundProps {
    * containeren den står i (Comments).
    */
   masthead?: boolean;
+  /** Tegn identitetsfeltet i grunnen (default). `false` når feltet ligger FORAN listen (MastheadField). */
+  field?: boolean;
   /**
    * Identitetsfeltets farge i masthead-modus. Utelatt = det aktive lagets
    * farge (Hjem/Kalender/Varsler). Profil sender Heias mørkegrønne: den
@@ -817,8 +820,40 @@ interface DaylightGroundProps {
   identity?: string;
 }
 
+/**
+ * IDENTITETSFELTET FORAN LISTEN (Brage 2026-09-06: «når det lyse kortet
+ * passerer header blir bunnen av det rød»). Systemglasset sampler alt som
+ * ligger BAK det i vinduet, også litt utenfor egen ramme — så lagfargen i
+ * grunnen farget kortene nær laghodet. Feltet tegnes derfor som et eget lag
+ * ETTER listen (over den i z-orden) og er dermed ikke i glassets bakteppe.
+ * Samme geometri og farge som i grunnen; grunnen tegnes med `field={false}`.
+ */
+export function MastheadField({identity}: {identity?: string}) {
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const {activeTeamSpace} = useActiveTeam();
+  const color = identity ?? activeTeamSpace?.color;
+  if (!color) return null;
+  const spot = teamSpotlight(color);
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <TeamField
+        width={window.width}
+        height={mastheadHeight(insets.top)}
+        insetTop={insets.top}
+        color={spot.surface}
+      />
+    </View>
+  );
+}
+
 export function DaylightGround({
   masthead = false,
+  field = true,
   identity,
 }: DaylightGroundProps) {
   const variant = DAYLIGHT_VERTICAL_VARIANT;
@@ -841,6 +876,9 @@ export function DaylightGround({
     // samme kontrakt som MatchGround. Fyller KROPPEN den ligger i.
     <View
       style={styles.root}
+      // FEEDGLASS V3 (Brage 2026-09-04): det native glasset finner grunnen
+      // i vinduet via denne id-en og sampler den bak hvert kort.
+      nativeID={BACKDROP_SOURCE_ID}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
@@ -862,7 +900,7 @@ export function DaylightGround({
         <MasterGround stops={MASTER_STOPS[variant]} />
       )}
       <ChalkGeometry />
-      {spot && (
+      {spot && field && (
         <TeamField
           width={box.w}
           height={box.h}

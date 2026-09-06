@@ -31,7 +31,7 @@ import {
 } from '../lib/api/comments';
 import {toggleReaction, deletePost} from '../lib/api/feed';
 import {feedAllowsHeia, isSystemMatchPost} from '../shared/matchEngagement';
-import {adjustFeedItemCounts} from '../lib/queries/feed';
+import {adjustFeedItemCounts, peekFeedItem} from '../lib/queries/feed';
 import {adjustMatchEngagement} from '../lib/queries/eventDetail';
 import {promptReport} from '../lib/moderation';
 import {avatarRef} from '../lib/media/avatar';
@@ -107,7 +107,12 @@ export function CommentThread({
   // der — et varsel fra et annet lag skal ikke arve admin-rettigheter.
   const amAdmin = teamSpaceId === activeTeamSpaceId && isTeamAdmin(activeRole);
 
-  const [post, setPost] = useState<FeedItem | null>(null);
+  // SEEDET FRA FEED-CACHEN (Brage 2026-09-06): kortet står med ekte innhold
+  // fra første ramme når du kommer fra feeden; henting under oppdaterer
+  // det på plass (samme element, ingen remontering av materialet).
+  const [post, setPost] = useState<FeedItem | null>(() =>
+    peekFeedItem(teamSpaceId, postId),
+  );
   const [comments, setComments] = useState<FeedComment[]>([]);
   // SE DET DU SENDTE (Brage 2026-09-03): med tastaturet oppe er lista kort,
   // og innlegget øverst kan skyve den nyeste kommentaren under kanten.
@@ -115,6 +120,19 @@ export function CommentThread({
   const listRef = useRef<ScrollView>(null);
   const commentsTop = useRef(0);
   const [loading, setLoading] = useState(true);
+  // SKELETT BARE NÅR HENTINGEN ER TREG (Brage 2026-09-06: «kommentarer
+  // lastes noen ganger inn litt stygt»): kortet står alt seedet, og et
+  // skjelett som blinker i 100 ms før «Ingen kommentarer ennå» er støy.
+  // Under 180 ms vises ingenting; tom-tilstanden toner inn.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!loading) {
+      setSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setSlow(true), 180);
+    return () => clearTimeout(timer);
+  }, [loading]);
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
@@ -130,7 +148,8 @@ export function CommentThread({
         getFeedPost(teamSpaceId, postId).catch(() => null),
         getComments(teamSpaceId, postId),
       ]);
-      setPost(postResult);
+      // Feilet henting (null) skal ikke viske ut det seedede kortet.
+      setPost(previous => postResult ?? previous);
       setComments(commentResult);
     } catch {
       setError('Kunne ikke laste kommentarer.');
@@ -352,7 +371,9 @@ export function CommentThread({
           />
         )}
         {post && !isSystemMatchPost(post.type) && (
-          <LiquidGlassSurface style={styles.postCard}>
+          // Samme lyse innholdskort som i feeden — også optikklaget
+          // (FeedGlass V2, Brage 2026-09-04). Dokken nederst har det IKKE.
+          <LiquidGlassSurface style={styles.postCard} optics>
             <View style={styles.postHeader}>
               <Avatar
                 name={post.author.name}
@@ -426,38 +447,45 @@ export function CommentThread({
         )}
 
         {loading ? (
-          <>
-            {/* Innleggskortet + et par replikker — samme former som lastes. */}
-            <LiquidGlassSurface style={styles.postCard}>
-              <View style={styles.postHeader}>
+          !slow ? null : (
+            <>
+              {/* Skeleton BARE for det som faktisk mangler: innleggskortet når
+                det ikke lå i feed-cachen, og replikkene. */}
+              {!post && (
+                <LiquidGlassSurface style={styles.postCard} optics>
+                  <View style={styles.postHeader}>
+                    <Skeleton width={32} height={32} round />
+                    <View style={styles.skeletonHeaderText}>
+                      <Skeleton width={120} height={13} />
+                      <Skeleton width={64} height={10} />
+                    </View>
+                  </View>
+                  <Skeleton height={13} />
+                  <Skeleton width="60%" height={13} />
+                </LiquidGlassSurface>
+              )}
+              <View style={styles.comment}>
                 <Skeleton width={32} height={32} round />
-                <View style={styles.skeletonHeaderText}>
-                  <Skeleton width={120} height={13} />
-                  <Skeleton width={64} height={10} />
+                <View style={styles.skeletonBubbleWrap}>
+                  <Skeleton height={56} style={styles.skeletonBubble} />
                 </View>
               </View>
-              <Skeleton height={13} />
-              <Skeleton width="60%" height={13} />
-            </LiquidGlassSurface>
-            <View style={styles.comment}>
-              <Skeleton width={32} height={32} round />
-              <View style={styles.skeletonBubbleWrap}>
-                <Skeleton height={56} style={styles.skeletonBubble} />
+              <View style={styles.comment}>
+                <Skeleton width={32} height={32} round />
+                <View style={styles.skeletonBubbleWrap}>
+                  <Skeleton height={56} style={styles.skeletonBubble} />
+                </View>
               </View>
-            </View>
-            <View style={styles.comment}>
-              <Skeleton width={32} height={32} round />
-              <View style={styles.skeletonBubbleWrap}>
-                <Skeleton height={56} style={styles.skeletonBubble} />
-              </View>
-            </View>
-          </>
+            </>
+          )
         ) : error ? (
           <Text style={styles.empty}>{error}</Text>
         ) : comments.length === 0 ? (
-          <Text style={styles.empty}>
-            Ingen kommentarer ennå. Vær den første!
-          </Text>
+          <FadeIn>
+            <Text style={styles.empty}>
+              Ingen kommentarer ennå. Vær den første!
+            </Text>
+          </FadeIn>
         ) : (
           // NYESTE ØVERST (Brage 2026-09-03): composeren står i bunnen, så
           // det du nettopp sendte skal dukke opp rett under innlegget.
@@ -545,6 +573,19 @@ export function CommentThread({
       </Animated.View>
     </View>
   );
+}
+
+/** Toner inn på 220 ms (native driver) — tom-tilstanden skal ikke smelle inn. */
+function FadeIn({children}: {children: React.ReactNode}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [opacity]);
+  return <Animated.View style={{opacity}}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({
