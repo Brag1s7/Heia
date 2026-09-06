@@ -31,9 +31,15 @@ import {
 } from '../src/components/FeedCard';
 import {OpalSurface, OPAL} from '../src/components/OpalSurface';
 import {GLASS} from '../src/components/LiquidGlassSurface';
+import {
+  ARENA_GLASS,
+  FEED_GLASS,
+  FEED_GLASS_MAX_ALPHA,
+  FROST,
+} from '../src/shared/glassOptics';
 import {StadiumGlass, GLASS as STADIUM} from '../src/components/StadiumGlass';
 import {matchColors} from '../src/theme';
-import {colors, radius, spacing} from '../src/theme';
+import {colors, radius} from '../src/theme';
 import type {FeedItem} from '../src/shared/types';
 
 // ---------------------------------------------------------------------------
@@ -245,17 +251,39 @@ const highlightStops = (root: ReactTestRenderer.ReactTestRenderer) =>
     ?.findAllByType(Stop)
     .map(s => s.props.stopOpacity);
 
-describe('GLASS-variantene (Brages godkjente tall 2026-09-02)', () => {
+describe('GLASS-variantene (Brages godkjente tall 2026-09-02; kortet = FeedGlass V4 2026-09-04)', () => {
   const alpha = (rgba: string) => Number(rgba.match(/,\s*([\d.]+)\)$/)![1]);
 
-  it('control er tynnest, card i midten, important mest solid', () => {
+  it('control er tynnest; card og important er arena-dimming 0,56 (FeedGlass V5)', () => {
+    // A2 (0,72 + fade) ble AVVIST 2026-09-04: en nesten ugjennomsiktig
+    // plate. V2: kroppen er tab-barens glass (0,34), aldri over 0,40;
+    // VIKTIG har samme tetthet i varm perle — ekstra tetthet er LOKAL
+    // (leseslør +0,05), aldri i tinten. Se glassOptics.
+    // V3 (refraktivt glass, samme dag): kroppen er KLART systemglass med en
+    // svært svak tint (≤ 0,10) — kortets farge kommer fra grunnen.
+    // V5 (arenaglass, samme dag): Clear + arena-dimming 0,56 på begge;
+    // materiallaget bærer teksturen. Aldri over 0,70.
+    // SØLV (A/B 2026-09-06): kroppen følger FEED_MATERIAL; arenaens tall
+    // vaktes på ARENA_GLASS, sølvets (alfa 0) i glassOptics.test.
     expect(alpha(GLASS.control.tint)).toBe(0.2);
-    expect(alpha(GLASS.card.tint)).toBe(0.34);
-    expect(alpha(GLASS.important.tint)).toBe(0.52);
+    expect(alpha(GLASS.card.tint)).toBe(FEED_GLASS.card.alpha);
+    expect(ARENA_GLASS.card.alpha).toBe(0.56);
+    expect(alpha(GLASS.important.tint)).toBe(FEED_GLASS.important.alpha);
+    expect(alpha(GLASS.important.tint)).toBeLessThanOrEqual(
+      FEED_GLASS_MAX_ALPHA,
+    );
+    expect(FEED_GLASS_MAX_ALPHA).toBe(0.7);
+    // Arket (0,80) forblir familiens tyngste perle — glassSheet.test.
+    expect(alpha(GLASS.important.tint)).toBeLessThan(alpha(GLASS.sheet.tint));
   });
 
-  it('compose-glasset har halv sheen og ingen trykkrespons; kortene har full', () => {
-    expect(GLASS.control.sheen).toBe(GLASS.card.sheen / 2);
+  it('compose-glasset har sin godkjente halve sheen og ingen trykkrespons; kortene har trykkrespons', () => {
+    // fa8b107: control = halvparten av kortets 0,18. Kortet fikk siden
+    // tab-barens sheen (0,06, FeedGlass V2) — lyset bor i optikklaget.
+    // Compose-boksen er urørt (Brage 2026-09-04), så tallet står.
+    expect(GLASS.control.sheen).toBe(0.09);
+    // FROST (2026-09-06): kortet har prototypens sheen (0,14), ikke barens.
+    expect(GLASS.card.sheen).toBe(0.14);
     expect(GLASS.control.interactive).toBe(false);
     expect(GLASS.card.interactive).toBe(true);
     expect(GLASS.important.interactive).toBe(true);
@@ -328,10 +356,13 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
   it('vanlig melding: OpalSurface, lokalt blekk på pilletekst og rolle', async () => {
     const root = await render(melding);
     expect(root.root.findAllByType(OpalSurface)).toHaveLength(1);
-    expect(textsWithColor(root, OPAL.inkSecondary)).toEqual([
-      '👏 3 heier',
-      '2',
-    ]);
+    // FROST: pilleteksten er prototypens mørke blekk, ikke opalens sekundær.
+    expect(textsWithColor(root, FROST.pill.ink)).toEqual(
+      expect.arrayContaining(['👏 3 heier', '2']),
+    );
+    expect(textsWithColor(root, OPAL.inkSecondary)).not.toEqual(
+      expect.arrayContaining(['👏 3 heier']),
+    );
     expect(textsWithColor(root, OPAL.inkAccent)).toEqual(['Trener']);
     expect(textsWithColor(root, colors.textSecondary)).toEqual([]);
     root.unmount();
@@ -347,12 +378,12 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     expect(style.backgroundColor).not.toBe(colors.sun);
     expect(style.borderColor).toBe(GLASS.importantSolidEdge);
     expect(style.borderWidth).toBe(1);
-    expect(style.borderRadius).toBe(radius.xl);
-    expect(style.padding).toBe(spacing.xl);
-    expect(textsWithColor(root, OPAL.inkSecondary)).toEqual([
-      '👏 3 heier',
-      '2',
-    ]);
+    // FROST: prototypens ramme (radius 28, padding 12).
+    expect(style.borderRadius).toBe(FROST.radius);
+    expect(style.padding).toBe(FROST.padding);
+    expect(textsWithColor(root, FROST.pill.ink)).toEqual(
+      expect.arrayContaining(['👏 3 heier', '2']),
+    );
     expect(textsWithColor(root, colors.textSecondary)).toEqual([]);
     expect(textsWithColor(root, OPAL.inkAccent)).toEqual(['Trener']);
     root.unmount();
@@ -366,8 +397,11 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     const glass = root.root.findAllByType(StadiumGlass);
     expect(glass).toHaveLength(1);
     expect(glass[0].props.compact).toBe(true);
-    expect(glass[0].props.pressed).toBe(false);
-    expect(flat(glass[0].props.style).padding).toBe(spacing.xl);
+    // Trykket eies av useGlassPress/GlassPressSensor (2026-09-06), ikke
+    // Pressable sin `pressed`. Uten native: animert lys via `pressLight`.
+    expect(glass[0].props.pressed).toBeUndefined();
+    expect(glass[0].props.pressLight).toBeDefined();
+    expect(flat(glass[0].props.style).padding).toBe(FROST.padding);
     const views = root.root.findAllByType('View' as never);
     expect(views[0].props.accessibilityRole).toBe('button');
     // Flaten åpner SAMTALEN (2026-09-03); kampen ligger bak «Se kampen ›».
@@ -504,7 +538,7 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     festetKamp.unmount();
   });
 
-  it('padding-boksen er identisk med dagens kort: 1 pt kant + padding xl, radius xl', async () => {
+  it('padding-boksen er prototypens: 1 pt kant + FROST.padding (fallbackens radius er opalens)', async () => {
     const root = await render(melding);
     const surface = root.root.findByType(OpalSurface);
     // Innerboksen: det første View-et med overflow hidden under svg-en.
@@ -514,20 +548,16 @@ describe('FEED_OPAL_AB bytter kun ikke-festede kort', () => {
     const s = flat(inner?.props.style);
     expect(s.borderWidth).toBe(1);
     expect(s.borderColor).toBe('transparent');
-    expect(s.padding).toBe(spacing.xl);
+    expect(s.padding).toBe(FROST.padding);
     expect(s.borderRadius).toBe(radius.xl);
     root.unmount();
   });
 
-  it('reaksjonspillens vask er den vakten regner med', async () => {
+  it('reaksjonspillene er prototypens lyse frostpille (FROST.pill), ikke blekkvasken', async () => {
     const root = await render(melding);
     const pills = root.root
       .findAllByType('View' as never)
-      .filter(
-        v =>
-          flat(v.props.style).backgroundColor ===
-          `rgba(17, 36, 27, ${PILL_WASH.alpha})`,
-      );
+      .filter(v => flat(v.props.style).backgroundColor === FROST.pill.fill);
     expect(pills).toHaveLength(2);
     expect(rgb(PILL_WASH.color)).toEqual([17, 36, 27]);
     root.unmount();

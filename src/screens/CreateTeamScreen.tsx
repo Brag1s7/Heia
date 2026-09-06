@@ -6,14 +6,23 @@ import {
   Pressable,
   StyleSheet,
   Image,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button, Skeleton, TeamColorPicker, useBottomContentPadding} from '../components';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
+import {
+  ProfilPage,
+  Button,
+  Skeleton,
+  TeamColorPicker,
+  useBottomContentPadding,
+} from '../components';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {searchClubs, getSports, getCachedSports} from '../lib/api/teams';
 import {TEAM_COLORS} from '../shared/teamColors';
@@ -218,16 +227,10 @@ export function CreateTeamScreen() {
     );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar />
+    <ProfilPage keyboard>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Opprett lag</Text>
@@ -236,151 +239,171 @@ export function CreateTeamScreen() {
           dele.
         </Text>
 
-        {/* Lagnavn */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Lagnavn</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="F.eks. Ridabu G10"
-            placeholderTextColor={colors.textTertiary}
-            value={teamName}
-            onChangeText={setTeamName}
-            autoCapitalize="words"
-          />
-        </View>
+        {/* SKJEMAET PÅ ETT PANEL (ProfilPage, 2026-09-04): feltene og
+            etikettene står i glasset — én flate, ett blekk — i stedet for
+            spredt over grunnens fargereise. */}
+        <LiquidGlassSurface
+          variant="sheet"
+          detached
+          style={styles.formPanel}
+          // Alt som monteres SENT inne i arket (se `contentVersion`):
+          // idrettene, klubbtreffene, valgt klubb, feiltekster.
+          contentVersion={[
+            sportsLoading,
+            sportsError,
+            sports.length,
+            clubSearching,
+            clubResults.length,
+            selectedClub?.name ?? '',
+            error ?? '',
+          ].join('|')}>
+          {/* Lagnavn */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Lagnavn</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="F.eks. Ridabu G10"
+              placeholderTextColor={OPAL.inkTertiary}
+              value={teamName}
+              onChangeText={setTeamName}
+              autoCapitalize="words"
+            />
+          </View>
 
-        {/* Klubb */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Klubb</Text>
-          {selectedClub ? (
-            <View style={styles.selectedClub}>
-              <Text style={styles.selectedClubText}>
-                {selectedClub.name}
-                {selectedClub.id ? '' : '  (ny klubb)'}
-              </Text>
-              <Pressable onPress={clearClub} hitSlop={8}>
-                <Text style={styles.changeText}>Endre</Text>
+          {/* Klubb */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Klubb</Text>
+            {selectedClub ? (
+              <View style={styles.selectedClub}>
+                <Text style={styles.selectedClubText}>
+                  {selectedClub.name}
+                  {selectedClub.id ? '' : '  (ny klubb)'}
+                </Text>
+                <Pressable onPress={clearClub} hitSlop={8}>
+                  <Text style={styles.changeText}>Endre</Text>
+                </Pressable>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Søk etter klubb…"
+                  placeholderTextColor={OPAL.inkTertiary}
+                  value={clubQuery}
+                  onChangeText={setClubQuery}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+                {(clubResults.length > 0 || showCreateRow || clubSearching) && (
+                  <View style={styles.dropdown}>
+                    {clubSearching && clubResults.length === 0 && (
+                      <Text style={styles.dropdownHint}>Søker…</Text>
+                    )}
+                    {clubResults.map(c => (
+                      <Pressable
+                        key={c.id}
+                        style={styles.dropdownRow}
+                        onPress={() => pickExistingClub(c)}>
+                        <ClubBadge name={c.name} logoUrl={c.logoUrl} />
+                        <Text style={styles.dropdownText}>{c.name}</Text>
+                      </Pressable>
+                    ))}
+                    {showCreateRow && (
+                      <Pressable
+                        style={styles.dropdownRow}
+                        onPress={createNewClub}>
+                        <Text style={styles.dropdownCreate}>
+                          + Opprett «{clubQuery.trim()}»
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+
+          {/* Idrett */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Idrett</Text>
+            {sportsLoading ? (
+              <View style={styles.sportRow}>
+                <Skeleton width={92} height={36} round style={styles.bone} />
+                <Skeleton width={104} height={36} round style={styles.bone} />
+                <Skeleton width={80} height={36} round style={styles.bone} />
+              </View>
+            ) : sportsError ? (
+              <Pressable onPress={() => setSportsReloadKey(k => k + 1)}>
+                <Text style={styles.retryText}>
+                  Kunne ikke laste idretter. Trykk for å prøve igjen.
+                </Text>
               </Pressable>
-            </View>
-          ) : (
-            <>
-              <TextInput
-                style={styles.input}
-                placeholder="Søk etter klubb…"
-                placeholderTextColor={colors.textTertiary}
-                value={clubQuery}
-                onChangeText={setClubQuery}
-                autoCapitalize="words"
-                autoCorrect={false}
-              />
-              {(clubResults.length > 0 || showCreateRow || clubSearching) && (
-                <View style={styles.dropdown}>
-                  {clubSearching && clubResults.length === 0 && (
-                    <Text style={styles.dropdownHint}>Søker…</Text>
-                  )}
-                  {clubResults.map(c => (
+            ) : sports.length === 0 ? (
+              <Text style={styles.emptyHint}>Ingen idretter tilgjengelig.</Text>
+            ) : (
+              <View style={styles.sportRow}>
+                {sports.map(s => {
+                  const selected = sportSlug === s.slug;
+                  return (
                     <Pressable
-                      key={c.id}
-                      style={styles.dropdownRow}
-                      onPress={() => pickExistingClub(c)}>
-                      <ClubBadge name={c.name} logoUrl={c.logoUrl} />
-                      <Text style={styles.dropdownText}>{c.name}</Text>
-                    </Pressable>
-                  ))}
-                  {showCreateRow && (
-                    <Pressable
-                      style={styles.dropdownRow}
-                      onPress={createNewClub}>
-                      <Text style={styles.dropdownCreate}>
-                        + Opprett «{clubQuery.trim()}»
+                      key={s.id}
+                      style={[
+                        styles.sportPill,
+                        selected && styles.sportPillSelected,
+                      ]}
+                      onPress={() => setSportSlug(s.slug)}>
+                      <Text
+                        style={[
+                          styles.sportPillText,
+                          selected && styles.sportPillTextSelected,
+                        ]}>
+                        {s.displayName}
                       </Text>
                     </Pressable>
-                  )}
-                </View>
-              )}
-            </>
-          )}
-        </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
 
-        {/* Idrett */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Idrett</Text>
-          {sportsLoading ? (
-            <View style={styles.sportRow}>
-              <Skeleton width={92} height={36} round />
-              <Skeleton width={104} height={36} round />
-              <Skeleton width={80} height={36} round />
-            </View>
-          ) : sportsError ? (
-            <Pressable onPress={() => setSportsReloadKey(k => k + 1)}>
-              <Text style={styles.retryText}>
-                Kunne ikke laste idretter. Trykk for å prøve igjen.
-              </Text>
-            </Pressable>
-          ) : sports.length === 0 ? (
-            <Text style={styles.emptyHint}>Ingen idretter tilgjengelig.</Text>
-          ) : (
-            <View style={styles.sportRow}>
-              {sports.map(s => {
-                const selected = sportSlug === s.slug;
-                return (
-                  <Pressable
-                    key={s.id}
-                    style={[styles.sportPill, selected && styles.sportPillSelected]}
-                    onPress={() => setSportSlug(s.slug)}>
-                    <Text
-                      style={[
-                        styles.sportPillText,
-                        selected && styles.sportPillTextSelected,
-                      ]}>
-                      {s.displayName}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
+          {/* Alder / kull */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Alder / kull</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="F.eks. G10, 2015"
+              placeholderTextColor={OPAL.inkTertiary}
+              value={ageGroup}
+              onChangeText={setAgeGroup}
+              autoCapitalize="characters"
+            />
+          </View>
 
-        {/* Alder / kull */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Alder / kull</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="F.eks. G10, 2015"
-            placeholderTextColor={colors.textTertiary}
-            value={ageGroup}
-            onChangeText={setAgeGroup}
-            autoCapitalize="characters"
+          {/* Lagfarge */}
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Lagfarge</Text>
+            <TeamColorPicker value={teamColor} onChange={setTeamColor} />
+          </View>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+
+          <Button
+            title="Opprett lag"
+            onPress={handleCreate}
+            disabled={!canSubmit}
+            loading={submitting}
+            size="lg"
+            style={{marginTop: spacing.xl}}
           />
-        </View>
-
-        {/* Lagfarge */}
-        <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Lagfarge</Text>
-          <TeamColorPicker value={teamColor} onChange={setTeamColor} />
-        </View>
-
-        {error && <Text style={styles.error}>{error}</Text>}
-
-        <Button
-          title="Opprett lag"
-          onPress={handleCreate}
-          disabled={!canSubmit}
-          loading={submitting}
-          size="lg"
-          style={{marginTop: spacing.xl}}
-        />
+        </LiquidGlassSurface>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskriften i reisens mørke topp → stadionblekk;
+// skjemaet på ett panel → OPAL-blekk og GLASS_FIELD-felt.
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   screen: {
     flex: 1,
   },
@@ -390,13 +413,22 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xl,
     gap: spacing.xl,
   },
+  formPanel: {
+    padding: spacing.lg,
+    gap: spacing.xl,
+  },
+  // Bones i blekk-tint: standardbonen (surfaceMuted) er usynlig på perlen.
+  bone: {
+    backgroundColor: 'rgba(8, 57, 46, 0.1)',
+  },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
     marginBottom: spacing.xs,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
   },
   fieldGroup: {
     gap: spacing.xs,
@@ -406,16 +438,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   input: {
     ...typography.input,
-    backgroundColor: colors.surface,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
   },
   selectedClub: {
@@ -436,20 +468,21 @@ const styles = StyleSheet.create({
   },
   changeText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     fontWeight: '600',
   },
+  // Treffslista under klubbsøket: tettere feltflate, så radene leses.
   dropdown: {
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.75)',
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     marginTop: spacing.xs,
     overflow: 'hidden',
   },
   dropdownHint: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
     padding: spacing.md,
   },
   dropdownRow: {
@@ -459,7 +492,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
+    borderTopColor: OPAL.hairline,
   },
   dropdownText: {
     ...typography.body,
@@ -499,8 +532,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
     borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: GLASS_FIELD.edge,
+    backgroundColor: GLASS_FIELD.fill,
   },
   sportPillSelected: {
     borderColor: colors.heia,
@@ -508,7 +541,7 @@ const styles = StyleSheet.create({
   },
   sportPillText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   sportPillTextSelected: {
     color: colors.heiaInk,
@@ -525,6 +558,6 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
 });

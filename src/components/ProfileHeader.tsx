@@ -2,20 +2,41 @@ import React, {useState} from 'react';
 import {View, Text, StatusBar, StyleSheet, Pressable} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
-import Svg, {Circle, Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {colors, typography, spacing, radius} from '../theme';
 import {Avatar} from './Avatar';
 import {avatarRef} from '../lib/media/avatar';
+import {teamSpotlight} from '../shared/teamColors';
+import {nameMaxWidth} from '../shared/masthead';
 import {
-  ARC_INSET_RIGHT,
-  ARC_INSET_BOTTOM,
-  ARC_R_OUTER,
-  ARC_R_INNER,
-  ARC_STROKE,
-  ARC_OPACITY_OUTER,
-  ARC_OPACITY_INNER,
   HEADER_CONTENT_HEIGHT,
+  HEADER_FOOT_HEIGHT,
 } from '../shared/headerGeometry';
+
+/**
+ * Profilens identitetsfelt — Heias mørkegrønne, IKKE lagfargen.
+ *
+ * FARGEN BÆRER MENING (låst 2026-08-19). Lagfargen i laghodet er et
+ * scope-signal, ikke dekor: alt under den er lag-scopet. Profil er ikke det —
+ * «Min støtte» er avtalene dine på tvers av lag, «Klubbetalinger» er en
+ * juridisk enhet, «Heia Ops» er alle klubber, og kontoen er din. Å male
+ * feltet i det aktive lagets farge ville påstått et scope skjermen ikke har.
+ * Dessuten står lagbytteren PÅ denne skjermen: et felt som skifter farge når
+ * du trykker et lagkort under det, mens navnet og e-posten i feltet ikke
+ * endrer seg, er en animasjon som sier feil ting.
+ *
+ * Sendes til `<DaylightGround masthead identity={PROFILE_IDENTITY} />` i
+ * ProfilScreen — lerretet tegner feltet, headeren er innhold oppå.
+ */
+export const PROFILE_IDENTITY = colors.heiaDeep;
+
+/** Blekket mot feltet — samme regel som laghodet (hvitt på mørkt felt). */
+const SPOT = teamSpotlight(PROFILE_IDENTITY);
+const INK_RGB = SPOT.light ? '17, 36, 27' : '255, 255, 255';
+
+/** Avatar 40 + 2×1 luft = 42 = lagmerkets plate. Navneblokken starter etter
+ *  padding + ring + gap — samme regnestykke som TeamHeader. */
+const AVATAR_RING = HEADER_CONTENT_HEIGHT;
+const NAME_START = spacing.lg + AVATAR_RING + spacing.md;
 
 interface ProfileHeaderProps {
   name: string;
@@ -38,25 +59,25 @@ interface ProfileHeaderProps {
 }
 
 /**
- * Profilens toppflate — samme familie som TeamHeader, egen farge.
+ * Profilens topp — SAMME masthead som laghodet (Brage 2026-09-04: «samme
+ * header og bakgrunn som resten av sidene»).
  *
- * FARGEN BÆRER MENING (låst 2026-08-19). Lagfargen i TeamHeader er et
- * scope-signal, ikke dekor: alt under den er lag-scopet. Profil er ikke det —
- * «Min støtte» er avtalene dine på tvers av lag, «Klubbetalinger» er en
- * juridisk enhet, «Heia Ops» er alle klubber, og kontoen er din. Å male den i
- * det aktive lagets farge ville påstått et scope skjermen ikke har. Dessuten
- * står lagbytteren PÅ denne skjermen: en header som skifter farge når du
- * trykker et lagkort under den, mens navnet og e-posten over ikke endrer seg,
- * er en animasjon som sier feil ting.
+ * MASTHEAD: headeren er IKKE en egen flate. Den er gjennomsiktig innhold —
+ * avatar, navn + e-post, rollebadge — oppå ÉTT lerret, DaylightGround i
+ * masthead-modus, som spenner fra statuslinja til bunnen og tegner reisen,
+ * identitetsfeltet og buene. Ingen egen gradient, ingen egne buer, ingen
+ * hårlinje under — det finnes ikke to flater lenger. Det som skiller Profil
+ * fra Hjem/Kalender/Varsler er BARE feltets farge (PROFILE_IDENTITY).
  *
- * ANATOMIEN er derimot TeamHeaders, slot for slot — det er dét som gjør dem
- * til én familie:
+ * ANATOMIEN er TeamHeaders, slot for slot — det er dét som gjør dem til én
+ * familie, og det som gjør at fanebytte ikke bytter modell:
  *   venstre  · avatar        (der lagmerket står)
  *   midt     · navn + e-post (der lagnavn + «Fotball · 18 medlemmer» står)
  *   høyre    · rollebadge    (der «Sesongen»-chipen står)
  *
- * Statisk, som headeren ellers i appen: ingen kollaps, ingen krysstoning,
- * ingen scrollstyrt animasjon. Fanebytte skal føles stabilt.
+ * Høyden er laghodets: insets.top + 42 + 12 = `mastheadHeight`, som lerretet
+ * regner med. Statisk, som headeren ellers i appen: ingen kollaps, ingen
+ * krysstoning, ingen scrollstyrt animasjon.
  */
 export function ProfileHeader({
   name,
@@ -69,75 +90,23 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  // Buer trenger ekte piksler (prosent på r/cx gir skjeve former).
-  const [box, setBox] = useState({w: 0, h: 0});
+  const [width, setWidth] = useState(0);
 
   return (
-    <View style={[styles.container, {paddingTop: insets.top + spacing.xs}]}>
-      {/* Fokus-vakt som i TeamHeader: uten den ville Profil styrt statuslinja
+    <View
+      style={[
+        styles.container,
+        {paddingTop: insets.top, paddingBottom: HEADER_FOOT_HEIGHT},
+      ]}
+      onLayout={e => setWidth(e.nativeEvent.layout.width)}>
+      {/* Statuslinja ligger på den universelle mørke basen — lys tekst.
+          Fokus-vakt som i TeamHeader: uten den ville Profil styrt statuslinja
           videre på skjermer som pushes oppå (ChangePassword, Lagoversikt …). */}
       {isFocused && <StatusBar barStyle="light-content" />}
 
-      <View
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-        onLayout={e =>
-          setBox({
-            w: e.nativeEvent.layout.width,
-            h: e.nativeEvent.layout.height,
-          })
-        }>
-        <Svg width="100%" height="100%">
-          <Defs>
-            {/* Samme oppbygning som TeamHeaders gradient, men på Heias faste
-                merkevaregrønne: ren og flat gjennom avatar/navn, dypere mot
-                midten, mørkest ved høyre kant. Ingen vertikal fade — bunnen
-                skal ikke bli lys eller grå. */}
-            <LinearGradient id="profileDepth" x1="0%" y1="0%" x2="100%" y2="0%">
-              <Stop offset="0" stopColor={colors.heiaDeep} />
-              <Stop offset="0.18" stopColor={colors.heiaDeep} />
-              <Stop offset="0.55" stopColor="#073026" />
-              <Stop offset="1" stopColor={colors.stadium} />
-            </LinearGradient>
-          </Defs>
-          <Rect
-            x="0"
-            y="0"
-            width="100%"
-            height="100%"
-            fill="url(#profileDepth)"
-          />
-
-          {/* Banesirkelen — nøyaktig samme geometri som TeamHeader og
-              kampkortene (delte konstanter). */}
-          {box.w > 0 && (
-            <>
-              <Circle
-                cx={box.w - ARC_INSET_RIGHT}
-                cy={box.h - ARC_INSET_BOTTOM}
-                r={ARC_R_OUTER}
-                fill="none"
-                stroke={colors.stadiumText}
-                strokeOpacity={ARC_OPACITY_OUTER}
-                strokeWidth={ARC_STROKE}
-              />
-              <Circle
-                cx={box.w - ARC_INSET_RIGHT}
-                cy={box.h - ARC_INSET_BOTTOM}
-                r={ARC_R_INNER}
-                fill="none"
-                stroke={colors.stadiumText}
-                strokeOpacity={ARC_OPACITY_INNER}
-                strokeWidth={ARC_STROKE}
-              />
-            </>
-          )}
-        </Svg>
-      </View>
-
       {/* Avatar 40 + 1 px ring = 42 = lagmerkets 38 + 2×2. Høydene matcher ved
           konstruksjon, ikke ved justering. Ringen holder kanten på et
-          profilbilde skarp mot den mørke flaten; initialer klarer seg selv.
+          profilbilde skarp mot det mørke feltet; initialer klarer seg selv.
 
           AVATAREN ER INNGANGEN til å sette profilbilde (00068): ingen egen
           rad i Innstillinger, ingen blyant-ikon. Å trykke på bildet sitt er
@@ -161,14 +130,22 @@ export function ProfileHeader({
         />
       </Pressable>
 
-      <View style={styles.textWrap}>
-        <Text style={styles.name} numberOfLines={1}>
+      {/* Navn + e-post klippes innenfor feltets fulle farge, som lagnavnet. */}
+      <View
+        style={[
+          styles.textWrap,
+          width > 0 && {maxWidth: nameMaxWidth(width, NAME_START)},
+        ]}>
+        <Text style={[styles.name, {color: SPOT.ink}]} numberOfLines={1}>
           {name}
         </Text>
         {/* Midt-ellipsis: det er DOMENET som avslører feil konto, og halen er
             nettopp det en vanlig ellipsis spiser. */}
         {!!email && (
-          <Text style={styles.email} numberOfLines={1} ellipsizeMode="middle">
+          <Text
+            style={[styles.email, {color: `rgba(${INK_RGB}, 0.72)`}]}
+            numberOfLines={1}
+            ellipsizeMode="middle">
             {email}
           </Text>
         )}
@@ -188,12 +165,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
     gap: spacing.md,
-    // Fallback-bunn bak svg-en (synlig et blunk mens den måles opp).
-    backgroundColor: colors.heiaDeep,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.18)',
+    // GJENNOMSIKTIG: lerretet (DaylightGround masthead) ligger bak.
+    backgroundColor: 'transparent',
   },
   avatarPressed: {
     opacity: 0.7,
@@ -213,17 +187,16 @@ const styles = StyleSheet.create({
     ...typography.heading3,
     fontWeight: '800',
     letterSpacing: -0.3,
-    color: colors.stadiumText,
   },
   email: {
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.1,
     marginTop: 1,
-    color: 'rgba(234, 255, 246, 0.82)',
   },
   // Samme form som «Sesongen»-chipen i TeamHeader — den plassen i raden er
   // allerede en pill. Her er den ren informasjon, så den er ikke trykkbar.
+  // Den står på den mørke basen utenfor feltet, som Sesongen-chipen.
   roleBadge: {
     marginLeft: 'auto',
     borderRadius: radius.full,

@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {StyleSheet, View} from 'react-native';
+import {StyleSheet, View, useWindowDimensions} from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -12,6 +12,7 @@ import Svg, {
 } from 'react-native-svg';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {colors} from '../theme';
+import {BACKDROP_SOURCE_ID} from '../shared/glassOptics';
 import {useActiveTeam} from '../context';
 import {HEADER_BASE, darkenSameHue, teamSpotlight} from '../shared/teamColors';
 import {
@@ -807,21 +808,77 @@ interface DaylightGroundProps {
    * containeren den står i (Comments).
    */
   masthead?: boolean;
+  /** Tegn identitetsfeltet i grunnen (default). `false` når feltet ligger FORAN listen (MastheadField). */
+  field?: boolean;
+  /**
+   * Identitetsfeltets farge i masthead-modus. Utelatt = det aktive lagets
+   * farge (Hjem/Kalender/Varsler). Profil sender Heias mørkegrønne: den
+   * skjermen er ikke lag-scopet (se ProfileHeader), så lagfargen ville
+   * påstått et scope den ikke har — men anatomien er den samme, så
+   * fanebytte bytter farge, ikke modell.
+   */
+  identity?: string;
 }
 
-export function DaylightGround({masthead = false}: DaylightGroundProps) {
+/**
+ * IDENTITETSFELTET FORAN LISTEN (Brage 2026-09-06: «når det lyse kortet
+ * passerer header blir bunnen av det rød»). Systemglasset sampler alt som
+ * ligger BAK det i vinduet, også litt utenfor egen ramme — så lagfargen i
+ * grunnen farget kortene nær laghodet. Feltet tegnes derfor som et eget lag
+ * ETTER listen (over den i z-orden) og er dermed ikke i glassets bakteppe.
+ * Samme geometri og farge som i grunnen; grunnen tegnes med `field={false}`.
+ */
+export function MastheadField({identity}: {identity?: string}) {
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const {activeTeamSpace} = useActiveTeam();
+  const color = identity ?? activeTeamSpace?.color;
+  if (!color) return null;
+  const spot = teamSpotlight(color);
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <TeamField
+        width={window.width}
+        height={mastheadHeight(insets.top)}
+        insetTop={insets.top}
+        color={spot.surface}
+      />
+    </View>
+  );
+}
+
+export function DaylightGround({
+  masthead = false,
+  field = true,
+  identity,
+}: DaylightGroundProps) {
   const variant = DAYLIGHT_VERTICAL_VARIANT;
-  const [box, setBox] = useState({w: 0, h: 0});
+  // FØRSTE RAMME (Brage 2026-09-04: «bytter lag og går til profilsiden, så
+  // blinker skjermen»): lagbytte gjør CommonActions.reset, og hele fanen
+  // monteres på nytt. Å vente på onLayout før reisen tegnes ga én ramme med
+  // flat mint-fallback før den mørke toppen — det er blinket. Grunnen fyller
+  // i praksis alltid vinduet (masthead: hele skjermen; ellers en full
+  // skjermrute), så vinduet er riktig gjetning i første ramme; onLayout
+  // korrigerer om containeren er en annen.
+  const window = useWindowDimensions();
+  const [box, setBox] = useState({w: window.width, h: window.height});
   const insets = useSafeAreaInsets();
   const {activeTeamSpace} = useActiveTeam();
   const headerHeight = masthead ? mastheadHeight(insets.top) : 0;
-  const teamColor = masthead ? activeTeamSpace?.color : undefined;
-  const spot = teamColor ? teamSpotlight(teamColor) : null;
+  const fieldColor = masthead ? identity ?? activeTeamSpace?.color : undefined;
+  const spot = fieldColor ? teamSpotlight(fieldColor) : null;
   return (
     // ATMOSFÆRE, IKKE INNHOLD — skjult for skjermleser og uten trykkflate,
     // samme kontrakt som MatchGround. Fyller KROPPEN den ligger i.
     <View
       style={styles.root}
+      // FEEDGLASS V3 (Brage 2026-09-04): det native glasset finner grunnen
+      // i vinduet via denne id-en og sampler den bak hvert kort.
+      nativeID={BACKDROP_SOURCE_ID}
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
@@ -843,7 +900,7 @@ export function DaylightGround({masthead = false}: DaylightGroundProps) {
         <MasterGround stops={MASTER_STOPS[variant]} />
       )}
       <ChalkGeometry />
-      {spot && (
+      {spot && field && (
         <TeamField
           width={box.w}
           height={box.h}

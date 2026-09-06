@@ -8,16 +8,19 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
 import {inkOnTeamColor} from '../shared/teamColors';
 import type {ProfilStackParamList} from '../shared/types';
 import {
-  BackBar,
+  ProfilPage,
   Button,
   TeamColorPicker,
   useBottomContentPadding,
@@ -110,7 +113,10 @@ export function TeamSettingsScreen() {
       await refreshMemberships();
       setName(trimmed);
     } catch (e: any) {
-      Alert.alert('Kunne ikke lagre navnet', e?.message ?? 'Prøv igjen om litt.');
+      Alert.alert(
+        'Kunne ikke lagre navnet',
+        e?.message ?? 'Prøv igjen om litt.',
+      );
     } finally {
       setSavingName(false);
     }
@@ -217,20 +223,14 @@ export function TeamSettingsScreen() {
     trimmedName.length > 0 && trimmedName !== activeTeamSpace.displayName;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar title="Laginnstillinger" />
+    <ProfilPage title="Laginnstillinger" keyboard>
       <ScrollView
         style={styles.screen}
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         {/* Lagnavn */}
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.label}>Lagnavn</Text>
           <TextInput
             style={styles.input}
@@ -238,7 +238,7 @@ export function TeamSettingsScreen() {
             onChangeText={setName}
             autoCapitalize="words"
             placeholder={activeTeamSpace.displayName}
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={OPAL.inkTertiary}
           />
           {nameChanged && (
             <Button
@@ -248,10 +248,10 @@ export function TeamSettingsScreen() {
               style={styles.cardButton}
             />
           )}
-        </View>
+        </LiquidGlassSurface>
 
         {/* Lagfarge */}
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.label}>Lagfarge</Text>
           <Text style={styles.hint}>
             Vises på lagmerket, i kampen og på laglisten.
@@ -260,10 +260,10 @@ export function TeamSettingsScreen() {
             value={activeTeamSpace.color}
             onChange={handleColorSelect}
           />
-        </View>
+        </LiquidGlassSurface>
 
         {/* Laglogo (override) */}
-        <View style={styles.card}>
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
           <Text style={styles.label}>Laglogo</Text>
           <View style={styles.logoRow}>
             <View style={[styles.logoRing, {borderColor: teamColor}]}>
@@ -278,8 +278,8 @@ export function TeamSettingsScreen() {
               {activeTeamSpace.logoUrl
                 ? 'Laget har egen logo — den vinner over klubblogoen.'
                 : club?.logoUrl
-                  ? 'Lagmerket viser klubblogoen. Egen laglogo overstyrer den — bare for dette laget.'
-                  : 'Lagmerket viser initialene. Egen laglogo gjelder bare dette laget.'}
+                ? 'Lagmerket viser klubblogoen. Egen laglogo overstyrer den — bare for dette laget.'
+                : 'Lagmerket viser initialene. Egen laglogo gjelder bare dette laget.'}
             </Text>
           </View>
           <View style={styles.buttonRow}>
@@ -299,11 +299,11 @@ export function TeamSettingsScreen() {
               />
             )}
           </View>
-        </View>
+        </LiquidGlassSurface>
 
         {/* Klubblogo */}
         {club && (
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <Text style={styles.label}>Klubblogo</Text>
             <View style={styles.logoRow}>
               <View style={[styles.logoRing, {borderColor: colors.border}]}>
@@ -329,53 +329,51 @@ export function TeamSettingsScreen() {
                 style={styles.cardButton}
               />
             )}
-          </View>
+          </LiquidGlassSurface>
         )}
 
         {/* Støtte fra supportere (betalingsspor fase 3) */}
         {club && (
-          <Pressable
-            style={styles.card}
-            onPress={() => navigation.navigate('SupportSetup')}>
-            <Text style={styles.label}>Støtte fra supportere</Text>
-            <View style={styles.supportRow}>
-              <HandHeart size={22} color={colors.heiaDeep} strokeWidth={2} />
-              <Text style={styles.hintFlex}>
-                Aktiver «Støtt laget» — faste månedlige bidrag fra foreldre og
-                supportere, utbetalt til klubben.
-              </Text>
-              <ChevronRight size={20} color={colors.textTertiary} />
-            </View>
+          <Pressable onPress={() => navigation.navigate('SupportSetup')}>
+            <LiquidGlassSurface variant="sheet" style={styles.card}>
+              <Text style={styles.label}>Støtte fra supportere</Text>
+              <View style={styles.supportRow}>
+                <HandHeart size={22} color={colors.heiaDeep} strokeWidth={2} />
+                <Text style={styles.hintFlex}>
+                  Aktiver «Støtt laget» — faste månedlige bidrag fra foreldre og
+                  supportere, utbetalt til klubben.
+                </Text>
+                <ChevronRight size={20} color={OPAL.inkTertiary} />
+              </View>
+            </LiquidGlassSurface>
           </Pressable>
         )}
 
         {/* Kontekstuell snarvei til «Klubbetalinger» (klubbdøren, 00047)
             — SAMME flate som på Profil, kun for betalingsansvarlige. */}
         {club && isManager && (
-          <Pressable
-            style={styles.card}
-            onPress={() => navigation.navigate('ClubPayments')}>
-            <Text style={styles.label}>Klubbetalinger</Text>
-            <View style={styles.supportRow}>
-              <Wallet size={22} color={colors.heiaDeep} strokeWidth={2} />
-              <Text style={styles.hintFlex}>
-                Du er betalingsansvarlig — godkjenn og administrer lagenes
-                støtte.
-              </Text>
-              <ChevronRight size={20} color={colors.textTertiary} />
-            </View>
+          <Pressable onPress={() => navigation.navigate('ClubPayments')}>
+            <LiquidGlassSurface variant="sheet" style={styles.card}>
+              <Text style={styles.label}>Klubbetalinger</Text>
+              <View style={styles.supportRow}>
+                <Wallet size={22} color={colors.heiaDeep} strokeWidth={2} />
+                <Text style={styles.hintFlex}>
+                  Du er betalingsansvarlig — godkjenn og administrer lagenes
+                  støtte.
+                </Text>
+                <ChevronRight size={20} color={OPAL.inkTertiary} />
+              </View>
+            </LiquidGlassSurface>
           </Pressable>
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): alt innhold står i paneler → OPAL-blekk og
+// GLASS_FIELD som feltflate.
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   screen: {
     flex: 1,
   },
@@ -385,38 +383,33 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
     padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card,
   },
   label: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   input: {
     ...typography.input,
-    backgroundColor: colors.background,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
   },
   hint: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   hintFlex: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     flex: 1,
   },
   logoRow: {

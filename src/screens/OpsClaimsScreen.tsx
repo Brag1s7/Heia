@@ -9,8 +9,10 @@ import {
 } from 'react-native';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Skeleton, useBottomContentPadding} from '../components';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {LiquidGlassSurface} from '../components/LiquidGlassSurface';
+import {ProfilPage, Skeleton, useBottomContentPadding} from '../components';
 import {listOpsClaims, type OpsClaim} from '../lib/api';
 import type {ProfilStackParamList} from '../shared/types';
 
@@ -71,10 +73,10 @@ export function OpsClaimsScreen() {
   }, [load]);
 
   const open = claims?.filter(
-    (c) => c.status === 'submitted' || c.status === 'in_review',
+    c => c.status === 'submitted' || c.status === 'in_review',
   );
   const done = claims?.filter(
-    (c) => c.status !== 'submitted' && c.status !== 'in_review',
+    c => c.status !== 'submitted' && c.status !== 'in_review',
   );
 
   const renderClaim = (claim: OpsClaim) => {
@@ -82,39 +84,40 @@ export function OpsClaimsScreen() {
     return (
       <Pressable
         key={claim.id}
-        style={({pressed}) => [styles.card, pressed && styles.cardPressed]}
+        style={({pressed}) => [styles.cardWrap, pressed && styles.cardPressed]}
         onPress={() =>
           navigation.navigate('OpsClaimDetail', {claimId: claim.id})
         }>
-        <View style={styles.cardTop}>
-          <Text style={[styles.pill, {backgroundColor: meta.bg, color: meta.fg}]}>
-            {meta.label}
+        <LiquidGlassSurface variant="sheet" style={styles.card}>
+          <View style={styles.cardTop}>
+            <Text
+              style={[styles.pill, {backgroundColor: meta.bg, color: meta.fg}]}>
+              {meta.label}
+            </Text>
+            <Text style={styles.date}>{formatDate(claim.createdAt)}</Text>
+          </View>
+          <Text style={styles.clubName}>{claim.legalName}</Text>
+          <Text style={styles.meta}>
+            Orgnr {claim.orgNumber} · {claim.claimant?.displayName ?? 'Ukjent'}{' '}
+            ({claim.claimedRole})
           </Text>
-          <Text style={styles.date}>{formatDate(claim.createdAt)}</Text>
-        </View>
-        <Text style={styles.clubName}>{claim.legalName}</Text>
-        <Text style={styles.meta}>
-          Orgnr {claim.orgNumber} · {claim.claimant?.displayName ?? 'Ukjent'} (
-          {claim.claimedRole})
-        </Text>
-        {claim.brreg?.notFound && (
-          <Text style={styles.warn}>❌ Orgnr finnes ikke i registeret</Text>
-        )}
-        {claim.brreg?.checks?.sokerIRegisteret && (
-          <Text style={styles.good}>✓ Søkeren står i Brønnøysund-rollene</Text>
-        )}
+          {claim.brreg?.notFound && (
+            <Text style={styles.warn}>❌ Orgnr finnes ikke i registeret</Text>
+          )}
+          {claim.brreg?.checks?.sokerIRegisteret && (
+            <Text style={styles.good}>
+              ✓ Søkeren står i Brønnøysund-rollene
+            </Text>
+          )}
+        </LiquidGlassSurface>
       </Pressable>
     );
   };
 
   return (
-    <View style={styles.screen}>
-      <BackBar />
+    <ProfilPage>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -123,21 +126,30 @@ export function OpsClaimsScreen() {
         <Text style={styles.subtitle}>Klubbsøknader</Text>
 
         {loading ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Skeleton width={120} height={12} />
             <Skeleton height={16} />
             <Skeleton width="60%" height={12} />
-          </View>
+          </LiquidGlassSurface>
         ) : error ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>
               Fikk ikke hentet søknadene — dra ned for å prøve igjen.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : claims === null || claims.length === 0 ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>Ingen søknader ennå.</Text>
-          </View>
+          </LiquidGlassSurface>
         ) : (
           <>
             {open && open.length > 0 && (
@@ -155,42 +167,40 @@ export function OpsClaimsScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskrift og etiketter på grunnen → stadionblekk;
+// kortene er paneler → OPAL-blekk.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   content: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginBottom: spacing.xl,
   },
   sectionLabel: {
     ...typography.caption,
     fontWeight: '700',
     letterSpacing: 1,
-    color: colors.textTertiary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
+  cardWrap: {
     marginBottom: spacing.md,
+  },
+  card: {
+    padding: spacing.lg,
     gap: spacing.xs,
-    ...shadows.card,
   },
   cardPressed: {
     opacity: 0.85,
@@ -211,14 +221,14 @@ const styles = StyleSheet.create({
   },
   date: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   clubName: {
     ...typography.heading3,
   },
   meta: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   warn: {
     ...typography.bodySmall,

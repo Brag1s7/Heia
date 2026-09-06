@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {LiquidGlassSurface} from '../components/LiquidGlassSurface';
 import {
   Avatar,
-  BackBar,
+  ProfilPage,
   ListRowSkeleton,
   Skeleton,
   useBottomContentPadding,
@@ -139,7 +141,12 @@ export function TeamMembersScreen() {
   const handleChangeRole = useCallback(
     (member: TeamMember) => {
       if (!activeTeamSpaceId) return;
-      const choices: UserRole[] = ['trener', 'lagleder', 'forelder', 'supporter'];
+      const choices: UserRole[] = [
+        'trener',
+        'lagleder',
+        'forelder',
+        'supporter',
+      ];
       Alert.alert(
         `Endre rollen til ${member.name}`,
         `Rollen er ${ROLE_LABELS[member.role].toLowerCase()} i dag.`,
@@ -315,8 +322,7 @@ export function TeamMembersScreen() {
   // Skeletonene er nå FØRSTE besøk — har cachen data, tegnes lista med én gang.
   if (isPending) {
     return (
-      <View style={styles.screen}>
-        <BackBar title="Lagoversikt" />
+      <ProfilPage title="Lagoversikt">
         {/* Lagnavnet er kjent fra context — bare medlemmene lastes. */}
         <View style={styles.header}>
           <Text style={styles.teamName}>
@@ -326,164 +332,158 @@ export function TeamMembersScreen() {
         </View>
         <View style={styles.section}>
           <Skeleton width={110} height={11} />
-          <View style={styles.card}>
+          <LiquidGlassSurface variant="sheet" style={styles.card}>
             <ListRowSkeleton />
             <ListRowSkeleton />
             <ListRowSkeleton />
             <ListRowSkeleton showBorder={false} />
-          </View>
+          </LiquidGlassSurface>
         </View>
-      </View>
+      </ProfilPage>
     );
   }
 
   return (
-    <View style={styles.screen}>
-      <BackBar title="Lagoversikt" />
+    <ProfilPage title="Lagoversikt">
       <ScrollView
-      contentContainerStyle={{paddingBottom: bottomPad}}
-      refreshControl={
-        <RefreshControl
-          refreshing={isRefetching}
-          onRefresh={refetch}
-          tintColor={colors.heia}
-        />
-      }>
-      <View style={styles.header}>
-        <Text style={styles.teamName}>
-          {activeTeamSpace?.displayName ?? 'Laget'}
-        </Text>
-        <Text style={styles.count}>
-          {members.length === 1 ? '1 medlem' : `${members.length} medlemmer`}
-        </Text>
-      </View>
-
-      {isError && (
-        <Text style={styles.error}>
-          Kunne ikke laste laget. Dra ned for å prøve igjen.
-        </Text>
-      )}
-
-      {sections.map(section => (
-        <View key={section.title} style={styles.section}>
-          <View style={styles.sectionTitleRow}>
-            <View style={styles.sectionDash} />
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-          </View>
-          <View style={styles.card}>
-            {section.data.map((member, i) => {
-              const isMe = member.id === myId;
-              const canContact = !!member.phone && !isMe;
-              // ⋯ samler handlingene (rolle/forespørsel/fjerning/bilde) —
-              // hva som faktisk tilbys avgjøres i menyen, vaktene bor i
-              // RPC-ene. Et vanlig medlem ser knappen KUN når det finnes et
-              // profilbilde å rapportere; ellers ville menyen vært tom.
-              const showActions =
-                !isMe && (amAdmin || !!member.avatarPath);
-              return (
-                <Pressable
-                  key={member.id}
-                  disabled={!canContact}
-                  onPress={() => handleContact(member)}
-                  style={({pressed}) => [
-                    styles.row,
-                    i < section.data.length - 1 && styles.rowBorder,
-                    pressed && canContact && styles.rowPressed,
-                  ]}>
-                  <Avatar
-                    media={avatarRef(member.avatarPath)}
-                    name={member.name}
-                    color={member.avatarColor}
-                    size="md"
-                  />
-                  <View style={styles.rowText}>
-                    <View style={styles.nameLine}>
-                      <Text style={styles.name} numberOfLines={1}>
-                        {member.name}
-                      </Text>
-                      {isMe && <Text style={styles.you}>deg</Text>}
-                    </View>
-                    <Text style={styles.subtitle} numberOfLines={1}>
-                      {subtitleFor(member)}
-                    </Text>
-                  </View>
-                  {member.status === 'invited' && (
-                    <View style={styles.pendingChip}>
-                      <Text style={styles.pendingText}>Invitert</Text>
-                    </View>
-                  )}
-                  {/* Trenerforespørselen (§5) — kun lagadmin ser og
-                      behandler den; chippen er selve inngangen. */}
-                  {amAdmin && member.requestedRole === 'trener' && (
-                    <Pressable
-                      onPress={() => handleRoleRequest(member)}
-                      hitSlop={6}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${member.name} vil bli trener — behandle forespørselen`}
-                      style={({pressed}) => [
-                        styles.requestChip,
-                        pressed && styles.morePressed,
-                      ]}>
-                      <Text style={styles.requestText}>Vil bli trener</Text>
-                    </Pressable>
-                  )}
-                  {canContact && <Text style={styles.contactIcon}>📞</Text>}
-                  {showActions && (
-                    <Pressable
-                      onPress={() => handleMemberActions(member)}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Flere valg for ${member.name}`}
-                      style={({pressed}) => [
-                        styles.moreBtn,
-                        pressed && styles.morePressed,
-                      ]}>
-                      <MoreHorizontal
-                        size={18}
-                        color={colors.textTertiary}
-                      />
-                    </Pressable>
-                  )}
-                </Pressable>
-              );
-            })}
-          </View>
+        contentContainerStyle={{paddingBottom: bottomPad}}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor={colors.heia}
+          />
+        }>
+        <View style={styles.header}>
+          <Text style={styles.teamName}>
+            {activeTeamSpace?.displayName ?? 'Laget'}
+          </Text>
+          <Text style={styles.count}>
+            {members.length === 1 ? '1 medlem' : `${members.length} medlemmer`}
+          </Text>
         </View>
-      ))}
 
-      {/* Inviter hører hjemme her: det er når du ser hvem som mangler at du
-          vil hente dem inn. */}
-      <View style={styles.section}>
-        <Pressable
-          onPress={() => navigation.navigate('Invite')}
-          style={({pressed}) => [
-            styles.inviteCard,
-            pressed && styles.rowPressed,
-          ]}>
-          <Text style={styles.inviteIcon}>＋</Text>
-          <View style={styles.rowText}>
-            <Text style={styles.inviteTitle}>Inviter til laget</Text>
-            <Text style={styles.subtitle}>Del invitasjonskoden</Text>
+        {isError && (
+          <Text style={styles.error}>
+            Kunne ikke laste laget. Dra ned for å prøve igjen.
+          </Text>
+        )}
+
+        {sections.map(section => (
+          <View key={section.title} style={styles.section}>
+            <View style={styles.sectionTitleRow}>
+              <View style={styles.sectionDash} />
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+            </View>
+            <LiquidGlassSurface variant="sheet" style={styles.card}>
+              {section.data.map((member, i) => {
+                const isMe = member.id === myId;
+                const canContact = !!member.phone && !isMe;
+                // ⋯ samler handlingene (rolle/forespørsel/fjerning/bilde) —
+                // hva som faktisk tilbys avgjøres i menyen, vaktene bor i
+                // RPC-ene. Et vanlig medlem ser knappen KUN når det finnes et
+                // profilbilde å rapportere; ellers ville menyen vært tom.
+                const showActions = !isMe && (amAdmin || !!member.avatarPath);
+                return (
+                  <Pressable
+                    key={member.id}
+                    disabled={!canContact}
+                    onPress={() => handleContact(member)}
+                    style={({pressed}) => [
+                      styles.row,
+                      i < section.data.length - 1 && styles.rowBorder,
+                      pressed && canContact && styles.rowPressed,
+                    ]}>
+                    <Avatar
+                      media={avatarRef(member.avatarPath)}
+                      name={member.name}
+                      color={member.avatarColor}
+                      size="md"
+                    />
+                    <View style={styles.rowText}>
+                      <View style={styles.nameLine}>
+                        <Text style={styles.name} numberOfLines={1}>
+                          {member.name}
+                        </Text>
+                        {isMe && <Text style={styles.you}>deg</Text>}
+                      </View>
+                      <Text style={styles.subtitle} numberOfLines={1}>
+                        {subtitleFor(member)}
+                      </Text>
+                    </View>
+                    {member.status === 'invited' && (
+                      <View style={styles.pendingChip}>
+                        <Text style={styles.pendingText}>Invitert</Text>
+                      </View>
+                    )}
+                    {/* Trenerforespørselen (§5) — kun lagadmin ser og
+                      behandler den; chippen er selve inngangen. */}
+                    {amAdmin && member.requestedRole === 'trener' && (
+                      <Pressable
+                        onPress={() => handleRoleRequest(member)}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${member.name} vil bli trener — behandle forespørselen`}
+                        style={({pressed}) => [
+                          styles.requestChip,
+                          pressed && styles.morePressed,
+                        ]}>
+                        <Text style={styles.requestText}>Vil bli trener</Text>
+                      </Pressable>
+                    )}
+                    {canContact && <Text style={styles.contactIcon}>📞</Text>}
+                    {showActions && (
+                      <Pressable
+                        onPress={() => handleMemberActions(member)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Flere valg for ${member.name}`}
+                        style={({pressed}) => [
+                          styles.moreBtn,
+                          pressed && styles.morePressed,
+                        ]}>
+                        <MoreHorizontal size={18} color={OPAL.inkTertiary} />
+                      </Pressable>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </LiquidGlassSurface>
           </View>
-        </Pressable>
-      </View>
+        ))}
 
-      {amAdmin && activeRole && (
-        <Text style={styles.footnote}>
-          Du ser telefonnumre fordi du er{' '}
-          {ROLE_LABELS[activeRole].toLowerCase()}. Andre i laget ser dem ikke.
-        </Text>
-      )}
+        {/* Inviter hører hjemme her: det er når du ser hvem som mangler at du
+          vil hente dem inn. */}
+        <View style={styles.section}>
+          <Pressable onPress={() => navigation.navigate('Invite')}>
+            {({pressed}) => (
+              <LiquidGlassSurface
+                variant="sheet"
+                style={[styles.inviteCard, pressed && styles.rowPressed]}>
+                <Text style={styles.inviteIcon}>＋</Text>
+                <View style={styles.rowText}>
+                  <Text style={styles.inviteTitle}>Inviter til laget</Text>
+                  <Text style={styles.subtitle}>Del invitasjonskoden</Text>
+                </View>
+              </LiquidGlassSurface>
+            )}
+          </Pressable>
+        </View>
+
+        {amAdmin && activeRole && (
+          <Text style={styles.footnote}>
+            Du ser telefonnumre fordi du er{' '}
+            {ROLE_LABELS[activeRole].toLowerCase()}. Andre i laget ser dem ikke.
+          </Text>
+        )}
       </ScrollView>
-    </View>
+    </ProfilPage>
   );
 }
 
+// Blekk på undersiden (ProfilPage): overskrift og tellinger står i reisens
+// mørke topp → stadionblekk; alt i panelene står i OPAL-blekk.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   header: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -491,10 +491,11 @@ const styles = StyleSheet.create({
   },
   teamName: {
     ...typography.heading2,
+    color: colors.stadiumText,
   },
   count: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
   },
   error: {
     ...typography.bodySmall,
@@ -523,15 +524,12 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
   },
+  // Panelet (LiquidGlassSurface) eier flate, kant, radius og skygge;
+  // `overflow: hidden` klipper radenes trykk-tint til radiusen.
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
     overflow: 'hidden',
-    ...shadows.card,
   },
   row: {
     flexDirection: 'row',
@@ -543,10 +541,10 @@ const styles = StyleSheet.create({
   },
   rowBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle,
+    borderBottomColor: OPAL.hairline,
   },
   rowPressed: {
-    backgroundColor: colors.heiaSoft,
+    backgroundColor: OPAL.rowPressed,
   },
   rowText: {
     flex: 1,
@@ -564,21 +562,21 @@ const styles = StyleSheet.create({
   },
   you: {
     ...typography.caption,
-    color: colors.heiaInk,
+    color: OPAL.inkAccent,
   },
   subtitle: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   pendingChip: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: 'rgba(8, 57, 46, 0.08)',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.sm,
   },
   pendingText: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   // Trenerforespørselen skal ses, ikke ropes: mint flate, mørk tekst
   // (A v2-regelen — mint er fyll på lys flate, aldri tekstfarge).
@@ -607,21 +605,16 @@ const styles = StyleSheet.create({
   inviteCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     gap: spacing.md,
     minHeight: 64,
-    ...shadows.card,
   },
   inviteIcon: {
     fontSize: 22,
     width: 40,
     textAlign: 'center',
-    color: colors.heiaInk,
+    color: OPAL.inkAccent,
   },
   inviteTitle: {
     ...typography.body,
@@ -629,6 +622,7 @@ const styles = StyleSheet.create({
   },
   footnote: {
     ...typography.caption,
+    color: OPAL.inkSecondary,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.xl,
     lineHeight: 18,

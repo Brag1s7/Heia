@@ -192,7 +192,11 @@ function HomeStackNavigator() {
         options={newEventOptions}
       />
       <HomeStack.Screen name="Lagkassa" component={LagkassaScreen} />
-      <HomeStack.Screen name="Invite" component={InviteScreen} />
+      <HomeStack.Screen
+        name="Invite"
+        component={InviteScreen}
+        options={daylightGroundOptions}
+      />
       <HomeStack.Screen name="Comments" component={CommentsScreen} />
       {/* ⚠️ SAMME KOMPONENT SOM I `KampStack`. «Sesongen»-snarveien i
           laghodet er en HJEM-inngang: du kom fra Hjem, og «tilbake» skal
@@ -267,14 +271,30 @@ function InboxStackNavigator() {
           oppføre seg likt uansett hva det peker på — samme innskyving, og
           «Tilbake» tilbake til varsellista. Skjermene er også registrert i
           Profil-stacken, der de er de faste flatene sine. */}
-      <InboxNav.Screen name="SupportSetup" component={SupportSetupScreen} />
-      <InboxNav.Screen name="ClubPayments" component={ClubPaymentsScreen} />
+      <InboxNav.Screen
+        name="SupportSetup"
+        component={SupportSetupScreen}
+        options={daylightGroundOptions}
+      />
+      <InboxNav.Screen
+        name="ClubPayments"
+        component={ClubPaymentsScreen}
+        options={daylightGroundOptions}
+      />
       {/* Rollevarslene (00067) åpner lagoversikten her av samme grunn.
           `Invite` MÅ følge med: lagoversikten har en «Inviter til laget»-rad,
           og uten ruten i DENNE stacken er den raden en død knapp når skjermen
           nås fra et varsel. */}
-      <InboxNav.Screen name="TeamMembers" component={TeamMembersScreen} />
-      <InboxNav.Screen name="Invite" component={InviteScreen} />
+      <InboxNav.Screen
+        name="TeamMembers"
+        component={TeamMembersScreen}
+        options={daylightGroundOptions}
+      />
+      <InboxNav.Screen
+        name="Invite"
+        component={InviteScreen}
+        options={daylightGroundOptions}
+      />
       <InboxNav.Screen
         name="NewEvent"
         component={NewEventScreen}
@@ -289,7 +309,10 @@ function InboxStackNavigator() {
 // ---------------------------------------------------------------------------
 function ProfilStackNavigator() {
   return (
-    <ProfilNav.Navigator screenOptions={stackScreenOptions}>
+    <ProfilNav.Navigator
+      // Alle Profil-sidene har dagslysgrunnen (fanen og undersidene via
+      // ProfilPage), så kortet bak hver av dem males i grunnens mint.
+      screenOptions={{...stackScreenOptions, ...daylightGroundOptions}}>
       <ProfilNav.Screen name="Profil" component={ProfilScreen} />
       <ProfilNav.Screen
         name="ChangePassword"

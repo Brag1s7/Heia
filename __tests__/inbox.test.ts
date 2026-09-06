@@ -67,13 +67,49 @@ function matchRow(
 /** Hele kampen, i den rekkefølgen den faktisk spilles. */
 function fullMatchRows() {
   return [
-    matchRow('n1', 'avspark', {minute: 0, body: '⚽ Kampen er i gang: Stange G10 mot Oslo'}),
-    matchRow('n2', 'mål', {minute: 28, teamSide: 'home', home: 1, away: 0, body: '⚽ MÅL! Stange G10 1–0 Oslo'}),
-    matchRow('n3', 'pause', {minute: 45, home: 1, away: 0, body: '⏸ Pause. Stange G10 1–0 Oslo'}),
-    matchRow('n4', 'andre_omgang', {minute: 45, home: 1, away: 0, body: '▶️ Andre omgang i gang. Stange G10 1–0 Oslo'}),
-    matchRow('n5', 'mål', {minute: 63, teamSide: 'away', home: 1, away: 1, body: 'Mål til Oslo. Stange G10 1–1 Oslo'}),
-    matchRow('n6', 'mål', {minute: 78, teamSide: 'home', home: 2, away: 1, body: '⚽ MÅL! Stange G10 2–1 Oslo'}),
-    matchRow('n7', 'slutt', {minute: 90, home: 2, away: 1, body: '🏁 Slutt! Stange G10 2–1 Oslo'}),
+    matchRow('n1', 'avspark', {
+      minute: 0,
+      body: '⚽ Kampen er i gang: Stange G10 mot Oslo',
+    }),
+    matchRow('n2', 'mål', {
+      minute: 28,
+      teamSide: 'home',
+      home: 1,
+      away: 0,
+      body: '⚽ MÅL! Stange G10 1–0 Oslo',
+    }),
+    matchRow('n3', 'pause', {
+      minute: 45,
+      home: 1,
+      away: 0,
+      body: '⏸ Pause. Stange G10 1–0 Oslo',
+    }),
+    matchRow('n4', 'andre_omgang', {
+      minute: 45,
+      home: 1,
+      away: 0,
+      body: '▶️ Andre omgang i gang. Stange G10 1–0 Oslo',
+    }),
+    matchRow('n5', 'mål', {
+      minute: 63,
+      teamSide: 'away',
+      home: 1,
+      away: 1,
+      body: 'Mål til Oslo. Stange G10 1–1 Oslo',
+    }),
+    matchRow('n6', 'mål', {
+      minute: 78,
+      teamSide: 'home',
+      home: 2,
+      away: 1,
+      body: '⚽ MÅL! Stange G10 2–1 Oslo',
+    }),
+    matchRow('n7', 'slutt', {
+      minute: 90,
+      home: 2,
+      away: 1,
+      body: '🏁 Slutt! Stange G10 2–1 Oslo',
+    }),
   ];
 }
 
@@ -268,16 +304,15 @@ describe('Varsler — hva kortet skal fortelle', () => {
   // det står 'Ridabu tar ledelsen'.» Stillingen ETTER holder ikke — man må
   // vite om ledelsen ble tatt eller økt, altså stillingen FØR målet.
   it('skiller mellom å TA og å ØKE ledelsen', () => {
-    const goal = (
-      side: 'home' | 'away',
-      home: number,
-      away: number,
-    ): string => lineOf(matchRow(`g-${side}-${home}${away}`, 'mål', {
-      teamSide: side,
-      home,
-      away,
-      minute: 50,
-    }));
+    const goal = (side: 'home' | 'away', home: number, away: number): string =>
+      lineOf(
+        matchRow(`g-${side}-${home}${away}`, 'mål', {
+          teamSide: side,
+          home,
+          away,
+          minute: 50,
+        }),
+      );
 
     // Eget lag
     expect(goal('home', 1, 0)).toBe('Stange G10 tar ledelsen'); // 0–0 → 1–0
@@ -318,7 +353,11 @@ describe('Varsler — hva kortet skal fortelle', () => {
       'melding',
     ];
     for (const t of types) {
-      const row = matchRow(`e-${t}`, t, {minute: 10, teamSide: 'home', home: 1});
+      const row = matchRow(`e-${t}`, t, {
+        minute: 10,
+        teamSide: 'home',
+        home: 1,
+      });
       // `melding` uten beskrivelse er den ene som kan bli tom — den
       // filtreres bort av kortet i stedet for å vise et nakent minutt.
       const text = lineOf(row);
@@ -401,7 +440,12 @@ describe('Varsler — endringer på et arrangement', () => {
   it('plukker ut gammel og ny verdi (00054)', () => {
     const n = mapNotificationRow(
       changeRow([
-        {field: 'meeting_time', label: 'oppmøtet er flyttet', old: '17:30', new: '17:00'},
+        {
+          field: 'meeting_time',
+          label: 'oppmøtet er flyttet',
+          old: '17:30',
+          new: '17:00',
+        },
         {field: 'location', label: 'nytt sted', old: 'Bane 1', new: 'Bane 2'},
       ]),
     );
@@ -416,7 +460,9 @@ describe('Varsler — endringer på et arrangement', () => {
   });
 
   it('ignorerer ufullstendige endringer', () => {
-    const n = mapNotificationRow(changeRow([{field: 'x'}, {label: 'bare label'}]));
+    const n = mapNotificationRow(
+      changeRow([{field: 'x'}, {label: 'bare label'}]),
+    );
     expect(n.changes).toBeUndefined();
   });
 
@@ -437,30 +483,72 @@ describe('Varsler — endringer på et arrangement', () => {
 });
 
 describe('Varsler — bolkene', () => {
-  it('deler i Nå / I dag / Tidligere', () => {
-    const now = Date.parse('2026-08-06T20:00:00Z');
-    const at = (iso: string, id: string) =>
-      mapNotificationRow({
-        id,
-        category: 'system',
-        title: 't',
-        body: 'b',
-        read_at: null,
-        created_at: iso,
-        team_space_id: 'ts-1',
-        data: {},
-      });
+  // Torsdag 6. august 2026, kl. 20:00Z. Tidspunktene er lagt midt på dagen
+  // (09:00Z), så bolkene er de samme i alle tidssoner testen kjører i.
+  const now = Date.parse('2026-08-06T20:00:00Z');
+  const at = (iso: string, id: string) =>
+    mapNotificationRow({
+      id,
+      category: 'system',
+      title: 't',
+      body: 'b',
+      read_at: null,
+      created_at: iso,
+      team_space_id: 'ts-1',
+      data: {},
+    });
 
+  it('deler i Nå / I dag / I går / Denne uken / Forrige uke / måned', () => {
     const entries = buildEntries([
       at('2026-08-06T19:45:00Z', 'a'), // siste time
       at('2026-08-06T09:00:00Z', 'b'), // tidligere i dag
-      at('2026-08-01T09:00:00Z', 'c'), // tidligere
+      at('2026-08-05T09:00:00Z', 'c'), // i går (onsdag)
+      at('2026-08-04T09:00:00Z', 'd'), // tirsdag — denne uken
+      at('2026-08-03T09:00:00Z', 'e'), // mandag — denne uken
+      at('2026-08-02T09:00:00Z', 'f'), // søndag — forrige uke
+      at('2026-07-28T09:00:00Z', 'g'), // tirsdag — forrige uke
+      at('2026-07-20T09:00:00Z', 'h'), // juli
+      at('2026-07-02T09:00:00Z', 'i'), // juli
+      at('2026-06-15T09:00:00Z', 'j'), // juni
+      at('2025-12-15T09:00:00Z', 'k'), // annet år → årstall
     ]);
 
+    expect(
+      groupByAge(entries, now).map(s => [s.label, s.entries.length]),
+    ).toEqual([
+      ['Nå', 1],
+      ['I dag', 1],
+      ['I går', 1],
+      ['Denne uken', 2],
+      ['Forrige uke', 2],
+      ['Juli', 2],
+      ['Juni', 1],
+      ['Desember 2025', 1],
+    ]);
+  });
+
+  it('lager ingen tomme bolker — bare de som har innhold', () => {
+    const entries = buildEntries([
+      at('2026-08-06T09:00:00Z', 'b'), // i dag
+      at('2026-07-20T09:00:00Z', 'h'), // juli
+    ]);
     expect(groupByAge(entries, now).map(s => s.label)).toEqual([
-      'Nå',
       'I dag',
-      'Tidligere',
+      'Juli',
+    ]);
+  });
+
+  it('på en mandag er «i går» søndagen, og «forrige uke» uka før den', () => {
+    const monday = Date.parse('2026-08-03T20:00:00Z');
+    const entries = buildEntries([
+      at('2026-08-02T09:00:00Z', 'f'), // søndag → i går
+      at('2026-08-01T09:00:00Z', 'g'), // lørdag → forrige uke
+      at('2026-07-26T09:00:00Z', 'h'), // søndag før → juli
+    ]);
+    expect(groupByAge(entries, monday).map(s => s.label)).toEqual([
+      'I går',
+      'Forrige uke',
+      'Juli',
     ]);
   });
 });

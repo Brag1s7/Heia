@@ -1,5 +1,14 @@
-import React, {useMemo} from 'react';
-import {StyleSheet, View, type StyleProp, type ViewStyle} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  StyleSheet,
+  View,
+  type GestureResponderEvent,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Svg, {
   ClipPath,
   Defs,
@@ -141,7 +150,112 @@ interface StadiumGlassProps {
   compact?: boolean;
   /** Trykk (Pressable): lys presses inn i glasset. Skalering eier Pressable. */
   pressed?: boolean;
+  /** Trykkfysikken fra `useGlassPress`: lyset inn i glasset, animert. */
+  pressLight?: Animated.AnimatedInterpolation<number>;
   children?: React.ReactNode;
+}
+
+/**
+ * TRYKKFYSIKKEN FRA DET LYSE GLASSET, I JS (Brage 2026-09-06: «kampkortet
+ * skal oppføre seg likt som det lyse kortet når man scroller og tar tak i
+ * det»). Speiler HeiaLiquidGlassView sin UILongPressGestureRecognizer:
+ * touch-down → lys 0,16 + skala 0,98 + 1 pt ned på 120 ms; bevegelse > 12 pt
+ * (scroll), slipp eller avbrudd → tilbake på 300 ms, alltid fra nåverdien.
+ * Rå touch-hendelser, ikke responder-kjeden: barna (piller, ⋯) trykker som
+ * før, og kortet lyser likevel under dem. Reduce Motion → kun lys.
+ */
+export const PRESS = {
+  light: 0.16,
+  scale: 0.98,
+  drop: 1,
+  slop: 12,
+  inMs: 120,
+  outMs: 300,
+} as const;
+
+export function useGlassPress() {
+  const value = useRef(new Animated.Value(0)).current;
+  const start = useRef<{x: number; y: number} | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    let live = true;
+    AccessibilityInfo.isReduceMotionEnabled().then(v => {
+      if (live) {
+        setReduceMotion(v);
+      }
+    });
+    const sub = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReduceMotion,
+    );
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, []);
+  const drive = useCallback(
+    (down: boolean) => {
+      Animated.timing(value, {
+        toValue: down ? 1 : 0,
+        duration: down ? PRESS.inMs : PRESS.outMs,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+    },
+    [value],
+  );
+  const handlers = useMemo(
+    () => ({
+      onTouchStart: (e: GestureResponderEvent) => {
+        start.current = {x: e.nativeEvent.pageX, y: e.nativeEvent.pageY};
+        drive(true);
+      },
+      onTouchMove: (e: GestureResponderEvent) => {
+        const s = start.current;
+        if (!s) {
+          return;
+        }
+        const dx = e.nativeEvent.pageX - s.x;
+        const dy = e.nativeEvent.pageY - s.y;
+        if (Math.hypot(dx, dy) > PRESS.slop) {
+          start.current = null; // fingeren scroller — slipp glasset
+          drive(false);
+        }
+      },
+      onTouchEnd: () => {
+        start.current = null;
+        drive(false);
+      },
+      onTouchCancel: () => {
+        start.current = null;
+        drive(false);
+      },
+    }),
+    [drive],
+  );
+  const light = value.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, PRESS.light],
+  });
+  const style = reduceMotion
+    ? undefined
+    : {
+        transform: [
+          {
+            translateY: value.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, PRESS.drop],
+            }),
+          },
+          {
+            scale: value.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, PRESS.scale],
+            }),
+          },
+        ],
+      };
+  return {light, style, handlers};
 }
 
 const FULL = {x: '0', y: '0', width: '100%', height: '100%'} as const;
@@ -151,6 +265,7 @@ export function StadiumGlass({
   style,
   compact = false,
   pressed = false,
+  pressLight,
   children,
 }: StadiumGlassProps) {
   const {reduceTransparency, increaseContrast} = useMaterialAccessibility();
@@ -170,8 +285,26 @@ export function StadiumGlass({
     ? [GLASS.edgeContrast, GLASS.edgeContrast, GLASS.edgeContrast]
     : [GLASS.edgeTop, GLASS.edgeMid, GLASS.edgeBottom];
 
+  // MÅLT LERRET (Brage 2026-09-06: «bunnen av kampkortet kuttes i
+  // kommentararket»): rn-svg regner prosent mot sin EGEN første oppmålte
+  // størrelse og henger igjen der (samme felle som MatchEventRow). I arket
+  // får kortet første layout før innholdet er ferdig, så kroppen stoppet
+  // over platen. Høyden måles og gis i PUNKTER; prosent bare til første
+  // måling.
+  const [box, setBox] = useState({w: 0, h: 0});
+  const onBoxLayout = useCallback(
+    (e: {nativeEvent: {layout: {width: number; height: number}}}) => {
+      const {width, height} = e.nativeEvent.layout;
+      setBox(prev =>
+        prev.w === width && prev.h === height ? prev : {w: width, h: height},
+      );
+    },
+    [],
+  );
+
   return (
     <View
+      onLayout={onBoxLayout}
       style={[
         compact ? styles.shadowCompact : styles.shadow,
         reduceTransparency && styles.shadowSolid,
@@ -182,7 +315,7 @@ export function StadiumGlass({
         pointerEvents="none"
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants">
-        <Svg width="100%" height="100%">
+        <Svg width={box.w || '100%'} height={box.h || '100%'}>
           <Defs>
             <ClipPath id="sgClip">
               <Rect {...FULL} rx={radius.xl} ry={radius.xl} />
@@ -276,6 +409,12 @@ export function StadiumGlass({
         <View style={styles.arcOuter} pointerEvents="none" />
         <View style={styles.arcInner} pointerEvents="none" />
         {pressed && <View style={styles.pressLight} pointerEvents="none" />}
+        {pressLight !== undefined && (
+          <Animated.View
+            style={[styles.pressLightAnimated, {opacity: pressLight}]}
+            pointerEvents="none"
+          />
+        )}
         {children}
       </View>
     </View>
@@ -296,6 +435,11 @@ const styles = StyleSheet.create({
   pressLight: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: `rgba(255, 255, 255, ${GLASS.pressLight})`,
+  },
+  // Animert lys (useGlassPress): hvitt lag, opasiteten er trykkverdien.
+  pressLightAnimated: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#FFFFFF',
   },
   // Reduce Transparency: solid bunn under den (da ugjennomsiktige) svg-en.
   shadowSolid: {

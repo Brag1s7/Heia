@@ -6,12 +6,15 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
-import {BackBar, Button, useBottomContentPadding} from '../components';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
+import {ProfilPage, Button, useBottomContentPadding} from '../components';
 import {Check} from '../components/icons';
 import {useAuth} from '../context';
 import {authErrorMessage} from '../shared/authErrors';
@@ -144,38 +147,36 @@ export function ChangePasswordScreen() {
   // ------------------------------------------------------------------ ferdig
   if (step === 'done') {
     return (
-      <View style={styles.flex}>
-        <BackBar />
-        <View
-          style={[
-            styles.doneWrap,
-            {paddingBottom: bottomPad},
-          ]}>
-          <View style={styles.doneMark}>
-            <Check size={30} color={colors.heiaInk} strokeWidth={3} />
-          </View>
-          <Text style={styles.title}>Passordet er endret</Text>
-          <Text style={styles.subtitle}>
-            Du er fortsatt logget inn her. Neste gang du logger inn, bruker du
-            det nye passordet.
-          </Text>
-          <Button
-            title="Ferdig"
-            onPress={() => navigation.goBack()}
-            size="lg"
-          />
+      <ProfilPage>
+        <View style={[styles.doneWrap, {paddingBottom: bottomPad}]}>
+          {/* Kvitteringen står i et panel midt på reisen — der er grunnen
+              på sitt sterkeste, og panelet gir teksten én flate. */}
+          <LiquidGlassSurface variant="sheet" style={styles.donePanel}>
+            <View style={styles.doneMark}>
+              <Check size={30} color={colors.heiaInk} strokeWidth={3} />
+            </View>
+            <Text style={[styles.title, styles.titleOnPanel]}>
+              Passordet er endret
+            </Text>
+            <Text style={[styles.subtitle, styles.subtitleOnPanel]}>
+              Du er fortsatt logget inn her. Neste gang du logger inn, bruker du
+              det nye passordet.
+            </Text>
+            <Button
+              title="Ferdig"
+              onPress={() => navigation.goBack()}
+              size="lg"
+            />
+          </LiquidGlassSurface>
         </View>
-      </View>
+      </ProfilPage>
     );
   }
 
   const isRecovery = step === 'recovery';
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar />
+    <ProfilPage keyboard>
       <ScrollView
         style={styles.screen}
         contentContainerStyle={[
@@ -195,14 +196,17 @@ export function ChangePasswordScreen() {
             : 'Skriv inn det nåværende passordet ditt, og velg et nytt.'}
         </Text>
 
-        <View style={styles.form}>
+        <LiquidGlassSurface
+          variant="sheet"
+          wrapStyle={styles.formWrap}
+          style={styles.form}>
           {isRecovery ? (
             <View style={styles.fieldGroup}>
               <Text style={styles.label}>Kode fra e-post</Text>
               <TextInput
                 style={styles.codeInput}
                 placeholder="123456"
-                placeholderTextColor={colors.textTertiary}
+                placeholderTextColor={OPAL.inkTertiary}
                 value={code}
                 onChangeText={setCode}
                 keyboardType="number-pad"
@@ -218,7 +222,7 @@ export function ChangePasswordScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Passordet du bruker i dag"
-                placeholderTextColor={colors.textTertiary}
+                placeholderTextColor={OPAL.inkTertiary}
                 value={current}
                 onChangeText={setCurrent}
                 secureTextEntry
@@ -234,7 +238,7 @@ export function ChangePasswordScreen() {
             <TextInput
               style={styles.input}
               placeholder={`Minst ${MIN_PASSWORD} tegn`}
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={OPAL.inkTertiary}
               value={next}
               onChangeText={setNext}
               secureTextEntry
@@ -248,7 +252,7 @@ export function ChangePasswordScreen() {
             <TextInput
               style={[styles.input, mismatch && styles.inputError]}
               placeholder="Samme en gang til"
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={OPAL.inkTertiary}
               value={repeat}
               onChangeText={setRepeat}
               secureTextEntry
@@ -263,7 +267,7 @@ export function ChangePasswordScreen() {
               </Text>
             )}
           </View>
-        </View>
+        </LiquidGlassSurface>
 
         {error && (
           <Text
@@ -307,18 +311,15 @@ export function ChangePasswordScreen() {
           </Pressable>
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskriften i reisens mørke topp → stadionblekk;
+// skjemaet på ett panel → OPAL-blekk og GLASS_FIELD-felt.
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
     paddingHorizontal: spacing['2xl'],
@@ -326,16 +327,32 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
     marginBottom: spacing.xs,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginBottom: spacing['3xl'],
   },
-  form: {
-    gap: spacing.lg,
+  // På panelet (kvitteringen) er blekket mørkt.
+  titleOnPanel: {
+    color: colors.textPrimary,
+  },
+  subtitleOnPanel: {
+    color: OPAL.inkSecondary,
+    marginBottom: spacing.sm,
+  },
+  formWrap: {
     marginBottom: spacing['2xl'],
+  },
+  form: {
+    padding: spacing.lg,
+    gap: spacing.lg,
+  },
+  donePanel: {
+    padding: spacing.xl,
+    gap: spacing.md,
   },
   fieldGroup: {
     gap: spacing.xs,
@@ -345,16 +362,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   input: {
     ...typography.input,
-    backgroundColor: colors.surface,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
   },
   inputError: {
@@ -362,12 +379,12 @@ const styles = StyleSheet.create({
   },
   codeInput: {
     ...typography.input,
-    backgroundColor: colors.surface,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
     fontSize: 24,
     letterSpacing: 8,
@@ -386,13 +403,13 @@ const styles = StyleSheet.create({
   },
   notice: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
   link: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
     marginTop: spacing.lg,
     textDecorationLine: 'underline',

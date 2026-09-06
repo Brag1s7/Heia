@@ -8,17 +8,29 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import {useNavigation, useRoute, type RouteProp} from '@react-navigation/native';
+import {
+  useNavigation,
+  useRoute,
+  type RouteProp,
+} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Button, Skeleton, TeamBadge, useBottomContentPadding} from '../components';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
+import {
+  ProfilPage,
+  Button,
+  Skeleton,
+  TeamBadge,
+  useBottomContentPadding,
+} from '../components';
 import {Check} from '../components/icons';
 import {useAuth, useActiveTeam, useOnboarding} from '../context';
 import {lookupInviteCode, getMyTeamHistory} from '../lib/api/teams';
-import {
-  assessReentry,
-  type ReentryAssessment,
-} from '../shared/teamReentry';
+import {assessReentry, type ReentryAssessment} from '../shared/teamReentry';
 import {ROLE_LABELS} from '../shared/roles';
 import type {InviteCodeResult, MemberRole} from '../lib/types';
 import type {OnboardingStackParamList} from '../shared/types';
@@ -139,7 +151,7 @@ export function JoinTeamCodeScreen() {
     !reentry.leftVoluntarily &&
     reentry.reopenRole === null;
   // §3f-2: «Gjenåpne laget» vises kun i låst lag, for kvalifisert historikk.
-  const reopenRole = locked ? (reentry?.reopenRole ?? null) : null;
+  const reopenRole = locked ? reentry?.reopenRole ?? null : null;
   const canJoin = !blockedRemoved && !lockedOut;
 
   const handleContinue = async () => {
@@ -198,46 +210,50 @@ export function JoinTeamCodeScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <BackBar />
+    <ProfilPage>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Bli med i laget</Text>
-        <Text style={styles.subtitle}>Skriv inn invitasjonskoden du har fått</Text>
+        <Text style={styles.subtitle}>
+          Skriv inn invitasjonskoden du har fått
+        </Text>
 
-        <TextInput
-          style={styles.codeInput}
-          placeholder="F.eks. ABCD2345"
-          placeholderTextColor={colors.textTertiary}
-          value={code}
-          onChangeText={onChangeCode}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={8}
-        />
-
-        {!result && (
-          <Button
-            title="Finn lag"
-            onPress={() => runLookup(code)}
-            disabled={code.trim().length === 0}
-            loading={loading}
-            size="lg"
-            style={{marginTop: spacing.lg}}
+        {/* KODEN PÅ ETT ARK (runde 7): felt og knapp på arkets perle, så
+            felt, knapp og grunn ikke går i ett i reisens mørke topp. */}
+        <LiquidGlassSurface variant="sheet" style={styles.codePanel}>
+          <TextInput
+            style={styles.codeInput}
+            placeholder="F.eks. ABCD2345"
+            placeholderTextColor={OPAL.inkTertiary}
+            value={code}
+            onChangeText={onChangeCode}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={8}
           />
-        )}
+
+          {!result && (
+            <Button
+              title="Finn lag"
+              onPress={() => runLookup(code)}
+              disabled={code.trim().length === 0}
+              loading={loading}
+              size="lg"
+              style={{marginTop: spacing.lg}}
+            />
+          )}
+        </LiquidGlassSurface>
 
         {/* Skjelettet har SAMME geometri som lagkortet under, så laget glir
             inn i formen som allerede står der i stedet for å dukke opp under
             en spinner. Dette er øyeblikket forelderen finner laget sitt. */}
         {loading && (
-          <View
-            style={styles.resultBlock}
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.resultBlock}
+            style={styles.resultPanel}
             accessible
             accessibilityRole="progressbar"
             accessibilityLabel="Søker etter laget">
@@ -248,7 +264,7 @@ export function JoinTeamCodeScreen() {
                 <Skeleton width="80%" height={12} />
               </View>
             </View>
-          </View>
+          </LiquidGlassSurface>
         )}
 
         {error && (
@@ -261,7 +277,10 @@ export function JoinTeamCodeScreen() {
         )}
 
         {result && (
-          <View style={styles.resultBlock}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.resultBlock}
+            style={styles.resultPanel}>
             <View style={styles.teamCard}>
               {/* Lagets eget merke — TeamBadge eier kjeden laglogo →
                   klubblogo → initialer på lagfarge. Fargeflaten var det ene
@@ -319,8 +338,8 @@ export function JoinTeamCodeScreen() {
                     ROLE_LABELS[reopenRole as keyof typeof ROLE_LABELS] ??
                     reopenRole
                   ).toLowerCase()}{' '}
-                  her og meldte deg ut selv. Du kan gjenåpne laget og få
-                  rollen tilbake — eller bli med som vanlig under.
+                  her og meldte deg ut selv. Du kan gjenåpne laget og få rollen
+                  tilbake — eller bli med som vanlig under.
                 </Text>
                 <Button
                   title="Gjenåpne laget"
@@ -381,8 +400,8 @@ export function JoinTeamCodeScreen() {
                     valget bekreftes, ikke som en overraskelse etterpå. */}
                 {role === 'trener' && (
                   <Text style={styles.noteText}>
-                    En trener eller lagleder i laget godkjenner deg — til da
-                    er du med som supporter.
+                    En trener eller lagleder i laget godkjenner deg — til da er
+                    du med som supporter.
                   </Text>
                 )}
 
@@ -395,18 +414,17 @@ export function JoinTeamCodeScreen() {
                 />
               </>
             )}
-          </View>
+          </LiquidGlassSurface>
         )}
       </ScrollView>
-    </View>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskriften står i reisens mørke topp →
+// stadionblekk; lagkortet er et panel; tekst på grunnen lenger ned og i
+// panelet står i OPAL-blekk; feltene er GLASS_FIELD.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   // Samme marger som InviteScreen, så overskriften lander likt under headeren.
   content: {
     paddingHorizontal: spacing.lg,
@@ -414,23 +432,31 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
     marginBottom: spacing.xs,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginBottom: spacing['2xl'],
+  },
+  // Arkene: felt + knapp, og resultatet (lagrad, tekster, rolle, knapp).
+  codePanel: {
+    padding: spacing.lg,
+  },
+  resultPanel: {
+    padding: spacing.lg,
   },
   codeInput: {
     ...typography.heading2,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
-    backgroundColor: colors.surface,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
     textAlign: 'center',
     letterSpacing: 4,
@@ -444,16 +470,11 @@ const styles = StyleSheet.create({
   resultBlock: {
     marginTop: spacing['2xl'],
   },
+  // Lagraden inne på resultatarket — ingen egen flate (aldri ark i ark).
   teamCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card,
   },
   // Skjelettets utgave av lagmerket — samme flate, bonen eier fargen.
   badgeBone: {
@@ -473,14 +494,15 @@ const styles = StyleSheet.create({
   },
   teamMeta: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
+  // På resultatarket → opalblekk.
   sectionLabel: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginTop: spacing['2xl'],
     marginBottom: spacing.md,
   },
@@ -488,13 +510,13 @@ const styles = StyleSheet.create({
   // brukeren har ikke gjort noe galt.
   stopText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginTop: spacing.xl,
     lineHeight: 22,
   },
   noteText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginTop: spacing.lg,
     lineHeight: 20,
   },
@@ -513,7 +535,7 @@ const styles = StyleSheet.create({
   },
   reopenBody: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginTop: spacing.xs,
     lineHeight: 20,
   },
@@ -524,13 +546,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    backgroundColor: colors.surface,
+    // Radioraden er en KONTROLL, ikke et panel: feltflate på glassgrunnen.
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.lg,
     paddingVertical: spacing.lg,
     paddingHorizontal: spacing.lg,
     borderWidth: 2,
-    borderColor: colors.borderSubtle,
-    ...shadows.card,
+    borderColor: GLASS_FIELD.edge,
   },
   roleRowSelected: {
     borderColor: colors.heia,
@@ -545,7 +567,7 @@ const styles = StyleSheet.create({
   },
   roleDesc: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   // Radioprikken: tom ring til den er valgt, da mintfylt med hake.
   roleMark: {

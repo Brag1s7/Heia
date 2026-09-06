@@ -43,7 +43,8 @@ export {CreateSheet} from './CreateSheet';
 /** Tab-barens midtplass (P4, skive 10) — den erstattet «+». */
 export {MatchTabButton} from './MatchTabButton';
 export {TeamHeader} from './TeamHeader';
-export {ProfileHeader} from './ProfileHeader';
+export {ProfileHeader, PROFILE_IDENTITY} from './ProfileHeader';
+export {InboxChrome, STADIUM_PILL, INBOX_CHROME_HEIGHT} from './InboxChrome';
 export {TeamColorPicker} from './TeamColorPicker';
 export {InviteCodeCard} from './InviteCodeCard';
 export {NotificationRow} from './NotificationRow';
@@ -53,6 +54,7 @@ export {StadiumSurface} from './StadiumSurface';
 // NEXT_MATCH_GLASS_AB) + systembryterne materialet svarer på.
 export {StadiumGlass} from './StadiumGlass';
 export {OpalSurface, OPAL} from './OpalSurface';
+export {ProfilPage} from './ProfilPage';
 export {
   LiquidGlassSurface,
   FEED_LIQUID_GLASS_AB,

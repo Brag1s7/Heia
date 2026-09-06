@@ -25,7 +25,7 @@ import {
   type NavigationProp,
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius} from '../theme';
 import {
   pickPrimaryMembership,
   uniqueTeamMemberships,
@@ -36,9 +36,16 @@ import {
   ListRow,
   ListRowSkeleton,
   ProfileHeader,
+  PROFILE_IDENTITY,
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
   TeamBadge,
   useBottomContentPadding,
 } from '../components';
+import {OPAL} from '../components/OpalSurface';
+import {LiquidGlassSurface} from '../components/LiquidGlassSurface';
+import {OPAL_ROW_ICON_SLOT} from '../components/ListRow';
 import {
   Bell,
   Building2,
@@ -98,24 +105,109 @@ type Nav = NativeStackNavigationProp<ProfilStackParamList, 'Profil'>;
 
 // Mint-strek-etiketten — samme merkevaredetalj som SectionHeader, men uten
 // dens innebygde padding (seksjonene her eier luften selv).
-function SectionLabel({title}: {title: string}) {
+// `tone="stadium"`: etiketten står i dagslysgrunnens mørke topp (rett under
+// headeren) — stadionblekk, som kalenderchromen. Kun «Dine lag» står
+// deterministisk der; resten av etikettene følger reisen nedover.
+function SectionLabel({title, tone}: {title: string; tone?: 'stadium'}) {
   return (
     <View style={styles.sectionTitleRow}>
       <View style={styles.sectionDash} />
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text
+        style={[
+          styles.sectionTitle,
+          tone === 'stadium' && styles.sectionTitleStadium,
+        ]}>
+        {title}
+      </Text>
     </View>
   );
 }
 
-// Fast slot så alle rad-ikonene står på samme akse (P7: konsekvent
-// ikonlogikk — ingen tomme streng-slots).
-function MenuIcon({children}: {children: ReactNode}) {
-  return <View style={styles.menuIconSlot}>{children}</View>;
+// Ikonet i en avrundet kvadrat (32 = OPAL_ROW_ICON_SLOT) med blekket som
+// svak tint bak glyfen — samme hierarkiske gjengivelse som varselradene (én
+// farge, to styrker), og samme akse for alle rader (P7: ingen tomme
+// streng-slots). `ink` = innstilling/navigasjon i OPAL-blekk, `action` =
+// inngang (Bli med, Opprett) i opalens aksentblekk på heiaSoft, `danger` =
+// «Slett konto» i live-rødt.
+type MenuTone = 'ink' | 'action' | 'danger';
+const MENU_ICON_INK: Record<MenuTone, string> = {
+  ink: OPAL.inkSecondary,
+  action: OPAL.inkAccent,
+  danger: colors.liveInk,
+};
+const MENU_ICON_TINT: Record<MenuTone, string> = {
+  ink: 'rgba(8, 57, 46, 0.08)',
+  action: colors.heiaSoft,
+  danger: 'rgba(224, 74, 68, 0.12)',
+};
+
+/**
+ * VALGT LAG — INGEN egen ring (Brage 2026-09-04, runde 2 av polishen:
+ * «trenger ikke en tydelig separat ring. Checkmark + svak team/Heia-tint +
+ * subtil edge er nok»). Neon i full styrke er reservert for HANDLING
+ * (kampknappen, primærknappen, aktiv fane); et valgt lagkort er en TILSTAND,
+ * og en farget ring rundt hele flaten leste CTA-aktig.
+ *
+ * Runde 6 (Brage 2026-09-04: «burde være mer tydelig hva man har valgt, for
+ * eks mer fyldig farge på dette kortet»): tinten løftes fra heiaSoft (0,12)
+ * til 0,30 — en tydelig mintflate, fortsatt ikke neon i full styrke. Haken
+ * står. Ingen ring. Kontrastporten på den valgte flaten voktes i
+ * `__tests__/profilGlass.test.tsx`.
+ */
+export const TEAM_CARD_SELECTED = 'rgba(2, 255, 171, 0.3)';
+
+/**
+ * LAGKORTENES GLASS (Brage 2026-09-04, runde 6 → 7): «Dine lag-boksene
+ * endrer farge rart av seg selv ved scroll … så fort de nærmer seg header så
+ * blir de mørke». Et backdrop FØLGER grunnen bak seg, og lagkortene står i
+ * den bratteste delen av reisen (#0E211A → #00845A på 0–28 %). I
+ * feedkortets tynne glass (0,34) bidro grunnen med 66 % — kortene ble mørke
+ * mot laghodet. Brage så det tunge arkglasset (`sheet`, 0,80) på telefonen
+ * og kalte det fikset; et forsøk på gruppenes `panel` (0,34, ikke
+ * interaktivt) brakte feilen tilbake — det var TINTEN, ikke interaktiviteten.
+ * Derfor: lagkortene står i `sheet`. Gruppene lenger ned på reisen står i
+ * `panel`; de er aldri i den mørke sonen uten at brukeren har rullet dit.
+ *
+ * Trykk: `card`-glassets native lys (lys + 0,98-skala på touch-down) tentes
+ * også når en scroll STARTET på et kort. Lagkortene sender derfor ikke
+ * `pressed` til glasset; trykk er en blekk-tint i flaten, som radene.
+ */
+function MenuIcon({
+  children,
+  tone = 'ink',
+}: {
+  children: ReactNode;
+  tone?: MenuTone;
+}) {
+  return (
+    <View
+      style={[styles.menuIconSlot, {backgroundColor: MENU_ICON_TINT[tone]}]}>
+      {children}
+    </View>
+  );
 }
 
 // Chevron på rader som NAVIGERER — handlinger (logg ut, varsler) får ingen.
 function RowChevron() {
-  return <ChevronRight size={18} color={colors.textTertiary} />;
+  return <ChevronRight size={16} color={OPAL.inkTertiary} strokeWidth={2} />;
+}
+
+// MENYGRUPPENE OG LAGKORTENE (Brage 2026-09-04, runde 5: «kantene ser billige
+// ut og boksene er for hvite … mer glassaktig, som resten av appen») er SAMME
+// glass som feedkortene på Hjem: ekte `LiquidGlassSurface` — systemets blur,
+// refraksjon og optiske kant — med feedkortets perle og alfa. Den matte
+// svg-opalen med kantring (`OpalSurface panel`) leste som en hvit boks med en
+// lys fals langs venstre/topp; den er nå bare fallbacken uten glass (Android,
+// eldre iOS, Reduce Transparency). Gruppene bruker `panel` (= kortets glass
+// uten trykkrespons, for radene er kontrollene), lagkortene `card` (trykkes
+// som én flate). Radene inni er fortsatt `ListRow material="opal"` — blekk,
+// hårlinje og trykk-tint er de samme på glass som på opal.
+function MenuGroup({children}: {children: ReactNode}) {
+  return (
+    <LiquidGlassSurface variant="panel" style={styles.group}>
+      {children}
+    </LiquidGlassSurface>
+  );
 }
 
 // Siste kjente «Min støtte»-svar — lever over remounts så seksjonen aldri
@@ -442,10 +534,10 @@ export function ProfilScreen() {
       childNames.length === 0
         ? 'Utmeldingen gjelder deg.'
         : childNames.length === 1
-          ? `Utmeldingen gjelder deg og ${childNames[0]}.`
-          : `Utmeldingen gjelder deg og barna dine (${childNames
-              .slice(0, -1)
-              .join(', ')} og ${childNames[childNames.length - 1]}).`;
+        ? `Utmeldingen gjelder deg og ${childNames[0]}.`
+        : `Utmeldingen gjelder deg og barna dine (${childNames
+            .slice(0, -1)
+            .join(', ')} og ${childNames[childNames.length - 1]}).`;
 
     // Levende avtale på DETTE laget: utmeldingen rører den aldri
     // (medlemskap og støtte er separate relasjoner — modell B), men det
@@ -541,6 +633,14 @@ export function ProfilScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* MASTHEAD (Brage 2026-09-04): SAMME lerret som Hjem/Kalender/Varsler
+          bak HELE skjermen — reisen, buene og ett identitetsfelt — og
+          headeren er gjennomsiktig innhold oppå. Feltet er Heias
+          mørkegrønne, ikke lagfargen: Profil er ikke lag-scopet (se
+          PROFILE_IDENTITY). Av med DAYLIGHT_GROUND_AB = false. */}
+      {DAYLIGHT_GROUND_AB && (
+        <DaylightGround masthead identity={PROFILE_IDENTITY} />
+      )}
       {/* Profilheaderen er SØSKEN over scrollen, ikke inni den — samme
           plassering som TeamHeader på Hjem/Kalender/Varsler, så fanebytte
           ikke flytter toppflaten. Den eier safe area; scrollen under starter
@@ -554,13 +654,13 @@ export function ProfilScreen() {
         avatarBusy={avatarBusy}
         role={roleName}
       />
+      {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
       <ScrollView
-        style={styles.screen}
+        style={styles.body}
         contentContainerStyle={{
           paddingTop: spacing.lg,
           paddingBottom: bottomPad,
         }}>
-
         {/* Dine lag — lagkortene OG de to lag-handlingene. Handlingene lå
             begravd i «Innstillinger», mellom telefonnummeret og «Logg ut»
             (B6): de handler om lag, så de hører hjemme her.
@@ -570,7 +670,7 @@ export function ProfilScreen() {
             AppNavigator), men handlingene er nettopp veien INN i et lag — de
             skal ikke kunne forsvinne den dagen porten endres. */}
         <View style={styles.teamsSection}>
-          <SectionLabel title="Dine lag" />
+          <SectionLabel title="Dine lag" tone="stadium" />
           {/* Ett kort per LAG: en forelder med to barn har to medlems-
               rader i samme lag og så det samme kortet to ganger. Primær-
               raden representerer laget, så rollebadgen på kortet stemmer. */}
@@ -580,41 +680,54 @@ export function ProfilScreen() {
               <Pressable
                 key={m.id}
                 onPress={() => handleTeamSwitch(m.teamSpaceId)}
-                style={({pressed}) => [
-                  styles.teamCard,
-                  isActive && styles.teamCardActive,
-                  pressed && styles.teamCardPressed,
-                ]}>
-                {/* Logoen når den finnes (lag → klubb), ellers initialer på
-                    lagfargen — samme kjede som headeren (Brages P7-ønske). */}
-                <TeamBadge
-                  name={m.teamSpace.displayName}
-                  logoUrl={m.teamSpace.logoUrl ?? m.team.club.logoUrl}
-                  color={m.teamSpace.color}
-                  size={36}
-                  cornerRadius={radius.full}
-                  fontSize={12}
-                />
-                <View style={styles.teamInfo}>
-                  <Text style={styles.teamName}>
-                    {m.teamSpace.displayName}
-                  </Text>
-                  <Text style={styles.teamMeta}>
-                    {m.team.ageGroup} · {ROLE_LABELS[m.role]}
-                  </Text>
-                </View>
-                {/* heiaInk — mint er kun fyll på lys flate (A v2-regel). */}
-                {isActive && (
-                  <Check size={18} color={colors.heiaInk} strokeWidth={3} />
+                accessibilityRole="button"
+                accessibilityState={{selected: isActive}}>
+                {({pressed}) => (
+                  /* Lagkortet i arkets tunge glass (se kommentaren ved
+                     TEAM_CARD_SELECTED): stramt (8 pt luft, 40-merke),
+                     valgt = fyldig Heia-tint + hake (ingen ring), trykk =
+                     blekk-tint i flaten. */
+                  <LiquidGlassSurface
+                    variant="sheet"
+                    style={[
+                      styles.teamCard,
+                      isActive && styles.teamCardActive,
+                      pressed && styles.teamCardPressed,
+                    ]}>
+                    {/* Logoen når den finnes (lag → klubb), ellers initialer
+                        på lagfargen — samme kjede som headeren (P7). */}
+                    <TeamBadge
+                      name={m.teamSpace.displayName}
+                      logoUrl={m.teamSpace.logoUrl ?? m.team.club.logoUrl}
+                      color={m.teamSpace.color}
+                      size={40}
+                      cornerRadius={radius.full}
+                      fontSize={13}
+                    />
+                    <View style={styles.teamInfo}>
+                      <Text style={styles.teamName} numberOfLines={1}>
+                        {m.teamSpace.displayName}
+                      </Text>
+                      <Text style={styles.teamMeta} numberOfLines={1}>
+                        {m.team.ageGroup} · {ROLE_LABELS[m.role]}
+                      </Text>
+                    </View>
+                    {/* heiaInk — mint er kun fyll på lys flate (A v2). */}
+                    {isActive && (
+                      <Check size={18} color={colors.heiaInk} strokeWidth={3} />
+                    )}
+                  </LiquidGlassSurface>
                 )}
               </Pressable>
             );
           })}
-          <View style={styles.menuCard}>
+          <MenuGroup>
             <ListRow
+              material="opal"
+              tone="action"
               icon={
-                <MenuIcon>
-                  <UserPlus size={20} color={colors.textSecondary} />
+                <MenuIcon tone="action">
+                  <UserPlus size={18} color={MENU_ICON_INK.action} />
                 </MenuIcon>
               }
               title="Bli med i et lag"
@@ -623,9 +736,11 @@ export function ProfilScreen() {
               onPress={() => navigation.navigate('JoinTeamCode')}
             />
             <ListRow
+              material="opal"
+              tone="action"
               icon={
-                <MenuIcon>
-                  <Plus size={20} color={colors.textSecondary} />
+                <MenuIcon tone="action">
+                  <Plus size={18} color={MENU_ICON_INK.action} />
                 </MenuIcon>
               }
               title="Opprett et nytt lag"
@@ -634,18 +749,19 @@ export function ProfilScreen() {
               onPress={() => navigation.navigate('CreateTeam')}
               showBorder={false}
             />
-          </View>
+          </MenuGroup>
         </View>
 
         {/* Laget — radene som gjelder det aktive laget */}
         {activeMembership && (
           <View style={styles.menuBlock}>
             <SectionLabel title={activeMembership.teamSpace.displayName} />
-            <View style={styles.menuCard}>
+            <MenuGroup>
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Users size={20} color={colors.textSecondary} />
+                    <Users size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Lagoversikt"
@@ -655,9 +771,10 @@ export function ProfilScreen() {
               />
               {isTrener && (
                 <ListRow
+                  material="opal"
                   icon={
                     <MenuIcon>
-                      <Settings size={20} color={colors.textSecondary} />
+                      <Settings size={18} color={MENU_ICON_INK.ink} />
                     </MenuIcon>
                   }
                   title="Laginnstillinger"
@@ -667,9 +784,10 @@ export function ProfilScreen() {
                 />
               )}
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Share2 size={20} color={colors.textSecondary} />
+                    <Share2 size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Inviter til laget"
@@ -680,9 +798,10 @@ export function ProfilScreen() {
               {/* «Forlat laget» (00067) — nederst i lagblokka: en handling
                   som tar deg UT skal ikke stå mellom veiene inn. */}
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <UserMinus size={20} color={colors.textSecondary} />
+                    <UserMinus size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Forlat laget"
@@ -694,7 +813,7 @@ export function ProfilScreen() {
                 onPress={handleLeaveTeam}
                 showBorder={false}
               />
-            </View>
+            </MenuGroup>
           </View>
         )}
 
@@ -704,7 +823,7 @@ export function ProfilScreen() {
             er stabil, og en fersk betaling har et hjem fra første blikk. */}
         <View style={styles.menuBlock}>
           <SectionLabel title="Min støtte" />
-          <View style={styles.menuCard}>
+          <MenuGroup>
             {mySupport === null ? (
               <ListRowSkeleton showBorder={false} />
             ) : mySupport.length === 0 ? (
@@ -712,9 +831,10 @@ export function ProfilScreen() {
               // «hvorfor» før «betal» (fordelingen og hva støtten betyr bor
               // der). Uten aktivt lag er raden ren informasjon.
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <HandHeart size={20} color={colors.textSecondary} />
+                    <HandHeart size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Du støtter ingen lag ennå"
@@ -741,10 +861,11 @@ export function ProfilScreen() {
               <>
                 {mySupport.map((item, index) => (
                   <ListRow
+                    material="opal"
                     key={item.subscriptionId}
                     icon={
                       <MenuIcon>
-                        <HandHeart size={20} color={colors.textSecondary} />
+                        <HandHeart size={18} color={MENU_ICON_INK.ink} />
                       </MenuIcon>
                     }
                     title={item.teamName}
@@ -762,7 +883,7 @@ export function ProfilScreen() {
                 </Text>
               </>
             )}
-          </View>
+          </MenuGroup>
         </View>
 
         {/* Klubbetalinger (klubbdøren, 00047) — hovedinngangen for
@@ -771,11 +892,12 @@ export function ProfilScreen() {
         {isManager && (
           <View style={styles.menuBlock}>
             <SectionLabel title="Klubben" />
-            <View style={styles.menuCard}>
+            <MenuGroup>
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Wallet size={20} color={colors.textSecondary} />
+                    <Wallet size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Klubbetalinger"
@@ -784,7 +906,7 @@ export function ProfilScreen() {
                 onPress={() => navigation.navigate('ClubPayments')}
                 showBorder={false}
               />
-            </View>
+            </MenuGroup>
           </View>
         )}
 
@@ -793,11 +915,12 @@ export function ProfilScreen() {
         {isOps && (
           <View style={styles.menuBlock}>
             <SectionLabel title="Heia internt" />
-            <View style={styles.menuCard}>
+            <MenuGroup>
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <ShieldCheck size={20} color={colors.textSecondary} />
+                    <ShieldCheck size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Heia Ops"
@@ -806,9 +929,10 @@ export function ProfilScreen() {
                 onPress={() => navigation.navigate('OpsClaims')}
               />
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Building2 size={20} color={colors.textSecondary} />
+                    <Building2 size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Klubber og roller"
@@ -817,7 +941,7 @@ export function ProfilScreen() {
                 onPress={() => navigation.navigate('OpsEntities')}
                 showBorder={false}
               />
-            </View>
+            </MenuGroup>
           </View>
         )}
 
@@ -833,12 +957,13 @@ export function ProfilScreen() {
             sikkerhet» er det ikke. */}
         <View style={styles.menuBlock}>
           <SectionLabel title="Konto" />
-          <View style={styles.menuCard}>
+          <MenuGroup>
             {showPhoneRow && (
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Phone size={20} color={colors.textSecondary} />
+                    <Phone size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Telefonnummer"
@@ -851,9 +976,10 @@ export function ProfilScreen() {
                 password when updating» er på). Skjermen er en flate, ikke
                 en vakt — se ChangePasswordScreen. */}
             <ListRow
+              material="opal"
               icon={
                 <MenuIcon>
-                  <Lock size={20} color={colors.textSecondary} />
+                  <Lock size={18} color={MENU_ICON_INK.ink} />
                 </MenuIcon>
               }
               title="Passord og sikkerhet"
@@ -864,9 +990,10 @@ export function ProfilScreen() {
             />
             {showPushRow && (
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Bell size={20} color={colors.textSecondary} />
+                    <Bell size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title="Varslinger"
@@ -875,18 +1002,19 @@ export function ProfilScreen() {
                 showBorder={false}
               />
             )}
-          </View>
+          </MenuGroup>
         </View>
 
         {/* Om Heia — juss og versjon. Sjelden lest, men versjonsraden er den
             ENE en testbruker leter etter når hun skal melde en feil. */}
         <View style={styles.menuBlock}>
           <SectionLabel title="Om Heia" />
-          <View style={styles.menuCard}>
+          <MenuGroup>
             <ListRow
+              material="opal"
               icon={
                 <MenuIcon>
-                  <FileText size={20} color={colors.textSecondary} />
+                  <FileText size={18} color={MENU_ICON_INK.ink} />
                 </MenuIcon>
               }
               title="Vilkår for bruk"
@@ -894,9 +1022,10 @@ export function ProfilScreen() {
               right={<RowChevron />}
             />
             <ListRow
+              material="opal"
               icon={
                 <MenuIcon>
-                  <ShieldCheck size={20} color={colors.textSecondary} />
+                  <ShieldCheck size={18} color={MENU_ICON_INK.ink} />
                 </MenuIcon>
               }
               title="Personvern"
@@ -908,16 +1037,17 @@ export function ProfilScreen() {
                 hardkodet «v0.1.0» er nettopp feilen denne raden retter. */}
             {appVersion !== null && (
               <ListRow
+                material="opal"
                 icon={
                   <MenuIcon>
-                    <Info size={20} color={colors.textSecondary} />
+                    <Info size={18} color={MENU_ICON_INK.ink} />
                   </MenuIcon>
                 }
                 title={appVersion}
                 showBorder={false}
               />
             )}
-          </View>
+          </MenuGroup>
         </View>
 
         {/* Avslutningsblokken — uten overskrift med vilje. De to handlingene
@@ -925,11 +1055,12 @@ export function ProfilScreen() {
             siste rad på hele siden: den ene handlingen som ikke kan angres
             skal ikke ha noe under seg å bomme på. */}
         <View style={styles.menuBlock}>
-          <View style={styles.menuCard}>
+          <MenuGroup>
             <ListRow
+              material="opal"
               icon={
                 <MenuIcon>
-                  <LogOut size={20} color={colors.textSecondary} />
+                  <LogOut size={18} color={MENU_ICON_INK.ink} />
                 </MenuIcon>
               }
               title="Logg ut"
@@ -937,9 +1068,10 @@ export function ProfilScreen() {
               onPress={handleSignOut}
             />
             <ListRow
+              material="opal"
               icon={
-                <MenuIcon>
-                  <Trash2 size={20} color={colors.textSecondary} />
+                <MenuIcon tone="danger">
+                  <Trash2 size={18} color={MENU_ICON_INK.danger} />
                 </MenuIcon>
               }
               title="Slett konto"
@@ -951,7 +1083,7 @@ export function ProfilScreen() {
               onPress={handleDeleteAccount}
               showBorder={false}
             />
-          </View>
+          </MenuGroup>
         </View>
 
         {/* Footer — avbindingen beholdes, men kompakt. Den sto med 40 px luft
@@ -981,10 +1113,7 @@ export function ProfilScreen() {
           onPress={() => setColorSheetOpen(false)}
         />
         <View
-          style={[
-            styles.sheet,
-            {paddingBottom: insets.bottom + spacing.lg},
-          ]}>
+          style={[styles.sheet, {paddingBottom: insets.bottom + spacing.lg}]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Farge på avataren</Text>
 
@@ -1074,9 +1203,18 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
+  // Samme farge som navigatorens kort bak skjermen OG grunnens fallback,
+  // så ingen ramme viser krem mellom dem ved remount (lagbytte gjør
+  // CommonActions.reset → hele fanen monteres på nytt).
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: DAYLIGHT_GROUND_AB
+      ? DAYLIGHT_GROUND_FALLBACK
+      : colors.background,
+  },
+  /** Kroppen under headeren — gjennomsiktig, grunnen ligger bak. */
+  body: {
+    flex: 1,
   },
   teamsSection: {
     marginTop: spacing.md,
@@ -1102,58 +1240,71 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     color: colors.textSecondary,
   },
+  // Stadionblekk 0,8 — som ukedagene i kalenderchromen (≥ 4,5:1 på
+  // #143126 → #0B412E, der etiketten står).
+  sectionTitleStadium: {
+    color: 'rgba(234, 255, 246, 0.8)',
+  },
+  // Gruppene: glasset måler seg etter radene; `overflow: hidden` klipper
+  // radenes trykk-tint til radiusen (som Varsler-lista).
+  group: {
+    overflow: 'hidden',
+  },
+  // Lagkortet: flate, kant, radius og skygge eies av glasset — bare
+  // luften bor her. Mindre «pølse»: 40-merke, 16 pt navn, og 8 pt luft over
+  // og under (Brage 2026-09-04, polish: −8 pt total høyde, 66 → 58, uten at
+  // noe annet i raden flyttes). Merket på 40 er fortsatt det høyeste
+  // elementet, så raden er 58 pt — godt over HIGs 44 pt trykkmål, og en
+  // forelder med mange lag ser flere av dem uten å bla.
   teamCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: 14,
     gap: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    ...shadows.card,
   },
-  // Valgt skifter FLATE, ikke bare ramme (A v2-regelen fra RSVP-knappene).
+  // Valgt skifter FLATE, ikke ramme (A v2-regelen fra RSVP-knappene): kun
+  // tinten. Kanten forblir glassets egen (gjennomsiktig 1 pt — systemet
+  // tegner den optiske kanten selv), og haken står til høyre.
   teamCardActive: {
-    backgroundColor: colors.heiaSoft,
-    borderColor: colors.heia,
+    backgroundColor: TEAM_CARD_SELECTED,
   },
+  // Trykk = blekk-tint i flaten (samme som radene), ikke native trykklys.
   teamCardPressed: {
-    opacity: 0.7,
+    backgroundColor: OPAL.rowPressed,
   },
   teamInfo: {
     flex: 1,
     gap: 2,
   },
   teamName: {
-    ...typography.heading3,
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+    color: colors.textPrimary,
   },
   teamMeta: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
+    color: OPAL.inkSecondary,
   },
   menuBlock: {
     marginTop: spacing.xl,
     paddingHorizontal: spacing.lg,
     gap: spacing.sm,
   },
-  menuCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    overflow: 'hidden',
-    ...shadows.card,
-  },
   supportHint: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md,
   },
   menuIconSlot: {
-    width: 28,
+    width: OPAL_ROW_ICON_SLOT,
+    height: OPAL_ROW_ICON_SLOT,
+    borderRadius: 9,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   // Avbindingen beholdes, men kompakt: sto med 40 px luft over OG under en
   // 100×100 logo — ~250 px nesten tomt under «Slett konto».

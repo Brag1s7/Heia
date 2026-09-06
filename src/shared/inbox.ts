@@ -156,7 +156,10 @@ export function mapMatch(
 export function mapActor(
   data: Record<string, any>,
 ): NotificationActor | undefined {
-  if (typeof data.actor_id !== 'string' || typeof data.actor_name !== 'string') {
+  if (
+    typeof data.actor_id !== 'string' ||
+    typeof data.actor_name !== 'string'
+  ) {
     return undefined;
   }
   return {
@@ -218,7 +221,9 @@ export function mapNotificationRow(row: any): HeiaNotification {
     match: mapMatch(data),
     actor: mapActor(data),
     eventKind:
-      data.kind === 'change' || data.kind === 'reminder' ? data.kind : undefined,
+      data.kind === 'change' || data.kind === 'reminder'
+        ? data.kind
+        : undefined,
     changes: mapChanges(data),
   };
 }
@@ -305,20 +310,60 @@ export function buildEntries(items: HeiaNotification[]): Entry[] {
 
 const HOUR_MS = 3_600_000;
 
+/** Lokal midnatt `days` dager før `from` — via setDate, så sommertid ikke
+ *  forskyver grensa med en time. */
+function startOfDay(from: number, days = 0): number {
+  const d = new Date(from);
+  d.setHours(0, 0, 0, 0);
+  if (days) d.setDate(d.getDate() - days);
+  return d.getTime();
+}
+
+/** Månedsnavnet slik telefonen sier det («august»), med stor forbokstav. */
+function monthLabel(t: number, nowYear: number): string {
+  const d = new Date(t);
+  const name = d.toLocaleDateString('nb-NO', {month: 'long'});
+  const cap = name.charAt(0).toUpperCase() + name.slice(1);
+  return d.getFullYear() === nowYear ? cap : `${cap} ${d.getFullYear()}`;
+}
+
 /**
- * «Nå / I dag / Tidligere» — ren lesehjelp. «Nå» er siste time, altså det
- * som faktisk har skjedd siden du sist så på telefonen.
+ * BOLKENE — ren lesehjelp, og fra 2026-09-04 med dager og uker (Brage: «ser
+ * heller ikke ut som at varslinger har noe skille mellom dager og uker»;
+ * før samlet «Tidligere» ALT eldre enn i dag i én haug):
+ *
+ *   Nå            siste time — det som har skjedd siden du sist så på
+ *                 telefonen
+ *   I dag         resten av i dag
+ *   I går
+ *   Denne uken    fra mandag til i forgårs (uka er mandag–søndag, som
+ *                 kalenderen)
+ *   Forrige uke   mandag–søndag før det
+ *   August …      deretter måned for måned; annet år får årstall
+ *                 («Desember 2025»)
+ *
+ * Radens eget tidsstempel (ukedag < 7 dager, ellers «21. aug.») utfyller
+ * etiketten — bolken sier HVILKEN dag/uke, stempelet sier når i den.
  */
 export function groupByAge(
   entries: Entry[],
   now: number = Date.now(),
 ): {label: string; entries: Entry[]}[] {
-  const startOfToday = new Date(new Date(now).setHours(0, 0, 0, 0)).getTime();
+  const startOfToday = startOfDay(now);
+  const startOfYesterday = startOfDay(now, 1);
+  // Mandag = 0 … søndag = 6.
+  const weekday = (new Date(startOfToday).getDay() + 6) % 7;
+  const startOfWeek = startOfDay(now, weekday);
+  const startOfLastWeek = startOfDay(now, weekday + 7);
+  const nowYear = new Date(now).getFullYear();
 
   const labelFor = (t: number): string => {
     if (t >= now - HOUR_MS) return 'Nå';
     if (t >= startOfToday) return 'I dag';
-    return 'Tidligere';
+    if (t >= startOfYesterday) return 'I går';
+    if (t >= startOfWeek) return 'Denne uken';
+    if (t >= startOfLastWeek) return 'Forrige uke';
+    return monthLabel(t, nowYear);
   };
 
   const sections: {label: string; entries: Entry[]}[] = [];

@@ -5,8 +5,6 @@ import {
   TextInput,
   Alert,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
 } from 'react-native';
 import {
@@ -14,9 +12,19 @@ import {
   useRoute,
   type RouteProp,
 } from '@react-navigation/native';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
 import {errorMessage} from '../shared/errorMessage';
-import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
+import {
+  ProfilPage,
+  Button,
+  Skeleton,
+  useBottomContentPadding,
+} from '../components';
 import {
   getOpsClaim,
   opsApproveClaim,
@@ -144,10 +152,7 @@ export function OpsClaimDetailScreen() {
                 Alert.alert('Godkjent', describeApproval(result));
               }
             } catch (e) {
-              Alert.alert(
-                'Handlingen feilet',
-                errorMessage(e),
-              );
+              Alert.alert('Handlingen feilet', errorMessage(e));
             } finally {
               setActing(false);
             }
@@ -158,8 +163,7 @@ export function OpsClaimDetailScreen() {
     [claimId, note, load],
   );
 
-  const isOpen =
-    claim?.status === 'submitted' || claim?.status === 'in_review';
+  const isOpen = claim?.status === 'submitted' || claim?.status === 'in_review';
   const brreg = claim?.brreg;
   // Nominasjonen ligger i brreg-snapshotet (claim-notify skriver den ved
   // innsending). Eldre søknader mangler feltet — da ER det selvnominasjon,
@@ -167,42 +171,47 @@ export function OpsClaimDetailScreen() {
   const nomineeIsSelf = brreg?.checks?.nomineeIsSelf !== false;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar />
+    <ProfilPage keyboard>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Klubbsøknad</Text>
 
         {loading && !claim ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Skeleton width={140} height={12} />
             <Skeleton height={16} />
             <Skeleton width="70%" height={12} />
-          </View>
+          </LiquidGlassSurface>
         ) : !claim ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.body}>
               Fant ikke søknaden — den kan være utenfor din tilgang.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : (
           <>
             {/* Søknaden */}
-            <View style={styles.card}>
+            <LiquidGlassSurface
+              variant="sheet"
+              wrapStyle={styles.cardWrap}
+              style={styles.card}>
               <Text style={styles.cardTitle}>{claim.legalName}</Text>
               <FactRow label="Status" value={claim.status} />
               <FactRow label="Orgnr" value={claim.orgNumber} />
               <FactRow label="Klubb i Heia" value={claim.club?.name ?? '—'} />
               <FactRow
                 label="Søker"
-                value={`${claim.claimant?.displayName ?? 'Ukjent'} (${claim.claimedRole})`}
+                value={`${claim.claimant?.displayName ?? 'Ukjent'} (${
+                  claim.claimedRole
+                })`}
               />
               <FactRow label="E-post" value={claim.contactEmail ?? '—'} />
               {claim.contactPhone && (
@@ -212,20 +221,27 @@ export function OpsClaimDetailScreen() {
                 label="Betalingsansvarlig"
                 value={
                   nomineeIsSelf
-                    ? `Søkeren selv (${claim.claimant?.displayName ?? 'ukjent'})`
+                    ? `Søkeren selv (${
+                        claim.claimant?.displayName ?? 'ukjent'
+                      })`
                     : claim.nomineeName
-                      ? `${claim.nomineeName}${claim.nomineeEmail ? ` <${claim.nomineeEmail}>` : ''}`
-                      : 'En annen i klubben — se e-posten'
+                    ? `${claim.nomineeName}${
+                        claim.nomineeEmail ? ` <${claim.nomineeEmail}>` : ''
+                      }`
+                    : 'En annen i klubben — se e-posten'
                 }
               />
               {!nomineeIsSelf && claim.nomineePhone && (
-                <FactRow label="Nominertes telefon" value={claim.nomineePhone} />
+                <FactRow
+                  label="Nominertes telefon"
+                  value={claim.nomineePhone}
+                />
               )}
               {!nomineeIsSelf && (
                 <Text style={styles.hint}>
-                  Søkeren har nominert en ANNEN person — det er den personen
-                  som skal verifiseres, og godkjenning oppretter en invitasjon
-                  til hen, ikke en rolle til søkeren.
+                  Søkeren har nominert en ANNEN person — det er den personen som
+                  skal verifiseres, og godkjenning oppretter en invitasjon til
+                  hen, ikke en rolle til søkeren.
                 </Text>
               )}
               {/* BESLUTNINGSSTØTTE, ikke statusvisning — begge sier noe om hva
@@ -245,10 +261,13 @@ export function OpsClaimDetailScreen() {
                   godkjenning gjenbruker den.
                 </Text>
               )}
-            </View>
+            </LiquidGlassSurface>
 
             {/* Brønnøysund-beviset */}
-            <View style={styles.card}>
+            <LiquidGlassSurface
+              variant="sheet"
+              wrapStyle={styles.cardWrap}
+              style={styles.card}>
               <Text style={styles.cardTitle}>Brønnøysund</Text>
               {!brreg ? (
                 <Text style={styles.body}>
@@ -316,10 +335,10 @@ export function OpsClaimDetailScreen() {
                           {r.matchSoker && r.matchNominert
                             ? '★◆'
                             : r.matchSoker
-                              ? '★'
-                              : r.matchNominert
-                                ? '◆'
-                                : '·'}{' '}
+                            ? '★'
+                            : r.matchNominert
+                            ? '◆'
+                            : '·'}{' '}
                           {r.rolle}: {r.navn}
                         </Text>
                       ))}
@@ -336,28 +355,34 @@ export function OpsClaimDetailScreen() {
                   )}
                 </>
               ) : null}
-            </View>
+            </LiquidGlassSurface>
 
             {/* Historikk */}
             {(claim.audit.length > 0 || claim.infoRequestNote) && (
-              <View style={styles.card}>
+              <LiquidGlassSurface
+                variant="sheet"
+                wrapStyle={styles.cardWrap}
+                style={styles.card}>
                 <Text style={styles.cardTitle}>Logg</Text>
                 {claim.audit.map((a, i) => (
                   <Text key={i} style={styles.body}>
                     {a.action === 'approve'
                       ? '✅ Godkjent'
                       : a.action === 'reject'
-                        ? '❌ Avslått'
-                        : '💬 Ba om mer info'}{' '}
+                      ? '❌ Avslått'
+                      : '💬 Ba om mer info'}{' '}
                     av {a.actor ?? 'ukjent'}: «{a.note}»
                   </Text>
                 ))}
-              </View>
+              </LiquidGlassSurface>
             )}
 
             {/* Handlingene */}
             {isOpen && (
-              <View style={styles.card}>
+              <LiquidGlassSurface
+                variant="sheet"
+                wrapStyle={styles.cardWrap}
+                style={styles.card}>
                 <Text style={styles.cardTitle}>Behandle</Text>
                 <Text style={styles.hint}>
                   Godkjenning krever at du skriver HVORDAN autorisasjonen ble
@@ -367,7 +392,7 @@ export function OpsClaimDetailScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="F.eks. «Ringte styreleder på registerets nummer — bekreftet fullmakt»"
-                  placeholderTextColor={colors.textTertiary}
+                  placeholderTextColor={OPAL.inkTertiary}
                   value={note}
                   onChangeText={setNote}
                   multiline
@@ -392,42 +417,40 @@ export function OpsClaimDetailScreen() {
                   onPress={() => runAction('Avslå', opsRejectClaim)}
                   disabled={acting}
                 />
-              </View>
+              </LiquidGlassSurface>
             )}
           </>
         )}
       </ScrollView>
-    </KeyboardAvoidingView>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskriften på grunnen → stadionblekk; kortene
+// er paneler → OPAL-blekk og GLASS_FIELD-felt.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   content: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
     marginBottom: spacing.xl,
   },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
+  cardWrap: {
     marginBottom: spacing.lg,
+  },
+  card: {
+    padding: spacing.lg,
     gap: spacing.sm,
-    ...shadows.card,
   },
   cardTitle: {
     ...typography.heading3,
   },
   body: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   factRow: {
     flexDirection: 'row',
@@ -436,7 +459,7 @@ const styles = StyleSheet.create({
   },
   factLabel: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   factValue: {
     ...typography.bodySmall,
@@ -445,14 +468,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   factBox: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: 'rgba(8, 57, 46, 0.06)',
     borderRadius: radius.md,
     padding: spacing.md,
     gap: spacing.xs,
   },
   rolle: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   good: {
     ...typography.bodySmall,
@@ -466,11 +489,13 @@ const styles = StyleSheet.create({
   },
   hint: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   input: {
     ...typography.bodySmall,
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: GLASS_FIELD.fill,
+    borderWidth: 1,
+    borderColor: GLASS_FIELD.edge,
     borderRadius: radius.md,
     padding: spacing.md,
     minHeight: 72,

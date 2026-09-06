@@ -39,7 +39,12 @@ export function BackBar({
   labelsHidden,
 }: {
   title?: string;
-  variant?: 'default' | 'match';
+  /**
+   * `match` = kampens krittblekk. `stadium` (2026-09-04) = samme lyse blekk
+   * på dagslysgrunnens mørke topp — Profils undersider (`ProfilPage`).
+   * Begge er rene tillegg: `default` er urørt.
+   */
+  variant?: 'default' | 'match' | 'stadium';
   /** 1 = «Tilbake · Kampen», 0 = borte. Chevronen påvirkes ALDRI. */
   labelOpacity?: Animated.AnimatedInterpolation<number> | number;
   /** Tonet bort ⇒ også borte for skjermleseren. Usynlig betyr helt borte. */
@@ -47,8 +52,13 @@ export function BackBar({
 }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const onMatch = variant === 'match';
-  const ink = onMatch ? matchColors.text : colors.textPrimary;
+  const onMatch = variant !== 'default';
+  const ink =
+    variant === 'match'
+      ? matchColors.text
+      : variant === 'stadium'
+      ? colors.stadiumText
+      : colors.textPrimary;
 
   const faded = labelOpacity === undefined ? null : {opacity: labelOpacity};
   const hidden = labelsHidden === true;

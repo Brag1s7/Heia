@@ -1,4 +1,7 @@
 import React, {useState, useCallback, useEffect, useMemo, useRef} from 'react';
+import {MastheadField} from '../components/DaylightGround';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import {mastheadHeight} from '../shared/masthead';
 import {
   ActivityIndicator,
   View,
@@ -245,6 +248,7 @@ type Route = RouteProp<HomeStackParamList, 'TeamHome'>;
 export function TeamHomeScreen() {
   const bottomPad = useBottomContentPadding();
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
   const route = useRoute<Route>();
   const composeRef = useRef<TextInput>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -874,10 +878,11 @@ export function TeamHomeScreen() {
             toppstripe, lagets lys, reisen og buene — og laghodet er
             gjennomsiktig innhold oppå. Kroppens reise starter ved laghodets
             underkant (mastheadHeight). Av med DAYLIGHT_GROUND_AB = false. */}
-        {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
-        <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
-        {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
-        <View style={styles.body}>
+        {DAYLIGHT_GROUND_AB && <DaylightGround masthead field={false} />}
+        {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. Starter
+            under laghodet, som nå ligger i et eget lag OVER lista (se
+            MastheadField: glasset skal ikke sample lagfargen). */}
+        <View style={[styles.body, {marginTop: mastheadHeight(insets.top)}]}>
           <FlatList
             data={feed}
             renderItem={renderFeedItem}
@@ -918,6 +923,15 @@ export function TeamHomeScreen() {
             {...WRITING_SCROLL_PROPS}
           />
         </View>
+        {/* LAGHODET FORAN LISTA: identitetsfeltet + laghodet i ett lag etter
+            kroppen, så systemglasset i kortene aldri får lagfargen i
+            bakteppet sitt. Høyden er nøyaktig mastheadHeight, som før. */}
+        <View
+          style={[styles.mastheadLayer, {height: mastheadHeight(insets.top)}]}
+          pointerEvents="box-none">
+          {DAYLIGHT_GROUND_AB && <MastheadField />}
+          <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
+        </View>
       </View>
 
       {/* Fullskjerm bilde — åpnes kun av forstørr-ikonet, aldri av korttrykket. */}
@@ -948,6 +962,12 @@ const styles = StyleSheet.create({
   /** Kroppen under laghodet — grunnen og scrollflaten deler denne ramma. */
   body: {
     flex: 1,
+  },
+  mastheadLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
   section: {
     paddingHorizontal: spacing.lg,

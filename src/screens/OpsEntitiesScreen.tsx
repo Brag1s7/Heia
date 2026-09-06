@@ -14,9 +14,19 @@ import {
   StyleSheet,
 } from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
-import {colors, typography, spacing, radius, shadows} from '../theme';
+import {colors, typography, spacing, radius} from '../theme';
+import {OPAL} from '../components/OpalSurface';
+import {
+  GLASS_FIELD,
+  LiquidGlassSurface,
+} from '../components/LiquidGlassSurface';
 import {errorMessage} from '../shared/errorMessage';
-import {BackBar, Button, Skeleton, useBottomContentPadding} from '../components';
+import {
+  ProfilPage,
+  Button,
+  Skeleton,
+  useBottomContentPadding,
+} from '../components';
 import {
   AlertTriangle,
   ArrowLeftRight,
@@ -202,10 +212,7 @@ export function OpsEntitiesScreen() {
       closePrompt();
       await load();
     } catch (e) {
-      Alert.alert(
-        'Handlingen feilet',
-        errorMessage(e),
-      );
+      Alert.alert('Handlingen feilet', errorMessage(e));
     } finally {
       setActing(false);
     }
@@ -218,10 +225,13 @@ export function OpsEntitiesScreen() {
     (inv: OpsEntityInvitation) =>
       ask({
         title: 'Bekreft identiteten',
-        message: `${inv.acceptedByName ?? 'Innløseren'} får AKTIV rolle som betalingsansvarlig. Beskriv hvordan du bekreftet at det er riktig person.`,
-        placeholder: 'F.eks. «Ringte kasserer på registerets nummer — bekreftet ny e-post»',
+        message: `${
+          inv.acceptedByName ?? 'Innløseren'
+        } får AKTIV rolle som betalingsansvarlig. Beskriv hvordan du bekreftet at det er riktig person.`,
+        placeholder:
+          'F.eks. «Ringte kasserer på registerets nummer — bekreftet ny e-post»',
         confirm: 'Bekreft',
-        run: (n) => opsConfirmInvitationReview(inv.id, n),
+        run: n => opsConfirmInvitationReview(inv.id, n),
       }),
     [ask],
   );
@@ -235,7 +245,7 @@ export function OpsEntitiesScreen() {
         placeholder: 'F.eks. «Fikk ikke bekreftet identiteten»',
         confirm: 'Avvis',
         destructive: true,
-        run: (n) => opsRejectInvitationReview(inv.id, n),
+        run: n => opsRejectInvitationReview(inv.id, n),
       }),
     [ask],
   );
@@ -248,7 +258,7 @@ export function OpsEntitiesScreen() {
         placeholder: 'Hvorfor trekkes den?',
         confirm: 'Trekk tilbake',
         destructive: true,
-        run: (n) => opsRevokeManagerInvitation(inv.id, n),
+        run: n => opsRevokeManagerInvitation(inv.id, n),
       }),
     [ask],
   );
@@ -263,7 +273,7 @@ export function OpsEntitiesScreen() {
         placeholder: 'Hvorfor settes rollen på pause?',
         confirm: 'Sett på pause',
         destructive: true,
-        run: (n) => opsSuspendManager(entityId, userId, n),
+        run: n => opsSuspendManager(entityId, userId, n),
       }),
     [ask],
   );
@@ -275,7 +285,7 @@ export function OpsEntitiesScreen() {
         message: 'Personen får tilbake full tilgang til klubbens betalinger.',
         placeholder: 'Hvorfor reaktiveres rollen?',
         confirm: 'Reaktiver',
-        run: (n) => opsReactivateManager(entityId, userId, n),
+        run: n => opsReactivateManager(entityId, userId, n),
       }),
     [ask],
   );
@@ -289,7 +299,7 @@ export function OpsEntitiesScreen() {
         placeholder: 'Hvorfor fjernes rollen?',
         confirm: 'Fjern',
         destructive: true,
-        run: (n) => opsRemoveManager(entityId, userId, n),
+        run: n => opsRemoveManager(entityId, userId, n),
       }),
     [ask],
   );
@@ -319,10 +329,7 @@ export function OpsEntitiesScreen() {
         setInviteFor(null);
         await load();
       } catch (e) {
-        Alert.alert(
-          'Invitasjonen ble ikke opprettet',
-          errorMessage(e),
-        );
+        Alert.alert('Invitasjonen ble ikke opprettet', errorMessage(e));
       } finally {
         setActing(false);
       }
@@ -330,24 +337,18 @@ export function OpsEntitiesScreen() {
     [inviteName, inviteEmail, inviteNote, load],
   );
 
-  const loadTeams = useCallback(
-    async (entity: OpsPaymentEntity) => {
-      try {
-        const rows = await opsListTeamsForClubs(entity.clubs.map((c) => c.id));
-        setTeamsFor((prev) => ({...prev, [entity.entity.id]: rows}));
-      } catch (e) {
-        Alert.alert(
-          'Fikk ikke hentet lagene',
-          errorMessage(e),
-        );
-      }
-    },
-    [],
-  );
+  const loadTeams = useCallback(async (entity: OpsPaymentEntity) => {
+    try {
+      const rows = await opsListTeamsForClubs(entity.clubs.map(c => c.id));
+      setTeamsFor(prev => ({...prev, [entity.entity.id]: rows}));
+    } catch (e) {
+      Alert.alert('Fikk ikke hentet lagene', errorMessage(e));
+    }
+  }, []);
 
   const moveTeam = useCallback(
     (team: OpsClubTeam, entity: OpsPaymentEntity) => {
-      const targets = entity.clubs.filter((c) => c.id !== team.clubId);
+      const targets = entity.clubs.filter(c => c.id !== team.clubId);
       if (targets.length === 0) return;
       const pick = (clubId: string, clubName: string) =>
         ask({
@@ -355,7 +356,7 @@ export function OpsEntitiesScreen() {
           message: `Laget flyttes til klubbraden «${clubName}». Flyttingen logges i hendelsesloggen.`,
           placeholder: 'Hvorfor flyttes laget?',
           confirm: 'Flytt',
-          run: (n) =>
+          run: n =>
             opsMoveTeamToClub({
               teamId: team.teamId,
               targetClubId: clubId,
@@ -371,7 +372,7 @@ export function OpsEntitiesScreen() {
         `Flytt «${team.name}» til`,
         'Velg klubbraden laget skal ligge under.',
         [
-          ...targets.map((t) => ({
+          ...targets.map(t => ({
             text: t.name,
             onPress: () => pick(t.id, t.name),
           })),
@@ -385,10 +386,10 @@ export function OpsEntitiesScreen() {
   // Avvikskøen på tvers av alle enheter — det ops faktisk må ta stilling til.
   const reviewQueue = useMemo(
     () =>
-      (entities ?? []).flatMap((e) =>
+      (entities ?? []).flatMap(e =>
         e.invitations
-          .filter((i) => i.status === 'awaiting_review')
-          .map((i) => ({entity: e, inv: i})),
+          .filter(i => i.status === 'awaiting_review')
+          .map(i => ({entity: e, inv: i})),
       ),
     [entities],
   );
@@ -398,7 +399,7 @@ export function OpsEntitiesScreen() {
   // ------------------------------------------------------------------
   const renderEntity = (e: OpsPaymentEntity) => {
     const id = e.entity.id;
-    const activeManagers = e.managers.filter((m) => m.status === 'active');
+    const activeManagers = e.managers.filter(m => m.status === 'active');
     const teams = teamsFor[id];
     const duplicateRows = e.clubs.length > 1;
 
@@ -411,18 +412,20 @@ export function OpsEntitiesScreen() {
         <Text style={styles.meta}>
           orgnr {e.entity.orgNumber} · {e.entity.verificationStatus}
           {e.account
-            ? ` · konto ${e.account.status}${e.account.chargesEnabled ? ' (åpen)' : ''}`
+            ? ` · konto ${e.account.status}${
+                e.account.chargesEnabled ? ' (åpen)' : ''
+              }`
             : ' · ingen konto'}
         </Text>
         <Text style={styles.meta}>
           {e.clubs.length === 0
             ? 'Ingen aktive klubbrader'
-            : `Klubbrader: ${e.clubs.map((c) => c.name).join(' · ')}`}
+            : `Klubbrader: ${e.clubs.map(c => c.name).join(' · ')}`}
         </Text>
         {duplicateRows && (
           <Text style={styles.warnLine}>
-            Flere klubbrader på samme orgnr — én myndighetskrets, men lagene
-            kan ligge feil. Flytt dem til den kanoniske raden.
+            Flere klubbrader på samme orgnr — én myndighetskrets, men lagene kan
+            ligge feil. Flytt dem til den kanoniske raden.
           </Text>
         )}
 
@@ -430,7 +433,9 @@ export function OpsEntitiesScreen() {
           <View style={styles.warnBox}>
             <View style={styles.rowCenter}>
               <AlertTriangle size={15} color={colors.goldInk} />
-              <Text style={styles.warnBoxTitle}>Ingen aktiv betalingsansvarlig</Text>
+              <Text style={styles.warnBoxTitle}>
+                Ingen aktiv betalingsansvarlig
+              </Text>
             </View>
             <Text style={styles.warnText}>
               Enheten kan ikke starte Stripe-onboarding eller godkjenne lag.
@@ -441,11 +446,14 @@ export function OpsEntitiesScreen() {
 
         {/* Managere */}
         <Text style={styles.sectionLabel}>BETALINGSANSVARLIGE</Text>
-        <View style={styles.card}>
+        <LiquidGlassSurface
+          variant="sheet"
+          wrapStyle={styles.cardWrap}
+          style={styles.card}>
           {e.managers.length === 0 ? (
             <Text style={styles.meta}>Ingen registrert.</Text>
           ) : (
-            e.managers.map((m) => (
+            e.managers.map(m => (
               <View key={m.userId} style={styles.personBlock}>
                 <View style={styles.rowCenter}>
                   {m.status === 'active' ? (
@@ -467,7 +475,12 @@ export function OpsEntitiesScreen() {
                       title="Sett på pause"
                       variant="secondary"
                       onPress={() =>
-                        suspend(id, m.userId, m.name, activeManagers.length === 1)
+                        suspend(
+                          id,
+                          m.userId,
+                          m.name,
+                          activeManagers.length === 1,
+                        )
                       }
                       disabled={acting}
                     />
@@ -489,15 +502,18 @@ export function OpsEntitiesScreen() {
               </View>
             ))
           )}
-        </View>
+        </LiquidGlassSurface>
 
         {/* Invitasjoner */}
         <Text style={styles.sectionLabel}>INVITASJONER</Text>
-        <View style={styles.card}>
+        <LiquidGlassSurface
+          variant="sheet"
+          wrapStyle={styles.cardWrap}
+          style={styles.card}>
           {e.invitations.length === 0 ? (
             <Text style={styles.meta}>Ingen invitasjoner.</Text>
           ) : (
-            e.invitations.map((inv) => (
+            e.invitations.map(inv => (
               <View key={inv.id} style={styles.personBlock}>
                 <View style={styles.rowCenter}>
                   <Mail size={16} color={colors.textTertiary} />
@@ -520,11 +536,15 @@ export function OpsEntitiesScreen() {
                   {inv.sentAt
                     ? `sendt ${formatDate(inv.sentAt)}`
                     : 'IKKE SENDT (venter på web-landingen)'}
-                  {inv.remindedAt ? ` · purret ${formatDate(inv.remindedAt)}` : ''}
+                  {inv.remindedAt
+                    ? ` · purret ${formatDate(inv.remindedAt)}`
+                    : ''}
                 </Text>
                 {inv.mismatch && (
                   <View style={styles.mismatchBox}>
-                    <Text style={styles.mismatchTitle}>Avvik ved innløsning</Text>
+                    <Text style={styles.mismatchTitle}>
+                      Avvik ved innløsning
+                    </Text>
                     <Text style={styles.mismatchLine}>
                       Invitert: {inv.mismatch.invitedName ?? '—'} &lt;
                       {inv.mismatch.invitedEmail ?? '—'}&gt;
@@ -540,7 +560,9 @@ export function OpsEntitiesScreen() {
                     </Text>
                   </View>
                 )}
-                {inv.note && <Text style={styles.hint}>Notat: «{inv.note}»</Text>}
+                {inv.note && (
+                  <Text style={styles.hint}>Notat: «{inv.note}»</Text>
+                )}
                 {inv.status === 'awaiting_review' && (
                   <View style={styles.actionRow}>
                     <Button
@@ -579,7 +601,7 @@ export function OpsEntitiesScreen() {
                 onChangeText={setInviteName}
                 autoCapitalize="words"
                 placeholder="Fullt navn"
-                placeholderTextColor={colors.textTertiary}
+                placeholderTextColor={OPAL.inkTertiary}
               />
               <Text style={styles.fieldLabel}>E-post</Text>
               <TextInput
@@ -590,20 +612,22 @@ export function OpsEntitiesScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="Må matche kontoens e-post nøyaktig"
-                placeholderTextColor={colors.textTertiary}
+                placeholderTextColor={OPAL.inkTertiary}
               />
-              <Text style={styles.fieldLabel}>Hvordan ble fullmakten verifisert?</Text>
+              <Text style={styles.fieldLabel}>
+                Hvordan ble fullmakten verifisert?
+              </Text>
               <TextInput
                 style={[styles.input, styles.inputMulti]}
                 value={inviteNote}
                 onChangeText={setInviteNote}
                 multiline
                 placeholder="F.eks. «Ringte styreleder på registerets nummer»"
-                placeholderTextColor={colors.textTertiary}
+                placeholderTextColor={OPAL.inkTertiary}
               />
               <Text style={styles.hint}>
-                E-posten sendes kun når WEB_INVITE_BASE_URL er satt. Til da
-                står invitasjonen som «IKKE SENDT» her — den er ikke tapt.
+                E-posten sendes kun når WEB_INVITE_BASE_URL er satt. Til da står
+                invitasjonen som «IKKE SENDT» her — den er ikke tapt.
               </Text>
               <View style={styles.actionRow}>
                 <Button
@@ -628,13 +652,16 @@ export function OpsEntitiesScreen() {
               />
             </View>
           )}
-        </View>
+        </LiquidGlassSurface>
 
         {/* Lagflytting — hovedverktøyet ved duplikatrader (II.7). */}
         {duplicateRows && (
           <>
             <Text style={styles.sectionLabel}>LAG UNDER KLUBBRADENE</Text>
-            <View style={styles.card}>
+            <LiquidGlassSurface
+              variant="sheet"
+              wrapStyle={styles.cardWrap}
+              style={styles.card}>
               {teams === undefined ? (
                 <View style={styles.actionRow}>
                   <Button
@@ -647,8 +674,8 @@ export function OpsEntitiesScreen() {
               ) : teams.length === 0 ? (
                 <Text style={styles.meta}>Ingen lag under disse radene.</Text>
               ) : (
-                teams.map((t) => {
-                  const club = e.clubs.find((c) => c.id === t.clubId);
+                teams.map(t => {
+                  const club = e.clubs.find(c => c.id === t.clubId);
                   return (
                     <View key={t.teamId} style={styles.personBlock}>
                       <View style={styles.rowCenter}>
@@ -673,7 +700,7 @@ export function OpsEntitiesScreen() {
                   );
                 })
               )}
-            </View>
+            </LiquidGlassSurface>
           </>
         )}
 
@@ -681,7 +708,10 @@ export function OpsEntitiesScreen() {
         {e.events.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>HENDELSER</Text>
-            <View style={styles.card}>
+            <LiquidGlassSurface
+              variant="sheet"
+              wrapStyle={styles.cardWrap}
+              style={styles.card}>
               {e.events.map((ev, i) => (
                 <Text key={i} style={styles.logLine}>
                   {EVENT_LABEL[ev.event] ?? ev.event}
@@ -691,7 +721,7 @@ export function OpsEntitiesScreen() {
                   {ev.note ? ` — «${ev.note}»` : ''}
                 </Text>
               ))}
-            </View>
+            </LiquidGlassSurface>
           </>
         )}
       </View>
@@ -699,13 +729,9 @@ export function OpsEntitiesScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <BackBar />
+    <ProfilPage>
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
@@ -721,25 +747,37 @@ export function OpsEntitiesScreen() {
         </Text>
 
         {loading ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Skeleton width={140} height={12} />
             <Skeleton height={16} />
             <Skeleton width="70%" height={12} />
-          </View>
+          </LiquidGlassSurface>
         ) : error ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>
               Fikk ikke hentet oversikten — dra ned for å prøve igjen.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : entities === null ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>Denne flaten er kun for Heia Ops.</Text>
-          </View>
+          </LiquidGlassSurface>
         ) : entities.length === 0 ? (
-          <View style={styles.card}>
+          <LiquidGlassSurface
+            variant="sheet"
+            wrapStyle={styles.cardWrap}
+            style={styles.card}>
             <Text style={styles.meta}>Ingen juridiske enheter ennå.</Text>
-          </View>
+          </LiquidGlassSurface>
         ) : (
           <>
             {reviewQueue.length > 0 && (
@@ -757,8 +795,8 @@ export function OpsEntitiesScreen() {
                       </Text>
                     </View>
                     <Text style={styles.warnText}>
-                      {entity.entity.legalName} · invitert som{' '}
-                      {inv.invitedName} &lt;{inv.invitedEmail}&gt;
+                      {entity.entity.legalName} · invitert som {inv.invitedName}{' '}
+                      &lt;{inv.invitedEmail}&gt;
                     </Text>
                     {inv.mismatch && (
                       <Text style={styles.warnText}>
@@ -767,8 +805,8 @@ export function OpsEntitiesScreen() {
                       </Text>
                     )}
                     <Text style={styles.warnText}>
-                      Rollen er IKKE aktiv. Den aktiveres først når du
-                      bekrefter her.
+                      Rollen er IKKE aktiv. Den aktiveres først når du bekrefter
+                      her.
                     </Text>
                     <View style={styles.actionRow}>
                       <Button
@@ -829,7 +867,7 @@ export function OpsEntitiesScreen() {
               multiline
               autoFocus
               placeholder={prompt?.placeholder}
-              placeholderTextColor={colors.textTertiary}
+              placeholderTextColor={OPAL.inkTertiary}
               editable={!acting}
             />
             <Text style={styles.hint}>
@@ -844,25 +882,24 @@ export function OpsEntitiesScreen() {
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </ProfilPage>
   );
 }
 
+// Undersiden (ProfilPage): overskrifter og etiketter på grunnen →
+// stadionblekk; kortene er paneler → OPAL-blekk og GLASS_FIELD-felt.
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   content: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginBottom: spacing.lg,
   },
   entityHead: {
@@ -873,30 +910,31 @@ const styles = StyleSheet.create({
   },
   entityName: {
     ...typography.heading2,
+    color: colors.stadiumText,
     flexShrink: 1,
   },
   sectionLabel: {
     ...typography.caption,
     fontWeight: '700',
     letterSpacing: 1,
-    color: colors.textTertiary,
+    color: 'rgba(234, 255, 246, 0.8)',
     marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
+  // Gull på grunnen (ikke gullblekk — det er brunt og forsvinner i toppen).
   queueLabel: {
     ...typography.caption,
     fontWeight: '700',
     letterSpacing: 1,
-    color: colors.goldInk,
+    color: colors.gold,
+    marginBottom: spacing.md,
+  },
+  cardWrap: {
     marginBottom: spacing.md,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.md,
     gap: spacing.sm,
-    ...shadows.card,
   },
   queueCard: {
     backgroundColor: colors.sun,
@@ -922,7 +960,7 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingVertical: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderSubtle,
+    borderBottomColor: OPAL.hairline,
   },
   personName: {
     ...typography.bodySmall,
@@ -934,8 +972,8 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: colors.textSecondary,
-    backgroundColor: colors.surfaceMuted,
+    color: OPAL.inkSecondary,
+    backgroundColor: 'rgba(8, 57, 46, 0.08)',
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.full,
@@ -954,11 +992,11 @@ const styles = StyleSheet.create({
   },
   meta: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   hint: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
   },
   warnLine: {
     ...typography.caption,
@@ -984,7 +1022,7 @@ const styles = StyleSheet.create({
     color: colors.goldInk,
   },
   mismatchBox: {
-    backgroundColor: colors.surfaceMuted,
+    backgroundColor: 'rgba(8, 57, 46, 0.06)',
     borderRadius: radius.md,
     padding: spacing.md,
     gap: 2,
@@ -993,11 +1031,11 @@ const styles = StyleSheet.create({
   mismatchTitle: {
     ...typography.caption,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   mismatchLine: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   actionRow: {
     marginTop: spacing.sm,
@@ -1011,16 +1049,16 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   input: {
     ...typography.bodySmall,
-    backgroundColor: colors.background,
+    backgroundColor: GLASS_FIELD.fill,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: GLASS_FIELD.edge,
     color: colors.textPrimary,
   },
   inputMulti: {
@@ -1029,7 +1067,7 @@ const styles = StyleSheet.create({
   },
   logLine: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   backdrop: {
     flex: 1,

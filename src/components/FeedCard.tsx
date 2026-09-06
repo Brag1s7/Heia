@@ -1,5 +1,5 @@
 import React from 'react';
-import {View, Text, Pressable, StyleSheet} from 'react-native';
+import {Animated, View, Text, Pressable, StyleSheet} from 'react-native';
 import {
   colors,
   matchColors,
@@ -15,9 +15,21 @@ import {avatarRef} from '../lib/media/avatar';
 import {StatusPill} from './StatusPill';
 import {ScoreChip} from './ScoreChip';
 import {OPAL} from './OpalSurface';
-import {LiquidGlassSurface} from './LiquidGlassSurface';
-import {StadiumGlass} from './StadiumGlass';
+import {
+  GLASS_PRESS_NATIVE,
+  GlassPressSensor,
+  LiquidGlassSurface,
+  useLiquidGlassActive,
+} from './LiquidGlassSurface';
+import {StadiumGlass, useGlassPress} from './StadiumGlass';
 import {feedAllowsHeia} from '../shared/matchEngagement';
+import {
+  FEED_INK_LIGHT,
+  FEED_MATERIAL,
+  FEED_OPTICS_EDGES,
+  FROST,
+  SILVER,
+} from '../shared/glassOptics';
 import type {FeedItem, MatchEventType} from '../shared/types';
 
 /**
@@ -302,15 +314,39 @@ export function FeedCard({
   // Mørkt stadionglass — egen gren under, aldri LiquidGlassSurface.
   const matchCard = MATCH_GLASS_AB && isMatchType(item) && !item.isPinned;
   const glassVariant = item.isPinned ? 'important' : 'card';
+  // ARENAGLASS (Brage 2026-09-04): feedkortet er kampkortets materiale,
+  // lysere — så det får kampkortets LYSE blekk når native-glasset tegner.
+  // Fallbacken (eldre iOS/Android/Reduce Transparency) er lys opal med
+  // mørkt blekk som før.
+  // SØLVGLASSET (A/B, Brage 2026-09-06): mørkt blekk — bare arenaglasset
+  // har lyst blekk (FEED_INK_LIGHT).
+  const liquidGlass = useLiquidGlassActive();
+  // Kampkortets trykk = det lyse glassets fysikk (se useGlassPress).
+  const press = useGlassPress();
+  const glassInk = matchCard || (opal && liquidGlass && FEED_INK_LIGHT);
+  // Sølvglasset: rollemerket og handlingene i samme frostmateriale som
+  // kortet (leppe oppe/venstre, blekk-kant nede/høyre). Se SILVER.pill.
+  const frostPills =
+    !matchCard && opal && liquidGlass && FEED_MATERIAL === 'silver';
+  // FROST (prototypen, vedtatt 2026-09-06): rammen bærer bylinen, PLATEN
+  // bærer innholdet og handlingene. Kampkortet beholder stadionglasset og
+  // får samme plate som tynt lyst lag. Piller = prototypens lyse frostpille.
+  const frost = FEED_MATERIAL === 'frost';
+  const protoPills = !matchCard && opal && frost;
+  const plateStyle = matchCard
+    ? styles.matchPlate
+    : opal && frost
+    ? styles.plate
+    : undefined;
   // Opalens blekk (kontrastporten): lokalt mørkere sekundær/aksent på
   // opalen, tokenene på alt annet. Se OPAL.inkSecondary/inkAccent.
-  // Kampkortet: dempet lys mintgrå på mørkt glass (matchColors.dim).
-  const inkSecondary = matchCard
+  // Kampkortet/arenaglasset: dempet lys mintgrå på mørkt glass.
+  const inkSecondary = glassInk
     ? MATCH_INK.dim
     : opal
     ? OPAL.inkSecondary
     : colors.textSecondary;
-  const inkTertiary = matchCard
+  const inkTertiary = glassInk
     ? MATCH_INK.dim
     : opal
     ? OPAL.inkTertiary
@@ -346,7 +382,12 @@ export function FeedCard({
   const inner = (
     <>
       {/* Header */}
-      <View style={[styles.header, thread && styles.headerThread]}>
+      <View
+        style={[
+          styles.header,
+          thread && styles.headerThread,
+          frost && styles.headerFrost,
+        ]}>
         <Avatar
           name={item.author.name}
           size="md"
@@ -356,7 +397,7 @@ export function FeedCard({
         <View style={styles.headerText}>
           <View style={styles.nameRow}>
             <Text
-              style={[styles.name, matchCard && styles.textMatch]}
+              style={[styles.name, glassInk && styles.textMatch]}
               numberOfLines={1}>
               {item.author.name}
             </Text>
@@ -365,7 +406,9 @@ export function FeedCard({
                 style={[
                   styles.role,
                   opal && styles.roleOpal,
-                  matchCard && styles.roleMatch,
+                  glassInk && styles.roleMatch,
+                  frostPills && styles.roleFrost,
+                  protoPills && styles.roleProto,
                 ]}>
                 {roleLabel}
               </Text>
@@ -375,7 +418,7 @@ export function FeedCard({
             style={[
               styles.time,
               opal && styles.timeOpal,
-              matchCard && styles.dimMatch,
+              glassInk && styles.dimMatch,
             ]}>
             {timeAgo(item.createdAt)}
           </Text>
@@ -393,186 +436,228 @@ export function FeedCard({
         )}
       </View>
 
-      {/* Kampkortet: «FRA KAMPEN» + kapselen med hendelseskontekst */}
-      {matchCard && (
-        <View style={styles.matchEyebrowRow}>
-          <Text style={styles.matchEyebrow} accessibilityRole="header">
-            FRA KAMPEN
-          </Text>
-          {/* Egen lys ramme: kapselen er selv mørk og ville ellers
+      {/* PLATEN: innhold + handlinger (lyst kort) / kampøyeblikket (kampkort) */}
+      <View style={plateStyle}>
+        {/* Kampkortet: «FRA KAMPEN» + kapselen med hendelseskontekst */}
+        {matchCard && (
+          <View style={styles.matchEyebrowRow}>
+            <Text style={styles.matchEyebrow} accessibilityRole="header">
+              FRA KAMPEN
+            </Text>
+            {/* Egen lys ramme: kapselen er selv mørk og ville ellers
               forsvunnet inn i glasset. */}
-          <View style={styles.matchChipFrame}>
-            <Marker item={item} />
-          </View>
-        </View>
-      )}
-
-      {/* Innhold — kampkortet: kort Heia-pulslinje med ett hendelsespunkt
-          ved hovedteksten (kampsidens tidslinje i miniatyr). */}
-      {item.content ? (
-        matchCard ? (
-          <View style={styles.matchPulseRow}>
-            <View
-              style={styles.matchPulse}
-              pointerEvents="none"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants">
-              <View style={styles.matchPulseLine} />
-              <View
-                style={[
-                  styles.matchPulseDot,
-                  liveNow && styles.matchPulseDotLive,
-                ]}
-              />
+            <View style={styles.matchChipFrame}>
+              <Marker item={item} />
             </View>
+          </View>
+        )}
+
+        {/* Innhold — kampkortet: kort Heia-pulslinje med ett hendelsespunkt
+          ved hovedteksten (kampsidens tidslinje i miniatyr). */}
+        {item.content ? (
+          matchCard ? (
+            <View style={styles.matchPulseRow}>
+              <View
+                style={styles.matchPulse}
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants">
+                <View style={styles.matchPulseLine} />
+                <View
+                  style={[
+                    styles.matchPulseDot,
+                    liveNow && styles.matchPulseDotLive,
+                  ]}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.content,
+                  styles.contentStrong,
+                  styles.matchContent,
+                  styles.textMatch,
+                ]}>
+                {item.content}
+              </Text>
+            </View>
+          ) : (
             <Text
               style={[
                 styles.content,
-                styles.contentStrong,
-                styles.matchContent,
-                styles.textMatch,
+                strong && styles.contentStrong,
+                glassInk && styles.textMatch,
               ]}>
               {item.content}
             </Text>
+          )
+        ) : null}
+
+        {/* Bilde */}
+        {item.media && (
+          <View style={[styles.imageWrap, frost && styles.imageFrost]}>
+            <MediaImage
+              media={item.media}
+              variant="display"
+              style={[styles.image, frost && styles.imageFrost]}
+              resizeMode="cover"
+            />
+            {onExpandImage && (
+              <Pressable
+                onPress={onExpandImage}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Vis bildet i fullskjerm"
+                style={({pressed}) => [
+                  styles.expand,
+                  pressed && styles.expandPressed,
+                ]}>
+                <Maximize2 size={14} color={colors.surface} strokeWidth={2.2} />
+              </Pressable>
+            )}
           </View>
-        ) : (
-          <Text style={[styles.content, strong && styles.contentStrong]}>
-            {item.content}
-          </Text>
-        )
-      ) : null}
+        )}
 
-      {/* Bilde */}
-      {item.media && (
-        <View style={styles.imageWrap}>
-          <MediaImage
-            media={item.media}
-            variant="display"
-            style={styles.image}
-            resizeMode="cover"
-          />
-          {onExpandImage && (
-            <Pressable
-              onPress={onExpandImage}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Vis bildet i fullskjerm"
-              style={({pressed}) => [
-                styles.expand,
-                pressed && styles.expandPressed,
-              ]}>
-              <Maximize2 size={14} color={colors.surface} strokeWidth={2.2} />
-            </Pressable>
-          )}
-        </View>
-      )}
-
-      {/* Reaksjoner — designede pills, aktiv 👏 er et Heia-øyeblikk */}
-      <View style={[styles.reactions, thread && styles.reactionsThread]}>
-        {/* ⚠️ P1: PILLEN RENDRES IKKE PÅ MÅL IMOT — den er ikke disabled.
+        {/* Reaksjoner — designede pills, aktiv 👏 er et Heia-øyeblikk */}
+        <View
+          style={[
+            styles.reactions,
+            thread && styles.reactionsThread,
+            frost && styles.reactionsFrost,
+          ]}>
+          {/* ⚠️ P1: PILLEN RENDRES IKKE PÅ MÅL IMOT — den er ikke disabled.
             En avslått knapp ville sagt «du kan heie hvis du får lov», og det
             er ikke beslutningen: det finnes ingen HEIA der. Kommentarpillen
             står naken igjen alene, akkurat som i kampforløpet. */}
-        {canHeia && (
-          <Pressable
-            onPress={onHeia}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Heia"
-            style={({pressed}) => [
-              styles.reactPill,
-              matchCard && styles.reactPillMatch,
-              item.iReacted && styles.reactPillOn,
-              pressed && styles.reactPillPressed,
-            ]}>
-            <Text
-              style={[
-                styles.reactText,
-                opal && styles.reactTextOpal,
-                matchCard && styles.textMatch,
-                item.iReacted && styles.reactTextOn,
+          {canHeia && (
+            <Pressable
+              onPress={onHeia}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Heia"
+              style={({pressed}) => [
+                styles.reactPill,
+                glassInk && styles.reactPillMatch,
+                frostPills && styles.reactPillFrost,
+                protoPills && styles.reactPillProto,
+                frost && styles.reactPillStable,
+                item.iReacted && styles.reactPillOn,
+                frostPills && item.iReacted && styles.reactPillOnFrost,
+                protoPills && item.iReacted && styles.reactPillOnProto,
+                pressed && styles.reactPillPressed,
               ]}>
-              👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
-            </Text>
-          </Pressable>
-        )}
-        {/* I tråden finnes ingen Kommenter — du er allerede der. */}
-        {!thread && (
-          <Pressable
-            onPress={onComment}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Kommenter"
-            style={({pressed}) => [
-              styles.reactPill,
-              matchCard && styles.reactPillMatch,
-              pressed && styles.reactPillPressed,
-            ]}>
-            <MessageCircle
-              size={14}
-              color={matchCard ? MATCH_INK.text : inkSecondary}
-            />
-            <Text
-              style={[
-                styles.reactText,
-                opal && styles.reactTextOpal,
-                matchCard && styles.textMatch,
+              <Text
+                style={[
+                  styles.reactText,
+                  opal && styles.reactTextOpal,
+                  protoPills && styles.reactTextProto,
+                  glassInk && styles.textMatch,
+                  item.iReacted && styles.reactTextOn,
+                ]}>
+                👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
+              </Text>
+            </Pressable>
+          )}
+          {/* I tråden finnes ingen Kommenter — du er allerede der. */}
+          {!thread && (
+            <Pressable
+              onPress={onComment}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Kommenter"
+              style={({pressed}) => [
+                styles.reactPill,
+                glassInk && styles.reactPillMatch,
+                frostPills && styles.reactPillFrost,
+                protoPills && styles.reactPillProto,
+                pressed && styles.reactPillPressed,
               ]}>
-              {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
-            </Text>
-          </Pressable>
-        )}
-        {/* «Se kampen ›» — egen Pressable, den eneste veien til kampen.
+              <MessageCircle
+                size={14}
+                color={
+                  glassInk
+                    ? MATCH_INK.text
+                    : protoPills
+                    ? FROST.pill.ink
+                    : inkSecondary
+                }
+              />
+              <Text
+                style={[
+                  styles.reactText,
+                  opal && styles.reactTextOpal,
+                  protoPills && styles.reactTextProto,
+                  glassInk && styles.textMatch,
+                ]}>
+                {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
+              </Text>
+            </Pressable>
+          )}
+          {/* «Se kampen ›» — egen Pressable, den eneste veien til kampen.
             Trykkflaten er ≥ 44 pt via hitSlop (raden selv er lavere);
             den innerste Pressable-en vinner, så kortets onPress (samtalen)
             utløses aldri av dette trykket. */}
-        {matchCard && onOpenMatch && (
-          <Pressable
-            onPress={onOpenMatch}
-            hitSlop={{top: 10, bottom: 10, left: 8, right: 8}}
-            accessibilityRole="button"
-            accessibilityLabel="Se kampen"
-            style={({pressed}) => [
-              styles.matchLinkHit,
-              pressed && styles.matchLinkPressed,
-            ]}>
-            <Text style={styles.matchLink}>Se kampen ›</Text>
-          </Pressable>
-        )}
+          {matchCard && onOpenMatch && (
+            <Pressable
+              onPress={onOpenMatch}
+              hitSlop={{top: 10, bottom: 10, left: 8, right: 8}}
+              accessibilityRole="button"
+              accessibilityLabel="Se kampen"
+              style={({pressed}) => [
+                styles.matchLinkHit,
+                pressed && styles.matchLinkPressed,
+              ]}>
+              <Text style={styles.matchLink}>Se kampen ›</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </>
   );
 
   // KAMPKORTET: mørkt stadionglass (kompakt), samme padding-boks som
-  // kortene. Trykk = lys inn i glasset (StadiumGlass) + 0,98/1 pt ned her —
-  // samme tall som det native lyse glasset.
+  // kortene. Trykk = det lyse glassets fysikk i JS (useGlassPress): lys inn
+  // i glasset + 0,98/1 pt ned på touch-down, slipp ved scroll/slipp — ikke
+  // Pressable sin harde av/på.
   if (matchCard) {
-    const surface = (pressed: boolean) => (
+    const glassCard = (
       <StadiumGlass
         compact
-        pressed={pressed}
+        pressLight={GLASS_PRESS_NATIVE ? undefined : press.light}
         teamColor={teamColor}
-        style={styles.cardOpal}>
+        style={frost ? styles.cardFrost : styles.cardOpal}>
         {inner}
       </StadiumGlass>
+    );
+    // Native trykksensor (iOS 26) = nøyaktig det lyse kortets trykk; ellers
+    // JS-fysikken med samme tall.
+    const surface = GLASS_PRESS_NATIVE ? (
+      <GlassPressSensor cornerRadius={radius.xl} pressColor={FROST.matchPress}>
+        {glassCard}
+      </GlassPressSensor>
+    ) : (
+      <Animated.View style={press.style} {...press.handlers}>
+        {glassCard}
+      </Animated.View>
     );
     if (onPress) {
       return (
         <Pressable
           onPress={onPress}
           accessibilityRole="button"
-          accessibilityLabel="Åpne kommentarer"
-          style={({pressed}) => [pressed && styles.matchPressed]}>
-          {({pressed}) => surface(pressed)}
+          accessibilityLabel="Åpne kommentarer">
+          {surface}
         </Pressable>
       );
     }
-    return surface(false);
+    return surface;
   }
 
   // OPAL (prototypen): materialet bor i OpalSurface; padding-boksen er
   // identisk med `styles.card` (1 pt kant + padding xl). Trykk = samme
   // heiaSoft-tint som `cardPressed`, lagt på innerboksen over svg-en.
+  // ARENAGLASS (FeedGlass V5): `optics` = materiallaget (fade, skyer,
+  // opptak, neon, høylys, kant, skygge); `refraction` markerer «innholds-
+  // kort på grunnen» (spekular + ev. refraksjon nativt).
   if (opal) {
     if (onPress) {
       return (
@@ -582,9 +667,12 @@ export function FeedCard({
           accessibilityLabel="Åpne kommentarer">
           {({pressed}) => (
             <LiquidGlassSurface
-              style={styles.cardOpal}
+              style={frost ? styles.cardFrost : styles.cardOpal}
+              cornerRadius={frost ? FROST.radius : undefined}
               variant={glassVariant}
-              pressed={pressed}>
+              pressed={pressed}
+              optics={FEED_OPTICS_EDGES}
+              refraction>
               {inner}
             </LiquidGlassSurface>
           )}
@@ -592,7 +680,12 @@ export function FeedCard({
       );
     }
     return (
-      <LiquidGlassSurface style={styles.cardOpal} variant={glassVariant}>
+      <LiquidGlassSurface
+        style={frost ? styles.cardFrost : styles.cardOpal}
+        cornerRadius={frost ? FROST.radius : undefined}
+        variant={glassVariant}
+        optics={FEED_OPTICS_EDGES}
+        refraction>
         {inner}
       </LiquidGlassSurface>
     );
@@ -637,6 +730,56 @@ const styles = StyleSheet.create({
   cardOpal: {
     padding: spacing.xl,
   },
+  // FROST: prototypens padding-boks (rammen er tynn, platen bærer luften).
+  cardFrost: {
+    padding: FROST.padding,
+  },
+  headerFrost: {
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  plate: {
+    backgroundColor: FROST.plate.fill,
+    borderRadius: FROST.plate.radius,
+    paddingHorizontal: FROST.plate.paddingH,
+    paddingVertical: FROST.plate.paddingV,
+  },
+  matchPlate: {
+    backgroundColor: FROST.matchPlate.fill,
+    borderRadius: FROST.matchPlate.radius,
+    paddingHorizontal: FROST.plate.paddingH,
+    paddingVertical: FROST.plate.paddingV,
+  },
+  roleProto: {
+    backgroundColor: FROST.role.fill,
+  },
+  reactionsFrost: {
+    marginTop: spacing.md,
+  },
+  imageFrost: {
+    borderRadius: FROST.photoRadius,
+  },
+  // Prototypens Heia/Kommenter: lys frostpille, fin hvit kant, mørkt blekk.
+  reactPillProto: {
+    backgroundColor: FROST.pill.fill,
+    borderWidth: 1,
+    borderColor: FROST.pill.edge,
+    paddingVertical: 6,
+    boxShadow: [FROST.pill.shadow],
+  },
+  reactPillOnProto: {
+    backgroundColor: colors.heiaTint,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  reactTextProto: {
+    color: FROST.pill.ink,
+  },
+  // Heia-pillen holder bredden når teksten går «Heia» → «1 heier», så
+  // Kommenter-pillen står stille under trykket (Brage 2026-09-06).
+  reactPillStable: {
+    minWidth: 108,
+    justifyContent: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -673,6 +816,16 @@ const styles = StyleSheet.create({
   },
   roleOpal: {
     color: OPAL.inkAccent,
+  },
+  // Sølvglasset: frostet hvit pille med leppe — samme materiale som kortet.
+  roleFrost: {
+    backgroundColor: SILVER.pill.roleFill,
+    borderWidth: 1,
+    borderTopColor: SILVER.pill.lipLight,
+    borderLeftColor: SILVER.pill.lipLight,
+    borderRightColor: SILVER.pill.lipDark,
+    borderBottomColor: SILVER.pill.lipDark,
+    paddingVertical: 1,
   },
   time: {
     ...typography.caption,
@@ -836,8 +989,25 @@ const styles = StyleSheet.create({
     // Nøytral gjennomskinnelig — leselig på både hvit og solskinnsflate
     backgroundColor: 'rgba(17, 36, 27, 0.06)',
   },
+  reactPillFrost: {
+    backgroundColor: SILVER.pill.fill,
+    borderWidth: 1,
+    borderTopColor: SILVER.pill.lipLight,
+    borderLeftColor: SILVER.pill.lipLight,
+    borderRightColor: SILVER.pill.lipDark,
+    borderBottomColor: SILVER.pill.lipDark,
+    paddingVertical: 6,
+  },
   reactPillOn: {
     backgroundColor: colors.heiaTint,
+  },
+  // Sølvglasset: aktiv Heia gløder grønt (referansebildet), lys leppe.
+  reactPillOnFrost: {
+    borderTopColor: 'rgba(255, 255, 255, 0.9)',
+    borderLeftColor: 'rgba(255, 255, 255, 0.9)',
+    borderRightColor: 'rgba(2, 255, 171, 0.35)',
+    borderBottomColor: 'rgba(2, 255, 171, 0.35)',
+    boxShadow: SILVER.pill.glow,
   },
   reactPillPressed: {
     opacity: 0.7,
