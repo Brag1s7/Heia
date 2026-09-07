@@ -228,9 +228,16 @@ function fitLabel(
     hasGlyph,
     width: pillWidth,
     overflowPerSide: Math.max(0, (pillWidth - itemWidth) / 2),
-    // 11 + 11 luft + ~16 innhold i prototypen. Konstant, fordi barhøyden er
-    // det — pillen vokser aldri vertikalt.
-    height: 38,
+    // Konstant, fordi barhøyden er det — pillen vokser aldri vertikalt.
+    //
+    // ⚠️ 38 → 34 (Brage 2026-09-07: «den har flyttet seg høyere opp i nav
+    // bar»). 38 var prototypens tall (11 + 11 luft + ~16 innhold) målt mot
+    // den SOLIDE baren på 88 pt. Glasskapselen er 64, og der er ikonslotten
+    // 32 pt: en 38 pt pille stakk 3 pt ned i etiketten og måtte løftes ut av
+    // kapselen for å få plass. 34 sentrerer i slotten sammen med de fire
+    // andre ikonene (som er 30) og lar løftet gå til null — se
+    // `MatchTabButton.styles.wrap`.
+    height: 34,
     fontCap: MATCH_BUTTON_FONT_CAP,
   };
 }

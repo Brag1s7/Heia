@@ -1,5 +1,58 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-07 — KAMPKNAPPEN LUKKET: iOS 26-UNDERSKARPHET UNDER BEVEGELSE, TELEFONGODKJENT OG COMMITTET)
+
+**Saken som sto åpen i to samtaler er løst.** Symptom (Brage): knappen
+spratt fint, men ble «uskarp og kornete som om oppløsningen blir lav» MENS
+den beveget seg (sprett ved RAPPORTER↔LUKK, inn/ut av kampsiden, trykk), og
+var skarp igjen i ro. Brage 2026-09-07: «Veldig bra nå funker det!»
+
+**ÅRSAK (målt, ikke gjettet):** iOS 26 tegner et lag som HAR UNDERLAG
+gjennom en offscreen-pass i lagets egen contentsScale (1,0 for et vanlig
+container-lag) så lenge `transform` ENDRER SEG fra bilde til bilde. Statisk
+transform er knivskarp; per-bilde-endring er uskarp uansett driver. Ingenting
+i vår kode endret seg siden knappen ble godkjent — telefonens iOS gjorde det.
+Apple-forum bekrefter familien (OS 26, tekst uskarp under transformert
+foreldrelag; DTS ber om Feedback-sak).
+
+**FIKSEN:** `shouldRasterizeIOS` på TabButtons innholds-`Animated.View`
+(én prop). RN setter da rasterizationScale = skjermskala, og bevegelsen
+lander på statisk-skalert skarphet. Null ekstra rendere. Dekker trykk
+(compress), markørsquash og kampknappens sprett for ALLE fanene.
+
+**MÅLETALL** (blur-brøk = mellomfargede piksler / hvite piksler INNE i
+pillen; simulator iPhone 17 Pro iOS 26.5):
+
+    hvile 0,38–0,41 · statisk skalert 1,06/1,13 (satt i lldb) 0,53–0,58
+    animert sprett (FEILEN) 0,88 · med fiksen 0,64–0,67 (= statisk nivå)
+
+**FRIKJENT, hver med måling** (ikke bruk tid på disse igjen): glasskapselen,
+bottom-tabs' dobbelttegning av ikonet, native vs JS Animated-driver,
+CABasicAnimation (samme feil ⇒ ikke RN), pillens bakgrunn/kant/radius
+(tekst og prikk var like uskarpe uten dem), contentsScale på tekstlaget
+(det står allerede 3,0), rasterisering/maske/filter/gruppeopasitet i
+forfedrekjeden (lldb-dump: ingen).
+
+**MÅLEMETODEN — BRUK DEN IGJEN VED VISUELLE SYMPTOMER:** midlertidig rigg
+som utløser animasjonen på timer → `xcrun simctl io booted screenshot` i
+serie → PIL-metrikk INNE i flaten (kantvarians over hele boksen lyver:
+pillens ytterkant vokser med skalaen) → `lldb -p $(pgrep -x Heia2) -b -o
+'expr -l objc++ -O -- @import UIKit; …'` for å dumpe lagkjeden og sette
+statiske transformer live. Fallgruver: LogBox-banneret dekker tab-baren og
+ødelegger målingen (relanser appen), `navigation` må destrukureres fra
+`screenOptions`-callbacken, og zsh-glob på tom mappe stopper hele kjeden.
+
+▶️ **NESTE — DESIGNSPORET, BRAGE VELGER (min anbefaling: KAMPSKJERMEN).**
+Kampskjermen er den siste STORE flaten som ikke har fått Heia-materialet:
+Hjem har frost-kortet, Kalender har chrome + ark, Varsler og Profil har
+glasset, tab-baren er kapselen. Kampskjermen står igjen med flate grønne
+bokser i hendelsesgriden, og PULSENS UTTRYKK er fortsatt ubetalt gjeld
+(mekanikken godkjent 2026-08-21, utseendet ikke — se memory
+`pulse_expression_debt`). Den er også produktets kjerne (Strava for
+ungdomslag: live og deling er core). Alternativene, hvis Brage heller vil
+det: (B) etikettkontrast på grunnen som én skive over alle skjermer, eller
+(C) ryddeskiva — død kode sølv/perle/arena + ~790 KB bilder som bundles.
+
 ## ▶️▶️ START HER (oppdatert 2026-09-06 kveld — FEEDKORTET PÅ HJEM ER LUKKET: PROTOTYPENS FROST-KORT TELEFONGODKJENT, COMMITTET OG PUSHET)
 
   · VEDTATT OG BYGGET (Brage: «Dette funker bra nå!»): feedkortet er
