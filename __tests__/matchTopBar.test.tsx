@@ -40,7 +40,6 @@ import {FinishedMatch} from '../src/components/match/FinishedMatch';
 import {LiveBadge} from '../src/components/LiveBadge';
 import {useGoalMoment} from '../src/components/useGoalMoment';
 import {matchPulseClock} from '../src/shared/matchCopy';
-import {matchColors} from '../src/theme';
 import type {HeiaEventDetail, MatchEvent} from '../src/shared/types';
 
 const BAR = {
@@ -232,8 +231,13 @@ describe('toppflaten er ikke i scroll-flaten', () => {
           .flat(2)
           .filter(Boolean),
       );
-    const plate = children.findIndex(
-      c => flat(c).backgroundColor === matchColors.groundTop,
+    // Runde 2: «platen» er kapselen i kampglass (`barMatch`); i jest rendres
+    // den som den solide fallbacken. Fortsatt FØR tilbakeknappen.
+    void flat;
+    const plate = children.findIndex(c =>
+      nodes(c).some(
+        n => (n.props as {testID?: string}).testID === 'glass-solid-barMatch',
+      ),
     );
     const back = children.findIndex(c =>
       nodes(c).some(
@@ -464,7 +468,7 @@ describe('tilgjengelighet og klokke', () => {
     expect(texts(tree.toJSON()).join(' ')).not.toContain('36');
   });
 
-  it('lar lagnavn ellipseres, men aldri stillingen eller statusen', async () => {
+  it('bærer lange lagnavn i skjermleser-setningen — merker, ikke navn, i raden', async () => {
     const tree = await render(
       <MatchTopBar
         homeTeam="Hamar IL Fotball G14 Elite"
@@ -477,18 +481,18 @@ describe('tilgjengelighet og klokke', () => {
         shown
       />,
     );
-    const style = (label: string) => {
-      const node = nodes(tree.toJSON()).find(
-        n => n.type === 'Text' && texts(n).join('') === label,
-      );
-      return Object.assign(
-        {},
-        ...[(node!.props as {style: unknown}).style].flat(2).filter(Boolean),
-      );
-    };
-    expect(style('Hamar IL Fotball G14 Elite').flexShrink).toBe(1);
-    expect(style('12–4').flexShrink).toBe(0);
-    expect(style('NÅ 108′').flexShrink).toBe(0);
+    const all = nodes(tree.toJSON());
+    const row = all.find(n =>
+      (
+        (n.props as {accessibilityLabel?: string}).accessibilityLabel ?? ''
+      ).includes('Hamar IL Fotball G14 Elite'),
+    );
+    expect(row).toBeTruthy();
+    const t = all.filter(n => n.type === 'Text').map(n => texts(n).join(''));
+    expect(t).toContain('12');
+    expect(t).toContain('4');
+    expect(t).toContain('NÅ 108′');
+    expect(t).not.toContain('Hamar IL Fotball G14 Elite');
   });
 });
 

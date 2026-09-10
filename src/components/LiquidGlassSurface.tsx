@@ -108,6 +108,7 @@ export type GlassVariant =
   | 'important'
   | 'bar'
   | 'barMatch'
+  | 'score'
   | 'sheet'
   | 'panel';
 
@@ -138,6 +139,13 @@ export const GLASS = {
    * baren er opalhvitt (`matchColors.text`/`dim`) i denne varianten.
    */
   barMatch: {tint: 'rgba(29, 70, 51, 0.62)', sheen: 0.06, interactive: false},
+  /**
+   * SCOREKORTET på kampsiden (runde 2): mørk Heia-grønn frost over den lyse
+   * kampgrunnen — lettere enn StadiumGlass (Brage: «fortsatt ganske mørkt
+   * og tungt»), men fortsatt kampens eget mørke glass. Grunnen skinner
+   * gjennom, stillingen står i mint.
+   */
+  score: {tint: 'rgba(8, 57, 46, 0.6)', sheen: 0.08, interactive: false},
   /**
    * ARKENE (Brage 2026-09-03): månedsvisningen fra «Måned», «Ny hendelse»
    * («+ Ny» på Kalender og «Ny kamp» fra Sesongen). «Ganske tungt glass»:
@@ -176,6 +184,9 @@ export const GLASS = {
   /** Solid arena for kampbaren uten glass + svak opalhvit kant. */
   barMatchSolid: '#1D4633',
   barMatchSolidEdge: 'rgba(234, 255, 246, 0.16)',
+  /** Solid scorekort uten glass: arenaens mørke grønn + svak opalhvit kant. */
+  scoreSolid: '#1B5A42',
+  scoreSolidEdge: 'rgba(234, 255, 246, 0.2)',
   /** Solid perle for arkene uten glass (= OPAL.solid) + svak heiaDeep-kant. */
   sheetSolid: '#EFF3F1',
   sheetSolidEdge: 'rgba(8, 57, 46, 0.12)',
@@ -967,6 +978,7 @@ const SOLID: Partial<Record<GlassVariant, {fill: string; edge: string}>> = {
   important: {fill: GLASS.importantSolid, edge: GLASS.importantSolidEdge},
   bar: {fill: GLASS.barSolid, edge: GLASS.barSolidEdge},
   barMatch: {fill: GLASS.barMatchSolid, edge: GLASS.barMatchSolidEdge},
+  score: {fill: GLASS.scoreSolid, edge: GLASS.scoreSolidEdge},
   sheet: {fill: GLASS.sheetSolid, edge: GLASS.sheetSolidEdge},
 };
 
@@ -1286,6 +1298,12 @@ function GlassSurface({
         testID={`glass-unbounded-${variant}`}
         style={[
           styles.solid,
+          // ⚠️ MÅ KLIPPE (Brage 2026-09-10: «nå er det en hvit strek over
+          // boksen»). Høylyset under er `left:0/right:0` og gikk derfor rett
+          // forbi de runde hjørnene og stakk ut som en løs hvit strek over
+          // kortet. Kommentaren under påsto at den var klippet av radiusen —
+          // det var den ikke før nå.
+          styles.unboundedClip,
           {
             borderRadius: cornerRadius,
             backgroundColor:
@@ -1572,6 +1590,9 @@ const styles = StyleSheet.create({
   },
   nudgeOdd: {
     opacity: 0.99,
+  },
+  unboundedClip: {
+    overflow: 'hidden',
   },
   unboundedTop: {
     position: 'absolute',

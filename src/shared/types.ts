@@ -337,27 +337,15 @@ export type HomeStackParamList = {
   Lagkassa: undefined;
   Invite: {firstTime?: boolean} | undefined;
   Comments: {postId: string; teamSpaceId: string};
-  /**
-   * ⚠️ SAMME SKJERM SOM I `KampStack`, IKKE EN KOPI (kildebevarende
-   * tabmodell, Brage 2026-08-21).
-   *
-   * «Sesongen» øverst til høyre på Hjem er en HJEM-inngang: du kom fra
-   * Hjem, og «tilbake» skal føre til Hjem. Trykker du derimot Kamp-fanen,
-   * er du i `KampStack` og «tilbake» fører til Sesongen der.
-   *
-   * Det er FLERE NAVIGASJONSRUTER til én skjerm — ikke duplisert
-   * produktlogikk. `SeasonScreen` er den samme komponenten begge steder.
-   */
-  Season: undefined;
 };
 
 /**
  * KAMP-FANENS STACK (skive 10.3).
  *
- * ⚠️ SESONGEN BOR HER NÅ, ikke i Hjem. «Sesongen»-snarveien øverst til høyre
- * på Hjem består, men den navigerer HIT og aktiverer Kamp-fanen — det finnes
- * ikke lenger en egen Season-rute eid av Hjem. To ruter med samme skjerm
- * ville gitt to steder å komme tilbake til.
+ * ⚠️ SESONGEN BOR HER, OG BARE HER. «Sesongen»-snarveien i laghodet på Hjem
+ * er fjernet (Brage 2026-09-09): tab-baren er inngangen, og sesongsiden har
+ * ett utseende — fanerot med laghode. Ingen pushet variant, ingen
+ * tilbakelinje, ingen «ble jeg pushet»-logikk.
  */
 export type KampStackParamList = {
   Season: undefined;

@@ -320,7 +320,7 @@ describe('baren selv', () => {
    * stadionglass og blekket til opalhvitt — og INGENTING annet. Stilobjektet
    * på baren er identisk, og kampknappen får samme tilstand.
    */
-  it('kampsiden bytter kun tint og blekk — geometrien er identisk', () => {
+  it('kampsiden står i det LYSE miljøet (runde 2: kampen er dagslys) — geometrien er identisk', () => {
     mockState = TILSTANDER[1];
     const lys = render();
     const lysStil = JSON.stringify(barStyle(lys));
@@ -333,9 +333,9 @@ describe('baren selv', () => {
     const kamp = render();
     expect(JSON.stringify(barStyle(kamp))).toBe(lysStil);
     expect(etiketter(kamp)).toEqual(lysEtiketter);
-    expect(hostByTestId(kamp, 'tabbar-capsule-match').length).toBe(1);
-    expect(hostByTestId(kamp, 'tabbar-capsule-light').length).toBe(0);
-    // Opalhvitt blekk på inaktive etiketter (ikke lyst-miljøets grønngrå).
+    expect(hostByTestId(kamp, 'tabbar-capsule-light').length).toBe(1);
+    expect(hostByTestId(kamp, 'tabbar-capsule-match').length).toBe(0);
+    // Ingen opalhvitt blekk lenger — grunnen er lys.
     const {StyleSheet} = require('react-native');
     const inaktiv = kamp.root
       .findAllByType(Text)
@@ -345,7 +345,7 @@ describe('baren selv', () => {
       })
       .map(n => StyleSheet.flatten(n.props.style)?.color);
     expect(inaktiv.length).toBeGreaterThan(0);
-    for (const farge of inaktiv) expect(farge).toBe(matchColors.dim);
+    for (const farge of inaktiv) expect(farge).not.toBe(matchColors.dim);
   });
 });
 

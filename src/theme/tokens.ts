@@ -123,6 +123,17 @@ export const matchColors = {
   chalk: 'rgba(234, 255, 246, 0.22)',
   chalkStrong: 'rgba(234, 255, 246, 0.34)',
   chalkFaint: 'rgba(234, 255, 246, 0.15)',
+
+  // KAMPENS DAGSLYS (runde 2, 2026-09-07): kampen er LYS — litt mørkere
+  // enn Hjem, sterk Heia-grønn, rolig. Grunnen er én mintgradient med to
+  // skrå lysstreker (flomlys). Blekket på grunnen er appens vanlige
+  // (`colors.textPrimary`); de mørke `text`/`dim` over gjelder kun
+  // scorekortet og den kompakte scorelinja, som fortsatt er mørkt glass.
+  dayTop: '#13B98F',
+  dayMid: '#1ACDA0',
+  dayLow: '#2FE6BA',
+  /** Sløret bak faste faner når toppen er kompakt — grunnfargen, tett. */
+  dayVeil: 'rgba(24, 200, 156, 0.94)',
 } as const;
 
 // ---------------------------------------------------------------------------

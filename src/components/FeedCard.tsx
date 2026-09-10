@@ -628,9 +628,16 @@ export function FeedCard({
         {inner}
       </StadiumGlass>
     );
-    // Native trykksensor (iOS 26) = nøyaktig det lyse kortets trykk; ellers
-    // JS-fysikken med samme tall.
-    const surface = GLASS_PRESS_NATIVE ? (
+    // ⚠️ INGEN TRYKKSENSOR NÅR KORTET IKKE ER TRYKKBART (Brage 2026-09-07:
+    // «kuttes bunnen av kampkort i kommentarseksjonen»). I `thread`-varianten
+    // er kortet med vilje ikke trykkbart (samtalen ER skjermen), men sensoren
+    // ble montert likevel — og da er en NATIV visning rotelementet i arkets
+    // rulleflate. Uten `onPress` er den både unødvendig og den eneste
+    // forskjellen mellom feeden (der kortet ligger inni en Pressable) og
+    // tråden. Her er den borte: kortet er en helt vanlig visning.
+    const surface = !onPress ? (
+      <View>{glassCard}</View>
+    ) : GLASS_PRESS_NATIVE ? (
       <GlassPressSensor cornerRadius={radius.xl} pressColor={FROST.matchPress}>
         {glassCard}
       </GlassPressSensor>
@@ -744,9 +751,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: FROST.plate.paddingH,
     paddingVertical: FROST.plate.paddingV,
   },
+  // Fordypningen i kampkortet — se `FROST.matchPlate`.
   matchPlate: {
     backgroundColor: FROST.matchPlate.fill,
     borderRadius: FROST.matchPlate.radius,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: FROST.matchPlate.lipTop,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: FROST.matchPlate.lipBottom,
     paddingHorizontal: FROST.plate.paddingH,
     paddingVertical: FROST.plate.paddingV,
   },

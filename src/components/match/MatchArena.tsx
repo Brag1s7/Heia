@@ -73,6 +73,11 @@ interface MatchArenaProps {
   location?: string;
   /** Reporterens navn — «Jarle rapporterer». */
   reporterName?: string;
+  /**
+   * «Siste hendelse for 3 min» — avledet av nyeste `createdAt` hos kalleren
+   * (runde 2). Sier hva dataene faktisk vet; aldri «oppdatert» eller «nå».
+   */
+  lastEventLabel?: string;
   /** Målspretten fra `useGoalMoment`. Eies av kalleren, delt med floden. */
   scoreScale?: Animated.Value;
 }
@@ -96,8 +101,9 @@ export function MatchArena({
   minute,
   dateLabel,
   secondHalf,
-  location,
+  location: _location,
   reporterName,
+  lastEventLabel,
   scoreScale,
 }: MatchArenaProps) {
   const {width, fontScale} = useWindowDimensions();
@@ -215,13 +221,14 @@ export function MatchArena({
     </View>
   );
 
+  // Stedet bor i Info (runde 2) — metalinja er reporter + ferskhet.
   const meta = [
-    location,
     reporterName
       ? `${reporterName.split(' ')[0]} ${
           finished ? 'rapporterte' : 'rapporterer'
         }`
       : null,
+    finished ? null : lastEventLabel ?? null,
   ].filter(Boolean) as string[];
 
   return (
@@ -306,14 +313,6 @@ export function MatchArena({
               </Text>
             </React.Fragment>
           ))}
-          {phase === 'live' && (
-            <>
-              <Text style={styles.metaSep}>·</Text>
-              <Text style={styles.metaNow} maxFontSizeMultiplier={1.5}>
-                nå
-              </Text>
-            </>
-          )}
         </View>
       )}
     </View>
@@ -360,13 +359,18 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     color: colors.goldInk,
   },
+  /**
+   * ⚠️ MINUTT OG KAMPSTATUS I HEIA-NEON (Brage 2026-09-10: «score,
+   * kampstatus og minutt skal få tydelig #02FFAB»). På den tette
+   * kampflaten er neon både lesbart på avstand og det som skiller LIVE fra
+   * alt annet i appen. Full opasitet — dette er tallet folk ser etter.
+   */
   clock: {
     fontFamily: fonts.display,
     fontSize: 13,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: matchColors.text,
-    opacity: 0.9,
+    color: colors.heia,
     flexShrink: 1,
     textAlign: 'right',
   },
@@ -457,10 +461,5 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: matchColors.dim,
     opacity: 0.4,
-  },
-  metaNow: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: colors.heia,
   },
 });

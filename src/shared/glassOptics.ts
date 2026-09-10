@@ -130,10 +130,24 @@ export const FROST = {
     paddingH: 14,
     paddingV: 12,
   },
-  /** Platen i kampkortet — tynt lyst lag på mørkt glass. */
+  /**
+   * Platen i kampkortet — en FORDYPNING, ikke et lyst lag (Brage
+   * 2026-09-10: «gjør den heller til en mørkere fordypning i samme
+   * familie»).
+   *
+   * Den var et krittvask på 0,07 som la seg OPPÅ glasset og gjorde flaten
+   * flat og lys. Nå senkes den i stedet: ett hakk dypere grønn, så
+   * «FRA KAMPEN», kapselen og hendelsesteksten står sterkere på den enn på
+   * kortet rundt — og feedkortet blir tydelig roligere enn heroen.
+   *
+   * Kantene forteller hvilken vei den går: skygge langs TOPPEN (lyset når
+   * ikke ned i fordypningen) og et hint av lys langs BUNNEN. Motsatt av en
+   * hevet flate, som er hele poenget.
+   */
   matchPlate: {
-    fill: 'rgba(234, 255, 246, 0.07)',
-    lip: 'rgba(234, 255, 246, 0.1)',
+    fill: 'rgba(3, 30, 22, 0.3)',
+    lipTop: 'rgba(0, 0, 0, 0.16)',
+    lipBottom: 'rgba(234, 255, 246, 0.08)',
     radius: 16,
   },
   /** Kanten (prototypen): lys topp/venstre, svak blekk nede/høyre. */

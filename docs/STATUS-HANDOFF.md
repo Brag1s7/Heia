@@ -1,5 +1,497 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-09 sen kveld — TO SKIVER LIGGER UKOMMITTERT OG VENTER TELEFONDOM: KAMPSKJERMEN RUNDE 2 + SESONGSIDEN/HJEM. FRYSEN ETTER «NY KAMP» ER LØST.)
+
+### Tilstanden i treet akkurat nå (les denne først)
+
+45 endrede/nye filer. TRE grupper, og de MÅ holdes fra hverandre:
+
+1. **Kampskjermen runde 2** (2026-09-07, venter telefondom) — `MatchGround`,
+   `MatchTopBar`, `MatchArena`, `MatchEngagementRow`, `LiveMatch`,
+   `FinishedMatch`, nye `MatchChrome`/`MatchViewTabs`/`MatchViews`,
+   `LiquidGlassSurface`, `icons.tsx`, `theme/tokens.ts`,
+   `EventDetailScreen`, seks testfiler. + tilbakeknappen (2026-09-08).
+2. **Sesongsiden/Hjem** (2026-09-09, venter telefondom) — `SeasonScreen`,
+   `TeamHeader`, `TeamHomeScreen`, `NextEventCarousel`, `HeroSurface`,
+   `NewEventScreen`, `AppNavigator`, `shared/types.ts`,
+   `shared/headerGeometry.ts`, `lib/queries/keys.ts`, ny
+   `lib/queries/tournaments.ts`.
+3. **Brages egne filer, RØR ALDRI** — `index.js`, `lib/installPolyfills.ts`,
+   `lib/textCodec.ts`, `__tests__/textCodec.test.ts`, `AuthScreen`,
+   `ProfilScreen`, `VerifyEmailScreen`, `WelcomeIntentScreen`,
+   `TeamContext`, `lib/account.ts`, `ios/Heia2/Info.plist`,
+   `android/.../AndroidManifest.xml`, `FeedCard`, `MatchToast`.
+
+**INGENTING i gruppe 1 og 2 er telefongodkjent ennå.** Alt er bygget,
+lintet og dekket av grønne tester, men Brage har ikke sagt ja. Commit
+først etter dom — én commit per gruppe.
+
+**Hva som skjedde i dag:** Brage utvidet kampskjerm-oppdraget til en samlet
+kampopplevelse. Runde 1 (mørk smaragd, bue, fellesskapsrad, øyeblikksstripe,
+mint-plate for siste øyeblikk) ble tegnet i canvas og FORKASTET. Runde 2
+(lys mint-verden «litt mørkere enn Hjem», ett samlet scorekort i frost som
+blir kompakt scorelinje ved scroll, faste visningsfaner Referat · Hendelser ·
+Bilder · Info, enklere kort m/ Heia og kommentarer) ble tegnet som
+scroll-prototype, godkjent som utgangspunkt, og ER NÅ BYGGET I APPEN.
+Planfila (`~/.claude/plans/inspeksjonen-din-gir-oss-polished-flurry.md`)
+har vurderingen, Brages presiseringer og faktagrunnlaget (pulsens modell,
+kampuret, presence finnes ikke, foto↔hendelse, to tråder per mål+bilde).
+
+**BYGGET (ukommittert, simulatorbekreftet på Ridabu 3–2 Nes, topp + scrollet):**
+- `MatchGround`: lys mintgradient + to skrå lysstreker. Mørke tokens står
+  igjen for scorekort/scorelinje. Målfloden beholdt (halv styrke).
+- `LiquidGlassSurface`: ny variant `score` (heiaDeep .6, regular) + solid
+  fallback. Scorekortet = `MatchArena` inni denne (radius 28). Meta:
+  «Jarle rapporterer · Siste hendelse for N min» (`lastEventLabel`, avledet
+  av nyeste `createdAt`) — sted er flyttet til Info, statisk «nå» er borte.
+- `MatchTopBar`: kapsel i `barMatch`-glass (56 pt) m/ lagmerke, stilling,
+  «● NÅ 54′ / 2. omgang»; chevron mørk m/ lys brikke; `useMatchTopBar`
+  eksponerer `scrollY`. Samme krysstoningsmekanikk (bånd, native driver,
+  Reduce Motion).
+- NY `MatchViewTabs` (segmentert kontroll i `bar`-frost) + NY `MatchChrome`:
+  fanene er SKJERMFORANKRET chrome drevet av scrollY (`translateY =
+  clamp(tabsY − scrollY, 0)`), ALDRI stickyHeaderIndices; slør i
+  grunnfargen bak fanene når kompakt; «1 ny hendelse»-pill +
+  `useHeldMatchData` (holder listas struktur mens brukeren leser, rader som
+  vises oppdateres alltid, flush = flett inn + til toppen).
+- NY `MatchViews`: `MatchReferat` (mål/meldinger/bilder som frostkort,
+  målkapsel «⚽ MÅL · LAG» + scorer + stilling etter målet; bilde festet til
+  mål vises i kortet m/ egen «Bildet»-handlingsrad), `MatchEventsView`,
+  `MatchPhotosView`, `MatchInfoView` (tid/sted/reporter m/ Bytt, påmeldte,
+  Rediger).
+- `MatchEngagementRow` `variant="card"` (feedens frostpiller, Heia minWidth
+  108); `EventDetailScreen` sender den. Mål imot: KUN Kommenter (P1).
+- `LiveMatch`/`FinishedMatch` skrevet om til skallet. Reporterrad, «oppdaterer
+  seg selv»-linja, `MatchPulse` og `MatchTimeline` er UTE av disse skjermene
+  (filene står, MatchTimeline brukes fortsatt i den lyse grenen).
+- Tab-kapselen på kampsiden → `light`-miljø. StatusBar dark-content.
+- Tester: liveMatch/finishedMatch/matchTopBar/matchArena skrevet om til den
+  nye strukturen (faner, Info, kapsel først i treet). Full suite: se under.
+
+**IKKE GJORT / ÅPENT:** Heia på motstandermål (krever produktvedtak + DB, ikke
+omgått i UI) · tab-HEIA-målet uendret · 16–6 og stor tekst kun sjekket i
+canvas, ikke på telefon · ny hendelse under lesing er bygget men ikke
+telefonbevist (ingen livekamp i simulatoren) · kommentarark m/ tastatur
+uendret · gammel kamp uten slutt («Kampen er ikke avsluttet i Heia») ikke
+bygget · `MatchAttendance`, `MatchPulse`, `ArenaSurface`, `MatchTimeline`
+er nå (nesten) død kode på kampsiden — ryddeskive senere.
+
+⚠️ **ALT ER UKOMMITTERT.** Kjør ALDRI `git checkout`, `git stash` eller
+`git restore` i dette treet: Brage har egne ukommitterte filer fra før
+(`index.js`, `src/lib/installPolyfills.ts`, `src/lib/textCodec.ts`,
+`src/screens/Auth*/Profil*/TeamHome*/Verify*/WelcomeIntent*`,
+`src/context/TeamContext.tsx`, `src/lib/account.ts`, `ios/Heia2/Info.plist`,
+`android/.../AndroidManifest.xml`, `src/components/FeedCard.tsx`,
+`src/components/match/MatchToast.tsx`) som IKKE hører til denne skiva.
+Kampskjerm-filene er: `MatchGround`, `MatchTopBar`, `MatchArena`,
+`MatchEngagementRow`, `LiveMatch`, `FinishedMatch`, nye `MatchChrome`,
+`MatchViewTabs`, `MatchViews`, `LiquidGlassSurface`, `icons.tsx`,
+`theme/tokens.ts`, `EventDetailScreen`, `AppNavigator`, seks testfiler.
+
+**Designkanvasene (referanse, ikke fasit):** runde 1 (forkastet)
+https://claude.ai/code/artifact/df79570b-dcea-48a3-b36e-3c1cf6b0c326 ·
+runde 2 (denne retningen, m/ scroll-prototype)
+https://claude.ai/code/artifact/2e885b73-bcf8-496b-8acc-408c7eba7cf0
+
+**2026-09-08 — TILBAKEKNAPPEN RETTET (Brage: «fiks tilbakeknappen»),
+ukommittert, målt på simulator:** brikken bak chevronen sto ALLTID synlig i
+runde 2 — grå sirkel på den lyse grunnen, «Tilbake» rant 5 pt inn i kanten
+på den, og den sto 3 pt til høyre for streken (runde 2 antok `spacing.md` =
+16; den er 12). Nå: brikken toner inn SAMMEN MED den mørke kapselen
+(`opacity: inn`, som i den telefongodkjente HEAD-versjonen) og står på
+`INSET + 4` = sentrert om streken (målt 32,8 pt). I ro er knappen «‹ Tilbake»
+som på alle andre skjermer. Kun `MatchTopBar.tsx` rørt; matchTopBar 25/25,
+liveMatch+finishedMatch 19/19. Kompakt tilstand (chip på mørkt glass) er
+IKKE sett på telefon etter flyttingen — se etter at brikken sitter rundt
+chevronen når stillingen er oppe.
+
+**2026-09-09 — SESONGSIDEN I HEIA-MATERIALET (Brage: «samme bakgrunn som
+resten av appen og glass der det passer» + «lagkassa havner på bunnen … må
+være synlig»), ukommittert, IKKE sett på telefon/simulator:** kun
+`src/screens/SeasonScreen.tsx` rørt. Fanerot = `DaylightGround masthead` +
+`TeamHeader` (som Hjem/Kalender/Varsler); pushet fra Hjem = `DaylightGround`
++ `BackBar variant="stadium"` + StatusBar-fokusvakt (ProfilPage-malen).
+Tittel «Sesongen» i stadionblekk, lagnavn-undertittel kun når pushet.
+LAGKASSA er flyttet ØVERST rett under tittelen som kompakt stripe i
+`important`-glass (beløp 28 pt heiaDeep, eyebrow goldInk, chevron) — før
+kampprogrammet så dagens kamp fortsatt er synlig. Sesongtallene i
+`score`-glass (radius 28, `matchColors.dim` som dempet blekk — ikke
+stadiumDim). Kamplista `sheet` + `unbounded` m/ OPAL-hårlinje/rowPressed;
+tomtilstander/feil/skeleton i `sheet`; velgerchips = arkets tint + kant
+(ingen native glass per chip), valgt = mint/heiaDeep. `SectionHeader`
+brukes for «Kampene». StadiumSurface/HeroSurface er ute av siden.
+SE ETTER på telefon: (1) tittelblekk mot reisen rett under laghodet, (2)
+lagkassa-stripen på viktig-perlen, (3) chipenes lesbarhet midt i reisen,
+(4) kamplista m/ turneringsrad (`colors.sun` inne i arket), (5) Lagkassa-
+SIDEN (`LagkassaScreen`) er fortsatt hvit m/ HeroSurface — egen skive.
+
+**2026-09-09 runde 2 på sesongsiden (etter telefon):** (a) ⚠️ OVERKJØRT AV
+RUNDE 4 — hele «pushet»-grenen er fjernet, så denne fiksen finnes ikke
+lenger i koden. Beholdt som årsaksforklaring: «Ny kamp» og
+Lagkassa fikk headeren til å flytte seg — ÅRSAK: `pushet` var
+`getState().index > 0`, altså hvor STACKEN står, og når «Ny kamp»
+(transparentModal, siden synlig bak) eller Lagkassa ble pushet oppå, hoppet
+indeksen, siden re-rendret ved fokustap og byttet laghode → tilbakelinje +
+mistet mastheaden. FIKS: rutas EGEN posisjon (`routes.findIndex(key)`) målt
+én gang i `useState`-initializer. Ingen andre skjermer bruker mønsteret.
+(b) «Ny turnering» står nå FAST til høyre for den rullende chip-raden
+(`pickerBar` = ScrollView flex 1 + fast chip). (c) Uke/måned-inndeling av
+kamplista: ANBEFALT måned (ikke uke), IKKE bygget — venter Brages vedtak.
+
+**2026-09-09 runde 3:** (a) «Ny turnering» fast til høyre i chip-raden ble
+AVVIST («altfor dårlig plassering») → nå HANDLINGSRAD rett under tittelen:
+[＋ Ny kamp (mint)] [🏆 Ny turnering (chrome-glass `GLASS.bar.tint` + kant,
+stadionblekk)]. Tittelraden har ikke lenger knappen ved siden av seg.
+(b) «Ny kamp»-arket lastet ikke alt samtidig: «Turnering»-feltet monteres
+etter `getTournaments` og dyttet Motstander ned. FIKS: ny
+`lib/queries/tournaments.ts` (`useTournaments`/`prefetchTournaments`/
+`invalidateTournaments`, nøkkel `queryKeys.tournaments`, staleTime 60 s);
+Sesongen prefetcher ved montering (admin), NewEventScreen leser cachen
+synkront. Kald cache (første åpning fra Kalender uten å ha vært på
+Sesongen) kan fortsatt gi ett sent felt — akseptert rest.
+
+**2026-09-09 runde 4 (Brages vedtak):** (a) «Sesongen»-chippen i laghodet
+på Hjem er FJERNET, og alt som bare fantes for den: `onSeasonPress`-propen
+i `TeamHeader` (+ StadiumSurface/Trophy/Pressable-importene og fire
+stiler), `Season`-ruta i `HomeStack` + i `HomeStackParamList`, og hele
+«pushet»-grenen i `SeasonScreen` (BackBar, StatusBar-vakt, useRoute,
+undertittel). Sesongen er nå KUN fanerot med masthead + laghode — ett
+utseende. (b) Bue-endringen i grunnen ble gjort og REVERSERT samme kveld (Brage:
+«jeg ville kun endre selve kortet og buen på den»): `headerGeometry.ts` og
+`DaylightGround.tsx` er byte-identiske med HEAD. Deretter presiserte Brage: «få buen på
+kortet til å gå i ett med bakgrunnen/header». BYGGET: `HeroSurface
+arc="masthead"` + `mastheadCard={{right, top}}` tegner kortets to buer
+KONSENTRISK med lerretets sirkel (sentrum ARC_INSET_RIGHT fra vinduets
+høyrekant, ARC_INSET_BOTTOM over laghodet; radier 100/68; strek 1.5
+sentrert på radius via boks 2r+strek). Lagkassa-kortet i
+`NextEventCarousel` bruker det; luften over karusellen på Hjem er nå
+`MASTHEAD_CARD_GAP` (16) i headerGeometry — samme tall som før, men låst
+til utregningen. Standardbuen på de andre HeroSurface-kortene er urørt.
+Gjelder ved scrolltopp. IKKE sett på telefon. 49/49 grønt (tabBar, tabBarLayout,
+matchButtonNav, feedRefetch, listRowOpal). Ukommittert.
+
+**2026-09-09 sen kveld — «APPEN FRYSER ETTER NY KAMP» (LØST, ukommittert):**
+IKKE en løkke: JS-tråd og hovedtråd i ro (sample), 1 % CPU, kampen ble
+opprettet. BEVIS m/ lldb `_printHierarchy` på den frosne appen:
+`RNSModalScreen … presented with _UIOverFullscreenPresentationController`
+mens Kalender var synlig. `transparentModal` (Ny hendelse-arket) er på iOS
+en EKTE presentert VC over hele appen; lagringen gjorde `dismiss()` (JS-
+animasjon) og `navigate('KalenderStack')` i samme tick → modalen sto igjen
+usynlig over alt og spiste alle trykk. FIKS i `NewEventScreen`:
+`onDismissed` = goBack + `afterDismissRef` kjørt én rAF senere; fanebyttet
+til Kalender ligger i afterDismiss. REGEL: aldri naviger andre steder mens
+arket er oppe. Bare «Ny kamp» fra Sesongen traff dette (Kalenders «+ Ny» er
+samme stack). Simulatorloggen viste i tillegg 14 QUIC-timeouts mot
+Supabase (0 byte, 180–360 s) — nettmiljø («expensive, constrained»), ikke
+kode; Supabase-klienten har ingen fetch-timeout (forslag, ikke gjort).
+
+**2026-09-10 — FIRE TING FRA TELEFONBILDER + LAGKASSA-SIDEN (ukommittert,
+ikke sett på telefon):**
+- **Buen på Hjem-heroen.** `mastheadArcBox()` er flyttet til
+  `shared/headerGeometry.ts` og deles nå av `HeroSurface` og `StadiumGlass`
+  (ny opt-in `mastheadCard`-prop). `NextEventHero` sender den videre;
+  `NextEventCarousel` gir `{right: spacing.lg, top: MASTHEAD_CARD_GAP}`.
+  På det MØRKE glasset tegnes buen i lerretets eget kritt
+  (`rgba(234,255,246, ARC_OPACITY_*)`), ikke kortets mint — en linje som
+  krysser en kant må ha samme farge på begge sider. Feedens kampinnlegg
+  (StadiumGlass uten propen) beholder mint-buene sine.
+- **Den røde streken var IKKE en stilfeil.** `EventCard featured` BETYR
+  live (Kalender/turneringssiden sender `matchStatus === 'live'`), og
+  Sesongen brukte den for «i dag» — kortet løy om at kampen var i gang.
+  Nytt: `today`-prop = mint hårlinje (0,45); korall er igjen kun live.
+- **«Ny turnering»** har `Plus` i stedet for `Trophy`.
+- **Måned-inndeling** i «Kampene»: `buildRows(matches, grouped)` legger inn
+  `{kind:'month'}` når måneden skifter; turneringsoverskriften står UNDER
+  måneden og gjentas i neste måned om turneringen krysser skillet.
+  Turneringsvisningen deles ikke opp. Datoen på raden er uendret («7.
+  september») — trim den om Brage synes den gjentar seg.
+- **Lagkassa-SIDEN** ligger nå på `ProfilPage` (dagslysgrunn + stadion-
+  tilbakelinje): hero i `important`-glass (samme varme perle som stripen på
+  Sesongen), fordeling/«Hva støtten betyr»/CTA i `sheet`, alt blekk til
+  OPAL. Ingen tekst står løst på grunnen. `HeroSurface`/`BackBar` er ute.
+- 179/179 grønt på de ti suitene som dekker de delte materialene.
+- ⚠️ Brage refererte til et TREDJE skjermbilde som ikke kom fram («en side
+  som må ha samme bakgrunn»). Antatt Lagkassa-siden. Er det
+  `EventDetailScreen`s VANLIGE gren (trening/sosialt/kommende) han mente,
+  står den fortsatt på `colors.background` m/ `StadiumSurface`-kampdag.
+- ⚠️ Pre-eksisterende typefeil i `LiquidGlassSurface.tsx:857` (Image-stil
+  med prosentstrenger) — IKKE fra denne skiva, men den bor i den
+  ukommitterte kampskjerm-gruppa og bør ryddes før commit.
+
+**2026-09-10 kveld — HENDELSESSIDEN (vanlig gren) PÅ GRUNNEN (Brage: «denne
+skjermen må vi gjøre noe med! dette gjelder også trening og sosialt»),
+ukommittert, ikke sett på telefon:** `EventDetailScreen` sin VANLIGE gren +
+laste- og feilgrenen ligger nå på `ProfilPage` (dagslysgrunn +
+stadion-tilbakelinje). Alle hvite adminplater er borte:
+`adminActions`, reporter+«Start kamp», RSVP og hver `AttendanceSection` står
+i `sheet`-glass med OPAL-blekk, og oppmøte-etiketten er `SectionHeader
+tone="opal"` INNE i arket (bar etikett på grunnen = kontrastfella på rampen).
+`ReporterBar` bruker `variant="match"` inne i arket — den hvite plata var
+selve «admin»-uttrykket. Info-heroen (trening/sosialt/turnering):
+`HeroSurface` → `sheet`.
+**KAMP FÅR EKSTRA I MATERIALET:** kampdagen er flyttet fra `StadiumSurface`
+til `StadiumGlass` (designregelen «mørkt glass kjennetegner kamp»), blekket
+er byttet fra `colors.stadium*` til `matchColors.*` (kontrastfella felle 2 i
+tokens), og kampens beskrivelse er flyttet INN i kortet.
+⚠️ Fanget før telefon: `teamColor` finnes ikke i denne filen — StadiumGlass
+får `activeTeamSpace?.color`. 48/48 grønt (eventDetailRefetch, matchTimeline,
+liveMatch, finishedMatch).
+**ÅPENT:** (a) «Burde kamp ha litt ekstra?» — INNHOLD er ikke bygget, kun
+materialet. Anbefalt rekkefølge: 1) nedtelling til avspark i kampdagkortet
+(`nowMs` tikker alt på skjermen), 2) «Sist mot <motstander>: 1–0 seier, 7.
+september» fra sesongdataene, 3) heiarop før avspark (egen skive).
+(b) `SkeletonCard` i lastegrenen er fortsatt en hvit plate på grunnen.
+(c) Turneringens «Kamper»-`SectionHeader` står fortsatt bar på grunnen.
+(d) ⚠️ Denne fila hører til den UKOMMITTERTE kampskjerm-gruppa (gruppe 1) —
+sesong/Hjem-skiva (gruppe 2) og denne endringen ligger nå i samme fil.
+
+**2026-09-10 sen kveld — TRE FUNN FRA TELEFONEN (ukommittert):**
+1. **Fanetrykk → toppen.** `useScrollToTop` (React Navigations egen
+   `tabPress`-kobling) i alle fem rotskjermene: Hjem (`listRef`), Kalender
+   (`scrollRef`), Sesongen + Profil (nye `scrollRef`), Varsler (ny
+   `listRef`). ⚠️ `useRef<FlatList>` inneholder tegnfølgen `<FlatList` og
+   trippet kildetekst-testen i `inboxSurface` — testens matcher er strammet
+   til JSX-elementet (`/\n\s*<FlatList/`), intensjonen er uendret.
+2. **Svart slør i reportervelgeren.** `ReporterSheet` var det SISTE stedet i
+   appen som brukte `Modal` + `rgba(0,0,0,0.4)`. Nå `InlineSheet` +
+   `GlassSheetSurface` som dato-/klokkeslettarket: glass, ingen scrim,
+   siden bak står synlig. Feltet bruker `GLASS_FIELD`, radene OPAL-blekk og
+   blekk-tint ved trykk.
+3. **Knappene på hendelsessiden.** `secondary`-knappens kant er
+   `colors.border` (lys grå for den kremede grunnen) og forsvinner på glass.
+   Gjort: USVART RSVP = `primary` (fylt mint — «Kommer» er det siden ber
+   om), «Rediger»/«Sett opp igjen» får blekk-hårlinje (`OPAL.hairline`) via
+   lokal `onGlassEdge`-stil (INGEN endring i den delte `Button`), og
+   panelene er strammet (padding md/sm i stedet for lg).
+   ⚠️ ÅPENT: komposisjonen er fortsatt ETT ARK PER HANDLINGSRAD (fire lyse
+   plater under hverandre). Er det den Brage reagerer på, er neste steg
+   færre og tettere paneler — f.eks. RSVP + oppmøteliste i ETT ark, og
+   Rediger/Avlys nederst i stedet for rett under heroen.
+⚠️ **FELLE FUNNET:** `OPAL` lest i `StyleSheet.create` MÅ importeres direkte
+fra `../components/OpalSurface`, ikke fra barrelen — tester som mocker hele
+`../components` (tabBar) får ellers `undefined.inkSecondary` ved
+modul-lasting. Rettet i EventDetail, Lagkassa og Sesongen.
+✅ FULL SUITE: 1242 passed, 2 skipped, 87/87 suiter grønne.
+
+**2026-09-10, RUNDE 2 PÅ HENDELSESSIDEN — «de lyse boksene ser helt jævlig
+ut» (Brage). ÅRSAKEN, ikke symptomet:** jeg brukte `variant="sheet"` som
+KORT. `sheet` er `rgba(244,246,245,0.8)` — arkets nesten-hvite tunge perle,
+laget for flater som GLIR OPP over en side (Ny hendelse, månedsvisning) og
+for Profils undersider der de bærer tette lister. Kortet som LIGGER PÅ
+grunnen er `card` = FROST: mint perle `[214,244,230]` alfa **0,55**, sheen
+0,14 — det telefongodkjente feedkortet fra Hjem. 0,80 nesten-hvit × fire
+nesten TOMME plater = stablede adminbokser.
+**REGEL (skriv den ned):** ark = `sheet`, kort på grunnen = `card`.
+**Gjort:** hendelsessiden har nå TO tette frostkort i stedet for fire tomme
+plater — (1) handlingskortet: reporter + «Start kamp», hårlinje,
+Rediger/Avlys NEDERST (rettelser er ikke det man kom hit for), alle `ghost`;
+(2) oppmøtekortet: RSVP-bar + Kommer/Kan ikke + hårlinje + oppmøtelistene,
+fordi det er ÉN sak. `AttendanceSection` har ingen egen flate lenger.
+Info-heroen (trening/sosialt) → `card`. Lagkassa-siden: fire `sheet` → `card`
+samme runde (samme feil, ikke rapportert ennå).
+IKKE rørt: Sesongens kamplista/tomtilstander står fortsatt i `sheet` — de er
+tette lister, og siden er telefongodkjent («veldig bra»). Vurder ved neste
+dom.
+✅ FULL SUITE: 1242 passed, 2 skipped, 87/87 grønt.
+
+**2026-09-10, RUNDE 3 — BOKSENE FJERNET, IKKE BYTTET MATERIALE IGJEN.**
+To runder gikk med på å bytte tint (`sheet` 0,80 → `card`/FROST 0,55). Begge
+ble avvist. Diagnosen var feil: problemet er ikke TINTEN, det er at det står
+en PLATE RUNDT EN BAR KNAPPERAD. En boks rundt kontroller leser som
+adminpanel — nøyaktig det Heia ikke er. (Sammenlign Hjem: feedkortene ser
+bra ut fordi de bærer INNHOLD.)
+**Gjort:** hendelsessiden har nå TO flater totalt, og begge bærer innhold:
+(1) HEROEN eier sine egne kontroller — kampkortet (`StadiumGlass`) har fått
+hårlinje + `ReporterBar variant="match"` + «Start kamp» + foten
+«Rediger · Avlys kamp» som TEKSTKNAPPER (ny `HeroAction`, kritt-blekk på
+mørkt glass, Heia-blekk på det lyse info-kortet). Ingen plate rundt noe av
+det. (2) OPPMØTEKORTET: RSVP + hårlinje + listene.
+`actionCard`/`adminActions`/`adminAction`-stilene er slettet.
+**REPORTERVELGEREN ER RULLET TILBAKE.** Brage ba KUN om å fjerne det svarte
+sløret; jeg hadde bygget om hele arket til `InlineSheet`+`GlassSheetSurface`.
+Fila er satt tilbake til HEAD, og ENESTE endring er nå
+`backdrop.backgroundColor: 'rgba(0,0,0,0.4)' → 'transparent'` (4 linjer).
+⚠️ Hook-antallet endret seg under hot reload → «Rendered fewer hooks than
+expected». Krever FULL relansering, ikke bare Fast Refresh. App relansert i
+simulatoren og booter rent.
+⚠️ IKKE SETT: selve hendelsessiden er ikke inspisert etter runde 3 (kan ikke
+navigere dit uten trykk i simulatoren). Full suite 1242 grønn.
+**LÆRDOM (permanent):** ved visuell avvisning — ikke bytt token og send på
+nytt. Fjern det sist tilførte (her: platene), én variabel per runde.
+
+**2026-09-10, RUNDE 4 — KRASJ + RULLET TILBAKE TIL FORRIGE STRUKTUR.**
+- ⚠️ **KRASJ:** «appen døde når jeg bytter mellom kommer og kan ikke».
+  Årsak (sterkeste kandidat, ikke reprodusert): RSVP-en OG oppmøtelistene lå
+  inne i en `LiquidGlassSurface` — en legacy nativ view gjennom Fabrics
+  interop — og listene VOKSER/KRYMPER når man svarer. Barn som skifter under
+  en slik flate er den kjente fella (jf. `contentVersion`/GlassNudge).
+  **REGEL: aldri nativ glassflate rundt innhold som endrer antall rader.**
+  Glasset er fjernet; RSVP og listene står rett på grunnen igjen.
+- **Reporteren er UT av kampkortet igjen** (Brage: «vil ikke at reporter
+  greia skal være en del av den øverste hero»). Egen rad under heroen, med
+  `ReporterBar` i DEFAULT-variant, som før.
+- **Trening/sosialt har fått heroen sin tilbake**: `HeroSurface`
+  (mint→krem-gradient), ikke frostkort.
+- **Knappene ser ut som knapper**: `ghost`/`secondary` er tegnet for den
+  kremede grunnen og forsvinner på dagslysgrunnen. Nå bærer DET VALGTE
+  svaret fargen (primary mint / `selected`), og det andre får en ekte flate
+  (`styles.onGround`: hvit 0,72 + blekk-kant 0,14). Samme på «Rediger».
+- `HeroAction`, `actionCard`, `panelWrap`, `infoHeroWrap`, `kampdagDivider`
+  er slettet. Siden har igjen: hero (mørkt kampglass / lys HeroSurface) +
+  rader rett på grunnen. INGEN plate rundt kontroller.
+- App relansert i simulatoren: booter rent. Full suite 1242 grønn.
+  ⚠️ Selve hendelsessiden er fortsatt ikke inspisert (kan ikke navigere dit
+  uten trykk i simulatoren).
+
+**2026-09-10, RUNDE 5 — HENDELSESSIDEN RYDDET, SKYGGEN PÅ HJEM FJERNET.**
+- **Hjem:** `StadiumGlass` sin STORE flate hadde `boxShadow` blur 28 — under
+  et fullbreddes kort leser det som en STREK tvers over skjermen, ikke som
+  dybde (Brage: «et skille som en skygge … fjern denne»). Fjernet. Den
+  KOMPAKTE varianten (feedens kampinnlegg) beholder blur 16 — telefongodkjent.
+  `stadiumGlass.test` er oppdatert: hero = ingen skygge, compact = 16.
+- **Hendelsessiden er nå HERO + ÉN KOLONNE.** Alt under heroen ligger i ETT
+  kort, i rekkefølge: kampen (reporter + «Start kamp») → hårlinje →
+  påmeldingen (RSVP-bar + de to svarene) → hårlinje → hvem som kommer →
+  hårlinje → rettelsene nederst. Ett materiale, ett blekk, hårlinjer som
+  skiller. Forrige runde hadde hvit reporterplate + blek mint-boks + rød
+  tekst + kjempeknapp om hverandre; ingenting delte språk.
+- **`unbounded` på kolonnen** — tint+kant UTEN nativ backdrop. Det løser to
+  ting samtidig: en nativ glassflate kan ikke bli vilkårlig høy, OG barn som
+  skifter antall under en slik flate tok appen ned ved RSVP-bytte.
+- **Knappene:** ny `ReporterBar variant="plain"` (ingen plate, vanlig mørkt
+  blekk — den hvite plata inne i et lyst kort var eyesoren). RSVP: det VALGTE
+  svaret bærer fargen, det andre bærer en ekte flate (`styles.quietBtn`,
+  hvit 0,66 + blekk-kant 0,16). Samme flate på Rediger/Avlys. Ingen `ghost`
+  igjen på siden — ren tekst leste ikke som knapp.
+- **Hakkingen ved push:** `ProfilPage` monterer `DaylightGround` først etter
+  `InteractionManager.runAfterInteractions`. Lerretet er ett stort svg, og
+  rasteriseringen konkurrerte med push-animasjonen. Flaten under står
+  allerede i grunnens mint, så gradienten toner på plass rett etter landing.
+- Full suite 1242 grønn. App relansert i simulatoren, booter rent, og
+  skyggebåndet under Hjem-heroen er borte i skjermbildet.
+- ⚠️ Selve hendelsessiden er FORTSATT ikke inspisert (kan ikke navigere dit
+  uten trykk i simulatoren).
+
+**2026-09-10, RUNDE 6 — OPPMØTET KRYMPET TIL ÉN RAD.** Brage: «tar altfor
+mye plass til å bare være for hvem som kommer … boksen utvider seg … ser
+veldig billig ut». To feil i runde 5: (a) tre seksjoner med overskrift og én
+rad per person tok halve siden, (b) KORTET VOKSTE når man svarte, fordi en
+rad flyttet seg mellom «Kommer» og «Kan ikke».
+**Fiks:** `AttendanceSection` (3 stk) → ÉN `AttendanceStrip`: overlappende
+avatarstabel (maks 7 + «+n»), `minHeight: 32`. Fast høyde ⇒ svaret ditt
+flytter INGENTING. Tallene står allerede i `RSVPBar` rett over, så stripa
+svarer på HVEM; «kan ikke»/«har ikke svart» er tall der, ikke ansikter her.
+Hårlinja mellom RSVP og oppmøtet er fjernet — de er samme sak.
+`ListRow`-importen er ute. Full suite 1242 grønn.
+⚠️ Tapt funksjon (bevisst, si fra hvis det er feil): man ser ikke lenger
+NAVN på hvem som ikke kan / ikke har svart. Skal det tilbake, hører det
+hjemme bak et trykk, ikke i sidens faste høyde.
+
+**2026-09-10, RUNDE 7 — DEN HVITE STREKEN OVER KORTET.** `unbounded`-flatens
+høylys (`styles.unboundedTop`, hvit 0,55) er `left:0/right:0` og gikk rett
+forbi de RUNDE HJØRNENE — den stakk ut som en løs hvit strek over kortet.
+Koden påsto i en kommentar at den var «klippet av flatens egen radius»; det
+var den ikke. Fikset med `overflow: 'hidden'` på unbounded-containeren
+(`styles.unboundedClip`). Gjelder også Varsler-arkene, som bruker samme
+variant. Verifisert i simulatoren: ingen lys vannrett strek over kortet, og
+toppkanten følger nå radiusen. Full suite 1242 grønn.
+
+**2026-09-10, PASS 1 AV 2 — KAMPINNLEGGET I FEEDEN (Brages materialsystem).**
+Systemet Brage låste: Kalender/Sesongen beholder dagens tette kampflate ·
+upcoming hero (Hjem) + førkamp-hero = StadiumGlass · kampinnlegg i feed =
+COMPACT StadiumGlass · LIVE hero/målskive = den tette kampflaten (EGET PASS,
+sammen med resten av kampskjermen — IKKE blandet inn her).
+**Funn før bygging:** ytterflaten i feedens kampkort var ALLEREDE
+`StadiumGlass compact`. Det flate var (a) den indre «Fra kampen»-platen og
+(b) at `compact` kun endret SKYGGEN — materialet var ellers identisk med
+heroen, så de to konkurrerte.
+**Bygget:**
+1. `FROST.matchPlate` er snudd fra et LYST vaskelag (kritt 0,07 oppå
+   glasset) til en FORDYPNING: `rgba(3,30,22,0.30)`, med skygge langs
+   TOPPEN (`lipTop`) og et hint av lys langs BUNNEN (`lipBottom`) — motsatt
+   vei av en hevet flate, som er hele poenget. Ingen egne buer, ingen nytt
+   glasslag (to translusente lag oppå hverandre = grøt).
+2. `compact` er nå et EKTE materialtrinn: `GLASS.compactLight = 0.6` demper
+   lagrefleks, neon, aqua-opptak og topphøylys; `compactArcOuter/Inner`
+   legger buene lenger tilbake. Basen og KANTEN er urørt — de gir kortet
+   form, og et utvasket kort ville bare sett uskarpt ut.
+**Målt i simulatoren (tomme felt, RGB):** hero 31,98,62 · feedkortets ramme
+44,97,74 · fordypningen i feedkortet 26,71,51. Fordypningen er tydelig
+dypere enn både ramme og hero ⇒ hierarkiet leser riktig.
+Full suite 1242 grønn. IKKE rørt: Kalender, Sesongen, upcoming hero,
+førkamp-hero.
+▶️ **PASS 2 (ikke startet):** LIVE hero/målskive → tett kampflate som
+Kalender/Sesongen, sterk live-state (score/minutt i Heia-neon). Tas sammen
+med kampskjerm-skiva som venter telefondom.
+
+**2026-09-10, PASS 2 AV 2 — LIVE-MÅLSKIVA PÅ DEN TETTE KAMPFLATEN.**
+Målskiva i `LiveMatch` og `FinishedMatch` var `LiquidGlassSurface
+variant="score"` — gjennomskinnelig. På kampskjermens LYSE grunn mister et
+gjennomskinnelig kort vekt, og målskiva er det ene folk skal lese på
+avstand. Nå `StadiumSurface` (samme materialretning som kampkortene i
+Kalender/Sesongen): Heia-grønn base #0B1912→#143126, flomlys, banebuer.
+- **NY opt-in prop `arcTone="quiet"`** på StadiumSurface: buene legger seg I
+  flaten (0,07/0,05 mot 0,13/0,09). KUN målskiva sender den — `default` er
+  bit-identisk for Kalender og Sesongen.
+- **Minutt + kampstatus → `colors.heia`** (var `matchColors.text` på 0,9
+  opasitet). Stillingen sto allerede i neon med glød.
+- `borderRadius: 28` flyttet inn i `scoreCard`-stilen (glasset satte den før
+  som prop) — formen er uendret.
+- ⚠️ Den KOMPAKTE scorelinja i `MatchTopBar` er FORTSATT `barMatch`-glass.
+  Den er chrome, ikke kortet, og «ikke endre resten unødvendig» gjaldt. Se
+  etter på telefon om den nå føles for lett mot den tette målskiva.
+- **NY TEST `matchScoreSurface.test.ts`** (6 grønne): kildevakt for hele
+  materialsystemet — upcoming = StadiumGlass, feed = compact, målskive =
+  tett flate m/ quiet, Kalender/Sesongen sender ALDRI arcTone. De gamle
+  match-testene sjekket ikke materialet i det hele tatt.
+Full suite: 88 suiter, 1248 grønne.
+
+**2026-09-10 — VISNINGSFANENE LØSNET I OVERSCROLL (fikset).** Brage: «blar
+man oppover så flytter alt seg utenom den baren med referat/hendelser».
+ÅRSAK: `tabsTranslate` i `MatchChrome` brukte `extrapolate: 'clamp'` på
+BEGGE ender. Drar man forbi toppen blir `scrollY` negativ, output klemmes
+til `pin`, og fanene ble stående mens hele innholdet spratt nedover.
+FIKS: `extrapolateLeft: 'extend'` (for scrollY < 0 blir translateY = pin −
+scrollY, altså nøyaktig innholdets bevegelse) + `extrapolateRight: 'clamp'`
+(festepunktet består — det er hele grunnen til at fanene er skjermforankret
+chrome og ikke `stickyHeaderIndices`). NY test
+`matchChromeOverscroll.test.ts` (3 grønne) regner på interpolasjonen i
+stedet for å montere skjermen. Full suite: 89 suiter, 1251 grønne.
+
+**2026-09-10 — REFERATKORTENE STRAMMET OPP + «MEDLEM RAPPORTERTE»-BUGEN.**
+Referatet (`MatchViews`), etter Brages punktliste — opprydding, ikke ny
+retning:
+- **To trinn i samme LYSE familie.** `Card` tar nå `event`: reporterens
+  tekstkort får grønt dypvann `rgba(6,68,50,0.08)` oppå frostglasset,
+  hendelseskortet (mål) ett hakk dypere `0.16`. Mindre pastell, mer kamp —
+  og en hendelse leser ikke lenger som et vanlig innlegg. Ingen av dem blir
+  mørke som heroen.
+- **Målkortets tomrom er borte.** Stillingen sto på EGEN rad i motsatt
+  hjørne av målscoreren («1–0 flyter alene langt ute til høyre»). Nå henger
+  etikett + stilling + minutt sammen i ÉN rad (`eventTail`), og målscoreren
+  har hele bredden under. `tally` 26 → 19 pt fordi den nå bor i raden.
+  `goalRow`/`goalRowSpacer` er slettet.
+- **Heia/Kommenter er kompakte:** `pillHeia` minWidth 108 → 84,
+  `pill` paddingH 12 → 10, `more` 36 → 34, `textCard` fontSize 13.
+  ⚠️ HØYDEN ER IKKE RØRT: 36 pt er allerede under Apples 44, og å krympe
+  den videre ville vært et tilgjengelighetstap forkledd som design.
+**BUG (fikset):** «Etter kampen er slutt står det bare "medlem"
+rapporterte». Rosteret hentes MED VILJE ikke for en ferdig kamp
+(`needsRoster`), men `reporter` ble utledet fra nettopp rosteret → fallback
+`{name: 'Medlem'}`. Nå: roster → **forfattere** (`authorFor`, hentes for
+hver kamp, ingen statusfilter, kjenner også en reporter som har forlatt
+laget) → «Medlem» som siste utvei. Ingen nye nettkall. NY test
+`finishedReporterName.test.ts` (4 grønne). Full suite: 90 suiter, 1255.
+
+▶️ **NESTE:** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
+lagre → lander på Kalender UTEN frys; laghodet uten chip, sesongsiden («Ny kamp» og Lagkassa uten
+header-hopp, handlingsraden, «Ny kamp»-arket komplett fra første ramme), tilbakeknappen i ro OG kompakt, topp, scroll, fanene, Referat-kortene, «Siste hendelse for N min». Deretter én variabel per
+runde. Commit ETTER dom. Simulatorrigg-metoden (temp `useEffect` i
+`MainTabs` som navigerer til kamp + `scrollTo`-effekt, relanser m/ simctl —
+Fast Refresh avviser nye hooks) står i memory `kampskjerm_holistic_round`.
+
+---
+
 ## ▶️▶️ START HER (2026-09-07 — KAMPKNAPPEN LUKKET: iOS 26-UNDERSKARPHET UNDER BEVEGELSE, TELEFONGODKJENT OG COMMITTET)
 
 **Saken som sto åpen i to samtaler er løst.** Symptom (Brage): knappen

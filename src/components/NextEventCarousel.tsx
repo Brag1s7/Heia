@@ -13,6 +13,7 @@ import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
 import {Calendar} from './icons';
 import {NextEventHero} from './NextEventHero';
 import {HeroSurface} from './HeroSurface';
+import {MASTHEAD_CARD_GAP} from '../shared/headerGeometry';
 import {Skeleton} from './Skeleton';
 import {formatKr} from '../lib/money';
 import type {HeiaEvent} from '../shared/types';
@@ -94,6 +95,7 @@ export function NextEventCarousel({
             event={item.event}
             tournamentTitle={tournamentTitles?.[item.event.id]}
             onPress={() => onEventPress(item.event)}
+            mastheadCard={{right: spacing.lg, top: MASTHEAD_CARD_GAP}}
           />
         ) : item.kind === 'lagkassa' ? (
           <Pressable
@@ -101,7 +103,12 @@ export function NextEventCarousel({
             accessibilityRole="button"
             accessibilityLabel="Åpne lagkassa"
             style={({pressed}) => [styles.flexCard, pressed && styles.pressed]}>
-            <HeroSurface style={styles.lagkassaCard}>
+            {/* Buene fortsetter lerretets sirkel: kortet står `pageWrap`-
+                margen inn og MASTHEAD_CARD_GAP under laghodet. */}
+            <HeroSurface
+              style={styles.lagkassaCard}
+              arc="masthead"
+              mastheadCard={{right: spacing.lg, top: MASTHEAD_CARD_GAP}}>
               <Text style={styles.lagkassaPill}>💚 LAGKASSA</Text>
               {lagkassa ? (
                 lagkassa.supporters > 0 ? (

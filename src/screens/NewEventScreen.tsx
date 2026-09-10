@@ -25,10 +25,13 @@ import {
   createEvent,
   getBusyDays,
   getEventForEdit,
-  getTournaments,
   updateEvent,
   type TournamentOption,
 } from '../lib/api/events';
+import {
+  invalidateTournaments,
+  useTournaments,
+} from '../lib/queries/tournaments';
 import {
   addDays,
   dateFromDayKey,
@@ -68,6 +71,9 @@ const DEFAULT_TIME = '18:00';
 const DAYS_BACK = 30;
 const MONTHS_AHEAD = 18;
 
+/** Stabil identitet: en fersk tom array per render ville revet memoene. */
+const NO_TOURNAMENTS: TournamentOption[] = [];
+
 // «Turnering» sto lenge KUN på sesongsiden («+ Ny turnering»), for å ha ett
 // sted å lage dem. Brage 2026-08-06: den skal også ligge her, ved siden av
 // trening og kamp — det er her man er når man planlegger noe.
@@ -97,10 +103,34 @@ export function NewEventScreen({navigation, route}: Props) {
   // — full bredde, glir opp over skjermen du står på, dras ned for å lukke.
   // ALL lukking går via arket: utglidning først, så `navigation.goBack`.
   const sheetRef = useRef<FormSheetHandle>(null);
+  /**
+   * ⚠️ ALDRI NAVIGER ANDRE STEDER MENS ARKET FORTSATT ER OPPE (Brage
+   * 2026-09-09: «hele appen er fryst inne på kalendersiden»).
+   *
+   * Ruta er `transparentModal`, og på iOS er det en EKTE presentert
+   * view-controller (`UIModalPresentationOverFullScreen`) over HELE appen —
+   * tab-bar og alle faner inkludert. Lagringen gjorde `dismiss()` (JS-
+   * animasjon, ~250 ms) og byttet fane til Kalender i SAMME tick. Da sto
+   * modalen igjen presentert, gjennomsiktig og tom, over Kalender — bevist
+   * med `_printHierarchy` i lldb på den frosne appen: `RNSModalScreen …
+   * presented with _UIOverFullscreenPresentationController` mens Kalender
+   * var synlig. Alle trykk gikk til den usynlige modalen. JS og hovedtråd
+   * sto i ro; ingenting var i løkke.
+   *
+   * Rekkefølgen er derfor: gli ut → `goBack()` (popper modalen i den AKTIVE
+   * stacken) → én ramme senere det som skal skje etterpå (fanebytte).
+   */
+  const afterDismissRef = useRef<(() => void) | null>(null);
+  const onDismissed = useCallback(() => {
+    navigation.goBack();
+    const after = afterDismissRef.current;
+    afterDismissRef.current = null;
+    if (after) requestAnimationFrame(after);
+  }, [navigation]);
   const dismiss = useCallback(() => {
     if (sheetRef.current) sheetRef.current.dismiss();
-    else navigation.goBack();
-  }, [navigation]);
+    else onDismissed();
+  }, [onDismissed]);
   // Arkene (dato/klokkeslett) rendres i SKJERMROTEN som inline glassark —
   // ikke fra feltene, og ikke som `Modal` (se GlassSheet.tsx).
   const [dateSheet, setDateSheet] = useState<'start' | 'end' | null>(null);
@@ -147,27 +177,20 @@ export function NewEventScreen({navigation, route}: Props) {
   );
   // «Turnering»-feltet på en vanlig kamp: velges kun når det finnes noe å
   // velge i. null = vanlig seriekamp.
-  const [tournaments, setTournaments] = useState<TournamentOption[]>([]);
+  //
+  // Listen leses fra query-cachen (`useTournaments`), som sesongsiden har
+  // varmet FØR arket åpnes — så feltet står der fra første ramme i stedet
+  // for å dukke opp et blunk senere og dytte Motstander ned (Brage
+  // 2026-09-09). Kun den frie flyten trenger listen — de låste inngangene
+  // vet alt, og redigering flytter ikke en kamp mellom turneringer (egen
+  // skive). Feil = ingen liste = ingen felt, som før.
+  const tournamentsQuery = useTournaments(
+    isEdit || inTournament || isNewTournament ? null : activeTeamSpaceId,
+  );
+  const tournaments = tournamentsQuery.data ?? NO_TOURNAMENTS;
   const [selectedTournament, setSelectedTournament] = useState<string | null>(
     null,
   );
-
-  useEffect(() => {
-    // Kun den frie flyten trenger listen — de låste inngangene vet alt, og
-    // redigering flytter ikke en kamp mellom turneringer (egen skive).
-    if (isEdit || inTournament || isNewTournament || !activeTeamSpaceId) return;
-    let cancelled = false;
-    getTournaments(activeTeamSpaceId)
-      .then(list => {
-        if (!cancelled) setTournaments(list);
-      })
-      .catch(() => {
-        // Stille: uten liste vises ikke feltet, og kampen blir en vanlig kamp.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isEdit, inTournament, isNewTournament, activeTeamSpaceId]);
 
   const today = useMemo(() => startOfDay(new Date()), []);
 
@@ -444,6 +467,9 @@ export function NewEventScreen({navigation, route}: Props) {
           parentEventId ??
           (isMatch ? selectedTournament ?? undefined : undefined),
       });
+      // En ny turnering skal stå i «Turnering»-feltet på neste kamp med
+      // én gang — ikke om 60 s.
+      if (isTournament) invalidateTournaments(activeTeamSpaceId);
       // Hvor man lander (Brage 2026-08-06):
       //   fra Sesong          → tilbake til Sesong (goBack alene)
       //   fra turneringsside  → bli stående på turneringen
@@ -452,15 +478,18 @@ export function NewEventScreen({navigation, route}: Props) {
       // Turneringen vises nå i kalenderen som alle andre objekter, så det
       // er ingen grunn til å holde den unna lenger — men den skal treffes,
       // ikke ligge et sted i lista.
-      dismiss();
       if (!inTournament && !isNewTournament) {
-        navigation
-          .getParent<NavigationProp<RootTabParamList>>()
-          ?.navigate('KalenderStack', {
+        // Fanebyttet skjer ETTER at modalen er poppet — se `onDismissed`.
+        // Forelderen (fanenavigatoren) hentes nå, mens ruta lever.
+        const tabs = navigation.getParent<NavigationProp<RootTabParamList>>();
+        const focusDate = dayKey(day);
+        afterDismissRef.current = () =>
+          tabs?.navigate('KalenderStack', {
             screen: 'KalenderList',
-            params: {focusDate: dayKey(day)},
+            params: {focusDate},
           });
       }
+      dismiss();
       if (isTournament) {
         Alert.alert(
           'Turneringen er opprettet',
@@ -559,7 +588,7 @@ export function NewEventScreen({navigation, route}: Props) {
         <FormSheet
           ref={sheetRef}
           title={sheetTitle}
-          onDismissed={navigation.goBack}
+          onDismissed={onDismissed}
           reducedMotion={reducedMotion}>
           <View style={styles.centered}>
             {loadError ? (
@@ -583,7 +612,7 @@ export function NewEventScreen({navigation, route}: Props) {
       <FormSheet
         ref={sheetRef}
         title={sheetTitle}
-        onDismissed={navigation.goBack}
+        onDismissed={onDismissed}
         reducedMotion={reducedMotion}>
         <ScrollView
           contentContainerStyle={{paddingBottom: insets.bottom + spacing.lg}}

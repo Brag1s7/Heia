@@ -32,7 +32,7 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 import {FinishedMatch} from '../src/components/match/FinishedMatch';
-import {colors} from '../src/theme';
+import {colors, matchColors} from '../src/theme';
 import type {MatchPhoto} from '../src/lib/api/feed';
 import type {HeiaEventDetail, MatchEvent} from '../src/shared/types';
 
@@ -186,31 +186,28 @@ function texts(tree: ReactTestRenderer.ReactTestRenderer): string[] {
   });
 }
 
+/** Bytter visning via den segmenterte kontrollen. */
+function openTab(tree: ReactTestRenderer.ReactTestRenderer, label: string) {
+  const tab = tree.root.find(
+    n =>
+      n.props.accessibilityRole === 'tab' &&
+      n.props.accessibilityLabel === label,
+  );
+  act(() => tab.props.onPress());
+}
+
 describe('rapporten monterer som én grønn verden', () => {
   it('tegner uten å kaste — med og uten trenerrettigheter', () => {
     expect(render().toJSON()).toBeTruthy();
     expect(render({isAdmin: false}).toJSON()).toBeTruthy();
   });
 
-  it('bruker INGEN av appens lyse flater', () => {
-    // Samme regel som kampen, og den gjelder nettopp fordi rapporten arvet
-    // tre flater som VAR lyse i går: bildestripa, påmeldtlisten og
-    // «Rediger»-knappen.
-    const forbidden = [
-      colors.background,
-      colors.surfaceMuted,
-      colors.sun,
-      colors.border,
-      colors.borderSubtle,
-      colors.textSecondary,
-      colors.textTertiary,
-    ].map(c => c.toUpperCase());
-
+  it('står i dagslys (runde 2): mintgrunn, aldri det mørke rommet', () => {
     for (const variant of [{}, {isAdmin: false}]) {
       const used = usedColors(render(variant));
-      for (const bad of forbidden) {
-        expect(used).not.toContain(bad);
-      }
+      expect(used).toContain(matchColors.dayMid.toUpperCase());
+      expect(used).not.toContain(matchColors.groundTop.toUpperCase());
+      expect(used).not.toContain(colors.sun.toUpperCase());
     }
   });
 
@@ -218,20 +215,23 @@ describe('rapporten monterer som én grønn verden', () => {
     expect(usedColors(render())).not.toContain(colors.live.toUpperCase());
   });
 
-  it('gir bildestripa kampvarianten — også lasteplaten under thumben', () => {
-    // Stripa vises KUN på ferdig kamp, så skive 3 er første gang varianten
-    // faktisk brukes. Uten den blinker den krem mens thumbene dekodes.
-    const t = texts(render());
-    expect(t).toContain('Kampbilder');
-    expect(t).toContain('2 bilder');
+  it('legger bildene i Bilder-fanen — som trykkbare bilder', () => {
+    const tree = render();
+    openTab(tree, 'Bilder');
+    const images = tree.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        n.props.accessibilityRole === 'imagebutton',
+    );
+    expect(images).toHaveLength(2);
   });
 });
 
 describe('rapporten leses forfra', () => {
-  it('snur forløpet: «Kampens historie», ikke «Det som skjer»', () => {
+  it('viser ingen levende retningsmarkør — kampen er historie', () => {
     const t = texts(render());
-    expect(t).toContain('Kampens historie');
     expect(t).not.toContain('Det som skjer');
+    expect(t).not.toContain('Kampens puls');
   });
 
   it('setter markøren til SLUTT i stedet for et levende minutt', () => {
@@ -240,8 +240,11 @@ describe('rapporten leses forfra', () => {
     expect(t.some(x => x.startsWith('NÅ ·'))).toBe(false);
   });
 
-  it('åpner med avspark og ender med slutt', () => {
-    const t = texts(render());
+  it('åpner med avspark og ender med slutt — i Hendelser', () => {
+    const tree = render();
+    openTab(tree, 'Hendelser');
+    const t = texts(tree);
+    expect(t.indexOf('Avspark')).toBeLessThan(t.indexOf('Slutt'));
     expect(t.indexOf('0′')).toBeLessThan(t.indexOf('50′'));
   });
 });
@@ -250,41 +253,39 @@ describe('det som fulgte med ned på grunnen', () => {
   it('lar treneren fortsatt rette kampen — ellers finnes ingen vei dit', () => {
     const onEdit = jest.fn();
     const tree = render({onEdit});
+    openTab(tree, 'Info');
     const button = tree.root.find(
       n => n.props.accessibilityLabel === 'Rediger kampen',
     );
     act(() => button.props.onPress());
     expect(onEdit).toHaveBeenCalled();
     // Og den finnes ikke for et vanlig medlem.
+    const member = render({isAdmin: false});
+    openTab(member, 'Info');
     expect(
-      render({isAdmin: false}).root.findAll(
-        n => n.props.accessibilityLabel === 'Rediger kampen',
-      ),
+      member.root.findAll(n => n.props.accessibilityLabel === 'Rediger kampen'),
     ).toHaveLength(0);
   });
 
-  it('viser de påmeldte som ÉTT stopp, med barnets navn og ikke forelderens', () => {
-    const group = render().root.find(
-      n =>
-        typeof n.props.accessibilityLabel === 'string' &&
-        n.props.accessibilityLabel.startsWith('Påmeldt'),
-    );
-    expect(group.props.accessible).toBe(true);
-    expect(group.props.accessibilityLabel).toContain('Påmeldt, 6.');
-    expect(group.props.accessibilityLabel).toContain('Noah Lie');
-    expect(group.props.accessibilityLabel).not.toContain('Kari Lie');
-  });
-
-  it('teller resten bak «+N» i stedet for å tegne hele stallen', () => {
-    expect(texts(render())).toContain('+1');
+  it('viser de påmeldte i Info, med barnets navn og ikke forelderens', () => {
+    const tree = render();
+    openTab(tree, 'Info');
+    const t = texts(tree);
+    expect(t).toContain('Påmeldt · 6');
+    expect(t.some(x => x.includes('Noah Lie'))).toBe(true);
+    expect(t.some(x => x.includes('Kari Lie'))).toBe(false);
   });
 });
 
 describe('arenaen bærer «når» — resten er stille', () => {
   it('viser datoen og stedet, ikke en egen «hvor og når»-linje', () => {
-    const t = texts(render());
+    const tree = render();
+    const t = texts(tree);
     expect(t).toContain('20. aug · 18:00');
-    expect(t).toContain('Briskeby kunstgress 2');
+    // Stedet bor i Info (runde 2), ikke på scorekortet.
+    expect(t).not.toContain('Briskeby kunstgress 2');
+    openTab(tree, 'Info');
+    expect(texts(tree)).toContain('Briskeby kunstgress 2');
     // Den gamle rapportens undertekst skal ikke ha overlevd flyttingen.
     expect(t.some(x => x.includes('torsdag 20. august'))).toBe(false);
   });

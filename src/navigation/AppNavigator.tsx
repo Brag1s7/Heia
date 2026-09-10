@@ -198,10 +198,8 @@ function HomeStackNavigator() {
         options={daylightGroundOptions}
       />
       <HomeStack.Screen name="Comments" component={CommentsScreen} />
-      {/* ⚠️ SAMME KOMPONENT SOM I `KampStack`. «Sesongen»-snarveien i
-          laghodet er en HJEM-inngang: du kom fra Hjem, og «tilbake» skal
-          føre til Hjem. Flere ruter til én skjerm, ikke to sannheter. */}
-      <HomeStack.Screen name="Season" component={SeasonScreen} />
+      {/* Sesongen bor KUN i Kamp-fanen (Brage 2026-09-09: «Sesongen»-
+          chippen i laghodet er fjernet — tab-baren er inngangen). */}
     </HomeStack.Navigator>
   );
 }
@@ -442,7 +440,7 @@ export function MainTabs() {
   const navigation = useNavigation<NavigationProp<RootTabParamList>>();
   const {activeTeamSpaceId} = useActiveTeam();
   const {unreadCount, refreshUnreadIfStale} = useNotifications();
-  const {state: matchButton, press: pressMatch, inMatch} = useMatchButton();
+  const {state: matchButton, press: pressMatch} = useMatchButton();
   const insets = useSafeAreaInsets();
   const {width: windowWidth} = useWindowDimensions();
 
@@ -461,7 +459,10 @@ export function MainTabs() {
    * Det er en tint, ikke en «stadionvariant av baren» (P4-poenget om
    * reflow står: stilobjektet er det samme i alle kampknappens tilstander).
    */
-  const environment: TabBarEnvironment = inMatch ? 'match' : 'light';
+  // Runde 2 (2026-09-07): kampsiden er LYS (dagslysgrunn), så kapselen står
+  // i lyst miljø overalt. `match`-miljøet beholdes i TabBarGlass for et
+  // eventuelt mørkt rom senere.
+  const environment: TabBarEnvironment = 'light';
   const tabBarStyle = useMemo(
     () =>
       TAB_BAR_GLASS_AB

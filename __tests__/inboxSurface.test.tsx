@@ -152,7 +152,9 @@ describe('4. InboxScreen: rullende ark, ekte glass, aldri høyere enn skjermen',
 
   it('lista ligger rett i kroppen — spinneren står på grunnen', () => {
     const chrome = src.indexOf('<InboxChrome');
-    const list = src.indexOf('<FlatList');
+    // JSX-ELEMENTET, ikke en typeannotasjon: `useRef<FlatList>` inneholder
+    // samme tegnfølge og lå tidligere i fila enn chromen (2026-09-10).
+    const list = src.search(/\n\s*<FlatList/);
     const glass = src.indexOf('<LiquidGlassSurface', chrome);
     expect(chrome).toBeGreaterThan(-1);
     expect(list).toBeGreaterThan(chrome);

@@ -12,6 +12,7 @@ import {
   useFocusEffect,
   useIsFocused,
   useNavigation,
+  useScrollToTop,
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
@@ -117,6 +118,8 @@ export function InboxScreen() {
   // abonnementsløpet ved hver liste-endring.
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const listRef = useRef<FlatList>(null);
+  useScrollToTop(listRef);
   const loadedTeamRef = useRef<string | null>(null);
   // Sekvensvern for alt asynkront mot `items`: telleren bumpes ved lagbytte
   // og ved hver nullstilling, og et svar som landet ETTER at verden gikk
@@ -639,6 +642,7 @@ export function InboxScreen() {
             oppfrisk-spinneren står på grunnen over dem — som i den
             godkjente versjonen (6e7c88c). */}
         <FlatList
+          ref={listRef}
           data={blocks}
           renderItem={renderBlock}
           keyExtractor={blockKeyExtractor}

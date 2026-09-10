@@ -10,7 +10,15 @@ import type {HeiaEvent, EventType} from '../shared/types';
 interface EventCardProps {
   event: HeiaEvent;
   onPress?: () => void;
+  /**
+   * ⚠️ `featured` BETYR LIVE, og korallkanten er live-signalet (Kalender og
+   * turneringssiden sender `matchStatus === 'live'`). Bruk den ALDRI for
+   * «dagens kamp» — da lyver kortet om at kampen er i gang (Brage
+   * 2026-09-10: «kortet får en rød strek»). Dagens kamp = `today`.
+   */
   featured?: boolean;
+  /** Dagens kamp: mint hårlinje. Ignoreres når kampen faktisk er live. */
+  today?: boolean;
   /** Kalenderarkivet: fortidskort dempes og oppmøtet skjules — historikk
       skal ikke konkurrere med det som kommer. */
   past?: boolean;
@@ -31,7 +39,9 @@ const typePill: Record<EventType, {kind: PillKind; label: string}> = {
 };
 
 function formatTime(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes(),
+  ).padStart(2, '0')}`;
 }
 
 /** Samme datospråk som Hjem-heroen: «I dag», «I morgen», «Fredag 12. jun». */
@@ -39,7 +49,9 @@ function dayLabel(d: Date): string {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const eventDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const diffDays = Math.round((eventDay.getTime() - today.getTime()) / 86400000);
+  const diffDays = Math.round(
+    (eventDay.getTime() - today.getTime()) / 86400000,
+  );
   if (diffDays === 0) return 'I dag';
   if (diffDays === 1) return 'I morgen';
   const label = d.toLocaleDateString('nb-NO', {
@@ -80,6 +92,7 @@ export function EventCard({
   event,
   onPress,
   featured = false,
+  today = false,
   past = false,
   hideDay = false,
 }: EventCardProps) {
@@ -99,7 +112,7 @@ export function EventCard({
   const stadium = event.type === 'kamp' && !isCancelled;
   const pill = isCancelled
     ? {kind: 'neutral' as PillKind, label: 'Avlyst'}
-    : (typePill[event.type] ?? typePill.annet);
+    : typePill[event.type] ?? typePill.annet;
 
   // Pillen sier alt «Kamp» — standardtittelen strammes til «Mot Lyn».
   // Egendefinerte titler («Seriefinalen») vises som de er.
@@ -134,9 +147,7 @@ export function EventCard({
             </Text>
           )}
         </View>
-        <Text style={[styles.time, stadium && styles.timeStadium]}>
-          {time}
-        </Text>
+        <Text style={[styles.time, stadium && styles.timeStadium]}>{time}</Text>
       </View>
 
       <Text
@@ -197,9 +208,13 @@ export function EventCard({
         onPress={onPress}
         style={({pressed}) => [past && styles.past, pressed && styles.pressed]}>
         <StadiumSurface
-          style={[styles.darkCard, featured && styles.featured]}
+          style={[
+            styles.darkCard,
+            featured && styles.featured,
+            !featured && today && styles.today,
+          ]}
           flood={false}
-          bordered={!featured}>
+          bordered={!featured && !today}>
           {content}
         </StadiumSurface>
       </Pressable>
@@ -226,9 +241,16 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     ...shadows.card,
   },
+  // LIVE — korall, og bare her.
   featured: {
     borderWidth: 1,
     borderColor: colors.live,
+  },
+  // I DAG — mint hårlinje: tydelig mer enn stadionkanten (0,13), langt
+  // roligere enn live.
+  today: {
+    borderWidth: 1,
+    borderColor: 'rgba(2, 255, 171, 0.45)',
   },
   past: {
     opacity: 0.6,

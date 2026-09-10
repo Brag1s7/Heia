@@ -1,23 +1,13 @@
 import React, {useState} from 'react';
-import {View, Text, Pressable, StatusBar, StyleSheet} from 'react-native';
+import {View, Text, StatusBar, StyleSheet} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {useIsFocused} from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
 import {useActiveTeam} from '../context';
-import {StadiumSurface} from './StadiumSurface';
 import {TeamBadge} from './TeamBadge';
-import {Trophy} from './icons';
 import {teamSpotlight} from '../shared/teamColors';
 import {nameMaxWidth} from '../shared/masthead';
 import {HEADER_FOOT_HEIGHT} from '../shared/headerGeometry';
-
-interface TeamHeaderProps {
-  /**
-   * Viser en «Sesongen»-chip til høyre som åpner sesongflaten. Kun Hjem
-   * sender den — de andre fanene har ikke Season-skjermen i stacken sin.
-   */
-  onSeasonPress?: () => void;
-}
 
 /** Logoplate 38 + 2×2 luft. Navneblokken starter etter padding + plate + gap. */
 const LOGO_PLATE = 42;
@@ -40,7 +30,7 @@ const NAME_START = spacing.lg + LOGO_PLATE + spacing.md;
  * Høyden er som før: insets.top + 42 + 12 = 113 pt på iPhone med Dynamic
  * Island — nøyaktig `mastheadHeight`, som lerretet regner med.
  */
-export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
+export function TeamHeader() {
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const {activeTeamSpace, activeTeam, activeMemberCount} = useActiveTeam();
@@ -110,28 +100,6 @@ export function TeamHeader({onSeasonPress}: TeamHeaderProps) {
           </Text>
         )}
       </View>
-      {onSeasonPress && (
-        <Pressable
-          onPress={onSeasonPress}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Sesongen"
-          style={({pressed}) => [
-            styles.seasonWrap,
-            pressed && styles.seasonPressed,
-          ]}>
-          {/* Kampdata bor på mørk stadionflate — også som liten chip. Den
-              står på den mørke høyresiden, så stadionkanten er alltid på. */}
-          <StadiumSurface
-            style={styles.seasonChip}
-            flood={false}
-            arc={false}
-            bordered>
-            <Trophy size={14} color={colors.heia} strokeWidth={2.2} />
-            <Text style={styles.seasonText}>Sesongen</Text>
-          </StadiumSurface>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -171,26 +139,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.1,
     marginTop: 1,
-  },
-  seasonWrap: {
-    marginLeft: 'auto',
-  },
-  seasonPressed: {
-    opacity: 0.7,
-  },
-  seasonChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-  },
-  seasonText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: colors.stadiumText,
   },
 });

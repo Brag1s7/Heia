@@ -1,17 +1,28 @@
-import React, {useMemo} from 'react';
-import {Animated, StatusBar, StyleSheet, Text, View} from 'react-native';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
+import {Animated, ScrollView, StatusBar, StyleSheet, View} from 'react-native';
 import {useBottomContentPadding} from '../useBottomContentPadding';
 import {useIsFocused} from '@react-navigation/native';
-import {matchColors, spacing} from '../../theme';
-import {MatchTimeline} from '../MatchTimeline';
+import {spacing} from '../../theme';
 import type {ReporterActionType} from '../ReporterActions';
-import {ReporterBar} from '../ReporterBar';
+import {StadiumSurface} from '../StadiumSurface';
 import {useGoalMoment} from '../useGoalMoment';
-import {ArenaSurface} from './ArenaSurface';
 import {MatchArena} from './MatchArena';
+import {
+  MatchChromeOverlay,
+  MATCH_TABS_SLOT_H,
+  useHeldMatchData,
+  useMatchChrome,
+} from './MatchChrome';
 import {MatchGround} from './MatchGround';
-import {MatchPulse} from './MatchPulse';
 import {MatchTopBar, useMatchTopBar} from './MatchTopBar';
+import {
+  lastEventLabel,
+  MatchEventsView,
+  MatchInfoView,
+  MatchPhotosView,
+  MatchReferat,
+} from './MatchViews';
+import type {MatchViewKey} from './MatchViewTabs';
 import {ReporterDock, REPORTER_DOCK_HEIGHT} from './ReporterDock';
 import {MatchToast} from './MatchToast';
 import type {MatchPhoto} from '../../lib/api/feed';
@@ -22,33 +33,32 @@ import type {HeiaEventDetail, MatchEvent, User} from '../../shared/types';
  * KAMPEN, LIVE — hele skjermen, fra statuslinje til tab-bar.
  *
  * ---------------------------------------------------------------------------
- * HVORFOR DEN BOR HER OG IKKE I `EventDetailScreen`
+ * RUNDE 2 (2026-09-07): DAGSLYS, SCOREKORT, FASTE FANER
  *
- * Skjermen var 1490 linjer og betjente fire forskjellige ting (trening,
- * kommende kamp, live kamp, kamprapport) i ett stykke JSX. Kampen er den
- * eneste av dem som har sin egen VERDEN — egen grunn, eget blekk, egen
- * statuslinje — og å blande den inn i den lyse flaten gjorde hver endring på
- * kampen til en risiko for de tre andre.
+ * Rekkefølgen er: samlet scorekort → visningsfaner → innholdet i valgt
+ * visning (Referat nyeste først). Når scorekortet ruller ut, blir toppbaren
+ * den kompakte scorelinja og fanene fester seg under den (`MatchTopBar`,
+ * `MatchChrome`). Reporterraden, pulsen og det mørke kampforløpet er borte
+ * fra denne flaten: reporteren bor i Info (og i dokken), hendelsene i
+ * Hendelser.
  *
  * Det som IKKE flyttet: state, handlere, realtime, query-cachen og
- * modalene. De hører til skjermen og dens livssyklus (B2). Denne komponenten
- * er FLATEN, og tar alt den viser som props. Rutene og de tre stackene er
- * urørt.
+ * modalene. De hører til `EventDetailScreen` (B2). Denne komponenten er
+ * FLATEN, og tar alt den viser som props.
  *
  * ---------------------------------------------------------------------------
- * INGEN HVITE FLEKKER PÅ GRØNT
+ * NYE HENDELSER FLYTTER IKKE TEKSTEN
  *
- * Alt som tegner seg selv lyst måtte få en kampvariant i samme slag:
- * `BackBar`, `ReporterBar`, `ReporterActions`, statuslinja, og
- * «Du følger kampen direkte», som var et hvitt kort midt i kampverdenen.
- * Hvite kort er admin-språket i Heia — de hører ikke hjemme her.
+ * Har brukeren scrollet forbi fanenes festepunkt, holdes nye rader tilbake
+ * (`useHeldMatchData`) og «1 ny hendelse» vises under fanene. Stillingen og
+ * kampstatusen kommer fra `event.score`/`matchStatus` og oppdateres alltid.
  */
 
 interface LiveMatchProps {
   event: HeiaEventDetail;
   /** Vårt lags visningsnavn. */
   teamName: string;
-  /** Lagets farge — verdenens og arenaens lys. */
+  /** Lagets farge — scorekortets lys og målfloden. */
   teamColor: string;
   /**
    * Kampminuttet NÅ, regnet ut ÉN gang av skjermen.
@@ -57,39 +67,25 @@ interface LiveMatchProps {
    * kaller `Date.now()`.
    */
   minute?: number;
-  /**
-   * Klokkeslettet NÅ, fra SAMME tick som `minute` (P2).
-   *
-   * ⚠️ TO TALL, TO AKSER, MED VILJE. `minute` er FAKTISK SPILT TID og er en
-   * etikett; `nowMs` er klokketid og er en POSISJON. Etter 00073 hopper ikke
-   * spilt tid over pausen, mens hendelsenes `created_at` gjør det — brukes
-   * `minute` til å plassere noe på pulsen, havner det for langt til venstre.
-   */
+  /** Klokkeslettet NÅ, fra SAMME tick som `minute` (P2). Ferskheten
+   * («Siste hendelse for 3 min») regnes mot denne. */
   nowMs?: number;
   reporter?: User;
   isAdmin: boolean;
   isReporter: boolean;
   /**
    * Kampens hendelser. Kommer som prop med STABIL REFERANSE fra skjermen
-   * (`NO_MATCH_EVENTS`), ikke som `event.matchEvents ?? []`: en fersk tom
-   * array per render ville gjort hver memo her inne verdiløs — og
-   * minuttickeren re-rendrer skjermen hvert 30. sekund.
+   * (`NO_MATCH_EVENTS`), ikke som `event.matchEvents ?? []`.
    */
   matchEvents: MatchEvent[];
   photos: MatchPhoto[];
   authorFor: (userId: string) => User | undefined;
-  /**
-   * HEIA + kommentarer per øyeblikk (skive 4), som oppslag.
-   *
-   * Pulsen leser HEIA-summene HERFRA i stedet for å hente dem på nytt — det
-   * er de samme tallene engasjementslinjene i forløpet viser, og to kilder
-   * kunne vist ulikt antall heier på det samme målet i samme scroll.
-   */
+  /** HEIA + kommentarer per øyeblikk (skive 4), som oppslag. */
   engagement: {
     byMatchEvent: Map<string, MatchEngagement>;
     byPost: Map<string, MatchEngagement>;
   };
-  /** HEIA + kommentarer per øyeblikk (skive 4) — se `MatchTimeline`. */
+  /** HEIA + kommentarer per øyeblikk — skjermen eier handlerne. */
   renderEngagement?: (entry: {
     event?: MatchEvent;
     photo?: MatchPhoto;
@@ -98,17 +94,10 @@ interface LiveMatchProps {
   onReporterAction: (type: ReporterActionType) => void;
   onPickPhoto: () => void;
   onPressPhoto: (photo: MatchPhoto) => void;
-  /**
-   * Reporterdokken er åpen (skive 10). Styres av RAPPORTER-knappen i
-   * tab-baren; tilstanden bor i `EventDetailScreen` som alt annet her.
-   */
+  /** Reporterdokken er åpen (skive 10). Styres av RAPPORTER-knappen. */
   reporterDockOpen?: boolean;
-  /** Dokken ble dratt ned. */
   onCloseReporterDock?: () => void;
-  /**
-   * Kvitteringen på reporterens EGEN handling — «Mål registrert» osv.
-   * `null` = ingenting å vise. Se `MatchToast`.
-   */
+  /** Kvitteringen på reporterens EGEN handling. `null` = ingenting. */
   toast?: string | null;
   onToastHidden?: () => void;
 }
@@ -125,7 +114,7 @@ export function LiveMatch({
   isReporter,
   photos,
   authorFor,
-  engagement,
+  engagement: _engagement,
   renderEngagement,
   onChangeReporter,
   onReporterAction,
@@ -136,51 +125,50 @@ export function LiveMatch({
   toast = null,
   onToastHidden,
 }: LiveMatchProps) {
-  // Kapselen ligger over kampforløpet: barhøyde + pust, safe area telles
-  // én gang (inne i barhøyden). Se `useBottomContentPadding`.
+  // Kapselen ligger over innholdet: barhøyde + pust, safe area telles én
+  // gang (inne i barhøyden). Se `useBottomContentPadding`.
   const bottomPad = useBottomContentPadding(spacing['3xl']);
   const isFocused = useIsFocused();
+  const scrollRef = useRef<ScrollView>(null);
+  const [view, setView] = useState<MatchViewKey>('referat');
 
   const paused = event.matchStatus === 'halfTime';
   const home = event.score?.home ?? 0;
   const away = event.score?.away ?? 0;
 
-  // Toppflaten som blir stillingen når arenaen ruller ut av bildet. All
-  // mekanikk ligger i `useMatchTopBar` — se den for hvorfor båndet MÅLES og
-  // hvorfor terskelen bor i en ref.
+  // Toppflaten som blir scorelinja når kortet ruller ut, og fanene som
+  // fester seg under den. Begge drives av samme scrollY på native driver.
   const topBar = useMatchTopBar();
+  const chrome = useMatchChrome(topBar.scrollY);
 
-  // Omgangen leses av forløpet, ikke av klokka. Det er den ENESTE kilden vi
-  // har i dag som er sann: `andre_omgang` skrives av reporteren, mens et
-  // minutt-tall ikke sier noe om hvilken omgang det tilhører før kampuret
-  // blir serverautoritativt (P2, skive 7).
+  // Lista holdes mens brukeren leser — se MatchChrome.
+  const live = useMemo(() => ({matchEvents, photos}), [matchEvents, photos]);
+  const held = useHeldMatchData(live, chrome.reading);
+
+  const flushAndTop = useCallback(() => {
+    held.flush();
+    scrollRef.current?.scrollTo({y: 0, animated: true});
+  }, [held]);
+
+  // Omgangen leses av forløpet, ikke av klokka — den eneste sanne kilden
+  // til kampuret blir serverautoritativt (P2).
   const secondHalf = useMemo(
     () => matchEvents.some(e => e.type === 'andre_omgang'),
     [matchEvents],
   );
 
-  // ÉN kilde til måløyeblikket: spretten på tallet og floden over verdenen
-  // fyrer fra samme endring. To `useGoalMoment` ville gitt to animasjoner
-  // som drifter fra hverandre.
+  const freshness = useMemo(
+    () => lastEventLabel(matchEvents, nowMs) ?? 'Ingen hendelser ennå',
+    [matchEvents, nowMs],
+  );
+
+  // ÉN kilde til måløyeblikket: spretten på tallet og floden over verdenen.
   const {scoreScale, celebrate} = useGoalMoment(home, away);
 
   /**
-   * ⚠️ KONSTANT. DETTE VAR ÅRSAKEN TIL AT DOKKEN «KOM HAKKETE OPP» OG
-   * «HOPPET STYGT NED» (Brage 2026-08-21, tredje telefonrunde).
-   *
-   * Padding-en var `… + (reporterDockOpen ? DOCK_HEIGHT : 0)` i et INLINE
-   * objekt. Da endret innholdshøyden seg i NØYAKTIG det øyeblikket dokken
-   * animerte: `ScrollView` måtte måle og legge ut hele kampforløpet på nytt
-   * mens en animasjon kjørte på samme skjerm. En layout-pass som slåss med
-   * en animasjon blir hakk — hver gang, uansett hvor pen easing-en er.
-   *
-   * Plassen RESERVERES derfor permanent for reporteren. Hun har dokken
-   * tilgjengelig hele kampen; at forløpet har litt ekstra luft i bunnen når
-   * den er lukket, koster ingenting. Tilskuere får den ikke i det hele tatt.
-   *
-   * At objektet i tillegg er memoisert er den andre halvparten: et nytt
-   * objekt per render ville gitt `ScrollView` en ny `contentContainerStyle`
-   * ved hvert minutt-tick.
+   * ⚠️ KONSTANT PADDING. Plassen for dokken RESERVERES permanent for
+   * reporteren — en innholdshøyde som endrer seg i det dokken animerer
+   * gjorde dokken hakkete (Brage 2026-08-21). Memoisert av samme grunn.
    */
   const scrollPad = useMemo(
     () => ({
@@ -189,119 +177,110 @@ export function LiveMatch({
     [bottomPad, isReporter],
   );
 
+  const opponent = event.opponent ?? '';
+
   return (
     <MatchGround
       teamColor={teamColor}
       phase={paused ? 'paused' : 'live'}
       celebrate={celebrate}>
-      {/* Fokusvakt som i ProfileHeader: uten den ville kampen styrt
-          statuslinja videre på skjermer som pushes oppå den. */}
-      {isFocused && <StatusBar barStyle="light-content" />}
+      {/* Lys grunn → mørk statuslinje. Fokusvakt som i ProfileHeader. */}
+      {isFocused && <StatusBar barStyle="dark-content" />}
 
-      {/* TOPPFLATEN. Navlinja og stillingen er SAMME rad — se `MatchTopBar`
-          for hvorfor runde 1s `stickyHeaderIndices` ikke kunne bli myk. */}
       <MatchTopBar
         progress={topBar.progress}
         shown={topBar.shown}
         homeTeam={teamName}
-        awayTeam={event.opponent ?? ''}
+        awayTeam={opponent}
         homeScore={home}
         awayScore={away}
         phase={paused ? 'paused' : 'live'}
         minute={minute}
+        secondHalf={secondHalf}
       />
 
       <Animated.ScrollView
+        ref={scrollRef}
         contentContainerStyle={scrollPad}
         onScroll={topBar.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}>
-        {/* ⚠️ ARENAEN MÅLER SEG SELV. Krysstoningens bånd legges der
-            stillingen forlater toppen, og den høyden er ikke den samme i en
-            live kamp som i en rapport — eller med stor tekst. */}
-        <View onLayout={topBar.onArenaLayout}>
-          <ArenaSurface teamColor={teamColor} style={styles.arena}>
+        {/* ⚠️ SCOREKORTET MÅLER SEG SELV: krysstoningens bånd legges der
+            stillingen forlater toppen, og høyden varierer med stablet
+            layout og tekststørrelse. */}
+        <View onLayout={topBar.onArenaLayout} style={styles.scoreWrap}>
+          {/* ⚠️ MÅLSKIVA ER DEN TETTESTE KAMPFLATEN (Brage 2026-09-10).
+              Den var `score`-glass — gjennomskinnelig, og på kampens LYSE
+              grunn mister et gjennomskinnelig kort vekt. Nå den samme tette
+              materialretningen som kampkortene i Kalender/Sesongen: Heia-grønn
+              base (#0B1912→#143126, aldri nøytralt svart), flomlys og
+              banebuer — men buene i `quiet`, så de ligger I flaten og ikke
+              oppå den. Stillingen, kampstatusen og minuttet står i
+              Heia-neon. Kommende kamp beholder StadiumGlass. */}
+          <StadiumSurface style={styles.scoreCard} arcTone="quiet">
             <MatchArena
               homeTeam={teamName}
-              awayTeam={event.opponent ?? ''}
+              awayTeam={opponent}
               homeScore={home}
               awayScore={away}
               teamColor={teamColor}
               phase={paused ? 'paused' : 'live'}
               minute={minute}
               secondHalf={secondHalf}
-              location={event.location}
               reporterName={reporter?.name}
+              lastEventLabel={freshness}
               scoreScale={scoreScale}
             />
-          </ArenaSurface>
+          </StadiumSurface>
         </View>
 
-        <View style={styles.reporterRow}>
-          <ReporterBar
-            variant="match"
+        {/* Fanenes plassholder — de ekte fanene er chrome (MatchChrome). */}
+        <View onLayout={chrome.onTabsLayout} style={styles.tabsSlot} />
+
+        {view === 'referat' && (
+          <MatchReferat
+            matchEvents={held.matchEvents}
+            photos={held.photos}
+            startedAt={event.startedAt}
+            teamName={teamName}
+            opponent={opponent}
+            authorFor={authorFor}
+            renderEngagement={renderEngagement}
+            onPressPhoto={onPressPhoto}
+            newestFirst
+          />
+        )}
+        {view === 'hendelser' && (
+          <MatchEventsView
+            matchEvents={held.matchEvents}
+            teamName={teamName}
+            opponent={opponent}
+            newestFirst
+          />
+        )}
+        {view === 'bilder' && (
+          <MatchPhotosView photos={held.photos} onPressPhoto={onPressPhoto} />
+        )}
+        {view === 'info' && (
+          <MatchInfoView
+            event={event}
             reporter={reporter}
             isAdmin={isAdmin}
-            isMe={isReporter}
+            isReporter={isReporter}
             onChangeReporter={onChangeReporter}
           />
-        </View>
-
-        {/* ⚠️ REPORTERPANELET LIGGER IKKE LENGER HER (skive 10).
-            Det var en fast blokk midt på siden, altså et sted man måtte
-            scrolle for å nå kampens mest tidskritiske handling. Verktøyet bor
-            nå i `ReporterDock`, som RAPPORTER-knappen i tab-baren åpner —
-            der tommelen allerede er.
-
-            Og det står INGENTING her i stedet. Prototypen har ingen
-            hintetekst til reporteren; den sentrale knappen forklarer seg
-            selv. Å skrive «bruk knappen nederst» ville vært å finne opp
-            produktspråk, som er nettopp det autoritetsregelen forbyr.
-
-            Publikums linje står uendret — den forklarer hvorfor det ikke
-            finnes en oppdater-knapp, og den er en godkjent beslutning fra
-            skive 2 (den erstattet et hvitt «du følger kampen»-kort). */}
-        {!isReporter && (
-          <Text style={styles.following} maxFontSizeMultiplier={1.5}>
-            Stillingen og kampforløpet oppdaterer seg av seg selv.
-          </Text>
         )}
-
-        {/* KAMPENS PULS — det tredje rommet, rett over forløpet. Den ligger
-            her og ikke rett under arenaen fordi den er PORTEN inn i kampens
-            historie: gullprikken i forløpets eyebrow markerer nettopp det
-            skiftet, og krittstreken nederst i pulsen leder blikket dit. */}
-        <MatchPulse
-          matchEvents={matchEvents}
-          photos={photos}
-          startedAt={event.startedAt}
-          engagement={engagement}
-          phase={paused ? 'paused' : 'live'}
-          minute={minute}
-          nowMs={nowMs}
-          authorFor={authorFor}
-        />
-
-        {/* Kampforløpet — bildene ligger i forløpet, ikke i en egen seksjon.
-            Under kampen skal ingenting konkurrere med stillingen.
-            `ground` tegner det fjerde rommet; den lokale mørke flaten fra
-            skive 1 er borte. */}
-        <MatchTimeline
-          ground
-          matchEvents={matchEvents}
-          photos={photos}
-          startedAt={event.startedAt}
-          newestFirst
-          nowMinute={minute}
-          authorFor={authorFor}
-          renderEngagement={renderEngagement}
-          onPressPhoto={onPressPhoto}
-        />
       </Animated.ScrollView>
 
-      {/* Reporterens verktøy, over grunnen og rett under tab-baren.
-          Rendres kun for reporteren — en tilskuer skal ikke ha den i treet
-          i det hele tatt. */}
+      <MatchChromeOverlay
+        chrome={chrome}
+        view={view}
+        onChangeView={setView}
+        pending={held.pending}
+        onFlush={flushAndTop}
+      />
+
+      {/* Reporterens verktøy, over grunnen og rett under tab-baren. */}
       {isReporter && (
         <ReporterDock
           open={reporterDockOpen}
@@ -312,8 +291,6 @@ export function LiveMatch({
         />
       )}
 
-      {/* Kvitteringen ligger OVER dokken: den kommer i det dokken glir ned,
-          og skal ikke ligge bak den i det halve sekundet de overlapper. */}
       <MatchToast message={toast} onHidden={onToastHidden ?? noop} />
     </MatchGround>
   );
@@ -323,27 +300,19 @@ export function LiveMatch({
 const noop = () => {};
 
 const styles = StyleSheet.create({
-  // Arenaen er et platå i verdenen, ikke et kort i en liste: den ligger tett
-  // på kantene og har luft bare der underkanten buer.
-  arena: {
-    marginHorizontal: 10,
+  scoreWrap: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+  },
+  scoreCard: {
+    // Samme radius som glasset hadde — kortets form er telefongodkjent.
+    borderRadius: 28,
     paddingTop: 14,
-    paddingHorizontal: spacing.xl,
-    paddingBottom: 34,
+    paddingHorizontal: 18,
+    paddingBottom: 16,
   },
-  reporterRow: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-  },
-  tools: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-  },
-  following: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
-    fontSize: 13,
-    lineHeight: 19,
-    color: matchColors.dim,
+  tabsSlot: {
+    height: MATCH_TABS_SLOT_H,
+    marginTop: spacing.sm,
   },
 });
