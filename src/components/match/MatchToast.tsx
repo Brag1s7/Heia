@@ -2,6 +2,7 @@ import React, {useEffect, useRef} from 'react';
 import {Animated, StyleSheet, Text} from 'react-native';
 import {matchColors, radius, spacing} from '../../theme';
 import {useReducedMotion} from '../useReducedMotion';
+import {useTabBarOverlap} from '../useBottomContentPadding';
 
 /**
  * BEKREFTELSEN I KAMPVERDENEN (skive 10.1).
@@ -50,6 +51,18 @@ interface MatchToastProps {
 
 export function MatchToast({message, onHidden}: MatchToastProps) {
   const reducedMotion = useReducedMotion();
+  /**
+   * ⚠️ KVITTERINGEN LÅ UNDER BAREN (Brage 2026-09-07: «nå kommer meldingen
+   * når man rapporterer under nav bar»).
+   *
+   * `bottom: spacing.md` var riktig da tab-baren var en SOLID plate utenfor
+   * skjermflaten: skjermbunnen var barens overkant. Glasskapselen (2026-09-03)
+   * er absolutt og FLYTER OVER skjermen — skjermbunnen er nå enhetens
+   * underkant, og kvitteringen havnet bak kapselen. Samme rettelse som
+   * `ReporterDock` allerede har: løft barhøyden, så pillen igjen lander
+   * nøyaktig der dokken gled ned.
+   */
+  const tabBarOverlap = useTabBarOverlap();
   const fade = useRef(new Animated.Value(0)).current;
   // Den STIGER inn nedenfra — samme retning dokken forsvant i, så den leses
   // som en avløser og ikke som noe nytt som dukket opp.
@@ -107,7 +120,11 @@ export function MatchToast({message, onHidden}: MatchToastProps) {
       accessibilityLiveRegion="polite"
       accessible
       accessibilityLabel={message}
-      style={[styles.toast, {opacity: fade, transform: [{translateY: rise}]}]}>
+      style={[
+        styles.toast,
+        {bottom: spacing.md + tabBarOverlap},
+        {opacity: fade, transform: [{translateY: rise}]},
+      ]}>
       <Text style={styles.text} numberOfLines={2} maxFontSizeMultiplier={1.6}>
         {message}
       </Text>
@@ -120,8 +137,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.xl,
     right: spacing.xl,
-    // Like over tab-baren — der dokken nettopp gled ned.
-    bottom: spacing.md,
+    // Bunnen settes i komponenten (barhøyden er safe-area-avhengig) — like
+    // over tab-baren, der dokken nettopp gled ned.
     alignSelf: 'center',
     alignItems: 'center',
     // Prototypens mørke glass. Tokens, ikke rå rgba.

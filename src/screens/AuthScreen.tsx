@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   Pressable,
+  StatusBar,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -12,8 +13,8 @@ import {
 } from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows} from '../theme';
-import {BackBar, Button} from '../components';
+import {colors, typography, spacing, radius} from '../theme';
+import {BackBar, Button, StadiumSurface} from '../components';
 import {useAuth} from '../context';
 import {authErrorMessage} from '../shared/authErrors';
 import {TERMS_URL, PRIVACY_URL} from '../shared/links';
@@ -87,7 +88,10 @@ export function AuthScreen({route, navigation}: Props) {
     } catch (e) {
       // Typisk rate limit — Supabase-teksten er engelsk og kryptisk.
       setError(
-        authErrorMessage(e, 'Fikk ikke sendt kode akkurat nå — prøv igjen om litt'),
+        authErrorMessage(
+          e,
+          'Fikk ikke sendt kode akkurat nå — prøv igjen om litt',
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -98,184 +102,194 @@ export function AuthScreen({route, navigation}: Props) {
     email.trim().length > 0 && password.length >= 6 && !submitting;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BackBar />
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: spacing.lg,
-            paddingBottom: insets.bottom + spacing['3xl'],
-          },
-        ]}
-        keyboardShouldPersistTaps="handled">
-        {/* Tittel */}
-        <Text style={styles.title}>
-          {mode === 'login' ? 'Velkommen tilbake' : 'Opprett konto'}
-        </Text>
-        <Text style={styles.subtitle}>
-          {mode === 'login'
-            ? 'Logg inn for å se laget ditt'
-            : 'Bli med i Heia'}
-        </Text>
+    /* ⚠️ SAMME FLATE SOM RESTEN AV UTLOGGET-SEKVENSEN (Brage 2026-09-07:
+       «samme bakgrunn på logg inn siden som de to andre når man ikke er
+       logget inn»). Ikon → LaunchScreen.storyboard → BootScreen →
+       WelcomeIntent er én sammenhengende mørk stadionflate; innloggingen lå
+       som et hvitt blink midt i den. Nå bærer den samme grunn, og blekket
+       følger stadionvokabularet (stadiumText/stadiumDim), ikke krem-appens.
+       Statuslinjen må lyses opp mens skjermen står — App.tsx sitt
+       `dark-content` er skrevet for kremflaten. */
+    <StadiumSurface style={styles.flex} bordered={false}>
+      <StatusBar barStyle="light-content" />
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <BackBar variant="stadium" />
+        <ScrollView
+          style={styles.screen}
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: spacing.lg,
+              paddingBottom: insets.bottom + spacing['3xl'],
+            },
+          ]}
+          keyboardShouldPersistTaps="handled">
+          {/* Tittel */}
+          <Text style={styles.title}>
+            {mode === 'login' ? 'Velkommen tilbake' : 'Opprett konto'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {mode === 'login'
+              ? 'Logg inn for å se laget ditt'
+              : 'Bli med i Heia'}
+          </Text>
 
-        {/* Tab toggle */}
-        <View style={styles.tabRow} accessibilityRole="tablist">
-          <Pressable
-            style={[styles.tab, mode === 'login' && styles.tabActive]}
-            accessibilityRole="tab"
-            accessibilityState={{selected: mode === 'login'}}
-            accessibilityLabel="Logg inn"
-            onPress={() => {
-              setMode('login');
-              setError(null);
-            }}>
-            <Text
-              style={[
-                styles.tabText,
-                mode === 'login' && styles.tabTextActive,
-              ]}>
-              Logg inn
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.tab, mode === 'register' && styles.tabActive]}
-            accessibilityRole="tab"
-            accessibilityState={{selected: mode === 'register'}}
-            accessibilityLabel="Registrer deg"
-            onPress={() => {
-              setMode('register');
-              setError(null);
-            }}>
-            <Text
-              style={[
-                styles.tabText,
-                mode === 'register' && styles.tabTextActive,
-              ]}>
-              Registrer deg
-            </Text>
-          </Pressable>
-        </View>
+          {/* Tab toggle */}
+          <View style={styles.tabRow} accessibilityRole="tablist">
+            <Pressable
+              style={[styles.tab, mode === 'login' && styles.tabActive]}
+              accessibilityRole="tab"
+              accessibilityState={{selected: mode === 'login'}}
+              accessibilityLabel="Logg inn"
+              onPress={() => {
+                setMode('login');
+                setError(null);
+              }}>
+              <Text
+                style={[
+                  styles.tabText,
+                  mode === 'login' && styles.tabTextActive,
+                ]}>
+                Logg inn
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.tab, mode === 'register' && styles.tabActive]}
+              accessibilityRole="tab"
+              accessibilityState={{selected: mode === 'register'}}
+              accessibilityLabel="Registrer deg"
+              onPress={() => {
+                setMode('register');
+                setError(null);
+              }}>
+              <Text
+                style={[
+                  styles.tabText,
+                  mode === 'register' && styles.tabTextActive,
+                ]}>
+                Registrer deg
+              </Text>
+            </Pressable>
+          </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          {mode === 'register' && (
+          {/* Form */}
+          <View style={styles.form}>
+            {mode === 'register' && (
+              <View style={styles.fieldGroup}>
+                <Text style={styles.label}>Navn</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Ditt navn"
+                  placeholderTextColor={colors.stadiumDim}
+                  value={displayName}
+                  onChangeText={setDisplayName}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                />
+              </View>
+            )}
+
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>Navn</Text>
+              <Text style={styles.label}>E-post</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Ditt navn"
-                placeholderTextColor={colors.textTertiary}
-                value={displayName}
-                onChangeText={setDisplayName}
-                autoCapitalize="words"
+                placeholder="din@epost.no"
+                placeholderTextColor={colors.stadiumDim}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
                 autoCorrect={false}
+                autoComplete="email"
               />
             </View>
-          )}
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>E-post</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="din@epost.no"
-              placeholderTextColor={colors.textTertiary}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="email"
-            />
-          </View>
+            <View style={styles.fieldGroup}>
+              <Text style={styles.label}>Passord</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Minst 6 tegn"
+                placeholderTextColor={colors.stadiumDim}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoComplete={
+                  mode === 'login' ? 'current-password' : 'new-password'
+                }
+              />
+              {mode === 'login' && (
+                <Pressable
+                  onPress={handleForgotPassword}
+                  disabled={submitting}
+                  accessibilityRole="button"
+                  accessibilityLabel="Glemt passordet? Send meg en kode">
+                  <Text style={styles.forgotLink}>Glemt passordet?</Text>
+                </Pressable>
+              )}
+            </View>
 
-          <View style={styles.fieldGroup}>
-            <Text style={styles.label}>Passord</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Minst 6 tegn"
-              placeholderTextColor={colors.textTertiary}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete={
-                mode === 'login' ? 'current-password' : 'new-password'
-              }
-            />
-            {mode === 'login' && (
-              <Pressable
-                onPress={handleForgotPassword}
-                disabled={submitting}
-                accessibilityRole="button"
-                accessibilityLabel="Glemt passordet? Send meg en kode">
-                <Text style={styles.forgotLink}>Glemt passordet?</Text>
-              </Pressable>
+            {error && (
+              <Text
+                style={styles.error}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite">
+                {error}
+              </Text>
             )}
-          </View>
 
-          {error && (
-            <Text
-              style={styles.error}
-              accessibilityRole="alert"
-              accessibilityLiveRegion="polite">
-              {error}
-            </Text>
-          )}
-
-          {/* Knappen BYTTES ikke ut med en spinner: da forsvinner handlingen
+            {/* Knappen BYTTES ikke ut med en spinner: da forsvinner handlingen
               du nettopp trykket på, og alt under hopper oppover. Button har
               sin egen laste-tilstand — flaten står stille. */}
-          <Button
-            title={mode === 'login' ? 'Logg inn' : 'Opprett konto'}
-            onPress={handleSubmit}
-            disabled={!canSubmit}
-            loading={submitting}
-            size="lg"
-          />
+            <Button
+              title={mode === 'login' ? 'Logg inn' : 'Opprett konto'}
+              onPress={handleSubmit}
+              disabled={!canSubmit}
+              loading={submitting}
+              size="lg"
+            />
 
-          {/* Samtykket må stå FØR kontoen opprettes — vilkårene påstår det,
+            {/* Samtykket må stå FØR kontoen opprettes — vilkårene påstår det,
               og App Store-reviewen ser etter lenkene. Sidene ligger på
               heiaapp.no og åpnes i Safari. */}
-          {mode === 'register' && (
-            <Text style={styles.consent}>
-              Ved å opprette konto godtar du{' '}
-              <Text
-                style={styles.consentLink}
-                accessibilityRole="link"
-                accessibilityLabel="Vilkår for bruk, åpnes i nettleser"
-                onPress={() => Linking.openURL(TERMS_URL)}
-              >
-                vilkårene
-              </Text>{' '}
-              og{' '}
-              <Text
-                style={styles.consentLink}
-                accessibilityRole="link"
-                accessibilityLabel="Personvernerklæring, åpnes i nettleser"
-                onPress={() => Linking.openURL(PRIVACY_URL)}
-              >
-                personvernerklæringen
+            {mode === 'register' && (
+              <Text style={styles.consent}>
+                Ved å opprette konto godtar du{' '}
+                <Text
+                  style={styles.consentLink}
+                  accessibilityRole="link"
+                  accessibilityLabel="Vilkår for bruk, åpnes i nettleser"
+                  onPress={() => Linking.openURL(TERMS_URL)}>
+                  vilkårene
+                </Text>{' '}
+                og{' '}
+                <Text
+                  style={styles.consentLink}
+                  accessibilityRole="link"
+                  accessibilityLabel="Personvernerklæring, åpnes i nettleser"
+                  onPress={() => Linking.openURL(PRIVACY_URL)}>
+                  personvernerklæringen
+                </Text>
+                . Du må være minst 13 år.
               </Text>
-              . Du må være minst 13 år.
-            </Text>
-          )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </StadiumSurface>
   );
 }
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: colors.background,
+    // Stadionflaten eier bakgrunnen — ingen egen farge her, ellers ville
+    // gradientene ligget under en solid plate.
+    borderRadius: 0,
   },
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   content: {
     paddingHorizontal: spacing['2xl'],
@@ -283,20 +297,22 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.heading1,
+    color: colors.stadiumText,
     marginBottom: spacing.xs,
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: colors.stadiumDim,
     marginBottom: spacing['3xl'],
   },
+  // Ingen kortskygge på stadionflaten: en skygge trenger en lys grunn å
+  // falle på. Sporet er en dempet fordypning i flaten i stedet.
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderRadius: radius.md,
     padding: spacing.xs,
     marginBottom: spacing['2xl'],
-    ...shadows.card,
   },
   tab: {
     flex: 1,
@@ -310,7 +326,7 @@ const styles = StyleSheet.create({
   tabText: {
     ...typography.body,
     fontWeight: '600',
-    color: colors.textSecondary,
+    color: colors.stadiumDim,
   },
   // A v2-knapperegel: mintfyll bærer heiaDeep-tekst.
   tabTextActive: {
@@ -328,38 +344,40 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
+    color: colors.stadiumDim,
   },
   input: {
     ...typography.input,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.textPrimary,
+    borderColor: colors.stadiumEdge,
+    color: colors.stadiumText,
   },
   error: {
     ...typography.bodySmall,
-    color: colors.error,
+    // colors.error (#EF4444) faller til 3,7:1 mot gradientens nedre ende
+    // (#143126). colors.live er samme betydning og måler 4,6:1.
+    color: colors.live,
     textAlign: 'center',
   },
   consent: {
     ...typography.caption,
-    color: colors.textTertiary,
+    color: colors.stadiumDim,
     textAlign: 'center',
     marginTop: spacing.lg,
     lineHeight: 18,
   },
   consentLink: {
-    color: colors.textSecondary,
+    color: colors.stadiumText,
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
   forgotLink: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: colors.stadiumDim,
     fontWeight: '600',
     textDecorationLine: 'underline',
     alignSelf: 'flex-end',

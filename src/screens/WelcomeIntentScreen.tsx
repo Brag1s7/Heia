@@ -1,11 +1,18 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, Pressable, StyleSheet, Image} from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Image,
+} from 'react-native';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
 import {StadiumSurface} from '../components';
 import {useAuth, useOnboarding} from '../context';
-import {confirmDeleteAccount} from '../lib/account';
+import {confirmDeleteAccount, confirmSignOut} from '../lib/account';
 import {getSports} from '../lib/api/teams';
 import type {OnboardingStackParamList} from '../shared/types';
 
@@ -29,6 +36,9 @@ export function WelcomeIntentScreen({navigation}: Props) {
 
   return (
     <StadiumSurface style={styles.screen} bordered={false}>
+      {/* App.tsx setter `dark-content` for kremflaten — hele utlogget-
+          sekvensen er mørk og trenger lyse statusikoner. */}
+      <StatusBar barStyle="light-content" />
       <View style={[styles.content, {paddingTop: insets.top + spacing['5xl']}]}>
         {/* Beskåret, gjennomsiktig lockup. `logo-dark.png` har koksgrå
             bakgrunn bakt inn i rasteret og tegnet en hard grå boks midt på
@@ -85,7 +95,9 @@ export function WelcomeIntentScreen({navigation}: Props) {
         {!session && (
           <Pressable
             style={styles.loginLink}
-            onPress={() => go(() => navigation.navigate('Auth', {mode: 'login'}))}>
+            onPress={() =>
+              go(() => navigation.navigate('Auth', {mode: 'login'}))
+            }>
             <Text style={styles.loginText}>Jeg har konto · Logg inn</Text>
           </Pressable>
         )}
@@ -99,7 +111,7 @@ export function WelcomeIntentScreen({navigation}: Props) {
           ) : (
             <View style={styles.accountRow}>
               <Pressable
-                onPress={() => go(() => signOut())}
+                onPress={() => go(() => confirmSignOut(signOut))}
                 disabled={deletingAccount}>
                 <Text style={styles.accountLink}>Logg ut</Text>
               </Pressable>

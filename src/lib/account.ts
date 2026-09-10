@@ -59,6 +59,36 @@ export async function clearLocalCaches(): Promise<void> {
 }
 
 /**
+ * Delt bekreftelsesflyt for UTLOGGING (Brage 2026-09-07: «på logg ut, bør
+ * det komme «vil du logge ut?»»).
+ *
+ * Utlogging er ikke farlig, men den er heller ikke gratis: `signOut` river
+ * alle lokale cacher (feed, kalender, medlemmer, medie-URL-er, bootfrøet),
+ * så neste innlogging må hente alt på nytt — og et feiltrykk i Profils
+ * lange liste koster brukeren en full kaldstart. ÉN bekreftelse, ikke to:
+ * dramaet er reservert kontoslettingen under.
+ *
+ * Samme delte flyt som slettingen, av samme grunn: begge inngangene
+ * (Profil og velkomstskjermen) skal aldri kunne gli fra hverandre.
+ */
+export function confirmSignOut(signOut: () => void | Promise<void>): void {
+  Alert.alert(
+    'Vil du logge ut?',
+    'Du må logge inn igjen for å se laget ditt.',
+    [
+      {text: 'Avbryt', style: 'cancel'},
+      {
+        text: 'Logg ut',
+        style: 'destructive',
+        onPress: () => {
+          signOut();
+        },
+      },
+    ],
+  );
+}
+
+/**
  * Delt bekreftelsesflyt for kontosletting (Apple 5.1.1(v)).
  *
  * Brukes fra Profil OG fra velkomstskjermen: en innlogget bruker UTEN
