@@ -245,9 +245,13 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    // Løftet som prototypens `.mbw{margin-top:-12px}` og som dagens
-    // «+»-squircle. Barhøyden er urørt.
-    marginTop: -10,
+    // ⚠️ LØFTET ER BORTE (Brage 2026-09-07, telefonbekreftet: «den har blitt
+    // flyttet til riktig posisjon»). −10 var prototypens
+    // `.mbw{margin-top:-12px}` mot den SOLIDE baren på 88 pt. Glasskapselen
+    // er 64 pt og flyter: med −10 lå pillens overkant 4 pt OVER glasset, og
+    // 10 pt høyere enn de fire ikonene ved siden av. Med 0 sentreres den i
+    // samme 32 pt-slott som dem (pillen er 34, se matchButtonGeometry).
+    marginTop: 0,
   },
   pill: {
     flexDirection: 'row',

@@ -1,5 +1,6 @@
-import React, {type ReactNode} from 'react';
+import React, {useEffect, useState, type ReactNode} from 'react';
 import {
+  InteractionManager,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
@@ -53,9 +54,27 @@ export function ProfilPage({
   children,
 }: ProfilPageProps) {
   const isFocused = useIsFocused();
+  /**
+   * ⚠️ GRUNNEN TEGNES ETTER OVERGANGEN (Brage 2026-09-10: «det hakker stygt
+   * når man trykker inn på hendelser»).
+   *
+   * `DaylightGround` er ett stort svg-lerret med gradienter og lysfelt. Blir
+   * det montert i samme ramme som skjermen pushes inn, konkurrerer
+   * rasteriseringen med push-animasjonen, og overgangen hakker. Flaten under
+   * står allerede i grunnens dominante mint (`styles.screen`), så det som
+   * skjer er at gradienten toner på plass rett etter at skjermen har landet —
+   * ikke at siden blinker hvit.
+   */
+  const [groundReady, setGroundReady] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() =>
+      setGroundReady(true),
+    );
+    return () => task.cancel();
+  }, []);
   const body = (
     <>
-      {DAYLIGHT_GROUND_AB && <DaylightGround />}
+      {DAYLIGHT_GROUND_AB && groundReady && <DaylightGround />}
       {/* Fokus-vakt som i TeamHeader/ProfileHeader: uten den ville siden
           styrt statuslinja videre på skjermer som pushes oppå. */}
       {DAYLIGHT_GROUND_AB && isFocused && (

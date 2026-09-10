@@ -30,6 +30,7 @@ export {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Clock,
   FileText,
   Flag,

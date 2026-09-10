@@ -339,11 +339,16 @@ describe('compact + pressed (kampkortet deler heroens material-DNA)', () => {
     return flatStyle.boxShadow?.[0];
   };
 
-  it('compact tegner de samme lagene (base, opptak, neon, høylys, kant) — bare skyggen er lettere', async () => {
+  it('compact tegner de samme lagene (base, opptak, neon, høylys, kant); den STORE flaten har ingen slagskygge', async () => {
     const hero = await mount({});
     const compact = await mount({compact: true});
     expect(ids(compact)).toEqual(ids(hero));
-    expect(shadowOf(hero)?.blurRadius).toBe(28);
+    // ⚠️ ENDRET 2026-09-10 (Brage: «du har lagt til et skille som en skygge
+    // mellom kamp hero og det under — fjern denne»). En 28 pt myk skygge
+    // under et fullbreddes kort leser som en STREK tvers over skjermen, ikke
+    // som dybde. Den kompakte varianten (feedens kampinnlegg) er
+    // telefongodkjent og beholder sin lettere skygge.
+    expect(shadowOf(hero)).toBeUndefined();
     expect(shadowOf(compact)?.blurRadius).toBe(16);
     expect(shadowOf(compact)?.color).toBe(GLASS.shadowCompact);
     hero.unmount();

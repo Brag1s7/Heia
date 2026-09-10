@@ -20,6 +20,15 @@ import Svg, {
 } from 'react-native-svg';
 import {colors, matchColors, radius} from '../theme';
 import {arenaLightCap} from '../shared/teamColors';
+import {
+  ARC_OPACITY_INNER,
+  ARC_OPACITY_OUTER,
+  ARC_R_INNER,
+  ARC_R_OUTER,
+  ARC_STROKE,
+  mastheadArcBox,
+  type MastheadCard,
+} from '../shared/headerGeometry';
 import {useMaterialAccessibility} from './useMaterialAccessibility';
 
 /**
@@ -98,6 +107,19 @@ export const GLASS = {
   shadow: 'rgba(11, 59, 42, 0.22)',
   /** Kompakt (feedkort): lettere skygge — mindre flate, tynnere materiale. */
   shadowCompact: 'rgba(11, 59, 42, 0.18)',
+  /**
+   * KOMPAKT-TRINNET (Brage 2026-09-10: «feed-kampkortet skal tydelig føles
+   * som Compact StadiumGlass, altså underordnet heroen»).
+   *
+   * Fram til nå var `compact` KUN en lettere skygge — materialet var ellers
+   * identisk med heroen, og de to konkurrerte. Nå er det et ekte trinn:
+   * lyset dempes (lagrefleks, neon, aqua-opptak, topphøylys), og buene
+   * legger seg lenger tilbake. Basen og KANTEN røres ikke — det er de som
+   * gir kortet form, og et utvasket kort ville bare sett uskarpt ut.
+   */
+  compactLight: 0.6,
+  compactArcOuter: 'rgba(2, 255, 171, 0.055)',
+  compactArcInner: 'rgba(2, 255, 171, 0.04)',
   /** Trykk: hvitt lys presset inn i glasset (JS-motstykket til native 0,16 på lyst). */
   pressLight: 0.1,
 } as const;
@@ -152,6 +174,14 @@ interface StadiumGlassProps {
   pressed?: boolean;
   /** Trykkfysikken fra `useGlassPress`: lyset inn i glasset, animert. */
   pressLight?: Animated.AnimatedInterpolation<number>;
+  /**
+   * KORTET STÅR RETT UNDER LAGHODET (Brage 2026-09-10: «legg til samme bue
+   * på det kortet på toppen»). Da byttes kortets egne buer ut med lerretets
+   * sirkel, tegnet videre gjennom kortets kant — samme sentrum, samme
+   * radier, samme kritt (`mastheadArcBox`). Kun Hjem-heroen sender den;
+   * kampinnleggene i feeden beholder sine egne, roligere mint-buer.
+   */
+  mastheadCard?: MastheadCard;
   children?: React.ReactNode;
 }
 
@@ -266,6 +296,7 @@ export function StadiumGlass({
   compact = false,
   pressed = false,
   pressLight,
+  mastheadCard,
   children,
 }: StadiumGlassProps) {
   const {reduceTransparency, increaseContrast} = useMaterialAccessibility();
@@ -278,8 +309,10 @@ export function StadiumGlass({
     [teamColor, increaseContrast],
   );
   const half = increaseContrast ? 0.5 : 1;
-  const neon = GLASS.neonReflex * half;
-  const uptake = GLASS.uptake * half;
+  // Kompakt = samme material-DNA, dempet lys. Se `GLASS.compactLight`.
+  const damp = compact ? GLASS.compactLight : 1;
+  const neon = GLASS.neonReflex * half * damp;
+  const uptake = GLASS.uptake * half * damp;
   const edgeColor = increaseContrast ? '#FFFFFF' : GLASS.edgeColor;
   const edgeStops = increaseContrast
     ? [GLASS.edgeContrast, GLASS.edgeContrast, GLASS.edgeContrast]
@@ -342,7 +375,7 @@ export function StadiumGlass({
             </RadialGradient>
             {lifted && team > 0 && (
               <RadialGradient id="sgTeam" cx="10%" cy="-12%" rx="58%" ry="84%">
-                <Stop offset="0" stopColor={lifted} stopOpacity={team} />
+                <Stop offset="0" stopColor={lifted} stopOpacity={team * damp} />
                 <Stop offset="0.62" stopColor={lifted} stopOpacity={0} />
               </RadialGradient>
             )}
@@ -372,7 +405,7 @@ export function StadiumGlass({
               <Stop
                 offset="0.32"
                 stopColor={edgeColor}
-                stopOpacity={GLASS.highlight}
+                stopOpacity={GLASS.highlight * damp}
               />
               <Stop offset="0.95" stopColor={edgeColor} stopOpacity={0} />
             </LinearGradient>
@@ -406,8 +439,37 @@ export function StadiumGlass({
       </View>
 
       <View style={[styles.surface, style]}>
-        <View style={styles.arcOuter} pointerEvents="none" />
-        <View style={styles.arcInner} pointerEvents="none" />
+        {mastheadCard ? (
+          <>
+            <View
+              style={[
+                styles.arcMasthead,
+                styles.arcMastheadOuter,
+                mastheadArcBox(ARC_R_OUTER, mastheadCard),
+              ]}
+              pointerEvents="none"
+            />
+            <View
+              style={[
+                styles.arcMasthead,
+                styles.arcMastheadInner,
+                mastheadArcBox(ARC_R_INNER, mastheadCard),
+              ]}
+              pointerEvents="none"
+            />
+          </>
+        ) : (
+          <>
+            <View
+              style={[styles.arcOuter, compact && styles.arcOuterCompact]}
+              pointerEvents="none"
+            />
+            <View
+              style={[styles.arcInner, compact && styles.arcInnerCompact]}
+              pointerEvents="none"
+            />
+          </>
+        )}
         {pressed && <View style={styles.pressLight} pointerEvents="none" />}
         {pressLight !== undefined && (
           <Animated.View
@@ -421,10 +483,20 @@ export function StadiumGlass({
   );
 }
 
+/** Lerretets krittfarge (= `colors.stadiumText`) med gitt styrke. */
+const CHALK = (alpha: number) => `rgba(234, 255, 246, ${alpha})`;
+
 const styles = StyleSheet.create({
+  /**
+   * ⚠️ INGEN SLAGSKYGGE PÅ DEN STORE FLATEN (Brage 2026-09-10: «du har lagt
+   * til et skille som en skygge mellom kamp hero og det under»). En 28 pt
+   * myk skygge under et fullbreddes kort leser som en STREK tvers over
+   * skjermen, ikke som dybde. Kortet står på egne ben: materialet og kanten
+   * skiller det fra grunnen. Den kompakte varianten (feedens kampinnlegg)
+   * beholder sin lettere skygge — den er telefongodkjent.
+   */
   shadow: {
     borderRadius: radius.xl,
-    boxShadow: [{offsetX: 0, offsetY: 8, blurRadius: 28, color: GLASS.shadow}],
   },
   shadowCompact: {
     borderRadius: radius.xl,
@@ -453,6 +525,23 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
     overflow: 'hidden',
   },
+  /**
+   * Lerretets sirkel, tegnet videre inne i kortet (`mastheadCard`). Samme
+   * KRITT som `DaylightGround` ArcFamily — ikke kortets mint: linjen skal
+   * leses som ÉN linje som krysser kortets kant, og da må den ha samme
+   * farge og styrke på begge sider av kanten.
+   */
+  arcMasthead: {
+    position: 'absolute',
+    borderRadius: 999,
+    borderWidth: ARC_STROKE,
+  },
+  arcMastheadOuter: {
+    borderColor: CHALK(ARC_OPACITY_OUTER),
+  },
+  arcMastheadInner: {
+    borderColor: CHALK(ARC_OPACITY_INNER),
+  },
   // Banebuene — identisk geometri som StadiumSurface, litt roligere kritt.
   arcOuter: {
     position: 'absolute',
@@ -473,5 +562,12 @@ const styles = StyleSheet.create({
     borderRadius: 68,
     borderWidth: 1.5,
     borderColor: 'rgba(2, 255, 171, 0.07)',
+  },
+  // Kompakt: buene legger seg lenger tilbake enn i heroen.
+  arcOuterCompact: {
+    borderColor: GLASS.compactArcOuter,
+  },
+  arcInnerCompact: {
+    borderColor: GLASS.compactArcInner,
   },
 });

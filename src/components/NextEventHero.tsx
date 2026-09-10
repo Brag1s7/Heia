@@ -11,12 +11,21 @@ import {
 } from '../theme';
 import {ChevronRight, MapPin} from './icons';
 import {StadiumSurface} from './StadiumSurface';
+import {
+  ARC_R_INNER,
+  ARC_R_OUTER,
+  mastheadArcBox,
+  type MastheadCard,
+} from '../shared/headerGeometry';
 import {StadiumGlass} from './StadiumGlass';
 import {StatusPill, type PillKind} from './StatusPill';
 import {useActiveTeam} from '../context';
 import type {HeiaEvent, EventType} from '../shared/types';
 
 interface NextEventHeroProps {
+  /** Kortets ytre kant når det står rett under laghodet — se
+   *  `mastheadArcBox`. Uten: kortets egne buer, som før. */
+  mastheadCard?: MastheadCard;
   event: HeiaEvent;
   onPress: () => void;
   /**
@@ -93,10 +102,12 @@ function GlassPill({label}: {label: string}) {
 function GlassMatchHero({
   onPress,
   accessibilityLabel,
+  mastheadCard,
   children,
 }: {
   onPress: () => void;
   accessibilityLabel: string;
+  mastheadCard?: MastheadCard;
   children: React.ReactNode;
 }) {
   const {activeTeamSpace} = useActiveTeam();
@@ -106,7 +117,10 @@ function GlassMatchHero({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       style={({pressed}) => [pressed && styles.pressed]}>
-      <StadiumGlass style={styles.glassHero} teamColor={activeTeamSpace?.color}>
+      <StadiumGlass
+        style={styles.glassHero}
+        teamColor={activeTeamSpace?.color}
+        mastheadCard={mastheadCard}>
         {children}
       </StadiumGlass>
     </Pressable>
@@ -122,6 +136,7 @@ export function NextEventHero({
   event,
   onPress,
   tournamentTitle,
+  mastheadCard,
 }: NextEventHeroProps) {
   const pill = typePill[event.type] ?? typePill.annet;
   const {coming, notComing, pending} = event.rsvp;
@@ -226,6 +241,7 @@ export function NextEventHero({
     return (
       <GlassMatchHero
         onPress={onPress}
+        mastheadCard={mastheadCard}
         accessibilityLabel={`${title}, ${dayLabel(
           event.startTime,
         )} ${formatTime(event.startTime)}`}>
@@ -271,8 +287,24 @@ export function NextEventHero({
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#hero)" />
         </Svg>
       </View>
-      <View style={styles.arcOuter} pointerEvents="none" />
-      <View style={styles.arcInner} pointerEvents="none" />
+      {/* Står kortet rett under laghodet, fortsetter lerretets sirkel inn
+          i det (`mastheadArcBox`) — samme geometri som Lagkassa-kortet.
+          Blekket forblir kortets eget: en lys linje ville vært usynlig på
+          den kremede flaten. */}
+      <View
+        style={[
+          styles.arcOuter,
+          mastheadCard && mastheadArcBox(ARC_R_OUTER, mastheadCard),
+        ]}
+        pointerEvents="none"
+      />
+      <View
+        style={[
+          styles.arcInner,
+          mastheadCard && mastheadArcBox(ARC_R_INNER, mastheadCard),
+        ]}
+        pointerEvents="none"
+      />
       {inner}
     </Pressable>
   );
@@ -359,7 +391,7 @@ const styles = StyleSheet.create({
     top: -74,
     width: 190,
     height: 190,
-    borderRadius: 95,
+    borderRadius: 999,
     borderWidth: 1.5,
     borderColor: 'rgba(8, 57, 46, 0.08)',
   },
@@ -369,7 +401,7 @@ const styles = StyleSheet.create({
     top: -44,
     width: 130,
     height: 130,
-    borderRadius: 65,
+    borderRadius: 999,
     borderWidth: 1.5,
     borderColor: 'rgba(8, 57, 46, 0.06)',
   },

@@ -2,8 +2,11 @@ import React, {useState, useCallback, useEffect, useMemo, useRef} from 'react';
 import {MastheadField} from '../components/DaylightGround';
 import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {mastheadHeight} from '../shared/masthead';
+import {MASTHEAD_CARD_GAP} from '../shared/headerGeometry';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   View,
   Text,
   Image,
@@ -15,6 +18,9 @@ import {
   Alert,
   Keyboard,
   type AlertButton,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {
@@ -23,6 +29,7 @@ import {
   useRoute,
   type NavigationProp,
   type RouteProp,
+  useScrollToTop,
 } from '@react-navigation/native';
 import {colors, typography, spacing, radius} from '../theme';
 import {
@@ -40,9 +47,10 @@ import {
   useBottomContentPadding,
 } from '../components';
 import {LiquidGlassSurface, OPAL} from '../components';
-import {Camera, Check} from '../components/icons';
+import {Bell, Camera, Check} from '../components/icons';
 import {CommentSheet} from '../components/match/CommentSheet';
 import {WRITING_SCROLL_PROPS} from '../components/keyboard';
+import {useReducedMotion} from '../components/useReducedMotion';
 import {useActiveTeam, useOnboarding, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {isSystemMatchPost} from '../shared/matchEngagement';
@@ -107,6 +115,122 @@ function ComposeSurface({children}: {children: React.ReactNode}) {
         {children}
       </LiquidGlassSurface>
     </View>
+  );
+}
+
+/**
+ * KOMPONISTENS HANDLINGSLINJE — varsel-valget og «Publiser» (2026-09-07).
+ *
+ * ⚠️ HVORFOR DEN ER ÉN LINJE, OG HVORFOR DEN GLIR INN
+ *
+ * Brage, fra telefonen: «send knappen skjules under tastaturet siden det
+ * kommer opp valg om å varsle laget. Denne valg boksen som kommer ned ser
+ * stygg ut også, i tillegg til hvordan den kommer ned.» Tre feil i én:
+ *
+ *   1. HØYDE. Varselvalget var en full boks (avkryssingsrute + tittel +
+ *      hjelpetekst, ~64 pt) OVER en egen knapperad. iOS ruller det
+ *      FOKUSERTE FELTET fram — alt som vokser NEDENFOR caret havner bak
+ *      tastaturet. To rader var én for mye. Nå er valget en pille og deler
+ *      rad med knappen.
+ *   2. MATERIALE. Boksen var `colors.surfaceMuted` — en lys, SOLID plate
+ *      oppå lyst glass, nøyaktig det feltet over den sluttet med (se
+ *      `composeFieldGlass`). Pillen bruker samme blekkvask, og mintfyll
+ *      først når den er PÅ.
+ *   3. BEVEGELSE. Den smalt inn i samme ramme som første bokstav. Nå toner
+ *      den inn og stiger 8 pt på 200 ms (native driver, ingen
+ *      LayoutAnimation — `keyboard.tsx`-regelen).
+ *
+ * `onLayout` melder høyden opp: skjermen ruller lista nøyaktig så langt som
+ * linja vokste, så den aldri kan legge seg bak tastaturet.
+ *
+ * ⚠️ MODULNIVÅ, ikke nestet — samme grunn som `ComposeSurface`: elementet i
+ * `listHeader` må beholde typen mellom rendere, ellers mister TextInput-en
+ * fokus for hvert tastetrykk.
+ */
+function ComposeActions({
+  canBroadcast,
+  broadcast,
+  onToggleBroadcast,
+  onPost,
+  canPost,
+  posting,
+  onLayout,
+}: {
+  canBroadcast: boolean;
+  broadcast: boolean;
+  onToggleBroadcast: () => void;
+  onPost: () => void;
+  canPost: boolean;
+  posting: boolean;
+  onLayout: (e: LayoutChangeEvent) => void;
+}) {
+  const reducedMotion = useReducedMotion();
+  const rise = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  useEffect(() => {
+    if (reducedMotion) {
+      rise.setValue(1);
+      return;
+    }
+    Animated.timing(rise, {
+      toValue: 1,
+      duration: 200,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [rise, reducedMotion]);
+
+  return (
+    <Animated.View
+      onLayout={onLayout}
+      style={[
+        styles.composeActions,
+        {
+          opacity: rise,
+          transform: [
+            {
+              translateY: rise.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 0],
+              }),
+            },
+          ],
+        },
+      ]}>
+      {canBroadcast ? (
+        <Pressable
+          style={({pressed}) => [
+            styles.notifyPill,
+            broadcast && styles.notifyPillOn,
+            pressed && styles.notifyPillPressed,
+          ]}
+          onPress={onToggleBroadcast}
+          disabled={posting}
+          hitSlop={6}
+          accessibilityRole="switch"
+          accessibilityState={{checked: broadcast}}
+          accessibilityLabel="Varsle hele laget"
+          accessibilityHint="Fester innlegget øverst i feeden og gir alle et varsel">
+          {broadcast ? (
+            <Check size={15} color={colors.heiaDeep} strokeWidth={3} />
+          ) : (
+            <Bell size={15} color={colors.textSecondary} strokeWidth={2.2} />
+          )}
+          <Text
+            style={[styles.notifyText, broadcast && styles.notifyTextOn]}
+            numberOfLines={1}>
+            Varsle laget
+          </Text>
+        </Pressable>
+      ) : (
+        <View />
+      )}
+      <Button
+        title="Publiser"
+        onPress={onPost}
+        disabled={!canPost}
+        loading={posting}
+      />
+    </Animated.View>
   );
 }
 
@@ -474,6 +598,58 @@ export function TeamHomeScreen() {
 
   const canPost = composeText.trim().length > 0 || selectedImage !== null;
 
+  /**
+   * HANDLINGSLINJA SKAL ALDRI HAVNE BAK TASTATURET (Brage 2026-09-07).
+   *
+   * `automaticallyAdjustKeyboardInsets` gir lista riktig inset, og iOS
+   * ruller det FOKUSERTE FELTET fram — men den ruller ikke på nytt når
+   * innhold vokser UNDER caret. Første bokstav føder handlingslinja der,
+   * og «Publiser» forsvant bak tastaturet.
+   *
+   * Rettelsen er nøyaktig så stor som problemet: når linja måler seg selv
+   * for første gang (eller blir høyere), ruller vi lista NØYAKTIG så mange
+   * punkter — feltet blir stående der det står, og linja tar plassen som
+   * nettopp ble ledig. Refs, ikke state: dette skal ikke koste en render
+   * per scroll-hendelse midt i en skriveøkt.
+   *
+   * Ingenting skjer om feltet ikke har fokus (da er tastaturet nede og alt
+   * er synlig uansett) — f.eks. når et bilde velges fra galleriet.
+   */
+  /**
+   * TRYKK PÅ FANEN DU ALT STÅR I ⇒ TIL TOPPEN (Brage 2026-09-10). Dette er
+   * iOS-standard, og `useScrollToTop` er React Navigations egen kobling: den
+   * lytter på `tabPress` og ruller bare når skjermen faktisk er i fokus.
+   */
+  const listRef = useRef<FlatList<FeedItem>>(null);
+  useScrollToTop(listRef);
+  const scrollYRef = useRef(0);
+  const composeFocusedRef = useRef(false);
+  const actionsHeightRef = useRef(0);
+
+  const handleScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollYRef.current = e.nativeEvent.contentOffset.y;
+    },
+    [],
+  );
+
+  const handleActionsLayout = useCallback((e: LayoutChangeEvent) => {
+    const height = e.nativeEvent.layout.height;
+    const grew = height - actionsHeightRef.current;
+    actionsHeightRef.current = height;
+    if (grew <= 0.5 || !composeFocusedRef.current) return;
+    listRef.current?.scrollToOffset({
+      offset: scrollYRef.current + grew,
+      animated: true,
+    });
+  }, []);
+
+  // Linja er borte igjen (publisert, eller alt slettet) — neste gang den
+  // dukker opp er den «ny» og skal rulles fram på nytt.
+  useEffect(() => {
+    if (!canPost && !posting) actionsHeightRef.current = 0;
+  }, [canPost, posting]);
+
   const handlePost = useCallback(async () => {
     if (!activeTeamSpaceId || !canPost || posting) return;
     setPosting(true);
@@ -761,6 +937,12 @@ export function TeamHomeScreen() {
               }
               multiline
               editable={!posting}
+              onFocus={() => {
+                composeFocusedRef.current = true;
+              }}
+              onBlur={() => {
+                composeFocusedRef.current = false;
+              }}
               // Placeholder leses av VoiceOver, men den er en oppfordring —
               // ikke navnet på handlingen. Labelen gir feltet produktordet,
               // det samme som valgarket het før det ble erstattet.
@@ -799,36 +981,16 @@ export function TeamHomeScreen() {
         {/* Kringkasting er trenerens verktøy: vanlige innlegg varsler ikke,
             så dette er måten å si «dette må alle få med seg».
             Vises først når noe er i ferd med å publiseres — rolig composer. */}
-        {canBroadcast && (canPost || posting) && (
-          <Pressable
-            style={[styles.broadcastRow, broadcast && styles.broadcastRowOn]}
-            onPress={() => setBroadcast(v => !v)}
-            disabled={posting}
-            accessibilityRole="switch"
-            accessibilityState={{checked: broadcast}}>
-            <View
-              style={[styles.broadcastBox, broadcast && styles.broadcastBoxOn]}>
-              {broadcast && (
-                <Check size={14} color={colors.heiaInk} strokeWidth={3} />
-              )}
-            </View>
-            <View style={styles.broadcastText}>
-              <Text style={styles.broadcastTitle}>🔔 Varsle hele laget</Text>
-              <Text style={styles.broadcastHint}>
-                Festes øverst i feeden og gir alle et varsel
-              </Text>
-            </View>
-          </Pressable>
-        )}
         {(canPost || posting) && (
-          <View style={styles.composeActions}>
-            <Button
-              title="Publiser"
-              onPress={handlePost}
-              disabled={!canPost}
-              loading={posting}
-            />
-          </View>
+          <ComposeActions
+            canBroadcast={canBroadcast}
+            broadcast={broadcast}
+            onToggleBroadcast={() => setBroadcast(v => !v)}
+            onPost={handlePost}
+            canPost={canPost}
+            posting={posting}
+            onLayout={handleActionsLayout}
+          />
         )}
       </ComposeSurface>
     </>
@@ -884,6 +1046,7 @@ export function TeamHomeScreen() {
             MastheadField: glasset skal ikke sample lagfargen). */}
         <View style={[styles.body, {marginTop: mastheadHeight(insets.top)}]}>
           <FlatList
+            ref={listRef}
             data={feed}
             renderItem={renderFeedItem}
             keyExtractor={feedKeyExtractor}
@@ -914,6 +1077,11 @@ export function TeamHomeScreen() {
             initialNumToRender={6}
             maxToRenderPerBatch={6}
             windowSize={7}
+            // Posisjonen leses av `handleActionsLayout` (se der hvorfor).
+            // 16 ms: vi trenger en fersk verdi i det linja dukker opp, ikke
+            // en strøm — verdien havner i en ref, så ingen render koster noe.
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             // TASTATURET (keyboard.tsx): lista er ENESTE eier. Komponisten
             // ligger inni lista, så RN sin innebygde inset (vindusbasert,
             // ruller det fokuserte feltet fram) gjør jobben på iOS; Android
@@ -930,7 +1098,7 @@ export function TeamHomeScreen() {
           style={[styles.mastheadLayer, {height: mastheadHeight(insets.top)}]}
           pointerEvents="box-none">
           {DAYLIGHT_GROUND_AB && <MastheadField />}
-          <TeamHeader onSeasonPress={() => navigation.navigate('Season')} />
+          <TeamHeader />
         </View>
       </View>
 
@@ -973,8 +1141,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
   },
+  // ⚠️ Luften over karusellen er MASTHEAD_CARD_GAP, ikke spacing.lg: lag-
+  // kassa-kortets bue regnes ut fra den (HeroSurface arc="masthead").
   carouselSection: {
-    paddingTop: spacing.lg,
+    paddingTop: MASTHEAD_CARD_GAP,
   },
   cardWrap: {
     paddingHorizontal: spacing.lg,
@@ -1038,49 +1208,40 @@ const styles = StyleSheet.create({
   cameraChipPressed: {
     opacity: 0.7,
   },
+  // Varsel-pillen til venstre, «Publiser» til høyre — ÉN rad (se
+  // `ComposeActions` for hvorfor det ikke lenger er to).
   composeActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  broadcastRow: {
-    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.sm,
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceMuted,
   },
-  broadcastRowOn: {
-    backgroundColor: colors.heiaSoft,
-  },
-  broadcastBox: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.sm,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+  // Samme blekkvask som komponeringsfeltet: aldri en lys SOLID flate oppå
+  // lyst glass (Emil-linsa) — det var nettopp det den gamle grå boksen var.
+  notifyPill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+    gap: spacing.xs + 2,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(8, 57, 46, 0.06)',
   },
-  broadcastBoxOn: {
-    borderColor: colors.heiaInk,
+  // PÅ: mintfyll med heiaDeep-blekk — A v2-knapperegelen, samme par som
+  // resten av appens valgte tilstander.
+  notifyPillOn: {
+    backgroundColor: colors.heiaTint,
   },
-  broadcastText: {
-    flex: 1,
-    gap: 1,
+  notifyPillPressed: {
+    opacity: 0.7,
   },
-  broadcastTitle: {
-    ...typography.body,
-    fontWeight: '600',
-  },
-  broadcastHint: {
-    ...typography.caption,
+  notifyText: {
+    ...typography.bodySmall,
+    fontWeight: '700',
     color: colors.textSecondary,
+  },
+  notifyTextOn: {
+    color: colors.heiaDeep,
   },
   imagePreview: {
     gap: spacing.sm,

@@ -33,9 +33,7 @@ export function ReporterSheet({
   const [search, setSearch] = useState('');
 
   const filtered = search
-    ? members.filter(m =>
-        m.name.toLowerCase().includes(search.toLowerCase()),
-      )
+    ? members.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
     : members;
 
   const handleSelect = (userId: string) => {
@@ -97,9 +95,7 @@ export function ReporterSheet({
               </Pressable>
             );
           }}
-          ListEmptyComponent={
-            <Text style={styles.empty}>Ingen treff</Text>
-          }
+          ListEmptyComponent={<Text style={styles.empty}>Ingen treff</Text>}
         />
       </View>
     </Modal>
@@ -107,9 +103,12 @@ export function ReporterSheet({
 }
 
 const styles = StyleSheet.create({
+  // ⚠️ INGEN SVART FADE (Brage 2026-09-10). Flaten er der KUN for å fange
+  // trykk utenfor arket; den skal ikke dimme siden bak. Arkene i Heia er
+  // parallelle paneler, ikke blokkerende oppgaver.
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    backgroundColor: 'transparent',
   },
   sheet: {
     backgroundColor: colors.surface,

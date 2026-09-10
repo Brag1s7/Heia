@@ -102,12 +102,18 @@ describe('arenaen viser kampen', () => {
     expect(texts(render({secondHalf: true}))).toContain('2. omgang · 40′');
   });
 
-  it('viser sted og reporter som type på flaten, ikke som chips', () => {
+  it('viser reporter og ferskhet — stedet bor i Info (runde 2)', () => {
     const t = texts(
-      render({location: 'Briskeby kunstgress 2', reporterName: 'Jarle Vestli'}),
+      render({
+        location: 'Briskeby kunstgress 2',
+        reporterName: 'Jarle Vestli',
+        lastEventLabel: 'Siste hendelse for 3 min',
+      }),
     );
-    expect(t).toContain('Briskeby kunstgress 2');
+    expect(t).not.toContain('Briskeby kunstgress 2');
     expect(t).toContain('Jarle rapporterer');
+    expect(t).toContain('Siste hendelse for 3 min');
+    expect(t).not.toContain('nå');
   });
 });
 

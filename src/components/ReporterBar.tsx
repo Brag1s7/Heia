@@ -16,7 +16,7 @@ interface ReporterBarProps {
    * kampens grunn: ingen hvit plate, ingen ramme — skillet kommer av lys og
    * luft, som resten av kampverdenen.
    */
-  variant?: 'default' | 'match';
+  variant?: 'default' | 'match' | 'plain';
 }
 
 /**
@@ -34,6 +34,9 @@ export function ReporterBar({
   variant = 'default',
 }: ReporterBarProps) {
   const onMatch = variant === 'match';
+  // `plain`: ingen egen plate, men vanlig (mørkt) blekk — raden bor da
+  // INNE i et lyst kort, og to lyse lag oppå hverandre er uleselig.
+  const flat = onMatch || variant === 'plain';
 
   // Ingen reporter satt — kun en admin kan gjøre noe med det.
   if (!reporter) {
@@ -48,7 +51,7 @@ export function ReporterBar({
 
     if (!isAdmin) {
       return (
-        <View style={[styles.container, onMatch && styles.containerMatch]}>
+        <View style={[styles.container, flat && styles.containerMatch]}>
           {empty}
         </View>
       );
@@ -60,7 +63,7 @@ export function ReporterBar({
         accessibilityLabel="Velg kampreporter"
         style={({pressed}) => [
           styles.container,
-          onMatch && styles.containerMatch,
+          flat && styles.containerMatch,
           pressed && (onMatch ? styles.pressedMatch : styles.pressed),
         ]}
         onPress={onChangeReporter}>
@@ -74,7 +77,7 @@ export function ReporterBar({
   }
 
   return (
-    <View style={[styles.container, onMatch && styles.containerMatch]}>
+    <View style={[styles.container, flat && styles.containerMatch]}>
       <Avatar
         name={reporter.name}
         size="sm"

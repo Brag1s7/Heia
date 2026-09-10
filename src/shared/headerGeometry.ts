@@ -54,3 +54,52 @@ export const HEADER_FOOT_HEIGHT = 12;
 /** Buene fades ut over denne andelen av kroppshøyden under laghodet
  *  (≈ 89 pt på 739 pt — der den ytre buen uansett slutter). */
 export const ARC_CONTINUATION_FRACTION = 0.12;
+
+/**
+ * Luften mellom laghodets underkant og det første kortet på Hjem (Brage
+ * 2026-09-09: «få buen på kortet til å gå i ett med bakgrunnen»). Kortets
+ * bue (`HeroSurface arc="masthead"`) regnes ut fra denne og kortets
+ * sidemarg, så sirkelen fortsetter gjennom kortets kant uten skjøt. Endrer
+ * du toppmargen på Hjem, endre den HER — ikke i stilen.
+ */
+export const MASTHEAD_CARD_GAP = 16;
+
+/** Kortets egen kantlinje — buene regnes fra INNSIDEN av den. */
+const CARD_BORDER = 1;
+
+/** Kortets ytterkant: avstand til vinduets høyrekant og til laghodets
+ *  underkant. Alt et kort trenger for å tegne lerretets sirkel videre. */
+export interface MastheadCard {
+  right: number;
+  top: number;
+}
+
+/**
+ * BUEBOKSEN FOR ET KORT SOM STÅR RETT UNDER LAGHODET — ÉN utregning, delt
+ * av alle kortmaterialene (`HeroSurface`, `StadiumGlass`).
+ *
+ * Sentrum er lerretets: `ARC_INSET_RIGHT` fra vinduets høyrekant og
+ * `ARC_INSET_BOTTOM` over laghodets underkant (se `DaylightGround`
+ * ArcFamily). Regnet om til kortets egne koordinater fortsetter linjen
+ * gjennom kortets kant i stedet for å nesten møte den.
+ *
+ * Boksen er `2r + strek` og forskjøvet en halv strek, så RNs kantlinje (som
+ * tegnes innenfor boksen) blir sentrert på radiusen — som svg-strøket i
+ * lerretet. `borderRadius: 999` på stilen; RN klipper til halve boksen.
+ */
+export function mastheadArcBox(
+  r: number,
+  card: MastheadCard,
+): {right: number; top: number; width: number; height: number} {
+  // Positivt = innover fra kortets indre høyrekant.
+  const cx = ARC_INSET_RIGHT - card.right - CARD_BORDER;
+  // Negativt = over kortets indre toppkant.
+  const cy = -(card.top + CARD_BORDER + ARC_INSET_BOTTOM);
+  const box = 2 * r + ARC_STROKE;
+  return {
+    right: cx - r - ARC_STROKE / 2,
+    top: cy - r - ARC_STROKE / 2,
+    width: box,
+    height: box,
+  };
+}

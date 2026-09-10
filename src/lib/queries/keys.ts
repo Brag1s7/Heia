@@ -32,6 +32,11 @@ export const queryKeys = {
   supportSummary: (teamSpaceId: string) =>
     ['supportSummary', teamSpaceId] as const,
   members: (teamSpaceId: string) => ['members', teamSpaceId] as const,
+  /** Aktuelle turneringer til «Turnering»-feltet i kampskjemaet. I cachen
+   *  fordi feltet ellers monteres ETTER at arket står (Brage 2026-09-09:
+   *  «raden med motstander eller turnering henger litt etter»): Sesongen
+   *  varmer nøkkelen, arket leser den synkront. */
+  tournaments: (teamSpaceId: string) => ['tournaments', teamSpaceId] as const,
   /** Forfatter-oppslaget (00067) — som members, men inkluderer utmeldte
    *  og bærer aldri telefon/barn. Egen nøkkel: rosteret og forfatterskapet
    *  har ulikt innhold og ulik livssyklus. */

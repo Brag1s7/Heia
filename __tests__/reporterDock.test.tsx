@@ -115,16 +115,19 @@ it('PUBLIKUM ser aldri verktøyet — det er ikke engang i treet', () => {
   expect(antallPaneler(tree)).toBe(0);
 });
 
-it('publikum beholder linja som forklarer hvorfor det ikke finnes en oppdater-knapp', () => {
-  const tekster = render({isReporter: false})
-    .root.findAllByType(require('react-native').Text)
+it('publikum får ingen dokk og ingen forklarende linje (runde 2: fanene bærer flaten)', () => {
+  const tree = render({isReporter: false});
+  const tekster = tree.root
+    .findAllByType(require('react-native').Text)
     .flatMap(n =>
       Array.isArray(n.props.children) ? n.props.children : [n.props.children],
     )
     .filter(c => typeof c === 'string');
-  expect(tekster).toContain(
+  expect(tekster).not.toContain(
     'Stillingen og kampforløpet oppdaterer seg av seg selv.',
   );
+  expect(tekster).not.toContain('Mål oss');
+  expect(tekster).toContain('Referat');
 });
 
 /**

@@ -85,6 +85,11 @@ export function TeamProvider({children}: PropsWithChildren) {
       .catch(() => setStoredTeamSpaceId(null));
   }, []);
 
+  // Har denne app-kjøringen noen gang sett en innlogget bruker? Skiller
+  // «utlogging» (skal slette lagvalget) fra «session ikke lest fra disk
+  // ennå» (skal IKKE røre det) — se auto-valg-effekten lenger ned.
+  const hadUserRef = useRef(false);
+
   // Se kommentaren i UserContext: ID-en er stabil, mens `session.user` får ny
   // objekt-identitet ved hver token-refresh.
   const userId = session?.user?.id;
@@ -322,8 +327,21 @@ export function TeamProvider({children}: PropsWithChildren) {
     }
     if (!userId) {
       setActiveTeamSpaceId(null);
-      // Utlogging: neste bruker på enheten skal ikke arve lagvalget.
-      AsyncStorage.removeItem(ACTIVE_TEAM_KEY).catch(() => {});
+      // ⚠️ KUN VED EKTE UTLOGGING (telefonfunn 2026-09-07: lagvalget var
+      // tilbake til lag 1 ved hver kaldstart). `session` er null i de første
+      // rammene av HVER kaldstart — Supabase leser den fra disk asynkront —
+      // så en ubetinget sletting her tømte nøkkelen FØR noen rakk å lese
+      // den. Frø-boot-stien leser lagringen sist av alle (etter readBootSeed
+      // + restorePersistedQueries) og fikk derfor null, falt til
+      // `seedMemberships[0]` — og persisterings-effekten under skrev den
+      // feilen tilbake til disk. Ref, ikke state: dette skal ikke re-rendre
+      // noe, bare huske at vi FAKTISK har sett en innlogget bruker.
+      if (hadUserRef.current) {
+        hadUserRef.current = false;
+        AsyncStorage.removeItem(ACTIVE_TEAM_KEY).catch(() => {});
+      }
+    } else {
+      hadUserRef.current = true;
     }
   }, [userId, userMemberships, activeTeamSpaceId, storedTeamSpaceId]);
 

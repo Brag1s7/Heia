@@ -23,6 +23,7 @@ import {
   useNavigation,
   CommonActions,
   type NavigationProp,
+  useScrollToTop,
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
@@ -88,7 +89,11 @@ import {
 import {errorMessage} from '../shared/errorMessage';
 import {pickAvatarImage} from '../lib/media';
 import {deleteAvatarFile, uploadAvatar} from '../lib/media/avatar';
-import {confirmDeleteAccount, registerLocalCache} from '../lib/account';
+import {
+  confirmDeleteAccount,
+  confirmSignOut,
+  registerLocalCache,
+} from '../lib/account';
 import {useAppVersion} from '../lib/appVersion';
 import {formatKr} from '../lib/money';
 import type {ProfilStackParamList, RootTabParamList} from '../shared/types';
@@ -236,6 +241,12 @@ function supportStatusLine(item: MySupportItem): string {
 export function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const bottomPad = useBottomContentPadding();
+  /**
+   * TRYKK PÅ FANEN DU ALT STÅR I ⇒ TIL TOPPEN (Brage 2026-09-10).
+   * `useScrollToTop` er React Navigations egen kobling mot `tabPress`.
+   */
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const {session, profile, signOut, refreshProfile} = useAuth();
   const {
     activeTeamSpaceId,
@@ -339,8 +350,9 @@ export function ProfilScreen() {
 
   // All lokal rydding (modul-cacher, medie-URL-er) bor i selve signOut
   // (UserContext → clearLocalCaches) — begge utloggingsinngangene får den.
+  // Bekreftelsen er delt med velkomstskjermen (src/lib/account.ts).
   const handleSignOut = useCallback(() => {
-    signOut();
+    confirmSignOut(signOut);
   }, [signOut]);
 
   // Kontosletting (Apple 5.1.1(v)). To bekreftelser — dette er den ene
@@ -656,6 +668,7 @@ export function ProfilScreen() {
       />
       {/* KROPPEN: scrollflaten er gjennomsiktig over lerretet. */}
       <ScrollView
+        ref={scrollRef}
         style={styles.body}
         contentContainerStyle={{
           paddingTop: spacing.lg,

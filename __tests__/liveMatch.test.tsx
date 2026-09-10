@@ -31,7 +31,7 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 import {LiveMatch} from '../src/components/match/LiveMatch';
-import {colors} from '../src/theme';
+import {colors, matchColors} from '../src/theme';
 import type {HeiaEventDetail, MatchEvent} from '../src/shared/types';
 
 const EVENTS: MatchEvent[] = [
@@ -157,29 +157,15 @@ describe('kampen monterer som én grønn verden', () => {
     expect(render({isReporter: true}).toJSON()).toBeTruthy();
   });
 
-  it('bruker INGEN av appens lyse flater', () => {
-    // «Hele skjermen er grønn, statuslinje til tab-bar. Ingen hvit eller
-    // creamfarget flate.» Dette er den regelen, som test.
-    //
-    // ⚠️ RENT HVITT ER IKKE PÅ LISTA, og det er med vilje: den frosne
-    // retningen har selv to hvite ting i kampverdenen — platen bak lagets
-    // logo, og typen på den korale LIVE-pillen. Det som ikke får finnes er
-    // KREMFAMILIEN og det mørke blekket som hører til den lyse verdenen.
-    const forbidden = [
-      colors.background,
-      colors.surfaceMuted,
-      colors.sun,
-      colors.border,
-      colors.borderSubtle,
-      colors.textSecondary,
-      colors.textTertiary,
-    ].map(c => c.toUpperCase());
-
+  it('står i dagslys (runde 2): mintgrunn, aldri det mørke rommet', () => {
+    // Kampen er LYS — litt mørkere enn Hjem. Det mørke rommet fra skive 2
+    // (groundTop) skal ikke finnes på flaten; kremfamilien heller ikke.
     for (const variant of [{}, {isReporter: true}]) {
       const used = usedColors(render(variant));
-      for (const bad of forbidden) {
-        expect(used).not.toContain(bad);
-      }
+      expect(used).toContain(matchColors.dayMid.toUpperCase());
+      expect(used).not.toContain(matchColors.groundTop.toUpperCase());
+      expect(used).not.toContain(colors.background.toUpperCase());
+      expect(used).not.toContain(colors.sun.toUpperCase());
     }
   });
 
@@ -193,19 +179,27 @@ describe('kampen monterer som én grønn verden', () => {
     expect(used).toContain(colors.heiaDeep.toUpperCase());
   });
 
-  it('erstatter det hvite «du følger kampen»-kortet med én linje', () => {
+  it('viser visningsfanene, med Referat valgt — ingen følge-linje', () => {
+    const tree = render();
+    // Kun vertsnodene — komposittene speiler propsene sine.
+    const tabs = tree.root.findAll(
+      n => typeof n.type === 'string' && n.props.accessibilityRole === 'tab',
+    );
+    expect(tabs.map(t => t.props.accessibilityLabel)).toEqual([
+      'Referat',
+      'Hendelser',
+      'Bilder',
+      'Info',
+    ]);
+    expect(tabs[0].props.accessibilityState).toEqual({selected: true});
     const {Text} = require('react-native');
-    const texts = render()
-      .root.findAllByType(Text)
-      .map(n => {
-        const c = n.props.children;
-        return (Array.isArray(c) ? c : [c])
-          .filter(
-            (x: unknown) => typeof x === 'string' || typeof x === 'number',
-          )
-          .join('');
-      });
-    expect(texts).toContain(
+    const texts = tree.root.findAllByType(Text).map(n => {
+      const c = n.props.children;
+      return (Array.isArray(c) ? c : [c])
+        .filter((x: unknown) => typeof x === 'string' || typeof x === 'number')
+        .join('');
+    });
+    expect(texts).not.toContain(
       'Stillingen og kampforløpet oppdaterer seg av seg selv.',
     );
     expect(texts).not.toContain('Du følger kampen direkte');
@@ -248,7 +242,7 @@ describe('kampen monterer som én grønn verden', () => {
           .join('');
       });
     expect(texts).toContain('1. omgang · 37′');
-    expect(texts).toContain('NÅ · 37′');
+    expect(texts).toContain('NÅ 37′');
   });
 
   it('leser andre omgang av forløpet, ikke av klokka', () => {

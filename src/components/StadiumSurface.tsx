@@ -21,6 +21,13 @@ interface StadiumSurfaceProps {
   arc?: boolean;
   /** Kantlinjen (stadiumEdge). Av på chips som skal ligge rett på et kort. */
   bordered?: boolean;
+  /**
+   * `quiet` (Brage 2026-09-10, live-målskiva): banebuene ligger lenger
+   * tilbake og blir en del av flaten i stedet for en dekor OPPÅ den. Kun
+   * målskiva sender den — kampkortene i Kalender og Sesongen er urørt, og
+   * `default` er nøyaktig som før.
+   */
+  arcTone?: 'default' | 'quiet';
   children?: React.ReactNode;
 }
 
@@ -38,8 +45,10 @@ export function StadiumSurface({
   flood = true,
   arc = true,
   bordered = true,
+  arcTone = 'default',
   children,
 }: StadiumSurfaceProps) {
+  const quiet = arcTone === 'quiet';
   return (
     <View style={[styles.surface, bordered && styles.border, style]}>
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -50,11 +59,21 @@ export function StadiumSurface({
               <Stop offset="0.78" stopColor="#143126" />
               <Stop offset="1" stopColor="#143126" />
             </LinearGradient>
-            <RadialGradient id="floodAmber" cx="18%" cy="-20%" rx="130%" ry="100%">
+            <RadialGradient
+              id="floodAmber"
+              cx="18%"
+              cy="-20%"
+              rx="130%"
+              ry="100%">
               <Stop offset="0" stopColor="#FFC53D" stopOpacity={0.13} />
               <Stop offset="0.52" stopColor="#FFC53D" stopOpacity={0} />
             </RadialGradient>
-            <RadialGradient id="floodMint" cx="85%" cy="-10%" rx="120%" ry="90%">
+            <RadialGradient
+              id="floodMint"
+              cx="85%"
+              cy="-10%"
+              rx="120%"
+              ry="90%">
               <Stop offset="0" stopColor="#02FFAB" stopOpacity={0.15} />
               <Stop offset="0.55" stopColor="#02FFAB" stopOpacity={0} />
             </RadialGradient>
@@ -62,15 +81,37 @@ export function StadiumSurface({
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#base)" />
           {flood && (
             <>
-              <Rect x="0" y="0" width="100%" height="100%" fill="url(#floodAmber)" />
-              <Rect x="0" y="0" width="100%" height="100%" fill="url(#floodMint)" />
+              <Rect
+                x="0"
+                y="0"
+                width="100%"
+                height="100%"
+                fill="url(#floodAmber)"
+              />
+              <Rect
+                x="0"
+                y="0"
+                width="100%"
+                height="100%"
+                fill="url(#floodMint)"
+              />
             </>
           )}
         </Svg>
       </View>
 
-      {arc && <View style={styles.arcOuter} pointerEvents="none" />}
-      {arc && <View style={styles.arcInner} pointerEvents="none" />}
+      {arc && (
+        <View
+          style={[styles.arcOuter, quiet && styles.arcOuterQuiet]}
+          pointerEvents="none"
+        />
+      )}
+      {arc && (
+        <View
+          style={[styles.arcInner, quiet && styles.arcInnerQuiet]}
+          pointerEvents="none"
+        />
+      )}
 
       {children}
     </View>
@@ -107,5 +148,12 @@ const styles = StyleSheet.create({
     borderRadius: 68,
     borderWidth: 1.5,
     borderColor: 'rgba(2, 255, 171, 0.09)',
+  },
+  // `quiet`: buene sitter i flaten, ikke oppå den.
+  arcOuterQuiet: {
+    borderColor: 'rgba(2, 255, 171, 0.07)',
+  },
+  arcInnerQuiet: {
+    borderColor: 'rgba(2, 255, 171, 0.05)',
   },
 });

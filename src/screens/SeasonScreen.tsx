@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -7,24 +7,42 @@ import {
   StyleSheet,
   RefreshControl,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
-import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
-import {colors, typography, spacing, radius, shadows, fonts} from '../theme';
 import {
-  BackBar,
+  useFocusEffect,
+  useNavigation,
+  useScrollToTop,
+} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
+import {
+  colors,
+  typography,
+  spacing,
+  radius,
+  shadows,
+  fonts,
+  matchColors,
+} from '../theme';
+import {
+  DaylightGround,
+  DAYLIGHT_GROUND_AB,
+  DAYLIGHT_GROUND_FALLBACK,
   EventCard,
-  HeroSurface,
+  GLASS,
+  LiquidGlassSurface,
   ListRowSkeleton,
   LiveMatchBanner,
   ScoreChip,
   SectionHeader,
   Skeleton,
-  StadiumSurface,
   StatusPill,
+  TeamHeader,
   useBottomContentPadding,
 } from '../components';
-import {Plus, Trophy} from '../components/icons';
+// ⚠️ DIREKTE, ikke fra barrelen: `OPAL` leses i `StyleSheet.create`, altså
+// ved MODUL-LASTING, og tester som mocker hele `../components` ville da
+// fått `undefined.inkSecondary`.
+import {OPAL} from '../components/OpalSurface';
+import {ChevronRight, Plus, Trophy} from '../components/icons';
 import {useActiveTeam} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {
@@ -38,6 +56,7 @@ import {
   useSupportSummary,
 } from '../lib/queries/supportSummary';
 import {useScreenFocusRefetch} from '../lib/queries/useScreenFocusRefetch';
+import {prefetchTournaments} from '../lib/queries/tournaments';
 import {formatKr} from '../lib/money';
 import {getMatchSchedule} from '../lib/api/events';
 import {buildMatchSchedule} from '../shared/matchSchedule';
@@ -72,28 +91,47 @@ function formatMatchDate(date: Date): string {
 // turneringsvisning er alle kampene samme turnering og titlene ville
 // bare gjentatt overskriften.
 type SeasonRow =
+  | {kind: 'month'; label: string; key: string}
   | {kind: 'tournament'; title: string; key: string}
   | {kind: 'match'; match: SeasonMatch; key: string};
 
-function buildRows(
-  matches: SeasonMatch[],
-  withTournamentHeaders: boolean,
-): SeasonRow[] {
+/**
+ * MÅNED, IKKE UKE (Brage 2026-09-10: «legg til måned inndeling her»).
+ *
+ * Et halvår har typisk 8–20 spilte kamper. Uke ville gitt mest tomme
+ * overskrifter med én kamp under; måned gir 3–6 bolker som leser som
+ * sesongens gang. Måneden er den YTRE bolken: en turnering som krysser et
+ * månedsskille får overskriften sin i begge månedene, fordi den faktisk
+ * spilte kamper i begge.
+ *
+ * Turneringsvisningen deles ikke opp — der er alle kampene samme helg.
+ */
+function buildRows(matches: SeasonMatch[], grouped: boolean): SeasonRow[] {
   const rows: SeasonRow[] = [];
   let prevTournament: string | undefined;
+  let prevMonth: number | undefined;
   matches.forEach((match, index) => {
-    if (
-      withTournamentHeaders &&
-      match.tournament &&
-      match.tournament !== prevTournament
-    ) {
-      rows.push({
-        kind: 'tournament',
-        title: match.tournament,
-        key: `t${index}`,
-      });
+    if (grouped) {
+      const month = match.startTime.getMonth();
+      if (month !== prevMonth) {
+        rows.push({
+          kind: 'month',
+          label: MONTHS[month],
+          key: `m${index}`,
+        });
+        prevMonth = month;
+        // Ny måned ⇒ turneringens overskrift skal stå igjen under den.
+        prevTournament = undefined;
+      }
+      if (match.tournament && match.tournament !== prevTournament) {
+        rows.push({
+          kind: 'tournament',
+          title: match.tournament,
+          key: `t${index}`,
+        });
+      }
+      prevTournament = match.tournament;
     }
-    prevTournament = match.tournament;
     rows.push({kind: 'match', match, key: match.eventId});
   });
   return rows;
@@ -108,8 +146,29 @@ function buildRows(
  * tall, og «+ Ny turnering» bor her (kun trener) — IKKE i kalenderen.
  *
  * Formvalget er bevisst IKKE et diagram: en KPI-rad med store tall og én
- * liste. Sesongtallene er kampdata og bor på den mørke stadionflaten (låst
- * A v2-signatur); listen under er hverdag og bor på hvitt kort.
+ * liste.
+ *
+ * ---------------------------------------------------------------------------
+ * MATERIALET (Brage 2026-09-09: «samme bakgrunn som resten av appen og glass
+ * der det passer, så det er samme språk»):
+ *
+ *   grunn     `DaylightGround` i masthead-modus + `TeamHeader`, nøyaktig som
+ *             Hjem, Kalender og Varsler. Sesongen er KUN fanerot (2026-09-09:
+ *             «Sesongen»-chippen på Hjem er fjernet) — ett utseende.
+ *   tallene   kampdata bor i kampens mørke glass (designregelen «mørkt glass
+ *             = kamp»): `LiquidGlassSurface variant="score"`, samme flate som
+ *             scorekortet på kampsiden. Blekket er kampens (`matchColors`).
+ *   lagkassa  `important`-glasset (feedens varme perle for det som er
+ *             viktig) — og den står ØVERST, rett under tittelen (Brage
+ *             2026-09-09: «lagkasse havner på bunnen … den er viktig
+ *             ettersom den viser hvor mye laget har fått inn»). Kompakt
+ *             stripe: beløpet er det store tallet, resten er bitekst.
+ *   listene   `sheet`-glass (arkets tunge perle) for kamplista, velgeren og
+ *             tomtilstandene, med OPAL-blekk og innfelt hårlinje mellom
+ *             radene — som Varsler-arket og Profils undersider.
+ *   chipene   velgeren er små trykkflater i rekke; ett native glass per chip
+ *             er for dyrt. De er tegnet i arkets tint med materialets kant,
+ *             valgt = appens hovedpar (mint på heiaDeep).
  *
  * Ingen toppscorerliste — LÅST beslutning (bruker, 2026-07-30): ingen
  * spillerstatistikk før laget har en strukturert spillerstall.
@@ -164,10 +223,10 @@ function MatchProgramme({
 
       {today.map(match => (
         <View key={match.id} style={styles.programmeItem}>
-          {/* `featured` er dagens signal — samme kort, mer vekt. */}
+          {/* ⚠️ `today`, IKKE `featured`: korallkanten betyr LIVE. */}
           <EventCard
             event={match}
-            featured
+            today
             onPress={() => onOpenMatch(match.id)}
           />
         </View>
@@ -181,24 +240,89 @@ function MatchProgramme({
 
       {/* Påstanden om tomhet kommer FØRST når vi faktisk vet. */}
       {loaded && !harNoe && (
-        <View style={styles.programmeEmpty}>
+        <LiquidGlassSurface
+          variant="sheet"
+          cornerRadius={radius.xl}
+          wrapStyle={styles.programmeEmpty}
+          style={styles.programmeEmptyInner}>
           <Text style={styles.programmeEmptyText}>
             Ingen kamper er satt opp ennå.
           </Text>
-        </View>
+        </LiquidGlassSurface>
       )}
     </View>
   );
 }
 
+/**
+ * LAGKASSA-STRIPEN — øverst på flaten, rett under tittelen.
+ *
+ * Den er et tall folk kommer for («hvor mye laget har fått inn»), så den
+ * står FØR kampprogrammet, ikke etter arkivet. Kompakt så dagens kamp
+ * fortsatt er synlig uten å bla (Brage 2026-08: «dagens kamp tydelig
+ * prioritert»): én rad, beløpet som eneste store tall, chevron som lover
+ * en side bak.
+ */
+function LagkassaStrip({
+  supporters,
+  monthlyToClubMinor,
+  onPress,
+}: {
+  supporters: number;
+  monthlyToClubMinor: number;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel="Åpne lagkassa"
+      style={styles.lagkassaWrap}>
+      {({pressed}) => (
+        <LiquidGlassSurface
+          variant="important"
+          cornerRadius={radius.xl}
+          pressed={pressed}
+          style={styles.lagkassa}>
+          <View style={styles.lagkassaText}>
+            <Text style={styles.lagkassaPill}>💚 LAGKASSA</Text>
+            {supporters > 0 ? (
+              <>
+                <Text style={styles.lagkassaAmount} maxFontSizeMultiplier={1.3}>
+                  {formatKr(monthlyToClubMinor)}
+                </Text>
+                <Text style={styles.lagkassaCaption}>
+                  til laget hver måned ·{' '}
+                  {supporters === 1
+                    ? '1 støttespiller'
+                    : `${supporters} støttespillere`}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.lagkassaEmpty}>
+                  Bli lagets første støttespiller
+                </Text>
+                <Text style={styles.lagkassaCaption}>
+                  Hver krone gjør lagfølelsen større
+                </Text>
+              </>
+            )}
+          </View>
+          <ChevronRight size={20} color={colors.heiaDeep} strokeWidth={2.4} />
+        </LiquidGlassSurface>
+      )}
+    </Pressable>
+  );
+}
+
 export function SeasonScreen() {
-  const insets = useSafeAreaInsets();
   const bottomPad = useBottomContentPadding();
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const navigation = useNavigation<Nav>();
-  const {activeTeamSpaceId, activeTeamSpace, activeRole} = useActiveTeam();
+  const {activeTeamSpaceId, activeRole} = useActiveTeam();
   const isAdmin = isTeamAdmin(activeRole);
-  // Pushet fra Hjem (index > 0) eller fanerot (index 0)? Se `BackBar` under.
-  const pushet = navigation.getState().index > 0;
 
   const [stats, setStats] = useState<SeasonStats | null>(null);
   // Kampprogrammet (skive 10.1) — EGEN henting, ikke en endring av
@@ -221,6 +345,12 @@ export function SeasonScreen() {
   const supportQuery = useSupportSummary(activeTeamSpaceId);
   const supportSummary = supportQuery.data ?? null;
   useScreenFocusRefetch(supportSummaryKey(activeTeamSpaceId ?? ''));
+
+  // Varm «Turnering»-feltets liste FØR treneren trykker «Ny kamp», så arket
+  // står komplett fra første ramme (se lib/queries/tournaments).
+  useEffect(() => {
+    if (isAdmin) prefetchTournaments(activeTeamSpaceId);
+  }, [isAdmin, activeTeamSpaceId]);
 
   const loadStats = useCallback(async () => {
     if (!activeTeamSpaceId) return;
@@ -289,17 +419,17 @@ export function SeasonScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* ⚠️ SESONGEN BOR TO STEDER, OG BARE DET ENE HAR EN VEI TILBAKE.
-          Som ROT i Kamp-fanen har den ingen — `goBack()` ville bobla opp til
-          fanenavigatoren og kastet deg til Hjem (Brage 2026-08-21: «som ikke
-          skal være mulig»). Som PUSHET skjerm fra laghodet på Hjem MÅ den ha
-          en, ellers er snarveien en blindvei.
-
-          `index > 0` er stackens eget svar på «ble jeg pushet hit», og det
-          er sannere enn `canGoBack()`, som også teller foreldrenavigatoren. */}
-      {pushet && <BackBar />}
+      {/* ⚠️ SESONGEN ER FANEROT, OG BARE DET. Ingen tilbakelinje: `goBack()`
+          ville bobla opp til fanenavigatoren og kastet deg til Hjem (Brage
+          2026-08-21: «som ikke skal være mulig»). Den pushede varianten
+          (fra «Sesongen»-chippen på Hjem) er fjernet 2026-09-09 — den var
+          årsaken til to utseender og til header-hoppet i runde 2.
+          Laghodet setter statuslinja selv. */}
+      {DAYLIGHT_GROUND_AB && <DaylightGround masthead />}
+      <TeamHeader />
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={{paddingBottom: bottomPad}}
         refreshControl={
           <RefreshControl
@@ -308,26 +438,21 @@ export function SeasonScreen() {
             tintColor={colors.heia}
           />
         }>
-        <View
-          style={[
-            styles.header,
-            // Toppmargen bæres av `BackBar` når den finnes. Som fanerot er
-            // det ingenting over tittelen, og da må den holde seg klar av
-            // statuslinja selv — ellers legger den seg oppå klokka.
-            {paddingTop: pushet ? spacing.sm : insets.top + spacing.md},
-          ]}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>Sesongen</Text>
-            {activeTeamSpace ? (
-              <Text style={styles.subtitle}>{activeTeamSpace.displayName}</Text>
-            ) : null}
-          </View>
-          {/* ⚠️ EN EKTE KNAPP, IKKE EN TEKSTLENKE (Brage: «må det være en
-              bedre knapp for å legge til ny kamp!»). Å sette opp kampen er
-              hele grunnen til at en trener åpner denne siden før sesongen
-              har startet — da kan handlingen ikke være det svakeste
-              elementet på flaten. */}
-          {isAdmin && (
+        {/* Tittelen står i reisens mørke topp rett under laghodet —
+            stadionblekk, som Kalender-chromen. Laghodet sier alt lagnavnet. */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Sesongen</Text>
+        </View>
+
+        {/* TRENERENS HANDLINGER — én rad rett under tittelen, begge synlige
+            uten å bla og uten å rulle (Brage 2026-09-09 om «Ny turnering»
+            sist i chip-raden og så fast til høyre: «altfor dårlig
+            plassering»). Hierarkiet ligger i materialet, ikke i plassen:
+            «Ny kamp» er hovedhandlingen (mint på heiaDeep — ⚠️ EN EKTE KNAPP,
+            Brage: «må det være en bedre knapp for å legge til ny kamp!»),
+            «Ny turnering» er sekundær i chrome-glass med stadionblekk. */}
+        {isAdmin && (
+          <View style={styles.actions}>
             <Pressable
               onPress={() =>
                 navigation.navigate('NewEvent', {presetType: 'kamp'})
@@ -342,14 +467,40 @@ export function SeasonScreen() {
               <Plus size={17} color={colors.heiaDeep} strokeWidth={2.6} />
               <Text style={styles.newMatchText}>Ny kamp</Text>
             </Pressable>
-          )}
-        </View>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('NewEvent', {presetType: 'turnering'})
+              }
+              accessibilityRole="button"
+              accessibilityLabel="Ny turnering"
+              hitSlop={8}
+              style={({pressed}) => [
+                styles.newTournament,
+                pressed && styles.newTournamentPressed,
+              ]}>
+              <Plus size={16} color={TOURNAMENT_INK} strokeWidth={2.6} />
+              <Text style={styles.newTournamentText}>Ny turnering</Text>
+            </Pressable>
+          </View>
+        )}
 
-        {/* ⚠️ PROGRAMMET LIGGER ØVERST, OVER SESONGTALLENE (skive 10.1).
-            Fra skive 10 fører kampknappen hit, og da er det DAGENS kamp man
-            leter etter — ikke fjorårets målforskjell. Brage etter
-            telefontesten: «dagens kamp tydelig prioritert». Arkivet under er
-            uendret; det er to ulike spørsmål på samme flate. */}
+        {/* Lagkassa — den permanente inngangen, og den står ØVERST (Brage
+            2026-09-09). Vises for alle medlemmer; feiler oppslaget, er data
+            undefined og stripen skjules — samme oppførsel som før. */}
+        {supportSummary && (
+          <LagkassaStrip
+            supporters={supportSummary.supporters}
+            monthlyToClubMinor={supportSummary.monthlyToClubMinor}
+            onPress={() => navigation.navigate('Lagkassa')}
+          />
+        )}
+
+        {/* ⚠️ PROGRAMMET LIGGER OVER SESONGTALLENE (skive 10.1). Fra skive
+            10 fører kampknappen hit, og da er det DAGENS kamp man leter
+            etter — ikke fjorårets målforskjell. Brage etter telefontesten:
+            «dagens kamp tydelig prioritert». Lagkassa-stripen over er
+            kompakt av samme grunn. Arkivet under er uendret; det er to
+            ulike spørsmål på samme flate. */}
         <MatchProgramme
           matches={schedule}
           loaded={scheduleLoaded}
@@ -359,9 +510,13 @@ export function SeasonScreen() {
 
         {loading ? (
           <>
-            {/* Tallene bor på stadionflaten også som skeleton — flatebyttet
+            {/* Tallene bor i det mørke glasset også som skeleton — flatebyttet
                 lys/mørk skal ikke blinke inn etter lastingen. */}
-            <StadiumSurface style={styles.hero}>
+            <LiquidGlassSurface
+              variant="score"
+              cornerRadius={SCORE_RADIUS}
+              wrapStyle={styles.heroWrap}
+              style={styles.hero}>
               <Skeleton width={110} height={11} style={styles.stadiumBone} />
               <View style={styles.kpiRow}>
                 <View style={styles.kpi}>
@@ -377,25 +532,35 @@ export function SeasonScreen() {
                   <Skeleton width={52} height={10} style={styles.stadiumBone} />
                 </View>
               </View>
-            </StadiumSurface>
-            <View style={styles.sectionHeader}>
+            </LiquidGlassSurface>
+            <View style={styles.sectionSkeleton}>
               <Skeleton width={80} height={11} />
             </View>
-            <View style={styles.listCard}>
+            <LiquidGlassSurface
+              variant="sheet"
+              cornerRadius={radius.xl}
+              wrapStyle={styles.listWrap}
+              style={styles.listCard}>
               <ListRowSkeleton />
               <ListRowSkeleton />
               <ListRowSkeleton showBorder={false} />
-            </View>
+            </LiquidGlassSurface>
           </>
         ) : error || !stats ? (
-          <View style={styles.emptyCard}>
+          <LiquidGlassSurface
+            variant="sheet"
+            cornerRadius={radius.xl}
+            wrapStyle={styles.emptyWrap}
+            style={styles.emptyCard}>
             <Text style={styles.emptyText}>
               {error ?? 'Kunne ikke laste sesongen.'}
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : (
           <>
-            {/* Velgeren: sesonger og turneringer om hverandre, + ny turnering */}
+            {/* Velgeren: sesonger og turneringer om hverandre. «Ny turnering»
+                bor IKKE her lenger — den står i handlingsraden under tittelen
+                (to plasseringer i raden ble avvist 2026-09-09). */}
             {showPicker && (
               <ScrollView
                 horizontal
@@ -448,7 +613,7 @@ export function SeasonScreen() {
                       ]}>
                       <Trophy
                         size={13}
-                        color={isActive ? colors.heiaInk : colors.goldInk}
+                        color={isActive ? colors.heiaDeep : colors.goldInk}
                         strokeWidth={2.2}
                       />
                       <Text
@@ -462,39 +627,29 @@ export function SeasonScreen() {
                     </Pressable>
                   );
                 })}
-                {isAdmin && (
-                  <Pressable
-                    onPress={() =>
-                      navigation.navigate('NewEvent', {
-                        presetType: 'turnering',
-                      })
-                    }
-                    style={({pressed}) => [
-                      styles.pickerChip,
-                      pressed && styles.pickerChipPressed,
-                    ]}>
-                    <Plus size={14} color={colors.heiaInk} strokeWidth={2.4} />
-                    <Text
-                      style={[styles.pickerChipText, styles.newTournamentText]}>
-                      Ny turnering
-                    </Text>
-                  </Pressable>
-                )}
               </ScrollView>
             )}
 
             {isBrandNew ? (
-              <View style={styles.emptyCard}>
+              <LiquidGlassSurface
+                variant="sheet"
+                cornerRadius={radius.xl}
+                wrapStyle={styles.emptyWrap}
+                style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>Sesongen starter her</Text>
                 <Text style={styles.emptyText}>
                   Når lagets første kamp er ferdigspilt, samles resultater og
                   kamprapporter på denne siden — sesong for sesong.
                 </Text>
-              </View>
+              </LiquidGlassSurface>
             ) : (
               <>
-                {/* Tallene — kampdata bor på stadionflaten */}
-                <StadiumSurface style={styles.hero}>
+                {/* Tallene — kampdata bor i kampens mørke glass */}
+                <LiquidGlassSurface
+                  variant="score"
+                  cornerRadius={SCORE_RADIUS}
+                  wrapStyle={styles.heroWrap}
+                  style={styles.hero}>
                   <View style={styles.heroLabelRow}>
                     {inTournamentView && (
                       <Trophy size={14} color={colors.gold} strokeWidth={2.2} />
@@ -529,22 +684,39 @@ export function SeasonScreen() {
                       {stats.goalsFor}–{stats.goalsAgainst} i målforskjell
                     </Text>
                   )}
-                </StadiumSurface>
+                </LiquidGlassSurface>
 
                 {/* Kampene — hver rad åpner kamprapporten */}
                 {stats.played === 0 ? (
-                  <View style={[styles.emptyCard, styles.emptyCardBelow]}>
+                  <LiquidGlassSurface
+                    variant="sheet"
+                    cornerRadius={radius.xl}
+                    wrapStyle={[styles.emptyWrap, styles.emptyCardBelow]}
+                    style={styles.emptyCard}>
                     <Text style={styles.emptyText}>{emptyInViewText}</Text>
-                  </View>
+                  </LiquidGlassSurface>
                 ) : (
                   <>
-                    <View style={styles.sectionHeader}>
-                      <View style={styles.sectionDash} />
-                      <Text style={styles.sectionLabel}>Kampene</Text>
-                    </View>
-                    <View style={styles.listCard}>
+                    <SectionHeader title="Kampene" />
+                    {/* `unbounded`: lista vokser med sesongen (og med
+                        turneringene i den) — samme grunn som Varsler. */}
+                    <LiquidGlassSurface
+                      variant="sheet"
+                      cornerRadius={radius.xl}
+                      unbounded
+                      wrapStyle={styles.listWrap}
+                      style={styles.listCard}>
                       {rows.map((row, index) =>
-                        row.kind === 'tournament' ? (
+                        row.kind === 'month' ? (
+                          <View
+                            key={row.key}
+                            style={[
+                              styles.monthRow,
+                              index > 0 && styles.rowBorder,
+                            ]}>
+                            <Text style={styles.monthLabel}>{row.label}</Text>
+                          </View>
+                        ) : row.kind === 'tournament' ? (
                           <View
                             key={row.key}
                             style={[
@@ -593,46 +765,10 @@ export function SeasonScreen() {
                           </Pressable>
                         ),
                       )}
-                    </View>
+                    </LiquidGlassSurface>
                   </>
                 )}
               </>
-            )}
-
-            {/* Lagkassa — den permanente inngangen ved siden av lagets
-                stolthet og tall (fase 5). Vises for alle medlemmer. */}
-            {supportSummary && (
-              <Pressable
-                onPress={() => navigation.navigate('Lagkassa')}
-                accessibilityRole="button"
-                accessibilityLabel="Åpne lagkassa"
-                style={({pressed}) => pressed && styles.lagkassaPressed}>
-                <HeroSurface style={styles.lagkassaCard}>
-                  <Text style={styles.lagkassaPill}>💚 LAGKASSA</Text>
-                  {supportSummary.supporters > 0 ? (
-                    <>
-                      <Text style={styles.lagkassaAmount}>
-                        {formatKr(supportSummary.monthlyToClubMinor)}
-                      </Text>
-                      <Text style={styles.lagkassaCaption}>
-                        til laget hver måned ·{' '}
-                        {supportSummary.supporters === 1
-                          ? '1 støttespiller'
-                          : `${supportSummary.supporters} støttespillere`}
-                      </Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.lagkassaEmpty}>
-                        Bli lagets første støttespiller
-                      </Text>
-                      <Text style={styles.lagkassaCaption}>
-                        Hver krone gjør lagfølelsen større
-                      </Text>
-                    </>
-                  )}
-                </HeroSurface>
-              </Pressable>
             )}
           </>
         )}
@@ -641,10 +777,13 @@ export function SeasonScreen() {
   );
 }
 
+/** Samme radius som scorekortet på kampsiden — det ER samme flate. */
+const SCORE_RADIUS = 28;
+
+/** Sekundærknappens blekk i reisens mørke topp. */
+const TOURNAMENT_INK = DAYLIGHT_GROUND_AB ? colors.stadiumText : colors.heiaInk;
+
 const styles = StyleSheet.create({
-  headerText: {
-    flex: 1,
-  },
   // Mint fyll med heiaDeep blekk — appens hovedhandling, samme par som
   // «Publiser» og «Mål oss». Den var en tekstlenke i et seksjonshode.
   newMatch: {
@@ -672,47 +811,48 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   programmeEmpty: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  programmeEmptyInner: {
+    padding: spacing.lg,
   },
   programmeEmptyText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
+  // Grunnen ligger absolutt over denne; fallbacken er grunnens dominante
+  // mint (samme som navigatorens kort bak skjermen), så ingenting blinker
+  // krem i kantene under push/pop — som ProfilPage.
   screen: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: DAYLIGHT_GROUND_AB
+      ? DAYLIGHT_GROUND_FALLBACK
+      : colors.background,
   },
+  // Toppen (statuslinja) bæres av laghodet eller tilbakelinja — tittelen
+  // trenger bare sitt eget pust under dem.
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    // ⚠️ `paddingTop` SETTES PÅ KALLSTEDET, med `insets.top`. Da `BackBar`
-    // ble fjernet (Sesongen er en fanerot nå), forsvant også det ENESTE
-    // som holdt innholdet klar av statuslinja — tittelen la seg oppå klokka
-    // og Dynamic Island (Brage 2026-08-21). En konstant her ville vært feil
-    // på hver telefon med et annet toppområde.
-    marginBottom: spacing.xl,
+    paddingTop: spacing.md,
+    marginBottom: spacing.lg,
   },
+  // Stadionblekk: tittelen står i reisens mørke topp.
   title: {
     ...typography.heading1,
-  },
-  subtitle: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    color: DAYLIGHT_GROUND_AB ? colors.stadiumText : colors.textPrimary,
   },
   stadiumBone: {
     backgroundColor: colors.stadiumEdge,
   },
-  emptyCard: {
+  emptyWrap: {
     marginHorizontal: spacing.lg,
+  },
+  emptyCard: {
     padding: spacing.xl,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
     gap: spacing.sm,
     alignItems: 'center',
   },
@@ -724,10 +864,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
   },
-  // Samme valgt-språk som chipene i NewEventScreen: valgt skifter FLATE.
+  // Velgeren: arkets tint + materialets kant på hver chip, valgt = appens
+  // hovedpar. Ingen native glass per chip (se toppkommentaren).
   pickerRow: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.lg,
@@ -741,31 +882,57 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: radius.full,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: GLASS.unboundedEdge,
+    backgroundColor: GLASS.sheet.tint,
     maxWidth: 220,
   },
   pickerChipActive: {
-    backgroundColor: colors.heiaSoft,
+    backgroundColor: colors.heia,
     borderColor: colors.heia,
   },
   pickerChipPressed: {
-    backgroundColor: colors.surfaceMuted,
+    opacity: 0.7,
   },
   pickerChipText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   pickerChipTextActive: {
-    color: colors.heiaInk,
+    color: colors.heiaDeep,
     fontWeight: '700',
   },
+  // Handlingsraden under tittelen. Sekundærknappen er chrome-glass (tab-
+  // barens perle + materialets kant) med stadionblekk: den står i reisens
+  // mørke topp, ved siden av den mint hovedknappen.
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  newTournament: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 44,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: GLASS.unboundedEdge,
+    backgroundColor: GLASS.bar.tint,
+  },
+  newTournamentPressed: {
+    opacity: 0.7,
+  },
   newTournamentText: {
-    color: colors.heiaInk,
-    fontWeight: '600',
+    ...typography.action,
+    color: TOURNAMENT_INK,
+  },
+  heroWrap: {
+    marginHorizontal: spacing.lg,
   },
   hero: {
-    marginHorizontal: spacing.lg,
     padding: spacing.xl,
     gap: spacing.lg,
   },
@@ -779,7 +946,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.stadiumDim,
+    color: matchColors.dim,
     flexShrink: 1,
   },
   kpiRow: {
@@ -789,7 +956,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 2,
   },
-  // Mint tekst er lov her — dette er stadionmørk flate (≈13:1).
+  // Mint tall på kampens mørke glass — samme par som scorekortet. Dempet
+  // blekk er kampens (`matchColors.dim`), ikke `stadiumDim` (felle 2 i
+  // tokens: den faller til 3,7:1 på arenaflaten).
   kpiValue: {
     ...typography.scoreLarge,
     color: colors.heia,
@@ -799,48 +968,46 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1.1,
     textTransform: 'uppercase',
-    color: colors.stadiumDim,
+    color: matchColors.dim,
   },
   heroMeta: {
     ...typography.bodySmall,
-    color: colors.stadiumDim,
+    color: matchColors.dim,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  sectionSkeleton: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing['2xl'],
     paddingBottom: spacing.md,
-    gap: spacing.sm,
   },
-  sectionDash: {
-    width: 14,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: colors.heia,
+  listWrap: {
+    marginHorizontal: spacing.lg,
   },
-  sectionLabel: {
+  listCard: {
+    overflow: 'hidden',
+  },
+  // Rader i materialet: innfelt blekk-hårlinje og blekk-tint ved trykk —
+  // aldri en lys flate oppå glass (OPAL-regelen, delt med Varsler).
+  rowBorder: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: OPAL.hairline,
+  },
+  rowPressed: {
+    backgroundColor: OPAL.rowPressed,
+  },
+  // Månedens mellomtittel: ren etikett i materialet, ingen egen flate —
+  // måneden er en bolk, ikke et objekt (turneringen er et objekt, og får
+  // derfor gulflaten under).
+  monthRow: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  monthLabel: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.4,
     textTransform: 'uppercase',
-    color: colors.textSecondary,
-  },
-  listCard: {
-    marginHorizontal: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.borderSubtle,
-    overflow: 'hidden',
-    ...shadows.card,
-  },
-  rowBorder: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.borderSubtle,
-  },
-  rowPressed: {
-    backgroundColor: colors.surfaceMuted,
+    color: OPAL.inkTertiary,
   },
   // Turneringens mellomtittel i kamplisten — myk gulflate, som pillen.
   tournamentRow: {
@@ -876,35 +1043,38 @@ const styles = StyleSheet.create({
   },
   matchMeta: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
-  // Lagkassa-kortet — hero-flaten som lys kontrast på stadionmørket.
-  lagkassaPressed: {
-    opacity: 0.93,
+  // Lagkassa-stripen — viktig-glasset, øverst. Beløpet er det store tallet.
+  lagkassaWrap: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
   },
-  lagkassaCard: {
-    marginTop: spacing.xl,
-    padding: spacing.xl,
+  lagkassa: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.lg,
+    paddingLeft: spacing.xl,
+    paddingRight: spacing.lg,
+  },
+  lagkassaText: {
+    flex: 1,
     gap: 2,
   },
   lagkassaPill: {
-    alignSelf: 'flex-start',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
-    color: colors.heiaDeep,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
+    color: colors.goldInk,
+    marginBottom: 2,
   },
   lagkassaAmount: {
-    fontSize: 30,
+    fontSize: 28,
     letterSpacing: -0.5,
     fontFamily: fonts.display,
     color: colors.heiaDeep,
+    includeFontPadding: false,
   },
   lagkassaEmpty: {
     ...typography.heading3,
@@ -912,7 +1082,6 @@ const styles = StyleSheet.create({
   },
   lagkassaCaption: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+    color: OPAL.inkSecondary,
   },
 });

@@ -153,7 +153,18 @@ export function TabButton({
       onPressOut={handlePressOut}
       style={style}>
       <TabPressContext.Provider value={ctx}>
-        <Animated.View style={[styles.content, motion]}>
+        {/*
+          ⚠️ `shouldRasterizeIOS` ER MEDISINEN MOT «UKLAR/KORNETE KNAPP»
+          (2026-09-07, målt i simulator + lldb, se STATUS-HANDOFF): iOS 26
+          rasteriserer et lag med underlag i LAGETS EGEN contentsScale (1x)
+          så lenge transformen ENDRER seg fra bilde til bilde. Statisk
+          transform er skarp, per-bilde-endring (native og JS-driver, CA-
+          animasjon) er uskarp. Med shouldRasterize setter RN
+          rasterizationScale = skjermskala, og bevegelsen lander på samme
+          skarphet som en statisk skalert flate. Én prop, null rendere,
+          dekker trykk (compress), markørsquash og kampknappens sprett.
+        */}
+        <Animated.View shouldRasterizeIOS style={[styles.content, motion]}>
           {children}
         </Animated.View>
       </TabPressContext.Provider>

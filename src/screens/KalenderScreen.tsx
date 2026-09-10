@@ -1,10 +1,4 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   Text,
@@ -21,6 +15,7 @@ import {
   useNavigation,
   useRoute,
   type RouteProp,
+  useScrollToTop,
 } from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import {colors, typography, spacing, radius} from '../theme';
@@ -103,12 +98,7 @@ const NEAR_TOP = 400;
  * Hvorfor agendaen skal flytte seg. Alle er en eksplisitt handling — eller
  * den ENE posisjoneringen ved åpning. Aldri en tilstand som endret seg.
  */
-type ScrollOrigin =
-  | 'oppstart'
-  | 'ukerad'
-  | 'månedsark'
-  | 'i-dag'
-  | 'opprettet';
+type ScrollOrigin = 'oppstart' | 'ukerad' | 'månedsark' | 'i-dag' | 'opprettet';
 
 export function KalenderScreen() {
   const bottomPad = useBottomContentPadding();
@@ -267,6 +257,7 @@ export function KalenderScreen() {
   // kort, seksjon og ScrollView, og ingen etterkorrigering.
   // -------------------------------------------------------------------------
   const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
   const innerRef = useRef<View | null>(null);
   const sectionNodes = useRef(new Map<string, View>());
 

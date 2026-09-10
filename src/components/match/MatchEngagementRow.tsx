@@ -1,6 +1,7 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {colors, matchColors, spacing, typography} from '../../theme';
+import {colors, matchColors, radius, spacing, typography} from '../../theme';
+import {FROST} from '../../shared/glassOptics';
 import {MessageCircle, MoreHorizontal} from '../icons';
 import type {MatchEngagement} from '../../shared/matchEngagement';
 
@@ -71,6 +72,11 @@ interface MatchEngagementRowProps {
   onCorrect?: () => void;
   /** Hva menyen gjør, som setning. «Meny» alene sier ingenting i VoiceOver. */
   correctLabel?: string;
+  /**
+   * `ground` = naken linje på den mørke grunnen (kampforløpet).
+   * `card` = feedens frostpiller på et lyst kort (Referat, runde 2).
+   */
+  variant?: 'ground' | 'card';
 }
 
 export function MatchEngagementRow({
@@ -83,7 +89,9 @@ export function MatchEngagementRow({
   onComment,
   onCorrect,
   correctLabel,
+  variant = 'ground',
 }: MatchEngagementRowProps) {
+  const card = variant === 'card';
   const ready = engagement !== undefined;
   const mine = engagement?.iReacted ?? false;
   const heiaCount = engagement?.heiaCount ?? 0;
@@ -105,9 +113,19 @@ export function MatchEngagementRow({
           // Tilstanden leses av skjermleseren, ikke av labelen — ellers sier
           // raden «heiet» to ganger på ulikt vis.
           accessibilityState={{selected: mine, disabled: !ready}}
-          style={({pressed}) => [styles.button, pressed && styles.pressed]}>
+          style={({pressed}) => [
+            styles.button,
+            card && styles.pill,
+            card && styles.pillHeia,
+            card && mine && styles.pillOn,
+            pressed && styles.pressed,
+          ]}>
           <Text
-            style={[styles.text, mine && styles.textOn]}
+            style={[
+              styles.text,
+              card && styles.textCard,
+              mine && (card ? styles.textCardOn : styles.textOn),
+            ]}
             maxFontSizeMultiplier={fontCap}>
             👏 {heiaCount > 0 ? `${heiaCount} heier` : 'Heia'}
           </Text>
@@ -121,9 +139,18 @@ export function MatchEngagementRow({
         accessibilityRole="button"
         accessibilityLabel={commentLabel}
         accessibilityState={{disabled: !ready}}
-        style={({pressed}) => [styles.button, pressed && styles.pressed]}>
-        <MessageCircle size={14} color={matchColors.dim} />
-        <Text style={styles.text} maxFontSizeMultiplier={fontCap}>
+        style={({pressed}) => [
+          styles.button,
+          card && styles.pill,
+          pressed && styles.pressed,
+        ]}>
+        <MessageCircle
+          size={card ? 16 : 14}
+          color={card ? FROST.pill.ink : matchColors.dim}
+        />
+        <Text
+          style={[styles.text, card && styles.textCard]}
+          maxFontSizeMultiplier={fontCap}>
           {commentCount > 0 ? `${commentCount}` : 'Kommenter'}
         </Text>
       </Pressable>
@@ -134,8 +161,15 @@ export function MatchEngagementRow({
           hitSlop={{top: 6, bottom: 6}}
           accessibilityRole="button"
           accessibilityLabel={correctLabel ?? 'Korriger målet'}
-          style={({pressed}) => [styles.button, pressed && styles.pressed]}>
-          <MoreHorizontal size={16} color={matchColors.dim} />
+          style={({pressed}) => [
+            styles.button,
+            card && styles.more,
+            pressed && styles.pressed,
+          ]}>
+          <MoreHorizontal
+            size={16}
+            color={card ? colors.textSecondary : matchColors.dim}
+          />
         </Pressable>
       )}
     </View>
@@ -180,5 +214,41 @@ const styles = StyleSheet.create({
   // flater, så tilstanden bor i blekket — samme semantikk, kampens språk.
   textOn: {
     color: colors.heia,
+  },
+  // --- kortvarianten: feedens frostpiller (FROST.pill), Heia med fast bredde
+  /**
+   * ⚠️ KOMPAKT, IKKE MINDRE Å TREFFE (Brage 2026-09-10: «gjør Heia/Kommenter
+   * mer kompakte — de skal være sekundære actions, ikke dominere kortet»).
+   * Høyden røres IKKE: 36 pt er allerede under Apples 44, og å krympe den
+   * videre ville vært et tilgjengelighetstap forkledd som design. Det som
+   * strammes er BREDDEN og blekkets vekt — pillene tok mer plass enn selve
+   * hendelsen de hang under.
+   */
+  pill: {
+    minHeight: 36,
+    paddingHorizontal: 10,
+    borderRadius: radius.full,
+    backgroundColor: FROST.pill.fill,
+    borderWidth: 1,
+    borderColor: FROST.pill.edge,
+    justifyContent: 'center',
+  },
+  pillHeia: {
+    minWidth: 84,
+  },
+  pillOn: {
+    backgroundColor: colors.heiaTint,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  more: {
+    minWidth: 34,
+    justifyContent: 'center',
+  },
+  textCard: {
+    fontSize: 13,
+    color: FROST.pill.ink,
+  },
+  textCardOn: {
+    color: colors.heiaInk,
   },
 });

@@ -1,11 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import {View, Text, ScrollView, StyleSheet, Alert} from 'react-native';
 import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {
@@ -18,16 +12,16 @@ import {
   matchColors,
 } from '../theme';
 import {
-  BackBar,
   Card,
   Button,
   RSVPBar,
   SectionHeader,
   Avatar,
-  ListRow,
   EventCard,
   HeroSurface,
-  StadiumSurface,
+  LiquidGlassSurface,
+  ProfilPage,
+  StadiumGlass,
   StatusPill,
   TeamBadge,
   ReporterModal,
@@ -41,6 +35,10 @@ import {
   SkeletonCard,
   useBottomContentPadding,
 } from '../components';
+// ⚠️ DIREKTE, ikke fra barrelen: `OPAL` leses i `StyleSheet.create`, altså
+// ved MODUL-LASTING. Tester som mocker hele `../components` (tabBar) ville
+// da fått `undefined.inkSecondary`. Samme grep som `SectionHeader`.
+import {OPAL} from '../components/OpalSurface';
 import {FinishedMatch} from '../components/match/FinishedMatch';
 import {LiveMatch} from '../components/match/LiveMatch';
 import {MatchEngagementRow} from '../components/match/MatchEngagementRow';
@@ -164,7 +162,9 @@ const monthNamesLong = [
 ];
 
 function formatTime(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${String(date.getHours()).padStart(2, '0')}:${String(
+    date.getMinutes(),
+  ).padStart(2, '0')}`;
 }
 
 // Samme type-pill som kortene på Hjem og i kalenderen — infokortet er samme
@@ -219,7 +219,6 @@ const ACTION_DONE: Record<ReporterActionType, string> = {
   slutt: 'Kampen er avsluttet',
   melding: 'Oppdateringen er delt',
 };
-
 
 /**
  * RPC-ene kaster med engelske meldinger. Oversett de vi kan handle på, og fall
@@ -519,6 +518,7 @@ export function EventDetailScreen({route, navigation}: Props) {
               count: entry?.commentCount ?? 0,
             })}
             fontCap={GRID_FONT_CAP}
+            variant="card"
             onHeia={handleMatchHeia}
             onComment={handleMatchComment}
           />
@@ -553,6 +553,7 @@ export function EventDetailScreen({route, navigation}: Props) {
             count: entry?.commentCount ?? 0,
           })}
           fontCap={GRID_FONT_CAP}
+          variant="card"
           onHeia={handleMatchHeia}
           onComment={handleMatchComment}
         />
@@ -842,8 +843,7 @@ export function EventDetailScreen({route, navigation}: Props) {
 
   if (eventQuery.isLoading) {
     return (
-      <View style={styles.screen}>
-        <BackBar title="Hendelse" />
+      <ProfilPage title="Hendelse">
         {/* Speiler info-kortet: pill + tittel + metarader. */}
         <View style={styles.section}>
           <SkeletonCard>
@@ -862,7 +862,7 @@ export function EventDetailScreen({route, navigation}: Props) {
             <Skeleton height={12} />
           </SkeletonCard>
         </View>
-      </View>
+      </ProfilPage>
     );
   }
 
@@ -870,16 +870,15 @@ export function EventDetailScreen({route, navigation}: Props) {
   // ikke ned en side som alt viser data — feilflaten er kun for tomt utfall.
   if (!event) {
     return (
-      <View style={styles.screen}>
-        <BackBar title="Hendelse" />
+      <ProfilPage title="Hendelse">
         <View style={styles.centered}>
-          <Text style={styles.emptyText}>
+          <Text style={styles.emptyTextGround}>
             {eventQuery.isError
               ? 'Kunne ikke laste hendelsen.'
               : 'Fant ikke hendelsen.'}
           </Text>
         </View>
-      </View>
+      </ProfilPage>
     );
   }
 
@@ -903,14 +902,34 @@ export function EventDetailScreen({route, navigation}: Props) {
   // Samme rolleregel som is_team_admin() i RLS — en lagleder skal se det
   // samme som en trener.
   const isCurrentUserAdmin = isTeamAdmin(activeRole);
-  // Rollen er tildelt så snart `reporterId` finnes. Er medlemslisten ikke lastet
-  // ennå (eller feilet), viser vi et navnløst medlem — `undefined` ville tegnet
-  // tom-tilstanden «Ingen kampreporter» med «Velg»-knapp, som er direkte feil.
+  /**
+   * Rollen er tildelt så snart `reporterId` finnes.
+   *
+   * ⚠️ FORFATTERE ER ANDREKILDEN, IKKE «Medlem» (Brage 2026-09-10: «etter
+   * kampen er slutt står det bare "medlem" rapporterte»). Rosteret hentes
+   * MED VILJE ikke for en ferdig kamp (`needsRoster` over) — men navnet
+   * leses herfra, så den frosne rapporten mistet reporteren og sa «Medlem
+   * rapporterte». `get_team_authors` hentes for hver kamp, har ingen
+   * statusfilter, og er nettopp kilden for forfatterskap: den kjenner også
+   * en reporter som siden har forlatt laget.
+   *
+   * Rekkefølgen er rosteret først (det bærer rollen for reporter-UI-et),
+   * så forfatteren, og bare helt til slutt et navnløst medlem — `undefined`
+   * ville tegnet tom-tilstanden «Ingen kampreporter» med «Velg»-knapp, som
+   * er direkte feil når rollen ER tildelt.
+   */
+  const reporterAuthor = reporterId ? authorFor(reporterId) : undefined;
   const reporter = reporterId
-    ? (teamMembers.find(u => u.id === reporterId) ?? {
-        id: reporterId,
-        name: 'Medlem',
-      })
+    ? teamMembers.find(u => u.id === reporterId) ??
+      (reporterAuthor
+        ? {
+            id: reporterAuthor.id,
+            name: reporterAuthor.name,
+            role: reporterAuthor.role,
+            avatarPath: reporterAuthor.avatarPath,
+            avatarColor: reporterAuthor.avatarColor,
+          }
+        : {id: reporterId, name: 'Medlem'})
     : undefined;
 
   // Speiler start_match: admin, eller en reporter som alt er utpekt.
@@ -946,13 +965,17 @@ export function EventDetailScreen({route, navigation}: Props) {
   // «kan ikke»-valg tegnet som `secondary` ser ut som et uregistrert trykk.
   // «Kommer» er `secondary` (ikke `ghost`) i ubesvart tilstand fordi den er
   // det forventede svaret, og skal invitere til trykk.
-  const comingVariant =
-    myStatus === 'kommer'
-      ? 'primary'
-      : myStatus === 'kan_ikke'
-        ? 'ghost'
-        : 'secondary';
-  const notComingVariant = myStatus === 'kan_ikke' ? 'selected' : 'ghost';
+  /**
+   * ⚠️ BEGGE SVARENE SKAL SE UT SOM KNAPPER (Brage 2026-09-10: «det er bare
+   * tekst inne i boksen og ser ikke ut som klikkbare knapper»). `ghost` er
+   * ren tekst og `secondary` er en lysegrå omriss laget for den kremede
+   * grunnen — på dagslysgrunnen forsvinner begge. Derfor: det VALGTE svaret
+   * bærer fargen (mint / mint-tint), og det andre får en ekte flate
+   * (`styles.onGround`) så det fortsatt er en knapp å trykke på.
+   */
+  const answeredNo = myStatus === 'kan_ikke';
+  const comingVariant = answeredNo ? 'secondary' : ('primary' as const);
+  const notComingVariant = answeredNo ? 'selected' : ('secondary' as const);
 
   // Svaret vises med én gang (optimistisk patch — applyMyStatus flytter
   // telleren i cachen) og lagres i bakgrunnen. setRsvp invaliderer
@@ -1022,7 +1045,9 @@ export function EventDetailScreen({route, navigation}: Props) {
     const notifies = eventIsUpcoming(event.startTime);
     Alert.alert(
       'Avlyse kampen?',
-      `${formatDateLong(event.startTime)} kl. ${formatTime(event.startTime)}. ` +
+      `${formatDateLong(event.startTime)} kl. ${formatTime(
+        event.startTime,
+      )}. ` +
         (notifies
           ? 'Kampen blir stående i kalenderen som avlyst, og hele laget får beskjed.'
           : 'Kampen blir stående i kalenderen som avlyst. Laget får ingen beskjed — kampen har vært.'),
@@ -1190,10 +1215,7 @@ export function EventDetailScreen({route, navigation}: Props) {
    * både i lagets feed og i kampens egen bildestripe. `matchEventId` er det
    * eneste valgfrie: uten den er det et generelt kampbilde.
    */
-  const handlePublishPhoto = async (
-    caption: string,
-    matchEventId?: string,
-  ) => {
+  const handlePublishPhoto = async (caption: string, matchEventId?: string) => {
     if (!activeTeamSpaceId || !pendingPhoto || publishingPhoto) return;
 
     setPublishingPhoto(true);
@@ -1263,7 +1285,9 @@ export function EventDetailScreen({route, navigation}: Props) {
    * måls målscorer i feltet.
    */
   const correctingGoal = correctingGoalId
-    ? (event.matchEvents ?? NO_MATCH_EVENTS).find(e => e.id === correctingGoalId)
+    ? (event.matchEvents ?? NO_MATCH_EVENTS).find(
+        e => e.id === correctingGoalId,
+      )
     : undefined;
   const correctionSheet = correctingGoal ? (
     <GoalCorrectionSheet
@@ -1275,7 +1299,9 @@ export function EventDetailScreen({route, navigation}: Props) {
       onSave={input =>
         submitCorrection(correctingGoal.id, {action: 'edit', ...input})
       }
-      onCancelGoal={() => submitCorrection(correctingGoal.id, {action: 'cancel'})}
+      onCancelGoal={() =>
+        submitCorrection(correctingGoal.id, {action: 'cancel'})
+      }
       onClose={() => setCorrectingGoalId(null)}
     />
   ) : null;
@@ -1413,277 +1439,306 @@ export function EventDetailScreen({route, navigation}: Props) {
   const infoPill =
     event.type === 'kamp' && event.matchStatus === 'cancelled'
       ? {kind: 'neutral' as PillKind, label: 'Avlyst'}
-      : (typePill[event.type] ?? typePill.annet);
+      : typePill[event.type] ?? typePill.annet;
 
   return (
-    <View style={styles.screen}>
-      <BackBar title="Hendelse" />
-      <ScrollView
-        contentContainerStyle={{paddingBottom: bottomPad}}>
-      {isUpcomingMatch && event.opponent ? (
-        /* Kampdag (P5B): motstander + avspark fortjener mer enn sort på
+    /* SAMME GRUNN SOM RESTEN AV APPEN (Brage 2026-09-10: «denne skjermen må
+       vi gjøre noe med … gjelder også trening og sosialt»). `ProfilPage` er
+       malen for pushede undersider: dagslysgrunn, tilbakelinje i
+       stadionblekk, statuslinje. Alt innhold står i glass — de hvite
+       adminplatene er borte (hvite kort leser som «admin», og Heia er ikke
+       et administrasjonsverktøy).
+
+       ⚠️ KAMP FÅR MER ENN DE ANDRE, OG DET LIGGER I MATERIALET: kampdagen bor
+       i `StadiumGlass`, kampverdenens mørke glass (designregelen «mørkt glass
+       kjennetegner kamp» — samme flate som kampkortet i feeden og
+       Hjem-heroen). Trening og sosialt får arkets lyse perle. Innholdet er
+       det samme; det er FLATEN som sier hva slags dag dette er. */
+    <ProfilPage title="Hendelse">
+      <ScrollView contentContainerStyle={{paddingBottom: bottomPad}}>
+        {isUpcomingMatch && event.opponent ? (
+          /* Kampdag (P5B): motstander + avspark fortjener mer enn sort på
            hvitt — en liten stadion-smak, IKKE full ScoreBoard (det er
            live-kampens språk). RSVP og «Start kamp»-flyten består under. */
-        <View style={styles.kampdagSection}>
-          <StadiumSurface style={styles.kampdag}>
-            <View style={styles.kampdagTop}>
-              <Text style={styles.kampdagLabel}>Kampdag</Text>
-              <Text style={styles.kampdagDay}>
-                {formatDateLong(event.startTime)}
-              </Text>
-            </View>
-            {/* Standardtittelen («Kamp mot Lyn») sier ikke mer enn platta
+          <View style={styles.kampdagSection}>
+            <StadiumGlass
+              style={styles.kampdag}
+              teamColor={activeTeamSpace?.color}>
+              <View style={styles.kampdagTop}>
+                <Text style={styles.kampdagLabel}>Kampdag</Text>
+                <Text style={styles.kampdagDay}>
+                  {formatDateLong(event.startTime)}
+                </Text>
+              </View>
+              {/* Standardtittelen («Kamp mot Lyn») sier ikke mer enn platta
                 selv — kun en egen tittel fortjener plassen. */}
-            {event.title !== `Kamp mot ${event.opponent}` && (
-              <Text style={styles.kampdagTitle}>{event.title}</Text>
-            )}
-            <View style={styles.kampdagTeams}>
-              <View style={styles.kampdagTeamCol}>
-                <TeamBadge
-                  size={44}
-                  cornerRadius={radius.lg}
-                  fontSize={13}
-                  logoPlate
-                  name={teamName}
-                  style={styles.kampdagUsRing}
-                />
-                <Text style={styles.kampdagTeamName} numberOfLines={2}>
-                  {teamName}
-                </Text>
-              </View>
-              <View style={styles.kampdagKickoff}>
-                <Text style={styles.kampdagTime}>
-                  {formatTime(event.startTime)}
-                </Text>
-                <Text style={styles.kampdagKickoffLabel}>Avspark</Text>
-              </View>
-              <View style={styles.kampdagTeamCol}>
-                <View style={styles.kampdagThemBadge}>
-                  <Text style={styles.kampdagThemText}>
-                    {initials(event.opponent)}
+              {event.title !== `Kamp mot ${event.opponent}` && (
+                <Text style={styles.kampdagTitle}>{event.title}</Text>
+              )}
+              <View style={styles.kampdagTeams}>
+                <View style={styles.kampdagTeamCol}>
+                  <TeamBadge
+                    size={44}
+                    cornerRadius={radius.lg}
+                    fontSize={13}
+                    logoPlate
+                    name={teamName}
+                    style={styles.kampdagUsRing}
+                  />
+                  <Text style={styles.kampdagTeamName} numberOfLines={2}>
+                    {teamName}
                   </Text>
                 </View>
-                <Text style={styles.kampdagTeamName} numberOfLines={2}>
-                  {event.opponent}
-                </Text>
+                <View style={styles.kampdagKickoff}>
+                  <Text style={styles.kampdagTime}>
+                    {formatTime(event.startTime)}
+                  </Text>
+                  <Text style={styles.kampdagKickoffLabel}>Avspark</Text>
+                </View>
+                <View style={styles.kampdagTeamCol}>
+                  <View style={styles.kampdagThemBadge}>
+                    <Text style={styles.kampdagThemText}>
+                      {initials(event.opponent)}
+                    </Text>
+                  </View>
+                  <Text style={styles.kampdagTeamName} numberOfLines={2}>
+                    {event.opponent}
+                  </Text>
+                </View>
               </View>
-            </View>
-            {event.location && (
-              <Text style={styles.kampdagMeta}>{event.location}</Text>
-            )}
-          </StadiumSurface>
-          {event.description && (
-            <Text style={styles.description}>{event.description}</Text>
-          )}
-        </View>
-      ) : (
-        /* Event-info: samme hero-flate som kortene på Hjem og i kalenderen
+              {event.location && (
+                <Text style={styles.kampdagMeta}>{event.location}</Text>
+              )}
+              {/* Beskrivelsen hører til KAMPEN — den bor inne i kortet, ikke
+                  som løs tekst på grunnen (kontrastfella på rampen). */}
+              {event.description && (
+                <Text style={styles.kampdagDescription}>
+                  {event.description}
+                </Text>
+              )}
+            </StadiumGlass>
+          </View>
+        ) : (
+          /* Event-info: samme hero-flate som kortene på Hjem og i kalenderen
            (Brages retning 2026-07-31) — mint→krem-gradient med banedekor,
            type-pill og stor tid i displayfonten. Ingen hvite adminflater. */
-        <HeroSurface style={styles.infoHero}>
-          <View style={styles.infoHeroTop}>
-            <StatusPill kind={infoPill.kind} label={infoPill.label} withDot />
-            <Text style={styles.infoTime}>
-              {/* En turnerings `end_time` bærer SLUTTDATOEN (siste dag
+          <HeroSurface style={styles.infoHero}>
+            <View style={styles.infoHeroTop}>
+              <StatusPill kind={infoPill.kind} label={infoPill.label} withDot />
+              <Text style={styles.infoTime}>
+                {/* En turnerings `end_time` bærer SLUTTDATOEN (siste dag
                   23:59), ikke et klokkeslett — «09:00–23:59» ville vært
                   meningsløst. Perioden står i datolinja under i stedet. */}
-              {event.type !== 'turnering' && event.endTime
-                ? `${formatTime(event.startTime)}–${formatTime(event.endTime)}`
-                : formatTime(event.startTime)}
-            </Text>
-          </View>
-          <Text style={styles.infoDate}>
-            {event.type === 'turnering'
-              ? dayRangeLabel(event.startTime, event.endTime ?? event.startTime)
-              : formatDateLong(event.startTime)}
-          </Text>
-          <Text style={styles.infoTitle}>{event.title}</Text>
-          {event.location && (
-            <View style={styles.locationRow}>
-              <MapPin size={14} color="#41604F" />
-              <Text style={styles.locationText}>{event.location}</Text>
+                {event.type !== 'turnering' && event.endTime
+                  ? `${formatTime(event.startTime)}–${formatTime(
+                      event.endTime,
+                    )}`
+                  : formatTime(event.startTime)}
+              </Text>
             </View>
-          )}
-          {event.description && (
-            <Text style={styles.description}>{event.description}</Text>
-          )}
-        </HeroSurface>
-      )}
-
-      {/* Trenerens to rettelser, rett under det som skal rettes. Kun for
-          trener/lagleder/admin — samme regel som RPC-ene vakter med.
-          «Avlys» er `ghost`: den er tilgjengelig, men den er ikke det man
-          kom hit for. */}
-      {isCurrentUserAdmin && (
-        <View style={styles.adminActions}>
-          <Button
-            title="Rediger"
-            variant="secondary"
-            onPress={() => navigation.navigate('NewEvent', {eventId})}
-            style={styles.adminAction}
-          />
-          {isUpcomingMatch && (
-            <Button
-              title="Avlys kamp"
-              variant="ghost"
-              onPress={() => handleSetCancelled(true)}
-              disabled={savingCancelled}
-              style={styles.adminAction}
-            />
-          )}
-          {isCancelledMatch && (
-            <Button
-              title="Sett opp igjen"
-              variant="secondary"
-              onPress={() => handleSetCancelled(false)}
-              disabled={savingCancelled}
-              style={styles.adminAction}
-            />
-          )}
-        </View>
-      )}
-
-      {/* Turnering: dagens kjøreplan. Kampene bor HER — kalenderen viser
-          turneringen som ett kort. Hver kamp er en helt vanlig kampside
-          (live-rapportering, kamprapport, bilder). */}
-      {isTournament && (
-        <>
-          <SectionHeader
-            title={
-              tournamentMatches.length > 0
-                ? `Kamper (${tournamentMatches.length})`
-                : 'Kamper'
-            }
-          />
-          <View style={styles.tournamentList}>
-            {tournamentMatches.length === 0 && (
-              <Card style={styles.tournamentEmpty}>
-                <Text style={styles.tournamentEmptyText}>
-                  {isCurrentUserAdmin
-                    ? 'Ingen kamper ennå — legg dem inn når kampoppsettet er klart.'
-                    : 'Kampene dukker opp her når treneren legger dem inn.'}
-                </Text>
-              </Card>
+            <Text style={styles.infoDate}>
+              {event.type === 'turnering'
+                ? dayRangeLabel(
+                    event.startTime,
+                    event.endTime ?? event.startTime,
+                  )
+                : formatDateLong(event.startTime)}
+            </Text>
+            <Text style={styles.infoTitle}>{event.title}</Text>
+            {event.location && (
+              <View style={styles.locationRow}>
+                <MapPin size={14} color="#41604F" />
+                <Text style={styles.locationText}>{event.location}</Text>
+              </View>
             )}
-            {tournamentMatches.map(match => (
-              <EventCard
-                key={match.id}
-                event={match}
-                featured={match.matchStatus === 'live'}
-                onPress={() =>
-                  navigation.push('EventDetail', {eventId: match.id})
-                }
-              />
-            ))}
-            {isCurrentUserAdmin && (
-              <Button
-                title="Ny kamp i turneringen"
-                variant="secondary"
-                onPress={() =>
-                  // Turneringens navn OG periode arves ned: kampen åpner på
-                  // første cupdag, og sier fra hvis den havner utenfor.
-                  navigation.navigate('NewEvent', {
-                    parentEventId: eventId,
-                    parentTitle: event.title,
-                    parentFrom: event.startTime.toISOString(),
-                    parentTo: (event.endTime ?? event.startTime).toISOString(),
-                  })
-                }
-              />
+            {event.description && (
+              <Text style={styles.description}>{event.description}</Text>
             )}
-          </View>
-        </>
-      )}
-
-      {/* Kommende kamp: her utnevnes reporteren, og herfra startes kampen.
-          Uten dette kunne ingen bli reporter (ReporterBar fantes kun i
-          live-modus), og ingen kamp kunne bli live. */}
-      {isUpcomingMatch && (
-        <View style={styles.matchSection}>
-          <ReporterBar
-            reporter={reporter}
-            isAdmin={isCurrentUserAdmin}
-            isMe={isCurrentUserReporter}
-            onChangeReporter={openReporterSheet}
-          />
-          {canStartMatch && (
-            <Button
-              title={startingMatch ? 'Starter…' : 'Start kamp'}
-              variant="primary"
-              size="lg"
-              onPress={handleStartMatch}
-              disabled={startingMatch}
-            />
-          )}
-        </View>
-      )}
-
-      {/* Etter kampslutt er bildene det man kommer tilbake for — derfor en
-          kompakt inngang øverst. De blir uansett stående i forløpet under. */}
-      {isFinishedMatch && (
-        <MatchPhotoRail
-          photos={matchPhotos}
-          onPressPhoto={openGalleryPhoto}
-        />
-      )}
-
-      {isFinishedMatch &&
-        (finishedMatchEvents.length > 0 || matchPhotos.length > 0) && (
-          <View style={styles.timeline}>
-            <MatchTimeline
-              matchEvents={finishedMatchEvents}
-              photos={matchPhotos}
-              startedAt={event.startedAt}
-              authorFor={authorFor}
-              onPressPhoto={openGalleryPhoto}
-            />
-          </View>
+          </HeroSurface>
         )}
 
-      {/* RSVP — meningsløst på en ferdigspilt kamp. */}
-      {!isFinishedMatch && (
-        <View style={styles.rsvpSection}>
-          <RSVPBar rsvp={rsvp} />
-          <View style={styles.rsvpButtons}>
-            <Button
-              title={myStatus === 'kommer' ? 'Du kommer!' : 'Kommer'}
-              variant={comingVariant}
-              onPress={() => handleRsvp('kommer')}
-              disabled={savingRsvp}
-              size="lg"
-              style={styles.rsvpBtn}
-            />
-            <Button
-              title={myStatus === 'kan_ikke' ? 'Du kan ikke' : 'Kan ikke'}
-              variant={notComingVariant}
-              onPress={() => handleRsvp('kan_ikke')}
-              disabled={savingRsvp}
-              size="lg"
-              style={styles.rsvpBtn}
-            />
-          </View>
-        </View>
-      )}
+        {/* ═══ ÉN KOLONNE UNDER HEROEN ═══
+            Heroen forteller HVA dette er. Alt du kan GJØRE og alt som er
+            SVART bor i ETT kort under den, i rekkefølge: kampen (reporter,
+            start) → påmeldingen (svaret ditt) → hvem som kommer →
+            rettelsene, nederst og stillest.
 
-      {/* Oppmøteliste. På en spilt kamp er «Kommer» fortid, og «Ikke svart»
-          er ren støy — påmeldingen blir en enkel deltakerliste i stedet. */}
-      <AttendanceSection
-        title={`Kommer (${attendees.coming.length})`}
-        users={attendees.coming}
-        emptyText="Ingen har svart ennå"
-      />
-      {attendees.notComing.length > 0 && (
-        <AttendanceSection
-          title={`Kan ikke (${attendees.notComing.length})`}
-          users={attendees.notComing}
-        />
-      )}
-      {attendees.pending.length > 0 && (
-        <AttendanceSection
-          title={`Ikke svart (${attendees.pending.length})`}
-          users={attendees.pending}
-        />
-      )}
+            ⚠️ `unbounded`: kortet vokser med oppmøtelista. Det er den
+            tint+kant-varianten UTEN nativ backdrop — både fordi en nativ
+            glassflate ikke kan bli vilkårlig høy, og fordi barn som skifter
+            antall under en slik flate tok appen ned da man byttet mellom
+            «Kommer» og «Kan ikke» (2026-09-10).
+
+            ⚠️ ETT MATERIALE, ETT BLEKK. Forrige runde hadde hvit
+            reporterplate, blek mint-boks, rød tekst og en kjempeknapp om
+            hverandre — ingenting delte språk. Her deler ALT kortets flate:
+            radene er flate, knappene er knapper, skillene er hårlinjer. */}
+        <LiquidGlassSurface
+          variant="sheet"
+          cornerRadius={radius.xl}
+          unbounded
+          wrapStyle={styles.columnWrap}
+          style={styles.column}>
+          {isUpcomingMatch && (
+            <>
+              <ReporterBar
+                reporter={reporter}
+                isAdmin={isCurrentUserAdmin}
+                isMe={isCurrentUserReporter}
+                onChangeReporter={openReporterSheet}
+                variant="plain"
+              />
+              {canStartMatch && (
+                <Button
+                  title={startingMatch ? 'Starter…' : 'Start kamp'}
+                  variant="primary"
+                  size="lg"
+                  onPress={handleStartMatch}
+                  disabled={startingMatch}
+                />
+              )}
+              <View style={styles.divider} />
+            </>
+          )}
+          {/* Turnering: dagens kjøreplan. Kampene bor HER — kalenderen viser
+          turneringen som ett kort. Hver kamp er en helt vanlig kampside
+          (live-rapportering, kamprapport, bilder). */}
+          {isTournament && (
+            <>
+              <SectionHeader
+                title={
+                  tournamentMatches.length > 0
+                    ? `Kamper (${tournamentMatches.length})`
+                    : 'Kamper'
+                }
+              />
+              <View style={styles.tournamentList}>
+                {tournamentMatches.length === 0 && (
+                  <Card style={styles.tournamentEmpty}>
+                    <Text style={styles.tournamentEmptyText}>
+                      {isCurrentUserAdmin
+                        ? 'Ingen kamper ennå — legg dem inn når kampoppsettet er klart.'
+                        : 'Kampene dukker opp her når treneren legger dem inn.'}
+                    </Text>
+                  </Card>
+                )}
+                {tournamentMatches.map(match => (
+                  <EventCard
+                    key={match.id}
+                    event={match}
+                    featured={match.matchStatus === 'live'}
+                    onPress={() =>
+                      navigation.push('EventDetail', {eventId: match.id})
+                    }
+                  />
+                ))}
+                {isCurrentUserAdmin && (
+                  <Button
+                    title="Ny kamp i turneringen"
+                    variant="secondary"
+                    onPress={() =>
+                      // Turneringens navn OG periode arves ned: kampen åpner på
+                      // første cupdag, og sier fra hvis den havner utenfor.
+                      navigation.navigate('NewEvent', {
+                        parentEventId: eventId,
+                        parentTitle: event.title,
+                        parentFrom: event.startTime.toISOString(),
+                        parentTo: (
+                          event.endTime ?? event.startTime
+                        ).toISOString(),
+                      })
+                    }
+                  />
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Kommende kamp: her utnevnes reporteren, og herfra startes kampen.
+          Uten dette kunne ingen bli reporter (ReporterBar fantes kun i
+          live-modus), og ingen kamp kunne bli live. */}
+          {/* Etter kampslutt er bildene det man kommer tilbake for — derfor en
+          kompakt inngang øverst. De blir uansett stående i forløpet under. */}
+          {isFinishedMatch && (
+            <MatchPhotoRail
+              photos={matchPhotos}
+              onPressPhoto={openGalleryPhoto}
+            />
+          )}
+
+          {isFinishedMatch &&
+            (finishedMatchEvents.length > 0 || matchPhotos.length > 0) && (
+              <View style={styles.timeline}>
+                <MatchTimeline
+                  matchEvents={finishedMatchEvents}
+                  photos={matchPhotos}
+                  startedAt={event.startedAt}
+                  authorFor={authorFor}
+                  onPressPhoto={openGalleryPhoto}
+                />
+              </View>
+            )}
+
+          {/* RSVP — meningsløst på en ferdigspilt kamp. */}
+          {!isFinishedMatch && (
+            <>
+              <RSVPBar rsvp={rsvp} />
+              <View style={styles.rsvpButtons}>
+                <Button
+                  title={myStatus === 'kommer' ? 'Du kommer!' : 'Kommer'}
+                  variant={comingVariant}
+                  onPress={() => handleRsvp('kommer')}
+                  disabled={savingRsvp}
+                  size="lg"
+                  style={[styles.rsvpBtn, answeredNo && styles.quietBtn]}
+                />
+                <Button
+                  title={myStatus === 'kan_ikke' ? 'Du kan ikke' : 'Kan ikke'}
+                  variant={notComingVariant}
+                  onPress={() => handleRsvp('kan_ikke')}
+                  disabled={savingRsvp}
+                  size="lg"
+                  style={[styles.rsvpBtn, !answeredNo && styles.quietBtn]}
+                />
+              </View>
+            </>
+          )}
+
+          <AttendanceStrip coming={attendees.coming} />
+
+          {/* Rettelsene NEDERST og stillest: de er ikke det man kom hit for. */}
+          {isCurrentUserAdmin && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.adminActions}>
+                <Button
+                  title="Rediger"
+                  variant="secondary"
+                  onPress={() => navigation.navigate('NewEvent', {eventId})}
+                  style={[styles.adminAction, styles.quietBtn]}
+                />
+                {isUpcomingMatch && (
+                  <Button
+                    title="Avlys kamp"
+                    variant="secondary"
+                    onPress={() => handleSetCancelled(true)}
+                    disabled={savingCancelled}
+                    style={[styles.adminAction, styles.quietBtn]}
+                  />
+                )}
+                {isCancelledMatch && (
+                  <Button
+                    title="Sett opp igjen"
+                    variant="secondary"
+                    onPress={() => handleSetCancelled(false)}
+                    disabled={savingCancelled}
+                    style={[styles.adminAction, styles.quietBtn]}
+                  />
+                )}
+              </View>
+            </>
+          )}
+        </LiquidGlassSurface>
       </ScrollView>
 
       {/* Reporter-velger — treneren utnevner i forkant av kampen. */}
@@ -1702,40 +1757,49 @@ export function EventDetailScreen({route, navigation}: Props) {
         initialPhotoId={galleryPhotoId}
         onClose={() => setGalleryPhotoId(null)}
       />
-    </View>
+    </ProfilPage>
   );
 }
 
 // ---------------------------------------------------------------------------
 // Hjelpkomponenter
 // ---------------------------------------------------------------------------
-function AttendanceSection({
-  title,
-  users: attendeeList,
-  emptyText,
-}: {
-  title: string;
-  users: EventAttendee[];
-  emptyText?: string;
-}) {
+/**
+ * HVEM KOMMER — ÉN RAD, FAST HØYDE.
+ *
+ * ⚠️ Runde 5 hadde tre seksjoner med overskrift og én rad per person. Det tok
+ * halve siden for et spørsmål som er verdt én linje, og verre: KORTET VOKSTE
+ * når du svarte, fordi en rad flyttet seg mellom listene (Brage 2026-09-10:
+ * «boksen utvider seg … ser veldig billig ut»). En avatarstabel har SAMME
+ * høyde uansett hvor mange som kommer, så svaret ditt flytter ingenting.
+ *
+ * Tallene står allerede i `RSVPBar` rett over — stripa svarer på HVEM, ikke
+ * hvor mange. «Kan ikke» og «har ikke svart» er tall der, ikke ansikter her.
+ */
+const STRIP_FACES = 7;
+
+function AttendanceStrip({coming}: {coming: EventAttendee[]}) {
+  const shown = coming.slice(0, STRIP_FACES);
+  const rest = coming.length - shown.length;
   return (
-    <>
-      <SectionHeader title={title} />
-      {attendeeList.length === 0 && emptyText ? (
-        <Text style={styles.emptyText}>{emptyText}</Text>
-      ) : (
-        attendeeList.map((attendee, index) => (
-          // En forelder kan svare for flere barn — id alene er ikke unik.
-          <ListRow
-            key={`${attendee.id}-${attendee.childName ?? 'selv'}`}
-            icon={<Avatar name={attendee.childName ?? attendee.name} size="sm" />}
-            title={attendee.childName ?? attendee.name}
-            subtitle={attendee.childName ? `Meldt av ${attendee.name}` : undefined}
-            showBorder={index < attendeeList.length - 1}
-          />
-        ))
+    <View style={styles.strip}>
+      {shown.map((attendee, index) => (
+        // En forelder kan svare for flere barn — id alene er ikke unik.
+        <View
+          key={`${attendee.id}-${attendee.childName ?? 'selv'}`}
+          style={index > 0 && styles.stripOverlap}>
+          <Avatar name={attendee.childName ?? attendee.name} size="sm" />
+        </View>
+      ))}
+      {rest > 0 && (
+        <Text style={styles.stripRest} maxFontSizeMultiplier={1.2}>
+          +{rest}
+        </Text>
       )}
-    </>
+      {coming.length === 0 && (
+        <Text style={styles.stripEmpty}>Ingen har svart ennå</Text>
+      )}
+    </View>
   );
 }
 
@@ -1743,9 +1807,13 @@ function AttendanceSection({
 // Stiler
 // ---------------------------------------------------------------------------
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
+  // Tomtekst rett på dagslysgrunnen (feilflaten): stadionblekk, som
+  // tilbakelinja over den.
+  emptyTextGround: {
+    ...typography.body,
+    color: colors.stadiumText,
+    textAlign: 'center',
+    paddingHorizontal: spacing.lg,
   },
   centered: {
     flex: 1,
@@ -1793,7 +1861,7 @@ const styles = StyleSheet.create({
   infoDate: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: OPAL.inkSecondary,
   },
   infoTitle: {
     ...typography.heading2,
@@ -1806,7 +1874,7 @@ const styles = StyleSheet.create({
   },
   locationText: {
     ...typography.body,
-    color: '#41604F',
+    color: OPAL.inkSecondary,
     flex: 1,
   },
   // Kampdag (P5B): mini-stadion før avspark — samme språk som ScoreBoard,
@@ -1828,15 +1896,15 @@ const styles = StyleSheet.create({
   },
   kampdagLabel: {
     ...typography.label,
-    color: colors.stadiumDim,
+    color: matchColors.dim,
   },
   kampdagDay: {
     ...typography.caption,
-    color: colors.stadiumDim,
+    color: matchColors.dim,
   },
   kampdagTitle: {
     ...typography.heading3,
-    color: colors.stadiumText,
+    color: matchColors.text,
   },
   kampdagTeams: {
     flexDirection: 'row',
@@ -1852,7 +1920,7 @@ const styles = StyleSheet.create({
   kampdagTeamName: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.stadiumText,
+    color: matchColors.text,
     textAlign: 'center',
     lineHeight: 17,
   },
@@ -1869,7 +1937,7 @@ const styles = StyleSheet.create({
   },
   kampdagKickoffLabel: {
     ...typography.caption,
-    color: colors.stadiumDim,
+    color: matchColors.dim,
   },
   kampdagUsRing: {
     borderWidth: 2,
@@ -1889,29 +1957,67 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
+  kampdagDescription: {
+    ...typography.body,
+    color: matchColors.dim,
+    lineHeight: 22,
+  },
   kampdagMeta: {
     ...typography.caption,
-    color: colors.stadiumDim,
+    color: matchColors.dim,
     textAlign: 'center',
   },
   description: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginTop: spacing.md,
     lineHeight: 22,
   },
-  matchSection: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-  },
   // Rettelsene ligger på rad under kortet. To knapper deler bredden når
   // kampen kan avlyses; alene fyller «Rediger» raden.
+  /** Kolonnen: ETT kort for alt under heroen. */
+  columnWrap: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  column: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  /**
+   * DEN STILLE KNAPPEN. `secondary` er en lysegrå omriss laget for den
+   * kremede grunnen — på kortet forsvinner den, og `ghost` er bare tekst
+   * (Brage: «ser ikke ut som klikkbare knapper»). Denne gir en ekte, lys
+   * flate med materialets egen kant, så begge valgene ER knapper: det ene
+   * bærer fargen, det andre bærer flaten.
+   */
+  quietBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.66)',
+    borderWidth: 1,
+    borderColor: 'rgba(8, 57, 46, 0.16)',
+  },
+  /** Fast høyde = avatarens høyde. Kortet rører seg ikke når du svarer. */
+  strip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 32,
+  },
+  stripOverlap: {
+    marginLeft: -10,
+  },
+  stripRest: {
+    ...typography.bodySmall,
+    fontWeight: '700',
+    color: OPAL.inkSecondary,
+    marginLeft: spacing.sm,
+  },
+  stripEmpty: {
+    ...typography.bodySmall,
+    color: OPAL.inkTertiary,
+  },
   adminActions: {
     flexDirection: 'row',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
   },
   adminAction: {
     flex: 1,
@@ -1928,11 +2034,6 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: colors.textSecondary,
   },
-  rsvpSection: {
-    paddingHorizontal: spacing.lg,
-    gap: spacing.lg,
-    marginBottom: spacing.sm,
-  },
   rsvpButtons: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -1940,9 +2041,10 @@ const styles = StyleSheet.create({
   rsvpBtn: {
     flex: 1,
   },
+  // Tomtekst INNE i et ark.
   emptyText: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },

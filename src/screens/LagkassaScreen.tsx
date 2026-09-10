@@ -11,7 +11,17 @@ import {
 } from 'react-native';
 import {useNavigation, type NavigationProp} from '@react-navigation/native';
 import {colors, typography, spacing, radius, fonts} from '../theme';
-import {BackBar, Button, HeroSurface, Skeleton, useBottomContentPadding} from '../components';
+import {
+  Button,
+  LiquidGlassSurface,
+  ProfilPage,
+  Skeleton,
+  useBottomContentPadding,
+} from '../components';
+// ⚠️ DIREKTE, ikke fra barrelen: `OPAL` leses i `StyleSheet.create`, altså
+// ved MODUL-LASTING, og tester som mocker hele `../components` ville da
+// fått `undefined.inkSecondary`.
+import {OPAL} from '../components/OpalSurface';
 import {useActiveTeam, useAuth} from '../context';
 import {isTeamAdmin} from '../shared/roles';
 import {profilEntry} from '../navigation/profilEntry';
@@ -179,13 +189,17 @@ export function LagkassaScreen() {
       : null;
 
   return (
-    <View style={styles.screen}>
-      <BackBar title="Lagkassa" />
+    /* SAMME GRUNN SOM RESTEN AV APPEN (Brage 2026-09-10): Lagkassa er en
+       pushet underside, og da er `ProfilPage` malen — dagslysgrunnen,
+       tilbakelinja i stadionblekk og statuslinja. Flatene i den er glass:
+       heroen i `important` (samme varme perle som Lagkassa-stripen på
+       Sesongen — det ER samme objekt), resten i `card` — feedkortets
+       FROST (mint perle 0,55), ikke arkets nesten-hvite 0,80: ark er noe
+       som GLIR OPP over en side, kort er noe som LIGGER PÅ grunnen. Ingenting står
+       som løs tekst på grunnen; det var problemet på rampen. */
+    <ProfilPage title="Lagkassa">
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {paddingBottom: bottomPad},
-        ]}
+        contentContainerStyle={[styles.content, {paddingBottom: bottomPad}]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -194,8 +208,11 @@ export function LagkassaScreen() {
           />
         }
         showsVerticalScrollIndicator={false}>
-        {/* Hero — lagets tall, på hero-flaten */}
-        <HeroSurface style={styles.heroCard}>
+        {/* Hero — lagets tall, i viktig-glasset */}
+        <LiquidGlassSurface
+          variant="important"
+          cornerRadius={radius.xl}
+          style={styles.heroCard}>
           <Text style={styles.heroPill}>💚 LAGKASSA</Text>
           {loading ? (
             <View style={styles.heroSkeleton}>
@@ -229,19 +246,29 @@ export function LagkassaScreen() {
               </Text>
             </>
           )}
-        </HeroSurface>
+        </LiquidGlassSurface>
 
         {/* Fordelingen — offentlig og positiv, rett fra offeringen.
             Under lasting: skeleton med kortets form, så flaten står stabilt
             fra første frame i stedet for å poppe inn når svaret lander. */}
         {loading ? (
-          <View style={styles.splitCard}>
+          <LiquidGlassSurface
+            variant="card"
+            cornerRadius={radius.xl}
+            style={styles.splitCard}>
             <Skeleton width="88%" height={16} />
             <Skeleton width="60%" height={12} />
-            <Skeleton width="92%" height={12} style={styles.splitSkeletonHint} />
-          </View>
+            <Skeleton
+              width="92%"
+              height={12}
+              style={styles.splitSkeletonHint}
+            />
+          </LiquidGlassSurface>
         ) : available ? (
-          <View style={styles.splitCard}>
+          <LiquidGlassSurface
+            variant="card"
+            cornerRadius={radius.xl}
+            style={styles.splitCard}>
             <Text style={styles.splitHeadline}>
               {formatKr(offering.amountMinor)} i måneden —{' '}
               {formatKr(offering.clubAmountMinor)} går direkte til laget
@@ -249,26 +276,32 @@ export function LagkassaScreen() {
             {shareLine && <Text style={styles.splitLine}>{shareLine}</Text>}
             <Text style={styles.splitHint}>
               De resterende{' '}
-              {formatKr(offering.amountMinor - offering.clubAmountMinor)}{' '}
-              dekker Heia, betalingsbehandling og drift. Utbetales til{' '}
+              {formatKr(offering.amountMinor - offering.clubAmountMinor)} dekker
+              Heia, betalingsbehandling og drift. Utbetales til{' '}
               {offering.recipientLegalName}.
             </Text>
-          </View>
+          </LiquidGlassSurface>
         ) : null}
 
         {/* Hva pengene går til */}
-        <View style={styles.whyCard}>
+        <LiquidGlassSurface
+          variant="card"
+          cornerRadius={radius.xl}
+          style={styles.whyCard}>
           <Text style={styles.whyTitle}>Hva støtten betyr</Text>
           <Text style={styles.whyText}>
-            Utstyr som holder. Cuper laget faktisk kan dra på. Sosiale
-            kvelder som bygger lagfølelse. Og barna som ser at noen heier —
-            også utenfor banen.
+            Utstyr som holder. Cuper laget faktisk kan dra på. Sosiale kvelder
+            som bygger lagfølelse. Og barna som ser at noen heier — også utenfor
+            banen.
           </Text>
-        </View>
+        </LiquidGlassSurface>
 
         {/* CTA — skeleton i knappens form under lasting, så bunnen av siden
             ikke hopper når tegneflaten (eller supporter-tilstanden) kommer. */}
-        <View style={styles.ctaSection}>
+        <LiquidGlassSurface
+          variant="card"
+          cornerRadius={radius.xl}
+          style={styles.ctaSection}>
           {loading ? (
             <>
               <Skeleton height={56} style={styles.ctaSkeleton} />
@@ -352,11 +385,11 @@ export function LagkassaScreen() {
                     : 'Laget tar ikke imot nye støttespillere akkurat nå. ' +
                       'Trenere og lagledere finner status i Laginnstillinger.'
                   : isTeamAdmin(activeRole)
-                    ? 'Støtten for laget er ikke åpnet ennå. Sjekk statusen ' +
-                      'og be om klubbens godkjenning under «Støtte fra ' +
-                      'supportere».'
-                    : 'Støtten for dette laget er ikke satt opp ennå. ' +
-                      'Trenere og lagledere finner status i Laginnstillinger.'}
+                  ? 'Støtten for laget er ikke åpnet ennå. Sjekk statusen ' +
+                    'og be om klubbens godkjenning under «Støtte fra ' +
+                    'supportere».'
+                  : 'Støtten for dette laget er ikke satt opp ennå. ' +
+                    'Trenere og lagledere finner status i Laginnstillinger.'}
               </Text>
               {/* Fulgte med fra mellomskjermen som ble fjernet — lagadmin
                   skal ikke måtte lete etter veien videre. */}
@@ -374,17 +407,13 @@ export function LagkassaScreen() {
               )}
             </>
           )}
-        </View>
+        </LiquidGlassSurface>
       </ScrollView>
-    </View>
+    </ProfilPage>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -394,17 +423,14 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.xs,
   },
+  // Samme eyebrow som Lagkassa-stripen på Sesongen: goldInk på perlen,
+  // ingen egen hvit brikke (to lyse lag oppå hverandre = uleselig).
   heroPill: {
     alignSelf: 'flex-start',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
-    color: colors.heiaDeep,
-    backgroundColor: 'rgba(255, 255, 255, 0.72)',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-    overflow: 'hidden',
+    color: colors.goldInk,
     marginBottom: spacing.sm,
   },
   heroSkeleton: {
@@ -425,12 +451,12 @@ const styles = StyleSheet.create({
   },
   heroSupporters: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     marginTop: spacing.sm,
   },
   heroTotal: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
     marginTop: spacing.xs,
   },
   heroEmptyTitle: {
@@ -439,8 +465,6 @@ const styles = StyleSheet.create({
   },
 
   splitCard: {
-    backgroundColor: colors.heiaSoft,
-    borderRadius: radius.lg,
     padding: spacing.lg,
     gap: spacing.xs,
   },
@@ -452,11 +476,11 @@ const styles = StyleSheet.create({
   splitLine: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
   },
   splitHint: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
     marginTop: spacing.xs,
   },
   splitSkeletonHint: {
@@ -468,7 +492,7 @@ const styles = StyleSheet.create({
   },
 
   whyCard: {
-    paddingHorizontal: spacing.xs,
+    padding: spacing.lg,
     gap: spacing.sm,
   },
   whyTitle: {
@@ -476,32 +500,32 @@ const styles = StyleSheet.create({
   },
   whyText: {
     ...typography.body,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     lineHeight: 22,
   },
 
   ctaSection: {
     alignItems: 'center',
     gap: spacing.md,
-    marginTop: spacing.sm,
+    padding: spacing.lg,
   },
   ctaButton: {
     width: '100%',
   },
   ctaHint: {
     ...typography.bodySmall,
-    color: colors.textTertiary,
+    color: OPAL.inkTertiary,
     textAlign: 'center',
   },
   renewalText: {
     ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.heiaInk,
+    color: OPAL.inkAccent,
     textAlign: 'center',
   },
   pastDueText: {
     ...typography.bodySmall,
-    color: colors.textSecondary,
+    color: OPAL.inkSecondary,
     textAlign: 'center',
   },
   iSupportText: {
