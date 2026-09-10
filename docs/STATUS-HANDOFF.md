@@ -483,7 +483,23 @@ hver kamp, ingen statusfilter, kjenner også en reporter som har forlatt
 laget) → «Medlem» som siste utvei. Ingen nye nettkall. NY test
 `finishedReporterName.test.ts` (4 grønne). Full suite: 90 suiter, 1255.
 
-▶️ **NESTE:** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
+**2026-09-10 — ALT ER COMMITTET OG PUSHET.** Treet er RENT. To commits på
+`origin/Brage`:
+- `3f8ffa4` fix: telefonfunnene fra 2026-09-07 (TextDecoder-polyfill i
+  index.js, lagvalget ved kaldstart, stående skjerm iOS+Android,
+  utloggingsbekreftelse, MatchToast over tab-baren, onboarding på
+  stadionflaten). 12 filer — INGEN av dem rørt av designsporet.
+- `72be9c0` design: kampskjermen, sesongsiden og hendelsessiden i
+  Heia-materialet. 49 filer.
+Før commit: full suite 1255 grønn (90 suiter), prettier i husstil på alle
+58 endrede kildefiler, eslint rent bortsett fra ÉN pre-eksisterende feil i
+`KalenderScreen.tsx:165` (manglende `eventsQuery` i useCallback-deps) som
+finnes i HEAD fra før og IKKE er rørt — å legge den inn i deps kan gi en
+refetch-løkke, så den fortjener en egen vurdering.
+⚠️ Den gamle advarselen om «Brages egne ukommitterte filer» er DØD — de er
+med i `3f8ffa4`. Neste økt starter fra et rent tre.
+
+▶️ **NESTE (forrige plan, står fortsatt):** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
 lagre → lander på Kalender UTEN frys; laghodet uten chip, sesongsiden («Ny kamp» og Lagkassa uten
 header-hopp, handlingsraden, «Ny kamp»-arket komplett fra første ramme), tilbakeknappen i ro OG kompakt, topp, scroll, fanene, Referat-kortene, «Siste hendelse for N min». Deretter én variabel per
 runde. Commit ETTER dom. Simulatorrigg-metoden (temp `useEffect` i
