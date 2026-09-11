@@ -1,9 +1,10 @@
 ---
 import Base from '../layouts/Base.astro';
 import Phone from '../components/Phone.astro';
-import {primaryCta, CONTACT_EMAIL, SUPPORT} from '../config';
+import {primaryCta, CONTACT_EMAIL, SUPPORT, EXAMPLE_MONTH, EXAMPLE_YEAR, nok} from '../config';
 const cta = primaryCta();
 const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget vårt vil prøve Heia')}`;
+const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
 ---
 <Base title="Heia">
   <!-- 1. Hero -->
@@ -12,17 +13,17 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
       <div>
         <span class="eyebrow">Appen for laget og alle rundt det</span>
         <h1>Tettere på laget.</h1>
-        <p class="lead">Treninger, kamper, bilder og små og store øyeblikk — samlet på ett sted. Så familien kan følge med, heie og kommentere, også når de ikke står på sidelinja.</p>
+        <p class="lead">Treninger, kamper, bilder og små og store øyeblikk — samlet på ett sted, så familien kan følge med, heie og kommentere. Og de som vil, kan gi laget et fast, frivillig bidrag hver måned.</p>
         <div class="cta">
           <a class="btn btn-primary" href={cta.href}>{cta.label}</a>
           <a class="btn btn-ghost" href="#slik">Slik fungerer Heia</a>
         </div>
-        {cta.note && <p class="note">{cta.note}</p>}
+        <p class="note">Heia er i pilot på iPhone. {cta.href.startsWith('mailto') ? 'Send oss en e-post om laget, så tar vi dere med.' : cta.note}</p>
         <div class="chips">
           <span class="chip neon">Gratis å bruke</span>
+          <span class="chip">Frivillig støtte til laget</span>
           <span class="chip">Lukkede lag</span>
           <span class="chip">Ingen annonser</span>
-          <span class="chip">iPhone i pilot</span>
         </div>
       </div>
       <div class="hero-phones">
@@ -33,7 +34,46 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
     </div>
   </section>
 
-  <!-- 2. Laglivet -->
+  <!-- 2. Sammen får laget til mer -->
+  <section class="section" id="bidra">
+    <div class="container split" style="align-items:start">
+      <div>
+        <span class="eyebrow">Frivillige bidrag</span>
+        <h2>Sammen får laget til mer.</h2>
+        <p class="lead">Et lag med litt penger i kassa kan si ja oftere. Ja til cuphelgen. Ja til nye drakter før sesongen. Ja til at alle blir med, uansett hva familien har råd til. I Heia kan de som vil, gi et fast bidrag hver måned — uten dugnad, kakesalg eller lager i garasjen.</p>
+        <ul class="value-list">
+          <li class="opal"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v4a6 6 0 0 1-12 0V3z"/><path d="M6 5H3v2a4 4 0 0 0 3 3.9M18 5h3v2a4 4 0 0 1-3 3.9"/><path d="M12 13v4M8 21h8M9 17h6"/></svg></div><div><b>Flere opplevelser sammen</b><span>Cuphelger, treningsleir, avslutningsfest. Det er der samholdet bygges — og det er ofte det som stopper på penger.</span></div></li>
+          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M7 17l2-2M15 9l2-2"/></svg></div><div><b>Utstyr som holder</b><span>Baller, vester, kjegler, et nytt mål — og alt det små som treneren ellers legger ut for selv.</span></div></li>
+          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div><div><b>Enklere for flere å være med</b><span>Laget kan velge å bruke kassa til å holde egenandelene nede, så ingen står utenfor på grunn av prisen.</span></div></li>
+          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><div><b>Forutsigbart, måned etter måned</b><span>Faste bidrag gir laget en kasse det går an å planlegge med — ikke bare et rykk når dugnaden er over.</span></div></li>
+        </ul>
+        <p class="mt-2 small muted">Hva pengene brukes til, bestemmer laget og klubben. Heia gir kassa — prioriteringene er deres.</p>
+      </div>
+
+      <div class="opal card" style="padding:30px">
+        <span class="eyebrow">Slik regner det seg</span>
+        <div class="pricebadge mt-2"><b>{SUPPORT.priceNok} kr i måneden — {SUPPORT.clubNok} kr til laget</b><span>Mer enn tre av fire kroner går til laget. Resten dekker Heia, betaling og drift.</span></div>
+        <div class="bar" aria-hidden="true"><i style={`width:${clubPct}%`}></i><b style={`width:${100 - clubPct}%`}></b></div>
+        <div class="legend"><span>{SUPPORT.clubNok} kr til laget</span><span class="heia">{SUPPORT.heiaNok} kr Heia + betaling + drift</span></div>
+        <div class="calc" aria-label="Regneeksempel">
+          <div class="row"><span>{SUPPORT.exampleSupporters} støttespillere rundt laget</span><b>× {SUPPORT.clubNok} kr</b></div>
+          <div class="arrow" aria-hidden="true">↓</div>
+          <div class="row"><span>Til laget hver måned</span><b>{nok(EXAMPLE_MONTH)}</b></div>
+          <div class="arrow" aria-hidden="true">↓</div>
+          <div class="row sum"><span>Til laget på ett år</span><b>{nok(EXAMPLE_YEAR)}</b></div>
+        </div>
+        <p class="small muted mt-2">Forutsetter {SUPPORT.exampleSupporters} betalende gjennom tolv måneder. Foreldre, besteforeldre, tanter og onkler — de fleste lag har flere rundt seg enn de tror.</p>
+        <ul class="mt-2" style="padding-left:22px;color:var(--ink-2);display:grid;gap:6px;font-size:15px">
+          <li>Helt frivillig. Vanlig bruk av Heia er gratis for alle i laget.</li>
+          <li>Ingen funksjoner låses. Treneren ser bare summen, aldri hvem som gir.</li>
+          <li>Via Stripe. Ingen bindingstid — si opp når du vil.</li>
+        </ul>
+        <a class="btn btn-deep mt-2" href="/stott-laget/">Alt om Støtt laget</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Laglivet -->
   <section class="section" id="slik">
     <div class="container">
       <div class="section-head">
@@ -61,7 +101,7 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
     </div>
   </section>
 
-  <!-- 3. Følelsen av å være med -->
+  <!-- 4. Følelsen av å være med -->
   <section class="section">
     <div class="container split">
       <div>
@@ -79,7 +119,7 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
     </div>
   </section>
 
-  <!-- 4. Kampopplevelsen -->
+  <!-- 5. Kampopplevelsen -->
   <section class="section">
     <div class="container">
       <div class="glass-dark" style="padding:clamp(28px,5vw,64px)">
@@ -93,30 +133,9 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
               <div class="notice dark"><b>Live stilling</b><br />Kampuret og stillingen oppdaterer seg selv. Ingen behov for å trykke oppdater.</div>
               <div class="notice dark"><b>Hendelser</b><br />Mål, omgang, bilder fra sidelinja — i rekkefølge, med minutt.</div>
               <div class="notice dark"><b>Referat</b><br />Etter kampen blir alt stående som lagets eget referat, med Heia og kommentarer.</div>
-              <div class="notice dark"><b>Sesongen</b><br />Kampprogram og resultater for hele sesongen, samlet.</div>
+              <div class="notice dark"><b>Sesongen</b><br />Kampprogram, resultater og lagkassa for hele sesongen, samlet.</div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- 5. Støtt laget -->
-  <section class="section" id="stott">
-    <div class="container split">
-      <Phone variant="sesong" />
-      <div>
-        <span class="eyebrow">Frivillig</span>
-        <h2>Vil du, kan du støtte laget.</h2>
-        <p class="lead">Heia er gratis å bruke. De som vil, kan bli Heia Supporter for laget: <b>{SUPPORT.priceNok} kr i måneden — {SUPPORT.clubNok} kr går direkte til laget.</b> Resten dekker Heia, betaling og drift.</p>
-        <ul class="mt-2" style="padding-left:22px;color:var(--ink-2);display:grid;gap:8px">
-          <li>Ingen funksjoner låses bak betaling. Alle i laget får alt.</li>
-          <li>Laget ser lagkassa vokse. Treneren ser bare summen, aldri hvem som gir.</li>
-          <li>Betalingen går via Stripe. Si opp når du vil.</li>
-          <li>Pengene går til klubben som er godkjent som mottaker for laget.</li>
-        </ul>
-        <div class="cta mt-2" style="display:flex;gap:12px;flex-wrap:wrap">
-          <a class="btn btn-deep" href="/stott-laget/">Les om Støtt laget</a>
         </div>
       </div>
     </div>
@@ -135,12 +154,12 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
           <div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div>
           <h3>For trenere og lagledere</h3>
           <p>Opprett laget i appen på under ett minutt. Du får en invitasjonskode og en lenke som du deler med foreldrene. Du styrer kalenderen, kampene og hvem som rapporterer.</p>
-          <a class="btn btn-ghost mt-2" href={pilotMail}>Ta laget med i piloten</a>
+          <a class="btn btn-ghost mt-2" href={pilotMail}>Få laget ditt med</a>
         </div>
         <div class="opal card">
           <div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></div>
           <h3>For familien</h3>
-          <p>Fikk du en kode eller lenke fra laget? Last ned Heia, velg «Bli med i lag» og skriv inn koden. Så er du inne — med alt laget deler.</p>
+          <p>Fikk du en kode eller lenke fra laget? Åpne Heia, velg «Bli med i lag» og skriv inn koden. Så er du inne — med alt laget deler.</p>
           <a class="btn btn-ghost mt-2" href="/lag/">Jeg har en kode</a>
         </div>
         <div class="opal card">
@@ -162,10 +181,10 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
         <div class="faq mt-2">
           <details>
             <summary>Koster det noe å bruke Heia?</summary>
-            <p>Nei. Feeden, kalenderen, kampene og bildene er gratis for alle i laget. Å støtte laget økonomisk er frivillig og skjer i tillegg.</p>
+            <p>Nei. Feeden, kalenderen, kampene og bildene er gratis for alle i laget. Å støtte laget økonomisk er frivillig og skjer i tillegg — {SUPPORT.priceNok} kr i måneden, hvorav {SUPPORT.clubNok} kr går til laget.</p>
           </details>
           <details>
-            <summary>Hvem kan se det laget deler?</summary>
+            <summary>Hvem ser det laget deler?</summary>
             <p>Bare medlemmene i laget. Man blir med via invitasjonskode fra treneren eller laglederen. Heia har ingen offentlige profiler eller åpne feeder.</p>
           </details>
           <details>
@@ -183,9 +202,9 @@ const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget v
         </div>
         <p class="mt-2"><a href="/hjelp/">Flere spørsmål og svar →</a></p>
       </div>
-      <div class="opal card" style="position:sticky;top:96px">
+      <div class="opal card" style="position:sticky;top:104px">
         <span class="eyebrow">Kontakt</span>
-        <h3 style="margin-top:12px">Vil du prøve Heia med laget ditt?</h3>
+        <h3 style="margin-top:12px">Vil du ha laget ditt med?</h3>
         <p>Vi tar med lag i piloten fortløpende. Send oss noen ord om laget — idrett, alder og omtrent hvor mange dere er — så tar vi kontakt.</p>
         <a class="btn btn-primary mt-2" href={pilotMail}>Skriv til {CONTACT_EMAIL}</a>
         {cta.href.startsWith('http') && <a class="btn btn-ghost mt-1" href={cta.href}>{cta.label}</a>}

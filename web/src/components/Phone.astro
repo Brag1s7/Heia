@@ -13,7 +13,7 @@ const dark = variant === 'match';
 ---
 <div class={`phone ${cls}`} role="img" aria-label={
   variant === 'feed' ? 'Heia-appen: lagets feed med treningsbilde, Heia-rop og kommentarer' :
-  variant === 'match' ? 'Heia-appen: live kamp med stilling, hendelser og referat' :
+  variant === 'match' ? 'Heia-appen: live kamp med stilling, hendelser, kommentarer og referat' :
   variant === 'kalender' ? 'Heia-appen: kalender med trening, kamp og sosialt' :
   'Heia-appen: sesongen med lagkassa og kampprogram'}>
   <div class={`screen ${dark ? 'dark' : ''}`}>
@@ -57,11 +57,15 @@ const dark = variant === 'match';
             <div class="s-score"><span>3</span><small>Bjørka – Lia</small><span>2</span></div>
             <div style="font-size:10px;opacity:.75">Jonas rapporterer · siste hendelse for 1 min siden</div>
           </div>
+          <div class="s-tabs"><span class="on">Referat</span><span>Hendelser</span><span>Bilder</span><span>Info</span></div>
           <div class="s-match" style="padding:6px 12px 2px">
             <div class="s-event"><span class="s-min">54′</span><span><span class="s-goal">MÅL</span>Bjørka øker til 3–2 etter hjørnespark!</span></div>
             <div class="s-event"><span class="s-min">47′</span><span><span class="s-goal" style="background:rgba(234,255,246,.25);color:#eafff6">MÅL</span>Lia utligner til 2–2.</span></div>
             <div class="s-event"><span class="s-min">31′</span><span>📸 Bilde fra sidelinja</span></div>
-            <div class="s-event"><span class="s-min">22′</span><span><span class="s-goal">MÅL</span>2–1! Nydelig kontring.</span></div>
+          </div>
+          <div class="s-match" style="padding:10px 12px">
+            <div class="s-byline" style="margin-bottom:4px"><div class="s-avatar" style="background:var(--neon);color:var(--ink)">B</div><span class="s-name" style="color:#f4fff9">Bestemor Eva</span><span class="s-time" style="color:rgba(234,255,246,.6)">nå</span></div>
+            <div style="font-size:11px;color:rgba(234,255,246,.9)">Heia Bjørka!! Følger med fra hytta 💚</div>
           </div>
           <div class="s-actions" style="justify-content:center">
             <span class="s-pill on">💚 Heia · 31</span>
@@ -93,7 +97,7 @@ const dark = variant === 'match';
             <div class="s-badge">BK</div>
             <div><div class="s-title">Sesongen</div><div class="s-sub">Høst 2026</div></div>
           </div>
-          <div class="s-kasse"><small style="font-weight:700;color:var(--ink-2)">LAGKASSA · denne måneden</small><b>1 380 kr</b><small style="color:var(--ink-2)">fra 23 supportere · går til laget</small></div>
+          <div class="s-kasse"><small style="font-weight:700;color:var(--ink-2)">LAGKASSA · denne måneden</small><b>1 500 kr</b><small style="color:var(--ink-2)">fra 25 supportere · går til laget</small></div>
           <div class="s-row"><div><b>8 kamper</b><small>5 seire · 1 uavgjort · 2 tap</small></div></div>
           <div class="s-row"><span class="s-dot match"></span><div><b>Bjørka – Lia FK</b><small>Lørdag 12:00</small></div></div>
           <div class="s-row"><span class="s-dot match"></span><div><b>Furuset – Bjørka</b><small>26. sep 11:00</small></div></div>

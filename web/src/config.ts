@@ -28,7 +28,12 @@ export const SUPPORT = {
   priceNok: 79,
   clubNok: 60,
   heiaNok: 19,
+  /** Regneeksempel: 25 betalende gjennom tolv måneder. */
+  exampleSupporters: 25,
 };
+export const EXAMPLE_MONTH = SUPPORT.exampleSupporters * SUPPORT.clubNok; // 1 500
+export const EXAMPLE_YEAR = EXAMPLE_MONTH * 12; // 18 000
+export const nok = (n: number) => n.toLocaleString('nb-NO') + ' kr';
 
 /** Primær-CTA: TestFlight hvis den finnes, ellers App Store, ellers kontakt. */
 export function primaryCta(): {href: string; label: string; note: string} {
@@ -44,7 +49,7 @@ export function primaryCta(): {href: string; label: string; note: string} {
   }
   return {
     href: `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Vi vil prøve Heia med laget vårt')}`,
-    label: 'Ta kontakt for å prøve Heia',
-    note: 'Heia er i pilot på iPhone. Send oss en e-post, så tar vi laget ditt med.',
+    label: 'Få laget ditt med',
+    note: 'Heia er i pilot på iPhone. Send oss en e-post om laget, så tar vi dere med.',
   };
 }

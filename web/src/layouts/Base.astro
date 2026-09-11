@@ -42,15 +42,28 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
       <div class="container">
         <div class="bar">
           <a class="logo" href="/" aria-label="Heia — til forsiden">
-            <img src="/img/logo-green-wordmark.png" alt="Heia" width="112" height="56" />
+            <img src="/img/logo-green-wordmark.png" alt="Heia" />
           </a>
           {!minimal && (
-            <nav aria-label="Hovedmeny">
-              <a href="/#slik" class="hide-m">Slik fungerer Heia</a>
-              <a href="/stott-laget/">Støtt laget</a>
-              <a href="/hjelp/">Hjelp</a>
-              <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">{cta.href.startsWith('http') ? 'Få Heia' : 'Kontakt'}</span></a>
-            </nav>
+            <>
+              <nav aria-label="Hovedmeny">
+                <a href="/#slik" class="hide-m">Slik fungerer Heia</a>
+                <a href="/stott-laget/">Støtt laget</a>
+                <a href="/hjelp/">Hjelp</a>
+                <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">Få laget med</span></a>
+                <button class="menu-btn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="mobile-menu" id="menu-btn">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                </button>
+              </nav>
+              <div class="mobile-menu" id="mobile-menu">
+                <a href="/#slik">Slik fungerer Heia</a>
+                <a href="/#bidra">Sammen får laget til mer</a>
+                <a href="/stott-laget/">Støtt laget</a>
+                <a href="/#kom-i-gang">Kom i gang</a>
+                <a href="/hjelp/">Hjelp</a>
+                <a href="/om/">Om Heia</a>
+              </div>
+            </>
           )}
           {minimal && (
             <nav aria-label="Meny">
@@ -64,12 +77,25 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
     <main>
       <slot />
     </main>
+    <script>
+      const btn = document.getElementById('menu-btn');
+      const menu = document.getElementById('mobile-menu');
+      if (btn && menu) {
+        const set = (open: boolean) => {
+          btn.setAttribute('aria-expanded', String(open));
+          if (open) menu.setAttribute('data-open', ''); else menu.removeAttribute('data-open');
+        };
+        btn.addEventListener('click', () => set(!menu.hasAttribute('data-open')));
+        menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).tagName === 'A') set(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+      }
+    </script>
 
     <footer class="site-footer">
       <div class="container">
         <div class="top">
           <div>
-            <a class="logo" href="/" aria-label="Heia"><img src="/img/logo-green-wordmark.png" alt="Heia" width="136" height="68" /></a>
+            <a class="logo" href="/" aria-label="Heia"><img src="/img/logo-green-wordmark.png" alt="Heia" /></a>
             <p>Appen som samler laget og alle rundt det. Følg med, hei på laget og støtt det — også når du ikke er på sidelinja.</p>
             <p class="mt-1"><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
           </div>
