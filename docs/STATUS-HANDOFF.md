@@ -499,6 +499,30 @@ refetch-løkke, så den fortjener en egen vurdering.
 ⚠️ Den gamle advarselen om «Brages egne ukommitterte filer» er DØD — de er
 med i `3f8ffa4`. Neste økt starter fra et rent tre.
 
+**2026-09-11 — NETTSIDESPORET STARTET.** Samlet plan, faktastatus,
+kontrakten mot appen, B4-stackanbefaling (Astro statisk + React-øyer +
+supabase-js, ingen SSR), sitemap, jus/analytics og skiveplan W0–W7 ligger i
+`docs/NETTSIDE-PLAN-2026-09.md`. Funn: `origin/main` = `Brage` (PR #52
+merget 2026-09-10) — ingenting å merge; nettsiden gater IKKE på App Store
+(kun CTA-konstanten); Android-ID `com.heia2` er plassholder og byttes som
+egen liten commit; Vercel Hobby forbyr kommersiell bruk → Pro før
+`/stott-laget`. Beslutningene Brage må ta står i planens §9.
+
+**2026-09-11 — W0 + W1 + enkel W2 BYGGET (Brage: «Kjør!», 30-min-økt).**
+`web/` er nå et Astro-prosjekt (statisk, ingen React-øyer ennå): `src/pages/`
+index · stott-laget · om · hjelp · lag (`?kode=`, kopieringsknapp,
+`heia://lag?kode=` på iOS) · betaling (samme flows + `src=web`-nyanse) ·
+vilkar · personvern (innhold identisk, samme layout). AASA ligger i
+`public/.well-known/` og verifisert i `dist/`. `vercel.json` har
+`"framework": "astro"` (Root Directory `web/` består). Konfig i
+`src/config.ts`: TESTFLIGHT_URL/APP_STORE_URL tomme → CTA = kontakt-e-post;
+LEGAL-felt null → «publiseres når bekreftet». Appvisningene er CSS-tegnede
+demoskjermer (`Phone.astro`), ingen ekte lag/barn. Fordelingen 79/60 er
+verifisert mot `heia_support_defaults` (00062). GJENSTÅR: Brages dom på
+telefon/PC (preview-URL fra Vercel for grenen), Vercel Pro,
+TestFlight public link, selskapsopplysninger, `/nytt`, deepLink.ts for
+https `/lag?kode=` i appen (W2 app-del), W3 `/konto`+`/invitasjon`.
+
 ▶️ **NESTE (forrige plan, står fortsatt):** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
 lagre → lander på Kalender UTEN frys; laghodet uten chip, sesongsiden («Ny kamp» og Lagkassa uten
 header-hopp, handlingsraden, «Ny kamp»-arket komplett fra første ramme), tilbakeknappen i ro OG kompakt, topp, scroll, fanene, Referat-kortene, «Siste hendelse for N min». Deretter én variabel per

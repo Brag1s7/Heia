@@ -1,0 +1,67 @@
+---
+import Base from '../layouts/Base.astro';
+import {primaryCta, CONTACT_EMAIL} from '../config';
+const cta = primaryCta();
+---
+<Base title="Bli med i laget" description="Du er invitert til et lag i Heia. Her er koden og veien videre." minimal noindex>
+  <section class="section">
+    <div class="container" style="max-width:640px">
+      <div class="opal card center" style="padding:36px 28px">
+        <span class="eyebrow">Invitasjon til laget</span>
+        <h1 style="font-size:clamp(30px,6vw,44px);margin:12px auto 8px;max-width:14ch">Du er invitert til Heia</h1>
+        <p class="lead" id="intro" style="margin-inline:auto">Skriv inn koden under i appen, så er du med i laget.</p>
+
+        <div id="has-code" hidden>
+          <div class="code-box mt-2" id="code" aria-live="polite"></div>
+          <div class="mt-1" style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-deep" id="copy" type="button">Kopier koden</button>
+            <a class="btn btn-primary" id="open" href="#" hidden>Åpne i Heia</a>
+          </div>
+          <p class="small muted mt-1" id="copied" aria-live="polite"></p>
+        </div>
+
+        <div id="no-code" hidden>
+          <p class="notice mt-2">Lenken mangler kode. Be den som inviterte deg om å sende lenken på nytt, eller om selve koden — den står under Laginnstillinger i Heia.</p>
+        </div>
+
+        <div class="steps mt-3" style="text-align:left">
+          <div class="step" style="padding:14px 0;background:none"><div><h3>Få Heia på telefonen</h3><p>{cta.href.startsWith('http') ? <span><a href={cta.href}>{cta.label}</a>. {cta.note}</span> : <span>Heia er i pilot på iPhone. Har du ikke appen, skriv til <a href={cta.href}>{CONTACT_EMAIL}</a> så hjelper vi deg inn.</span>}</p></div></div>
+          <div class="step" style="padding:14px 0;background:none"><div><h3>Velg «Bli med i lag»</h3><p>Første gang du åpner Heia, eller fra Profil → Dine lag hvis du allerede er med i et lag.</p></div></div>
+          <div class="step" style="padding:14px 0;background:none"><div><h3>Skriv inn koden</h3><p>Så er du med — og ser alt laget deler.</p></div></div>
+        </div>
+      </div>
+      <p class="small muted center mt-2">Lagene i Heia er lukkede. Koden gir tilgang til dette laget, så del den bare med folk som hører til.</p>
+    </div>
+  </section>
+
+  <script>
+    // Koden leses fra ?kode=… (eller ?code=). Ingen oppslag mot laget — v1
+    // viser aldri lagnavn eller tall på åpen web. Universal Link åpner appen
+    // direkte for dem som har den; denne siden er reserveflyten.
+    const params = new URLSearchParams(location.search);
+    const raw = (params.get('kode') || params.get('code') || '').trim().toUpperCase();
+    const code = raw.replace(/[^A-Z0-9]/g, '').slice(0, 12);
+    const has = document.getElementById('has-code')!;
+    const none = document.getElementById('no-code')!;
+    if (code) {
+      has.hidden = false;
+      document.getElementById('code')!.textContent = code;
+      const open = document.getElementById('open') as HTMLAnchorElement;
+      open.href = `heia://lag?kode=${encodeURIComponent(code)}`;
+      if (/iPhone|iPad|iPod/.test(navigator.userAgent)) open.hidden = false;
+      const copy = document.getElementById('copy')!;
+      const msg = document.getElementById('copied')!;
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(code);
+          msg.textContent = 'Koden er kopiert.';
+        } catch {
+          msg.textContent = 'Kunne ikke kopiere automatisk — marker koden og kopier den selv.';
+        }
+      });
+    } else {
+      none.hidden = false;
+      document.getElementById('intro')!.textContent = 'Du trenger en invitasjonskode fra laget for å bli med.';
+    }
+  </script>
+</Base>

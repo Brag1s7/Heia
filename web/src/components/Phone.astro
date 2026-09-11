@@ -1,0 +1,106 @@
+---
+/**
+ * CSS-tegnede appvisninger med demonstrasjonsinnhold (ingen ekte lag, barn
+ * eller navn). Variantene speiler appens flater: Hjem-feeden (frostkort),
+ * kampskjermen (mørkt stadionglass), Kalender og Sesongen/lagkassa.
+ */
+interface Props {
+  variant: 'feed' | 'match' | 'kalender' | 'sesong';
+  class?: string;
+}
+const {variant, class: cls = ''} = Astro.props;
+const dark = variant === 'match';
+---
+<div class={`phone ${cls}`} role="img" aria-label={
+  variant === 'feed' ? 'Heia-appen: lagets feed med treningsbilde, Heia-rop og kommentarer' :
+  variant === 'match' ? 'Heia-appen: live kamp med stilling, hendelser og referat' :
+  variant === 'kalender' ? 'Heia-appen: kalender med trening, kamp og sosialt' :
+  'Heia-appen: sesongen med lagkassa og kampprogram'}>
+  <div class={`screen ${dark ? 'dark' : ''}`}>
+    <div class={`screen-ground ${dark ? 'dark' : ''}`}></div>
+    <div class="screen-inner">
+      {variant === 'feed' && (
+        <>
+          <div class="s-header">
+            <div class="s-badge">BK</div>
+            <div><div class="s-title">Bjørka G12</div><div class="s-sub">24 medlemmer · Bjørka IL</div></div>
+          </div>
+          <div class="s-match" style="padding:10px 12px">
+            <div class="s-live">Neste kamp · lørdag 12:00</div>
+            <div class="s-score" style="font-size:16px;margin:4px 0 0">
+              <span>Bjørka G12</span><small>vs</small><span>Lia FK</span>
+            </div>
+          </div>
+          <div class="s-card">
+            <div class="s-byline"><div class="s-avatar">M</div><span class="s-name">Mona · trener</span><span class="s-time">i dag 18:40</span></div>
+            <div>Pasningsøvelser og masse latter på treninga i dag. Godt jobba, alle sammen! ⚽️</div>
+            <div class="s-photo"></div>
+            <div class="s-actions"><span class="s-pill on">💚 Heia · 14</span><span class="s-pill">💬 5</span></div>
+          </div>
+          <div class="s-card">
+            <div class="s-byline"><div class="s-avatar">K</div><span class="s-name">Kari · forelder</span><span class="s-time">i går</span></div>
+            <div>Takk for en super pizzakveld! Bilder fra alle er lagt i albumet 📸</div>
+            <div class="s-actions"><span class="s-pill">💚 Heia · 9</span><span class="s-pill">💬 2</span></div>
+          </div>
+          <div class="s-tab"><span class="on"></span><span></span><span></span><span></span></div>
+        </>
+      )}
+
+      {variant === 'match' && (
+        <>
+          <div class="s-header" style="color:#eafff6">
+            <div class="s-badge">BK</div>
+            <div><div class="s-title" style="color:#f4fff9">Bjørka G12 – Lia FK</div><div class="s-sub" style="color:rgba(234,255,246,0.7)">Seriekamp · Bjørka kunstgress</div></div>
+          </div>
+          <div class="s-match">
+            <div class="s-live">Direkte · 2. omgang 54′</div>
+            <div class="s-score"><span>3</span><small>Bjørka – Lia</small><span>2</span></div>
+            <div style="font-size:10px;opacity:.75">Jonas rapporterer · siste hendelse for 1 min siden</div>
+          </div>
+          <div class="s-match" style="padding:6px 12px 2px">
+            <div class="s-event"><span class="s-min">54′</span><span><span class="s-goal">MÅL</span>Bjørka øker til 3–2 etter hjørnespark!</span></div>
+            <div class="s-event"><span class="s-min">47′</span><span><span class="s-goal" style="background:rgba(234,255,246,.25);color:#eafff6">MÅL</span>Lia utligner til 2–2.</span></div>
+            <div class="s-event"><span class="s-min">31′</span><span>📸 Bilde fra sidelinja</span></div>
+            <div class="s-event"><span class="s-min">22′</span><span><span class="s-goal">MÅL</span>2–1! Nydelig kontring.</span></div>
+          </div>
+          <div class="s-actions" style="justify-content:center">
+            <span class="s-pill on">💚 Heia · 31</span>
+            <span class="s-pill" style="background:rgba(20,49,38,.8);color:#eafff6;border-color:rgba(143,255,224,.25)">💬 Kommenter</span>
+          </div>
+          <div class="s-tab"><span></span><span class="on"></span><span></span><span></span></div>
+        </>
+      )}
+
+      {variant === 'kalender' && (
+        <>
+          <div class="s-header">
+            <div class="s-badge">BK</div>
+            <div><div class="s-title">Kalender</div><div class="s-sub">Uke 38</div></div>
+          </div>
+          <div class="s-day"><div>ma</div><div class="on">ti</div><div>on</div><div>to</div><div>fr</div><div>lø</div><div>sø</div></div>
+          <div class="s-row"><span class="s-dot"></span><div><b>Trening</b><small>Tirsdag 17:30 · Bjørka kunstgress</small></div></div>
+          <div class="s-row"><span class="s-dot"></span><div><b>Trening</b><small>Torsdag 17:30 · Bjørka kunstgress</small></div></div>
+          <div class="s-row"><span class="s-dot match"></span><div><b>Kamp mot Lia FK</b><small>Lørdag 12:00 · Oppmøte 11:15</small></div></div>
+          <div class="s-row"><span class="s-dot social"></span><div><b>Pizzakveld for hele laget</b><small>Søndag 17:00 · Klubbhuset</small></div></div>
+          <div class="s-card" style="padding:10px 12px"><div class="s-name">Kommer du?</div><div class="s-actions" style="margin-top:6px"><span class="s-pill on">Ja</span><span class="s-pill">Nei</span><span class="s-pill">Vet ikke</span></div></div>
+          <div class="s-tab"><span></span><span></span><span class="on"></span><span></span></div>
+        </>
+      )}
+
+      {variant === 'sesong' && (
+        <>
+          <div class="s-header">
+            <div class="s-badge">BK</div>
+            <div><div class="s-title">Sesongen</div><div class="s-sub">Høst 2026</div></div>
+          </div>
+          <div class="s-kasse"><small style="font-weight:700;color:var(--ink-2)">LAGKASSA · denne måneden</small><b>1 380 kr</b><small style="color:var(--ink-2)">fra 23 supportere · går til laget</small></div>
+          <div class="s-row"><div><b>8 kamper</b><small>5 seire · 1 uavgjort · 2 tap</small></div></div>
+          <div class="s-row"><span class="s-dot match"></span><div><b>Bjørka – Lia FK</b><small>Lørdag 12:00</small></div></div>
+          <div class="s-row"><span class="s-dot match"></span><div><b>Furuset – Bjørka</b><small>26. sep 11:00</small></div></div>
+          <div class="s-row"><span class="s-dot match"></span><div><b>Bjørka – Åsen</b><small>3. okt 12:00 · 4–1</small></div></div>
+          <div class="s-tab"><span></span><span></span><span></span><span class="on"></span></div>
+        </>
+      )}
+    </div>
+  </div>
+</div>
