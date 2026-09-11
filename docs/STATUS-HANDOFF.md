@@ -1,6 +1,69 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 kveld — NETTSIDEN: SAMLET SPRÅK-/LENGDE-/DESIGNRUNDE + MENYFEILEN RETTET, PUSHET, VENTER BRAGES HELHETSDOM FØR MERGE)
+## ▶️▶️ START HER (2026-09-11 sen kveld — NETTSIDEN RUNDE 2: MER SYNLIG PRODUKT OG LAGLIV, PUSHET, VENTER BRAGES DOM PÅ PREVIEW FØR MERGE)
+
+**Tilstand:** `Brage` er ren og pushet, foran `main` uten PR — Brage
+oppretter/merger selv (`gh` er ikke innlogget). Vercel lager preview av
+pushen. Ingen dev-server kjører.
+
+**Oppdraget (Brage etter d3e4790):** teksten var bedre, men forenklingen
+hadde fjernet nyttige visuelle elementer og mobilen var teksttung. Mål: mer
+synlig produkt og lagliv med den kortere teksten. Levert i ÉN commit (se
+`git log -1`):
+
+- **Støtte:** fordelingsstolpen (60 kr laget / 19 kr Heia, betaling og
+  drift) er tilbake INNE i tallpanelet under prisen, med forklaring;
+  regneeksemplet kompakt som før, «Forutsetter 25 betalende gjennom tolv
+  måneder» står. De fire fordelene = `.tiles` (2 × 2 små fliser m/ ikon +
+  én linje, også på mobil), ikke fire høye kort. Samme fliser på
+  /stott-laget.
+- **Mobilkomposisjon:** ny `.media-split` (grid-areas: PC = tekst |
+  visning; ≤900 px = overskrift → visning → liste). Mobil (≤640) viser
+  KOMPAKTE UTSNITT (`Crop.astro`) i stedet for hele telefoner: kalender
+  ved aktivitetene, innlegg m/ foto + kommentarer ved fellesskapet,
+  kampvisning (stilling, hendelser m/ sidelinjebilde, kommentar) i det
+  mørke panelet. PC/nettbrett viser fortsatt telefonene. Heroens telefon
+  er på mobil et utsnitt (430 px, mask-fade nederst). Mobilsiden: 10 637 →
+  8 522 → **7 897 px**.
+- **Levende demoer:** ekte foto i stedet for grønne felt —
+  `web/public/img/demo/` (README m/ kilder): `trening.jpg` (stige +
+  kjegler på kunstgress, Pexels/Chris K) i feed-mockupen, `pizzakveld.jpg`
+  (pizzaesker, Pexels/Airam Dato-on) i innleggsutsnittet, `sidelinja.jpg`
+  (målnett i flomlys, Unsplash/Janosch Diggelmann) som hendelsesbilde i
+  kamputsnittet. Ingen personer, ingen varemerker (kandidater m/ Premier
+  League-ball, Kirkland/Domino's/Gurman-esker, øl/vin ble forkastet).
+  Higgsfield hadde 0 kreditter (gratisplan) — ikke brukt. Innlegget i
+  utsnittet er nå Karis pizzakveld (Bestemor Eva + Mona kommenterer);
+  feedmockupen har Monas trening.
+- **Kort og ikoner med hensikt:** «Slik kommer laget i gang» = tre opal-kort
+  m/ mørkt ikon (`.way`). Glødeprikkene og notisboksene er IKKE tilbake.
+- **PC-hero:** feeden er hovedtelefonen, kampskjermen FORAN til venstre og
+  lavere (232 px, −5°, overlapp 38 px) så «3–2» og «Direkte» er helt synlige.
+- **Uendret:** språkvasken, typografihierarkiet, slagordene, menyens egen
+  rulling (664/626 px, overflow auto), scroll-margin på ankre, navbaren og
+  Safari-tilpasningene (ikke rørt).
+- **Verifisert:** `astro build` grønn (12 sider); lenkesjekk 313/0 brutte
+  + 5 bildereferanser/0 mangler; ingen JS-feil i riggen; innlogget meny
+  viser Min konto/Heia-admin/Klubbetalinger/Logg ut + CTA (rullbar);
+  ekte WebKit i simulatoren (topp, #slik m/ kalenderutsnittet,
+  #kom-i-gang). Reisetesten (51/51 tidligere i dag) er IKKE kjørt på nytt —
+  header/meny-markup og -skript er urørt i denne runden.
+
+**Riggen:** `scripts/web-shot.mjs` m/ `eval: window.scrollTo({top:N,
+behavior:"instant"})` for viewport-bilder (sips-crop er upålitelig),
+`fullPage:true` for hele siden, `session` + `eval` (heia-web-roles +
+`heia:auth`) for innlogget header. Ekte WebKit: `xcrun simctl openurl
+booted "http://localhost:4321/?v=N#anker"` (cache-bust m/ query) +
+`simctl io booted screenshot`.
+
+**IKKE gjort / til Brage:** helhetsdom på preview (mobil + PC); PR
+Brage→main; Safari-flaten nederst (edb614f) fortsatt ikke sett på ekte
+telefon. Ny samtale er trygg å starte herfra.
+
+---
+
+
+## (forrige START HER — 2026-09-11 kveld — NETTSIDEN: SAMLET SPRÅK-/LENGDE-/DESIGNRUNDE + MENYFEILEN RETTET)
 
 **Tilstand:** `Brage` er ren og pushet, foran `main` uten PR — Brage
 oppretter/merger selv (`gh` er ikke innlogget). Vercel lager preview av

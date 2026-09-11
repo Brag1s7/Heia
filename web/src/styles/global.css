@@ -269,10 +269,7 @@ section[id] { scroll-margin-top: 100px; }
 .s-avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--deep); color: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 700; }
 .s-name { font-weight: 700; font-size: 12px; }
 .s-time { color: var(--ink-3); font-size: 10px; margin-left: auto; }
-.s-photo { height: 96px; border-radius: 12px; margin: 8px 0; background:
-  radial-gradient(80px 50px at 30% 80%, rgba(207,255,116,0.9), transparent 70%),
-  linear-gradient(160deg, #6fd9a8, #1f8a63 60%, #0f4d36); position: relative; overflow: hidden; }
-.s-photo::after { content: ''; position: absolute; inset: auto 0 0 0; height: 30%; background: linear-gradient(180deg, transparent, rgba(6,58,45,0.35)); }
+.s-photo { display: block; width: 100%; height: 96px; object-fit: cover; border-radius: 12px; margin: 8px 0; background: #1f8a63; }
 .s-actions { display: flex; gap: 8px; margin-top: 8px; }
 .s-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 10px; font-size: 11px; font-weight: 700; background: rgba(255,255,255,0.75); border: 1px solid rgba(6,58,45,0.1); }
 .s-pill.on { background: var(--neon); color: var(--ink); }
@@ -506,7 +503,7 @@ section[id] { scroll-margin-top: 100px; }
 /* PC: Hjem-feeden er hovedtelefonen (som på mobil); kampskjermen står skrått
    bak til venstre, så laget, stillingen og målene er den delen som synes. */
 .hero-phones .phone:nth-child(2) { position: relative; z-index: 2; }
-.hero-phones .phone:nth-child(3) { order: -1; width: 230px; margin-right: -56px; margin-bottom: -36px; transform: rotate(-6deg); z-index: 1; }
+.hero-phones .phone:nth-child(3) { order: -1; width: 232px; margin-right: -38px; margin-bottom: -64px; transform: rotate(-5deg); z-index: 3; }
 @media (max-width: 900px) { .hero-phones .phone:nth-child(3) { display: none; } }
 .hero-glow { position: absolute; inset: -8% 0 0; background: radial-gradient(60% 55% at 50% 60%, rgba(2, 255, 171, 0.5), transparent 70%); z-index: -1; filter: blur(10px); }
 .link-more { align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; font-family: var(--display); font-weight: 800; font-size: 16px; color: var(--deep); text-decoration: none; }
@@ -567,9 +564,9 @@ section[id] { scroll-margin-top: 100px; }
 .s-tabs span.on { background: rgba(234,255,246,.14); color: #f4fff9; }
 
 /* ── Forsiden og Støtt laget: komponentene ─────────────────────────────
-   Prinsipp: vanlige tekstgrupper med hårstreker der et kort ikke tilfører
-   noe; kort (opal) bare for tallpanelet og kontaktpanelet; neon bare på
-   hovedhandlinger og de viktige beløpene. */
+   Prinsipp: tekst og produktvisning følger hverandre tett (overskrift →
+   visning → liste på mobil, to spalter på PC); kort og ikoner der de gjør
+   innholdet lettere å skanne; neon på hovedhandlinger og beløp. */
 
 /* Tekstlenke med pil — «se mer»-handling uten knapp. */
 .link-arrow { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-family: var(--display); font-weight: 800; font-size: 16px; color: var(--deep); text-decoration: none; }
@@ -580,21 +577,42 @@ section[id] { scroll-margin-top: 100px; }
 /* Neon-markering — kun for de viktige beløpene. */
 .hi { background: linear-gradient(transparent 58%, rgba(2, 255, 171, 0.7) 58%); color: inherit; padding: 0 3px; margin: 0 -3px; border-radius: 3px; }
 
-/* Støtte: hva pengene kan gå til. */
-.uses { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; margin-top: 26px; }
-.uses > div { padding-top: 12px; border-top: 1px solid var(--line); }
-.uses dt { font-family: var(--display); font-weight: 800; font-size: 17px; color: var(--ink); }
-.uses dd { margin: 3px 0 0; font-size: 15px; color: var(--ink-2); }
-@media (max-width: 640px) { .uses { grid-template-columns: 1fr; gap: 10px; margin-top: 22px; } }
+/* Seksjon med produktvisning. PC: to spalter (tekst | visning), visningen
+   midtstilt. Mobil/nettbrett: overskrift → visning → liste, så det aldri
+   blir lange tekststrekk før neste bit av produktet. */
+.media-split { display: grid; grid-template-columns: 1.05fr 0.95fr; grid-template-areas: 'head media' 'list media'; column-gap: clamp(28px, 5vw, 72px); align-items: center; }
+.media-split.reverse { grid-template-columns: 0.95fr 1.05fr; grid-template-areas: 'media head' 'media list'; }
+.media-split > .head { grid-area: head; align-self: end; }
+.media-split > .media { grid-area: media; }
+.media-split > .list { grid-area: list; align-self: start; margin-top: 18px; }
+@media (max-width: 900px) {
+  .media-split, .media-split.reverse { grid-template-columns: 1fr; grid-template-areas: 'head' 'media' 'list'; row-gap: 22px; }
+  .media-split > .head, .media-split > .list { align-self: auto; }
+  .media-split > .list { margin-top: 0; }
+}
+/* Mobil viser kompakte utsnitt (Crop), PC og nettbrett hele telefonen. */
+.media .phone { margin-inline: auto; }
+.media .crop-m { display: none; }
+@media (max-width: 640px) { .media .phone { display: none; } .media .crop-m { display: grid; } }
 
-/* Støtte: tallpanelet — det ene kortet i seksjonen. */
+/* Støtte: fire fordeler som små fliser med ikon (2 × 2, også på mobil). */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
+.tile { display: grid; grid-template-columns: 36px 1fr; gap: 10px; align-items: start; padding: 12px 13px 13px; border-radius: 16px; background: rgba(255, 255, 255, 0.5); border: 1px solid rgba(255, 255, 255, 0.85); }
+.tile i { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; background: rgba(2, 255, 171, 0.32); color: var(--deep); }
+.tile i svg { width: 20px; height: 20px; }
+.tile b { display: block; font-family: var(--display); font-weight: 800; font-size: 15px; line-height: 1.2; color: var(--ink); }
+.tile span { display: block; margin-top: 3px; font-size: 13.5px; line-height: 1.35; color: var(--ink-2); }
+@media (max-width: 360px) { .tiles { grid-template-columns: 1fr; } }
+
+/* Støtte: tallpanelet — pris, fordelingsstolpe, regneeksempel. */
 .money { padding: 26px 26px 28px; align-self: start; }
 .money-price { display: flex; align-items: baseline; gap: 10px; }
 .money-price b { font-family: var(--display); font-weight: 800; font-size: clamp(46px, 5vw, 58px); line-height: 1; letter-spacing: -0.02em; color: var(--deep); }
 .money-price span { font-size: 17px; font-weight: 600; color: var(--ink-2); }
-.money-club { margin-top: 14px; font-family: var(--display); font-weight: 800; font-size: 22px; line-height: 1.25; color: var(--ink); }
-.money-club small { display: block; margin-top: 5px; font-family: var(--body); font-weight: 500; font-size: 14px; color: var(--ink-3); }
-.money-cap { margin: 24px 0 2px; font-family: var(--display); font-weight: 800; font-size: 14px; color: var(--deep); }
+.money .split-bar { margin: 16px 0 8px; }
+.money .legend { gap: 6px 16px; font-size: 14.5px; }
+.money .legend b { font-family: var(--display); font-weight: 800; color: var(--deep); }
+.money-cap { margin: 22px 0 2px; font-family: var(--display); font-weight: 800; font-size: 14px; color: var(--deep); }
 .money-calc .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); font-size: 15px; color: var(--ink-2); }
 .money-calc .row b { font-family: var(--display); font-weight: 800; font-size: 19px; color: var(--deep); white-space: nowrap; }
 .money-calc .row.sum { border-bottom: 1px solid var(--line); }
@@ -604,18 +622,16 @@ section[id] { scroll-margin-top: 100px; }
 .money .btn { margin-top: 18px; width: 100%; }
 @media (max-width: 640px) { .money { padding: 22px 20px 24px; } }
 
-/* Laglivet: uka som tekstgrupper, med appens kalenderprikker. */
-.week { margin-top: 20px; }
-.wk { display: grid; grid-template-columns: 18px 1fr; gap: 10px; padding: 14px 0; border-top: 1px solid var(--line); }
+/* Laglivet: tre korte linjer med appens kalenderprikker. */
+.wk { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 11px 0; border-top: 1px solid var(--line); }
 .wk:last-child { border-bottom: 1px solid var(--line); }
 .wk .s-dot { width: 10px; height: 10px; margin-top: 7px; }
-.wk small { display: block; font-size: 13px; font-weight: 600; color: var(--ink-3); }
-.wk h3 { margin: 1px 0 4px; }
 .wk p { font-size: 15.5px; color: var(--ink-2); }
+.wk b { font-family: var(--display); font-weight: 800; color: var(--ink); }
 
 /* Fellesskapet: funksjonsliste uten bokser. */
-.features { list-style: none; margin-top: 20px; }
-.features li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding: 14px 0; border-top: 1px solid var(--line); }
+.features { list-style: none; }
+.features li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; padding: 13px 0; border-top: 1px solid var(--line); }
 .features li:last-child { border-bottom: 1px solid var(--line); }
 .features svg { width: 26px; height: 26px; color: var(--deep); margin-top: 2px; }
 .features .emoji { font-size: 22px; line-height: 1.2; }
@@ -624,10 +640,10 @@ section[id] { scroll-margin-top: 100px; }
 
 /* Kampen: det mørke panelet, listen uten bokser. */
 .match-panel { padding: clamp(24px, 5vw, 56px); }
-@media (max-width: 640px) { .match-panel { padding: 26px 20px 28px; border-radius: 24px; } }
+@media (max-width: 640px) { .match-panel { padding: 26px 18px 26px; border-radius: 24px; } }
 .glass-dark .intro { color: rgba(234, 255, 246, 0.82); }
-.dark-list { list-style: none; margin-top: 22px; }
-.dark-list li { padding: 12px 0; border-top: 1px solid rgba(143, 255, 224, 0.16); }
+.dark-list { list-style: none; }
+.dark-list li { padding: 11px 0; border-top: 1px solid rgba(143, 255, 224, 0.16); }
 .dark-list li:last-child { border-bottom: 1px solid rgba(143, 255, 224, 0.16); }
 .dark-list b { display: block; font-family: var(--display); font-weight: 800; font-size: 17px; color: #f4fff9; }
 .dark-list span { display: block; margin-top: 2px; font-size: 15px; color: rgba(234, 255, 246, 0.78); }
@@ -640,11 +656,13 @@ section[id] { scroll-margin-top: 100px; }
 .dark-note { margin-top: 22px; font-size: 15px; color: rgba(234, 255, 246, 0.82); }
 .dark-note a { color: var(--neon); }
 
-/* Kom i gang: tre spalter uten kort. */
-.ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
-.ways > div { padding-top: 18px; border-top: 2px solid rgba(6, 58, 45, 0.5); }
-.ways p { margin: 8px 0 10px; font-size: 16px; color: var(--ink-2); }
-@media (max-width: 900px) { .ways { grid-template-columns: 1fr; gap: 20px; } }
+/* Kom i gang: tre kompakte kort med ikon — gruppering som gjør veiene lette å skille. */
+.ways { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.way { padding: 22px 22px 18px; }
+.way i { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--deep); color: var(--neon); margin-bottom: 12px; }
+.way i svg { width: 22px; height: 22px; }
+.way p { margin: 6px 0 4px; font-size: 15.5px; color: var(--ink-2); }
+@media (max-width: 900px) { .ways { grid-template-columns: 1fr; gap: 12px; } .way { padding: 18px 18px 12px; } }
 
 /* Kontaktpanelet ved FAQ. */
 .contact { padding: 26px; align-self: start; }
@@ -662,7 +680,8 @@ section[id] { scroll-margin-top: 100px; }
 .price > div + div { border-left: 1px solid var(--line); }
 @media (max-width: 760px) { .price > div + div { border-left: 0; border-top: 1px solid var(--line); } }
 
-/* Utsnittet: ett innlegg med Heia og kommentarer (Crop.astro). */
+/* ── Utsnittene (Crop.astro): innlegg, kalender, kamp ───────────────────
+   Uten telefonramme, større skala enn mockupen, viser bare det appen har. */
 .crop { width: min(100%, 400px); margin-inline: auto; display: grid; gap: 10px; }
 .crop-card {
   padding: 16px 18px 14px; border-radius: 22px; font-size: 15px; line-height: 1.45; color: var(--ink);
@@ -676,14 +695,55 @@ section[id] { scroll-margin-top: 100px; }
 .crop-byline small { margin-left: auto; font-size: 12.5px; color: var(--ink-3); }
 .crop-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--deep); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
 .crop-avatar.neon { background: var(--neon); color: var(--ink); }
-.crop-photo { height: 160px; border-radius: 14px; margin: 12px 0; position: relative; overflow: hidden; background:
-  radial-gradient(120px 70px at 30% 80%, rgba(207, 255, 116, 0.9), transparent 70%),
-  linear-gradient(160deg, #6fd9a8, #1f8a63 60%, #0f4d36); }
-.crop-photo::after { content: ''; position: absolute; inset: auto 0 0 0; height: 30%; background: linear-gradient(180deg, transparent, rgba(6, 58, 45, 0.35)); }
+.crop-photo { display: block; width: 100%; height: auto; aspect-ratio: 3 / 2; object-fit: cover; border-radius: 14px; margin: 12px 0; background: #1f8a63; }
 .crop-actions { display: flex; gap: 8px; }
 .crop-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 700; background: rgba(255, 255, 255, 0.75); border: 1px solid rgba(6, 58, 45, 0.1); }
 .crop-pill.on { background: var(--neon); color: var(--ink); border-color: transparent; }
+.crop-pill.dark { background: rgba(20, 49, 38, 0.8); color: #eafff6; border-color: rgba(143, 255, 224, 0.25); }
 .crop-thread { display: grid; gap: 8px; padding: 0 8px; }
 .crop-comment { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; padding: 10px 14px 11px; border-radius: 16px; font-size: 14px; background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(255, 255, 255, 0.85); }
 .crop-comment > div > b { display: block; font-size: 13px; }
 .crop-comment > div > span { display: block; color: var(--ink); }
+
+/* Kalenderutsnittet. */
+.crop-kal .crop-card { padding: 14px 14px 12px; }
+.k-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.k-head b { font-family: var(--display); font-weight: 800; font-size: 17px; }
+.k-head span { font-size: 13px; color: var(--ink-3); }
+.k-days { display: flex; gap: 6px; margin-bottom: 8px; }
+.k-days span { flex: 1; text-align: center; padding: 7px 0; border-radius: 10px; background: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 700; }
+.k-days span.on { background: var(--deep); color: var(--neon); }
+.k-row { display: grid; grid-template-columns: 10px 1fr; gap: 10px; align-items: center; padding: 9px 11px; border-radius: 12px; background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(255, 255, 255, 0.9); margin-top: 6px; }
+.k-row .s-dot { width: 9px; height: 9px; }
+.k-row b { display: block; font-size: 14px; }
+.k-row small { display: block; font-size: 12px; color: var(--ink-3); }
+.k-rsvp { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.55); }
+.k-rsvp b { font-size: 13px; margin-right: auto; }
+
+/* Kamputsnittet — stadionglass inne i det mørke panelet. */
+.crop-kamp { gap: 8px; color: #eafff6; }
+.kamp-score, .kamp-events, .kamp-comment { border-radius: 18px; padding: 12px 14px; background: linear-gradient(160deg, #1f4a39, #12302400); background-color: #143126; border: 1px solid rgba(143, 255, 224, 0.22); box-shadow: 0 1px 0 rgba(143, 255, 224, 0.1) inset; }
+.kamp-line { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 10px; margin: 8px 0 4px; font-family: var(--display); font-weight: 800; }
+.kamp-line span { font-size: 14px; }
+.kamp-line span:last-child { text-align: right; }
+.kamp-line b { font-size: 34px; line-height: 1; }
+.kamp-line small { font-size: 16px; opacity: 0.7; }
+.kamp-meta { font-size: 12px; opacity: 0.75; }
+.kamp-ev { display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(143, 255, 224, 0.12); font-size: 13.5px; }
+.kamp-ev:first-child { border-top: 0; padding-top: 2px; }
+.kamp-ev.photo { grid-template-columns: 34px 1fr 60px; }
+.kamp-ev img { width: 60px; height: 44px; object-fit: cover; border-radius: 8px; display: block; background: #1f8a63; }
+.kamp-min { font-family: var(--display); font-weight: 800; color: var(--neon); }
+.kamp-ev .s-goal { margin-right: 6px; }
+.kamp-ev .s-goal.dim { background: rgba(234, 255, 246, 0.25); color: #eafff6; }
+.kamp-comment { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; font-size: 14px; }
+.kamp-comment > div > b { display: block; font-size: 13px; }
+.kamp-comment > div > span { display: block; }
+.kamp-actions { display: flex; gap: 8px; justify-content: center; padding-top: 2px; }
+
+/* Hero på mobil: telefonen som utsnitt — øverste ~430 px, toner ut nederst,
+   så feeden med bilde og Heia er synlig tidlig uten at rammen tar en hel skjerm. */
+@media (max-width: 640px) {
+  .hero-phones { height: 430px; overflow: hidden; align-items: flex-start; -webkit-mask-image: linear-gradient(#000 72%, transparent 100%); mask-image: linear-gradient(#000 72%, transparent 100%); }
+  .hero-note-m { margin-top: 6px; }
+}
