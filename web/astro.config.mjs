@@ -9,6 +9,11 @@ import react from '@astrojs/react';
 // er bare ett ekstra varsel: Vercel forteller under byggingen om dette er
 // produksjon eller en forhåndsvisning, og en forhåndsvisning bygget mot
 // produksjonsdata skal stå svart på hvitt i byggeloggen (punkt 108).
+// `process` finnes bare fordi `@types/node` er en devDependency her —
+// astro.config.mjs KJØRER i Node under byggingen, i motsetning til alt i
+// `src/`. Uten den pakken feilet `astro check` i CI med «Cannot find name
+// 'process'», mens den var grønn lokalt: maskina hadde typene liggende fra
+// en tidligere installasjon, en ren `npm ci` har dem ikke.
 if (
   process.env.VERCEL_ENV &&
   process.env.VERCEL_ENV !== 'production' &&
