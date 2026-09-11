@@ -1,6 +1,193 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ 2026-09-11 (ettermiddag) — MOBILFORSIDEN + MOBILNAVBAREN: POLISHRUNDE BYGGET, VENTER TELEFONDOM
+## ▶️▶️ START HER (2026-09-11 sen kveld — NETTSIDEN RUNDE 2: MER SYNLIG PRODUKT OG LAGLIV, PUSHET, VENTER BRAGES DOM PÅ PREVIEW FØR MERGE)
+
+**Tilstand:** `Brage` er ren og pushet, foran `main` uten PR — Brage
+oppretter/merger selv (`gh` er ikke innlogget). Vercel lager preview av
+pushen. Ingen dev-server kjører.
+
+**Oppdraget (Brage etter d3e4790):** teksten var bedre, men forenklingen
+hadde fjernet nyttige visuelle elementer og mobilen var teksttung. Mål: mer
+synlig produkt og lagliv med den kortere teksten. Levert i ÉN commit (se
+`git log -1`):
+
+- **Støtte:** fordelingsstolpen (60 kr laget / 19 kr Heia, betaling og
+  drift) er tilbake INNE i tallpanelet under prisen, med forklaring;
+  regneeksemplet kompakt som før, «Forutsetter 25 betalende gjennom tolv
+  måneder» står. De fire fordelene = `.tiles` (2 × 2 små fliser m/ ikon +
+  én linje, også på mobil), ikke fire høye kort. Samme fliser på
+  /stott-laget.
+- **Mobilkomposisjon:** ny `.media-split` (grid-areas: PC = tekst |
+  visning; ≤900 px = overskrift → visning → liste). Mobil (≤640) viser
+  KOMPAKTE UTSNITT (`Crop.astro`) i stedet for hele telefoner: kalender
+  ved aktivitetene, innlegg m/ foto + kommentarer ved fellesskapet,
+  kampvisning (stilling, hendelser m/ sidelinjebilde, kommentar) i det
+  mørke panelet. PC/nettbrett viser fortsatt telefonene. Heroens telefon
+  er på mobil et utsnitt (430 px, mask-fade nederst). Mobilsiden: 10 637 →
+  8 522 → **7 897 px**.
+- **Levende demoer:** ekte foto i stedet for grønne felt —
+  `web/public/img/demo/` (README m/ kilder): `trening.jpg` (stige +
+  kjegler på kunstgress, Pexels/Chris K) i feed-mockupen, `pizzakveld.jpg`
+  (pizzaesker, Pexels/Airam Dato-on) i innleggsutsnittet, `sidelinja.jpg`
+  (målnett i flomlys, Unsplash/Janosch Diggelmann) som hendelsesbilde i
+  kamputsnittet. Ingen personer, ingen varemerker (kandidater m/ Premier
+  League-ball, Kirkland/Domino's/Gurman-esker, øl/vin ble forkastet).
+  Higgsfield hadde 0 kreditter (gratisplan) — ikke brukt. Innlegget i
+  utsnittet er nå Karis pizzakveld (Bestemor Eva + Mona kommenterer);
+  feedmockupen har Monas trening.
+- **Kort og ikoner med hensikt:** «Slik kommer laget i gang» = tre opal-kort
+  m/ mørkt ikon (`.way`). Glødeprikkene og notisboksene er IKKE tilbake.
+- **PC-hero:** feeden er hovedtelefonen, kampskjermen FORAN til venstre og
+  lavere (232 px, −5°, overlapp 38 px) så «3–2» og «Direkte» er helt synlige.
+- **Uendret:** språkvasken, typografihierarkiet, slagordene, menyens egen
+  rulling (664/626 px, overflow auto), scroll-margin på ankre, navbaren og
+  Safari-tilpasningene (ikke rørt).
+- **Verifisert:** `astro build` grønn (12 sider); lenkesjekk 313/0 brutte
+  + 5 bildereferanser/0 mangler; ingen JS-feil i riggen; innlogget meny
+  viser Min konto/Heia-admin/Klubbetalinger/Logg ut + CTA (rullbar);
+  ekte WebKit i simulatoren (topp, #slik m/ kalenderutsnittet,
+  #kom-i-gang). Reisetesten (51/51 tidligere i dag) er IKKE kjørt på nytt —
+  header/meny-markup og -skript er urørt i denne runden.
+
+**Riggen:** `scripts/web-shot.mjs` m/ `eval: window.scrollTo({top:N,
+behavior:"instant"})` for viewport-bilder (sips-crop er upålitelig),
+`fullPage:true` for hele siden, `session` + `eval` (heia-web-roles +
+`heia:auth`) for innlogget header. Ekte WebKit: `xcrun simctl openurl
+booted "http://localhost:4321/?v=N#anker"` (cache-bust m/ query) +
+`simctl io booted screenshot`.
+
+**IKKE gjort / til Brage:** helhetsdom på preview (mobil + PC); PR
+Brage→main; Safari-flaten nederst (edb614f) fortsatt ikke sett på ekte
+telefon. Ny samtale er trygg å starte herfra.
+
+---
+
+
+## (forrige START HER — 2026-09-11 kveld — NETTSIDEN: SAMLET SPRÅK-/LENGDE-/DESIGNRUNDE + MENYFEILEN RETTET)
+
+**Tilstand:** `Brage` er ren og pushet, foran `main` uten PR — Brage
+oppretter/merger selv (`gh` er ikke innlogget). Vercel lager preview av
+pushen (`heia-<hash>-heia1.vercel.app`); prod først ved merge til `main`.
+Brage vurderer helheten på preview før merge.
+
+**Oppdraget:** Brages skjermbilde viste at hamburgermenyen KLIPPES når man
+er innlogget, pluss én samlet runde på språk, lengde og design så siden
+føles som Heia og mindre som en generisk AI-landingsside. Levert i ÉN commit
+(se `git log -1`), verifisert:
+
+- **Menyfeilen:** innlogget meny (seks lenker + kontoblokk + CTA) er høyere
+  enn viewporten, og `.menu-inner` hadde `overflow: hidden` → «Logg ut» og
+  CTA-en ble klippet. Nå `overflow-y: auto` + `overscroll-behavior: contain`
+  (0fr→1fr-rullen virker fortsatt, touchmove-låsen slipper menyen
+  gjennom), kontoblokkens rader 48 px / 18 px. Navbarens frost
+  `rgba(143,252,205,.94)`, geometri (74/42/48) og rullebevegelse er URØRT.
+- **Språk:** forsiden 964 → 688 ord (−28 %), /stott-laget 730 → 636 (−12 %,
+  den skal være den grundige). «Ja til …»-rekka, «for alltid», «vi lover
+  ikke mer enn det som er klart» og notat-tonen er ute. Beholdt ordrett:
+  «Tettere på laget.», «Idrettsglede for alle», «Sammen får laget til mer.»
+  Hele produktet er med: trening/kamp/sosialt, bilder, Heia + kommentarer,
+  familien rundt laget, frivillig støtte.
+- **Støtteseksjonen (#bidra):** venstre = h2 + intro + fire tekstgrupper
+  (utstyr, cuper/turer, opplevelser, lavere egenandeler) + «laget og
+  klubben bestemmer»; høyre = ETT tallpanel `.money`: 79 kr i måneden,
+  «60 kr går til laget» (neon-markering `.hi`), «Regneeksempel» 25 × 60 →
+  1 500 → 18 000 kr (fra `config.ts`), én linje presiseringer (frivillig,
+  ingen bindingstid, gratis vanlig bruk), «Alt om Støtt laget». Split-bar,
+  legend, pricebadge og pil-kalkulatoren er borte fra forsiden (split-bar
+  står igjen i prisblokken på /stott-laget).
+- **Design:** glødeprikk-etikettene er borte overalt (`.eyebrow` er nå en
+  stille kicker uten prikk, brukt kun på /lag). Bokser-i-bokser → vanlige
+  tekstgrupper med hårstreker: `.uses`, `.week`, `.features`, `.dark-list`,
+  `.dark-steps`, `.ways` (2 px dempet spaltestrek), `.checks`, `.step` uten
+  opal. Kort (opal) kun for tallpanelet, kontaktpanelet, prisblokken og
+  mockupene. Neon bare på hovedknapper, beløpene og Heia-pillen. Typografi:
+  h1 38–64, h2 28–40 (−0.015em), h3 fast 20, ny `.intro` (17–19, ink-2,
+  46ch) for seksjonsforklaringer — `.lead` er kun heroens. Seksjonsluft
+  48–96 px (mobil 44). `section[id]` har `scroll-margin-top` så ankerlenker
+  fra menyen lander UNDER baren (før lå h2 bak den — sett i simulatoren).
+  Footer-teksten kortet ned. Om/Hjelp: h1 står alene.
+- **Produktvisninger (varierte):** hero = Hjem-feeden (PC: kampskjermen
+  skrått bak TIL VENSTRE, rotate −6°, så lag/stilling/mål er den synlige
+  delen; mobil: kun feeden, som før). Laglivet (#slik) = Kalender-mockupen
+  (NY på forsiden; prikkene følger appens tokens: trening #2F66DB, kamp
+  #E04A44, sosialt #7A4DE8 — rettet fra gul/lilla). Fellesskapet = NYTT
+  utsnitt `web/src/components/Crop.astro` (innlegg m/ bilde, «Heia · 14», to
+  kommentarer i bobler). Kampen = kampskjermen i mørkt `.match-panel`.
+  /stott-laget = Sesongen. Ingen ekte skjermbilder brukt: `docs/screenshots`
+  er fra før designsporet og har ekte lagnavn — mockupene (Bjørka G12) er
+  det offentlige materialet.
+- **Verifisert:** `npx astro build` grønn (12 sider). Lenkesjekk over dist:
+  313 interne lenker/ankre, 0 brutte. `verify-web-flows --keep` 34/34 +
+  `verify-web-login-journey` 51/51 mot lokal `astro preview` (PC-meny,
+  roller, /ops, /klubb, utlogging, mobil-hamburger inn-/utlogget, ingen
+  JS-feil) + `--cleanup` 0/0/0. Ekte WebKit i simulatoren (iPhone 17 Pro):
+  toppen, #bidra, #slik, #kom-i-gang — mark-markeringen, prikkene og
+  hårstrekene rendrer riktig. Diff-sjekket at Safari-tint-stripene,
+  `.ground`, html-bakgrunnen, `.site-header::before/::after`, scrimen og
+  navbar-frosten er UENDRET.
+
+**RØR IKKE (fortsatt):** navbarens frost og geometri, tint-stripene,
+html-canvasen (flat krem + mint 200 px), `.ground`-kantene. Se forrige
+START HER-blokk under for Safari 26-regelen og kildene.
+
+**Riggtriks lært i dag:** `sips -c … --cropOffset` er UPÅLITELIG (kuttet fra
+midten) — ta viewport-bilder med `eval: window.scrollTo({top:N,
+behavior:"instant"})` i `scripts/web-shot.mjs` i stedet. Ekte WebKit på en
+seksjon: `xcrun simctl openurl booted "http://localhost:4321/#anker"` +
+`simctl io booted screenshot` (simulatoren kan ikke scrolle, men ankre
+virker). Innlogget header i riggen: `session` i JSON + `eval` som setter
+`heia-web-roles` og sender `heia:auth`.
+
+**IKKE gjort / til Brage:** helhetsdom på telefon og PC (preview-URL);
+Safari-flaten nederst (edb614f) er fortsatt ikke sett på ekte telefon; PR
+Brage→main. Ny samtale er trygg å starte herfra.
+
+---
+
+
+## (forrige START HER — 2026-09-11 ettermiddag — NETTSIDEN: MOBILFORSIDE + MOBILNAVBAR FERDIG I NI RUNDER, ALT PUSHET, ÉN TING UBEKREFTET)
+
+**Tilstand:** `Brage` er ren og pushet, 15 commits foran `main` (fra
+`d4c1649` innlogging i headeren til `4dfed85`). INGEN PR er opprettet —
+`gh` er ikke innlogget, Brage oppretter/merger selv. Vercel lager
+preview-deploy av hver push til `Brage`
+(`heia-<hash>-heia1.vercel.app`); prod kommer først ved merge til `main`.
+
+**Godkjent av Brage:** hele mobilforsiden (hero, copy, produktet i første
+viewport), navbaren, den åpne menyen og rullebevegelsen, favicon.
+Sitat etter runde 7: «Utenom dette er alt godkjent!»
+
+**DET ENESTE ÅPNE:** Safari-flaten NEDERST på skjermen ved scroll oppover
+(iOS 26 «Liquid Glass»-verktøylinje). Ni runder, siste fiks `edb614f`
+(canvas flat krem i hele dokumentet, mint kun øverste 200 px) er IKKE
+sett på Brages telefon. **Be om telefonbilde FØR du rører noe her — ikke
+gjett.** Regelen (dokumentert + målt): Safari 26 toner status-/adressefelt
+og verktøylinje etter FASTE/STICKY elementer inntil 4 px fra toppen / 3 px
+fra bunnen, ≥80 % brede, ≥3 px høye, via `background-color`;
+pseudo-elementer, `theme-color` og skript etter første tegning IGNORERES,
+`opacity: 0` samples likevel. Faller det ikke på et slikt element, brukes
+canvasen (html). Kilder: jahir.dev/blog/safari-toolbar,
+nasedk.in/blog/ios26-safari-toolbar-colors,
+github.com/andesco/safari-color-tinting.
+
+**RØR IKKE:** navbarens frost `rgba(143, 252, 205, 0.94)` (godkjent siden
+runde 3; runde 5 gjorde den blekere og Brage reagerte). Ikke endre
+desktop. Ikke redesign resten av nettsiden.
+
+**Rigg:** `scripts/web-shot.mjs` (CDP, Chrome-emulering — den ENESTE som
+kan klikke, f.eks. åpne menyen) + `xcrun simctl openurl booted <url>` og
+`simctl io booted screenshot` for ekte WebKit (simulatoren kan IKKE
+trykke, og fryser toppfargen per fane). Dev: `npx astro dev` i `web/`.
+Reisetesten `scripts/verify-web-login-journey.mjs` (51/51) er IKKE kjørt
+på nytt etter designrundene — selektorene (`#menu-btn`, `.mobile-menu`,
+`.menu-cta`) er uendret, men `.mobile-menu` har fått en `.menu-inner`
+rundt innholdet.
+
+Detaljene for hver runde står under. Ny samtale er trygg å starte herfra.
+
+---
+
+## 2026-09-11 (ettermiddag) — MOBILFORSIDEN + MOBILNAVBAREN: RUNDE FOR RUNDE
 
 Brage ba om én samlet designrunde på mobilforsiden (<640 px) og
 hamburgermenyen. Bygget og riggbevist (Chrome 360/430 + ekte iOS-Safari i

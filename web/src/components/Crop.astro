@@ -1,0 +1,61 @@
+---
+/**
+ * Kompakte utsnitt av appen uten telefonramme — større skala enn
+ * Phone.astro, for mobil og for Fellesskapet på alle skjermer. Samme
+ * demonstrasjonsinnhold (Bjørka G12 — ingen ekte lag, barn eller navn),
+ * og bare det appen faktisk har: innlegg med bilde, Heia og kommentarer,
+ * kalender med svar på oppmøte, live kamp med stilling og hendelser.
+ * Bildene ligger i public/img/demo (fritt lisensierte foto uten
+ * identifiserbare personer — se README der).
+ */
+interface Props {
+  variant?: 'post' | 'kalender' | 'kamp';
+  class?: string;
+}
+const {variant = 'post', class: cls = ''} = Astro.props;
+---
+{variant === 'post' && (
+  <div class={`crop ${cls}`} role="img" aria-label="Heia-appen: et innlegg fra pizzakvelden med bilde, 11 Heia og to kommentarer fra familien rundt laget">
+    <div class="crop-card">
+      <div class="crop-byline"><span class="crop-avatar">K</span><b>Kari · forelder</b><small>i går 20:15</small></div>
+      <p>Takk for en super pizzakveld! Bilder fra alle er lagt i albumet 🍕</p>
+      <img class="crop-photo" src="/img/demo/pizzakveld.jpg" alt="" width="900" height="600" loading="lazy" decoding="async" />
+      <div class="crop-actions"><span class="crop-pill on">💚 Heia · 11</span><span class="crop-pill">💬 2</span></div>
+    </div>
+    <div class="crop-thread">
+      <div class="crop-comment"><span class="crop-avatar neon">E</span><div><b>Bestemor Eva</b><span>Så koselig! Hils alle fra hytta 💚</span></div></div>
+      <div class="crop-comment"><span class="crop-avatar">M</span><div><b>Mona · trener</b><span>Tusen takk til alle som ordnet! 🙌</span></div></div>
+    </div>
+  </div>
+)}
+
+{variant === 'kalender' && (
+  <div class={`crop crop-kal ${cls}`} role="img" aria-label="Heia-appen: kalenderen for uke 38 med to treninger, kamp og pizzakveld, og svar på om du kommer">
+    <div class="crop-card">
+      <div class="k-head"><b>Uke 38</b><span>Bjørka G12</span></div>
+      <div class="k-days"><span>ma</span><span class="on">ti</span><span>on</span><span>to</span><span>fr</span><span>lø</span><span>sø</span></div>
+      <div class="k-row"><i class="s-dot"></i><div><b>Trening</b><small>Tirsdag 17:30 · Bjørka kunstgress</small></div></div>
+      <div class="k-row"><i class="s-dot"></i><div><b>Trening</b><small>Torsdag 17:30 · Bjørka kunstgress</small></div></div>
+      <div class="k-row"><i class="s-dot match"></i><div><b>Kamp mot Lia FK</b><small>Lørdag 12:00 · Oppmøte 11:15</small></div></div>
+      <div class="k-row"><i class="s-dot social"></i><div><b>Pizzakveld for hele laget</b><small>Søndag 17:00 · Klubbhuset</small></div></div>
+      <div class="k-rsvp"><b>Kommer du?</b><span class="crop-pill on">Ja</span><span class="crop-pill">Nei</span><span class="crop-pill">Vet ikke</span></div>
+    </div>
+  </div>
+)}
+
+{variant === 'kamp' && (
+  <div class={`crop crop-kamp ${cls}`} role="img" aria-label="Heia-appen: live kamp der Bjørka leder 3–2 i andre omgang, med mål, bilde fra sidelinja og en kommentar fra familien">
+    <div class="kamp-score">
+      <div class="s-live">Direkte · 2. omgang 54′</div>
+      <div class="kamp-line"><span>Bjørka G12</span><b>3</b><small>–</small><b>2</b><span>Lia FK</span></div>
+      <div class="kamp-meta">Jonas rapporterer · siste hendelse for 1 min siden</div>
+    </div>
+    <div class="kamp-events">
+      <div class="kamp-ev"><span class="kamp-min">54′</span><span><b class="s-goal">MÅL</b>Bjørka øker til 3–2 etter hjørnespark!</span></div>
+      <div class="kamp-ev"><span class="kamp-min">47′</span><span><b class="s-goal dim">MÅL</b>Lia utligner til 2–2.</span></div>
+      <div class="kamp-ev photo"><span class="kamp-min">31′</span><span>Bilde fra sidelinja</span><img src="/img/demo/sidelinja.jpg" alt="" width="240" height="160" loading="lazy" decoding="async" /></div>
+    </div>
+    <div class="kamp-comment"><span class="crop-avatar neon">E</span><div><b>Bestemor Eva</b><span>Heia Bjørka!! Følger med fra hytta 💚</span></div></div>
+    <div class="kamp-actions"><span class="crop-pill on">💚 Heia · 31</span><span class="crop-pill dark">💬 Kommenter</span></div>
+  </div>
+)}
