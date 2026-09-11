@@ -341,6 +341,10 @@ test('TeamHome med bilde i feeden: signering er ÉN batch, reactions ÉN runde',
   });
 });
 
+// Fire faser i én test (reaksjon, post-patch, ny side, resync etter
+// reconnect). 5 s er jests standard og en ANTAGELSE OM MASKINVARE: lokalt
+// går den på ~1 s, på GitHubs tokjerners runner brukte fila 20 s og denne
+// testen tidsavbrøt. 40 s gir takhøyde og fanger fortsatt en ekte henging.
 test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt innlegg, resync ved reconnect', async () => {
   jest.useFakeTimers();
   const {supabase, __fire, __reconnect} = jest.requireMock(
@@ -504,7 +508,7 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();
   });
-});
+}, 40_000);
 
 // ---------------------------------------------------------------------------
 // «DEL MED LAGET» ER EN PERMANENT INNGANG (P4, skive 10)

@@ -142,6 +142,16 @@ function Probe({onRender}: {onRender: (s: Snapshot) => void}) {
   return null;
 }
 
+/**
+ * Siste tre som ble montert. Uten denne overlever et tre som IKKE ble
+ * avmontert — for eksempel fordi testen tidsavbrøt før `unmount()` — inn i
+ * neste test, og fyrer sine egne spørringer der. Det er nøyaktig det som
+ * skjedde i CI 2026-09-11: testen over tidsavbrøt, og den neste feilet på
+ * `expect(mockGetLiveMatch).not.toHaveBeenCalled()` med ett kall for
+ * «ts-1» — laget fra treet som fortsatt sto montert.
+ */
+let mountedRoot: ReactTestRenderer.ReactTestRenderer | undefined;
+
 async function renderHome(): Promise<{
   latest: () => Snapshot;
   unmount: () => void;
@@ -157,9 +167,13 @@ async function renderHome(): Promise<{
       </QueryClientProvider>,
     );
   });
+  mountedRoot = root;
   return {
     latest: () => current as Snapshot,
-    unmount: () => root?.unmount(),
+    unmount: () => {
+      root?.unmount();
+      if (mountedRoot === root) mountedRoot = undefined;
+    },
   };
 }
 
@@ -185,10 +199,21 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Avmonter FØRST: et tre som fortsatt står, rekker å sende kall inn i
+  // neste test. `act` svelges her — er treet alt borte, er det ingenting
+  // å gjøre, og en feil i oppryddingen skal ikke skjule testens eget svar.
+  try {
+    mountedRoot?.unmount();
+  } catch {}
+  mountedRoot = undefined;
   abandonSessionContext();
   queryClient.clear();
 });
 
+// 5 s er jests standard, og den er en ANTAGELSE OM MASKINVARE, ikke en
+// kontrakt testen skal håndheve. Lokalt går hele fila på ~1,5 s; på GitHubs
+// tokjerners runner brukte denne ene testen over 5 s og tidsavbrøt. 20 s gir
+// takhøyde på treg maskinvare og fanger fortsatt en ekte henging.
 test('frø-boot fyrer ingen enkeltkall mens konteksten er i flukt — og bruker svaret når det lander', async () => {
   const rpc = deferredRpc();
   // TeamContext har startet kontekst-kallet (frø-boot) …
@@ -232,7 +257,7 @@ test('frø-boot fyrer ingen enkeltkall mens konteksten er i flukt — og bruker 
   expect(mockGetUnreadCount).not.toHaveBeenCalled();
   expect(mockRpc).toHaveBeenCalledTimes(1);
   home.unmount();
-});
+}, 20_000);
 
 test('kontekstfeil: fallback-enkeltkallene starter ETTER forsøket, ingen deadlock', async () => {
   const rpc = deferredRpc();
