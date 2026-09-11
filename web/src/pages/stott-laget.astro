@@ -5,13 +5,13 @@ import {CONTACT_EMAIL, SUPPORT, primaryCta, EXAMPLE_MONTH, EXAMPLE_YEAR, nok} fr
 const cta = primaryCta();
 const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
 ---
-<Base title="Støtt laget" description={`Heia Supporter: ${SUPPORT.priceNok} kr i måneden, ${SUPPORT.clubNok} kr går direkte til laget. Frivillig, via Stripe, si opp når du vil.`}>
+<Base title="Støtt laget" description={`Heia Supporter: ${SUPPORT.priceNok} kr i måneden, ${SUPPORT.clubNok} kr går til laget. Frivillig, via Stripe, si opp når du vil.`}>
   <section class="hero">
     <div class="container split">
       <div>
-        <span class="eyebrow">Heia Supporter</span>
+        <p class="tagline">Heia Supporter</p>
         <h1 style="max-width:14ch">Litt hver måned. Rett til laget.</h1>
-        <p class="lead">Heia er gratis å bruke. Vil du gi laget litt ekstra, kan du bli Heia Supporter: <b>{SUPPORT.priceNok} kr i måneden — {SUPPORT.clubNok} kr går til laget.</b> Et fast, frivillig bidrag til lagets klubb, uten dugnad, varebestilling eller lager.</p>
+        <p class="lead">Heia er gratis å bruke. Vil du gi laget litt ekstra, kan du bli Heia Supporter: <b>{SUPPORT.priceNok} kr i måneden, og {SUPPORT.clubNok} kr går til laget.</b> Fast, frivillig og uten dugnad.</p>
         <div class="cta">
           <a class="btn btn-primary" href={cta.href}>{cta.label}</a>
           <a class="btn btn-ghost" href="#slik">Slik virker det</a>
@@ -26,52 +26,48 @@ const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
     <div class="container">
       <div class="opal price">
         <div>
-          <span class="eyebrow">Prisen</span>
-          <div class="big mt-1">{SUPPORT.priceNok} kr <small>/ måned</small></div>
-          <p class="lead mt-1"><b>{SUPPORT.clubNok} kr går direkte til laget.</b> Det er mer enn 3 av 4 kroner. De siste {SUPPORT.heiaNok} kr dekker Heia, betalingen og driften.</p>
+          <div class="big">{SUPPORT.priceNok} kr <small>/ måned</small></div>
+          <p class="lead mt-1"><b><mark class="hi">{SUPPORT.clubNok} kr</mark> går til laget.</b> Det er mer enn tre av fire kroner. De siste {SUPPORT.heiaNok} kr dekker Heia, betalingen og driften.</p>
           <div class="split-bar" aria-hidden="true"><i style={`width:${clubPct}%`}></i><b style={`width:${100 - clubPct}%`}></b></div>
           <div class="legend"><span>{SUPPORT.clubNok} kr til laget</span><span class="heia">{SUPPORT.heiaNok} kr Heia + betaling + drift</span></div>
         </div>
-        <div style="border-left:1px solid var(--line)">
+        <div>
           <h3>Det du kan stole på</h3>
-          <ul class="mt-1" style="padding-left:22px;color:var(--ink-2);display:grid;gap:10px">
-            <li><b>Fast beløp til laget.</b> {SUPPORT.clubNok} kr av hver betaling, ikke en prosent som varierer med gebyrer.</li>
+          <ul class="checks">
+            <li><b>Fast beløp til laget.</b> {SUPPORT.clubNok} kr av hver betaling, ikke en prosent som varierer.</li>
             <li><b>Ingen bindingstid.</b> Si opp når som helst fra Profil → Min støtte. Støtten løper ut perioden du har betalt for.</li>
-            <li><b>14 dagers angrerett</b> på nytegning, og feil trekk refunderes alltid.</li>
+            <li><b>14 dagers angrerett</b> på nytegning. Feil trekk refunderes.</li>
             <li><b>Betalingen går via Stripe.</b> Heia ser aldri kortnummeret ditt.</li>
-            <li><b>Ingenting låses.</b> Supportere får ingen ekstra funksjoner — alle i laget får alt.</li>
+            <li><b>Ingenting låses.</b> Supportere får ingen ekstra funksjoner. Alle i laget får alt.</li>
             <li><b>Treneren ser bare summen.</b> Aldri hvem som gir.</li>
           </ul>
         </div>
       </div>
-      <p class="small muted mt-2">Beløpene gjelder standardavtalen i Heia. Prisen og fordelingen vises alltid i appen før du tegner en avtale, og eksisterende avtaler endres aldri stille.</p>
+      <p class="small muted mt-2">Beløpene gjelder standardavtalen i Heia. Pris og fordeling vises i appen før du tegner en avtale.</p>
     </div>
   </section>
 
   <section class="section" id="mer">
-    <div class="container split" style="align-items:start">
+    <div class="container split top">
       <div>
-        <span class="eyebrow">Hva det gjør mulig</span>
         <h2>Sammen får laget til mer.</h2>
-        <p class="lead">En kasse med faste inntekter gjør at laget kan si ja oftere. Hva pengene går til, bestemmer laget og klubben — dette er det mange bruker dem til:</p>
-        <ul class="value-list">
-          <li class="opal"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v4a6 6 0 0 1-12 0V3z"/><path d="M6 5H3v2a4 4 0 0 0 3 3.9M18 5h3v2a4 4 0 0 1-3 3.9"/><path d="M12 13v4M8 21h8M9 17h6"/></svg></div><div><b>Flere opplevelser sammen</b><span>Cuphelger, treningsleir og avslutningsfest — der samholdet bygges, og der det oftest stopper på penger.</span></div></li>
-          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M7 17l2-2M15 9l2-2"/></svg></div><div><b>Utstyr som holder</b><span>Baller, vester, kjegler og mål — og alt det små treneren ellers legger ut for selv.</span></div></li>
-          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div><div><b>Enklere for flere å være med</b><span>Laget kan velge å holde egenandelene nede, så ingen står utenfor på grunn av prisen.</span></div></li>
-          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><div><b>Forutsigbar økonomi</b><span>Faste, frivillige bidrag gir en kasse det går an å planlegge med — ikke bare et rykk når dugnaden er over.</span></div></li>
-        </ul>
+        <p class="intro">Faste inntekter gjør at laget kan si ja oftere. Hva pengene går til, bestemmer laget og klubben. Dette er det mange bruker dem til:</p>
+        <dl class="uses">
+          <div><dt>Utstyr</dt><dd>Baller, vester, kjegler og et nytt mål. Alt det små treneren ellers legger ut for selv.</dd></div>
+          <div><dt>Cuper og turer</dt><dd>Cuphelga, treningsleiren og bussen dit.</dd></div>
+          <div><dt>Opplevelser</dt><dd>Avslutningen, pizzakvelden, noe å glede seg til.</dd></div>
+          <div><dt>Lavere egenandeler</dt><dd>Laget kan bruke kassa til å holde egenandelene nede, så ingen står utenfor fordi det koster.</dd></div>
+        </dl>
       </div>
-      <div class="opal card" style="padding:30px">
-        <span class="eyebrow">Regneeksempel</span>
-        <div class="calc" aria-label="Regneeksempel">
+      <div class="opal money">
+        <p class="money-cap" style="margin-top:0">Regneeksempel</p>
+        <div class="money-calc" aria-label="Regneeksempel">
           <div class="row"><span>{SUPPORT.exampleSupporters} støttespillere rundt laget</span><b>× {SUPPORT.clubNok} kr</b></div>
-          <div class="arrow" aria-hidden="true">↓</div>
           <div class="row"><span>Til laget hver måned</span><b>{nok(EXAMPLE_MONTH)}</b></div>
-          <div class="arrow" aria-hidden="true">↓</div>
-          <div class="row sum"><span>Til laget på ett år</span><b>{nok(EXAMPLE_YEAR)}</b></div>
+          <div class="row sum"><span>Til laget på ett år</span><b><mark class="hi">{nok(EXAMPLE_YEAR)}</mark></b></div>
         </div>
-        <p class="small muted mt-2">Forutsetter {SUPPORT.exampleSupporters} betalende gjennom tolv måneder. Foreldre, besteforeldre, tanter og onkler — de fleste lag har flere rundt seg enn de tror.</p>
-        <p class="mt-2" style="color:var(--ink-2)">Ingen varer å bestille, ingenting å lagre eller levere ut. Klubben får pengene rett på konto via Stripe, og laget ser kassa vokse i appen.</p>
+        <p class="money-fine">Forutsetter {SUPPORT.exampleSupporters} betalende gjennom tolv måneder. Foreldre, besteforeldre, tanter og onkler: det er ofte flere rundt laget enn man tror.</p>
+        <p class="money-fine">Ingen varer å bestille eller levere ut. Klubben får pengene på konto via Stripe, og laget ser kassa vokse i appen.</p>
       </div>
     </div>
   </section>
@@ -79,47 +75,45 @@ const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
   <section class="section" id="slik">
     <div class="container">
       <div class="section-head">
-        <span class="eyebrow">For familien</span>
         <h2>Slik støtter du laget</h2>
       </div>
       <div class="steps">
-        <div class="opal step"><div><h3>Åpne laget i Heia</h3><p>På Hjem eller under Sesongen finner du «Støtt laget» når klubben har aktivert støtte for laget.</p></div></div>
-        <div class="opal step"><div><h3>Se beløpet og hva laget får</h3><p>Prisen og lagets andel står svart på hvitt før du bestemmer deg.</p></div></div>
-        <div class="opal step"><div><h3>Betal trygt i Safari</h3><p>Betalingen skjer hos Stripe med kort eller Apple Pay. Du sendes rett tilbake til appen etterpå.</p></div></div>
-        <div class="opal step"><div><h3>Følg lagkassa</h3><p>Hele laget ser at kassa vokser. Du styrer avtalen din fra Profil → Min støtte.</p></div></div>
+        <div class="step"><div><h3>Åpne laget i Heia</h3><p>På Hjem eller under Sesongen finner du «Støtt laget» når klubben har aktivert støtte for laget.</p></div></div>
+        <div class="step"><div><h3>Se beløpet og hva laget får</h3><p>Prisen og lagets andel står der før du bestemmer deg.</p></div></div>
+        <div class="step"><div><h3>Betal trygt i Safari</h3><p>Betalingen skjer hos Stripe med kort eller Apple Pay. Etterpå sendes du rett tilbake til appen.</p></div></div>
+        <div class="step"><div><h3>Følg lagkassa</h3><p>Hele laget ser at kassa vokser. Du styrer avtalen din fra Profil → Min støtte.</p></div></div>
       </div>
     </div>
   </section>
 
   <section class="section" id="klubb">
     <div class="container">
-      <div class="glass-dark" style="padding:clamp(28px,5vw,64px)">
+      <div class="glass-dark match-panel">
         <div class="section-head">
-          <span class="eyebrow" style="color:var(--neon)">For klubben</span>
           <h2>Slik aktiverer klubben støtte</h2>
-          <p class="lead">Pengene går aldri til privatpersoner. Mottakeren er alltid klubben som juridisk enhet, godkjent av Heia.</p>
+          <p class="intro">Pengene går aldri til privatpersoner. Mottakeren er alltid klubben som juridisk enhet, godkjent av Heia.</p>
         </div>
-        <div class="grid grid-2" style="gap:14px">
-          <div class="notice dark"><b>1. Klubben søker fra appen</b><br />En trener eller lagleder sender inn klubbens organisasjonsnummer. Heia sjekker det mot Brønnøysundregistrene.</div>
-          <div class="notice dark"><b>2. Heia godkjenner manuelt</b><br />Vi bekrefter at søkeren har rett til å handle for klubben, og hvem som skal være betalingsansvarlig.</div>
-          <div class="notice dark"><b>3. Betalingsansvarlig kobler til utbetaling</b><br />Klubbens betalingsansvarlige gjennomfører en kort identitetskontroll hos Stripe, og legger inn klubbens konto.</div>
-          <div class="notice dark"><b>4. Lagene slås på</b><br />Betalingsansvarlig godkjenner hvilke lag i klubben som kan ta imot støtte. Da vises «Støtt laget» for familiene.</div>
-        </div>
-        <p class="mt-2" style="color:rgba(234,255,246,0.82)">Utbetaling skjer til klubbens konto via Stripe. Klubben får oversikt over lag, beløp og status i Heia. Spørsmål? <a href={`mailto:${CONTACT_EMAIL}`} style="color:var(--neon)">{CONTACT_EMAIL}</a></p>
+        <ol class="dark-steps">
+          <li><div><b>Klubben søker fra appen</b><span>En trener eller lagleder sender inn klubbens organisasjonsnummer. Heia sjekker det mot Brønnøysundregistrene.</span></div></li>
+          <li><div><b>Heia godkjenner</b><span>Vi bekrefter at søkeren kan handle for klubben, og hvem som skal være betalingsansvarlig.</span></div></li>
+          <li><div><b>Betalingsansvarlig kobler til utbetaling</b><span>En kort identitetskontroll hos Stripe, og klubbens konto legges inn.</span></div></li>
+          <li><div><b>Lagene slås på</b><span>Betalingsansvarlig velger hvilke lag som kan ta imot støtte. Da vises «Støtt laget» for familiene.</span></div></li>
+        </ol>
+        <p class="dark-note">Utbetaling går til klubbens konto via Stripe. Klubben ser lag, beløp og status i Heia. Spørsmål? <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
       </div>
     </div>
   </section>
 
   <section class="section">
     <div class="container" style="max-width:760px">
-      <span class="eyebrow">Spørsmål om støtte</span>
+      <h2>Spørsmål om støtte</h2>
       <div class="faq mt-2">
-        <details><summary>Får jeg noe ekstra som supporter?</summary><p>Nei — og det er med vilje. Heia låser aldri funksjoner bak betaling. Du får en varm følelse og et lag som får {SUPPORT.clubNok} kr mer i måneden.</p></details>
-        <details><summary>Hvordan sier jeg opp?</summary><p>Profil → Min støtte → Administrer. Oppsigelsen stopper fremtidige trekk, og støtten løper ut perioden du allerede har betalt for.</p></details>
+        <details><summary>Får jeg noe ekstra som supporter?</summary><p>Nei, og det er med vilje. Heia låser aldri funksjoner bak betaling. Det du får, er et lag med {SUPPORT.clubNok} kr mer i kassa hver måned.</p></details>
+        <details><summary>Hvordan sier jeg opp?</summary><p>Profil → Min støtte → Administrer. Oppsigelsen stopper fremtidige trekk, og støtten løper ut perioden du har betalt for.</p></details>
         <details><summary>Kan jeg støtte flere lag?</summary><p>Ja. Hvert lag har sin egen avtale, så du kan støtte både storesøster og lillebror.</p></details>
-        <details><summary>Hvem ser at jeg gir?</summary><p>Ingen i laget. Treneren og laget ser bare summen i lagkassa. Klubbens betalingsansvarlige ser beløp per lag, ikke navn.</p></details>
-        <details><summary>Hva om jeg angrer?</summary><p>Sier du opp innen 14 dager etter at du tegnet avtalen, betaler vi tilbake det første trekket. Feil trekk refunderes alltid. Skriv til <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p></details>
-        <details><summary>Får laget pengene med en gang?</summary><p>Stripe betaler ut til klubbens konto etter sin vanlige utbetalingsplan. Lagkassa i appen viser det som er samlet inn for laget.</p></details>
+        <details><summary>Hvem ser at jeg gir?</summary><p>Ingen i laget. Treneren ser bare summen i lagkassa. Klubbens betalingsansvarlige ser beløp per lag, ikke navn.</p></details>
+        <details><summary>Hva om jeg angrer?</summary><p>Sier du opp innen 14 dager etter at du tegnet avtalen, betaler vi tilbake det første trekket. Feil trekk refunderes. Skriv til <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p></details>
+        <details><summary>Får laget pengene med en gang?</summary><p>Stripe betaler ut til klubbens konto etter sin vanlige plan. Lagkassa i appen viser det som er samlet inn for laget.</p></details>
       </div>
       <p class="mt-2 small muted">Fullstendige betingelser står i <a href="/vilkar/">vilkårene</a>.</p>
     </div>
