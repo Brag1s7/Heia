@@ -747,3 +747,36 @@ section[id] { scroll-margin-top: 100px; }
   .hero-phones { height: 430px; overflow: hidden; align-items: flex-start; -webkit-mask-image: linear-gradient(#000 72%, transparent 100%); mask-image: linear-gradient(#000 72%, transparent 100%); }
   .hero-note-m { margin-top: 6px; }
 }
+
+/* Miljømerket (punkt 108). Vises bare utenfor produksjonsverten, eller når
+   byggingen peker et annet sted enn produksjon — aldri på heiaapp.no i et
+   produksjonsbygg. Bevisst smal, så Safaris toning av verktøylinja (som
+   krever ≥80 % bredde) ikke påvirkes. */
+#env-badge[hidden] { display: none; }
+#env-badge {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  /* Under .ui-toast (60), over .ui-modal-backdrop (50): merket skal aldri
+     dekke en varseltekst, men skal synes også over en dialog. */
+  z-index: 55;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  max-width: min(86vw, 440px);
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background: var(--stadium);
+  color: #eafff6;
+  font-family: var(--display);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(5, 44, 35, 0.28);
+}
+#env-badge .env-ref { font-weight: 600; opacity: 0.66; font-size: 11px; }
+@media (min-width: 700px) { #env-badge { white-space: nowrap; } }

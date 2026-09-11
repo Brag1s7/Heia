@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css';
 import {primaryCta, CONTACT_EMAIL, LEGAL, APP_STORE_ID} from '../config';
-import {SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_STORAGE_KEY, ROLES_STORAGE_KEY, AUTH_EVENT} from '../lib/env';
+import {SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_STORAGE_KEY, ROLES_STORAGE_KEY, AUTH_EVENT, HEIA_ENV, SUPABASE_PROJECT_REF} from '../lib/env';
 
 interface Props {
   title: string;
@@ -16,6 +16,10 @@ interface Props {
 const {title, description = 'Heia — appen som samler laget og alle rundt det. Treninger, kamper, bilder og øyeblikk, så familien kan følge med og heie.', minimal = false, noindex = false} = Astro.props;
 const cta = primaryCta();
 const fullTitle = title === 'Heia' ? 'Heia' : `${title} · Heia`;
+// Miljømerket: vertsadressen avgjør om det vises, ikke byggingen — en
+// forhåndsvisning bygget mot produksjonsdata skal si fra (punkt 108).
+const PROD_HOST = new URL(Astro.site ?? 'https://heiaapp.no').hostname;
+const envLabel = HEIA_ENV === 'production' ? 'Produksjonsdata' : HEIA_ENV === 'test' ? 'Testmiljø' : 'Lokalt miljø';
 const legalLine = LEGAL.companyName && LEGAL.orgNumber
   ? `${LEGAL.companyName} · org.nr. ${LEGAL.orgNumber}${LEGAL.address ? ' · ' + LEGAL.address : ''}`
   : null;
@@ -334,5 +338,41 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
         </div>
       </div>
     </footer>
+
+    <!-- Miljømerke. Står alltid i HTML-en, men avsløres bare når nettleseren
+         IKKE er på produksjonsverten, eller når byggingen peker et annet sted
+         enn produksjon. På heiaapp.no i et produksjonsbygg er det usynlig og
+         rører ingenting. Liten pille nede til høyre, bevisst under 80 % bred
+         så Safaris toning av adresse-/verktøylinja ikke endres. Klikk skjuler
+         den ut sesjonen, så den ikke er i veien i en designgjennomgang. -->
+    <button type="button" id="env-badge" hidden data-env={HEIA_ENV} data-prod-host={PROD_HOST}>
+      <span data-env-label>{envLabel}</span>
+      <span class="env-ref">{SUPABASE_PROJECT_REF}</span>
+    </button>
+
+    <script is:inline>
+      (function () {
+        var el = document.getElementById('env-badge');
+        if (!el) return;
+        var prodHost = el.dataset.prodHost;
+        var env = el.dataset.env;
+        var host = location.hostname;
+        var onProdHost = host === prodHost || host === 'www.' + prodHost;
+        if (onProdHost && env === 'production') return;
+        if (!onProdHost && env === 'production') {
+          el.querySelector('[data-env-label]').textContent = 'Produksjonsdata utenfor ' + prodHost;
+        }
+        try {
+          if (sessionStorage.getItem('heia-env-badge') === 'skjult') return;
+        } catch (e) {}
+        el.hidden = false;
+        el.title = 'Klikk for å skjule til fanen lukkes';
+        el.addEventListener('click', function () {
+          el.hidden = true;
+          try { sessionStorage.setItem('heia-env-badge', 'skjult'); } catch (e) {}
+        });
+      })();
+    </script>
+
   </body>
 </html>

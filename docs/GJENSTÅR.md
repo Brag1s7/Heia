@@ -63,7 +63,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 
 | Skive | Innhold | Avhenger av | Punkter |
 |---|---|---|---|
-| **1** | Miljøer og databaseautorisasjon | ingenting — start her | 108, 109, 97, 111, 98, 30 |
+| **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, 113, 97, 111, 98, 30 |
 | **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | 87, 96, 107, 22 |
 | **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
@@ -465,16 +465,51 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      arkiveres først, så kanselleres abonnementene serielt uten
      fremdriftsmerking. Et lag som ikke rekker gjennom på ett forsøk,
      rekker aldri gjennom.
-108. **Nettsiden har ingen miljøseparasjon.** Prod-URL og prod-nøkkel er
-     hardkodet som fallback, så en forhåndsvisning peker på produksjon.
-109. **CI bygger ikke nettsiden.** Ingenting typesjekker `web/src`, og
-     ingen av bevisfilene kjøres automatisk.
+108. ~~**Nettsiden har ingen miljøseparasjon.**~~ **LUKKET i kode
+     2026-09-11, VENTER PÅ VERCEL-VARIABLER.** `web/src/lib/env.ts` har
+     ingen reserveverdi lenger: `PUBLIC_HEIA_ENV` (`production`/`test`/
+     `local`), `PUBLIC_SUPABASE_URL` og `PUBLIC_SUPABASE_ANON_KEY` må
+     settes, ellers stopper byggingen med en forklarende feil. Et
+     miljømerke nede til høyre viser datamiljø og prosjektreferanse på
+     alle verter unntatt heiaapp.no. Bevis: `scripts/verify-web-env.mjs`.
+     **Gjenstår før merge:** Brage setter de tre variablene i Vercel for
+     både Production og Preview — se utrullingsplanen i STATUS-HANDOFF.
+109. ~~**CI bygger ikke nettsiden.**~~ **LUKKET 2026-09-11 for nettsidens
+     del.** `.github/workflows/ci.yml` har en `web`-jobb: `astro check`
+     (typer og `.astro`-diagnostikk, 0 feil), en negativ test som krever
+     at bygging uten miljø STOPPER, bygging med eksplisitt testmiljø, og
+     `scripts/verify-web-env.mjs`. **Gjenstår:** de databasenære
+     bevisfilene (`scripts/verify-*.sql`, `verify-web-flows.mjs` m.fl.)
+     kjøres fortsatt for hånd — de trenger et testmiljø, se punkt 113.
 110. **Invitasjonskoden bruker 30 av 31 tegn** i alfabetet, og bygger på
      en vanlig tilfeldighetsgenerator, ikke en kryptografisk.
 111. **`inbox_enabled` svarer på spørsmål om andre brukere** uten å sjekke
      hvem som spør. **Lukkes IKKE av 00084** — å stenge `anon` smalner bare
      til «hvilken som helst innlogget bruker». Funksjonen har ingen
      `auth.uid()`-sjekk i det hele tatt. Se korreksjonen øverst.
+
+### Nytt fra skive 1 (2026-09-11 kveld)
+
+113. **Det finnes ikke noe testmiljø å bevise i.** Forutsetningen for å
+     kjøre 00084 og de andre databasekontrollene trygt. To veier:
+     **(a)** `supabase start` lokalt — CLI-en ligger på maskina (v2.75.0),
+     men **ingen container-motor er installert** (verken Docker Desktop,
+     OrbStack, Colima eller Podman), så den er blokkert på en
+     installasjon. **(b)** Et eget Supabase-prosjekt som testmiljø —
+     koster penger og krever Brages konto. Nettsiden er nå klar for
+     begge: `PUBLIC_HEIA_ENV=local` godtar `http://127.0.0.1:54321`,
+     `test` krever https.
+114. **Astro 5.18.2 har en åpen sårbarhetskjede** — ti rådgivninger, én
+     kritisk (XSS i `define:vars`, som Base.astro bruker), pluss `sharp`
+     og `esbuild`. `npm audit fix` krever Astro 7, altså en versjonssprang
+     med brytende endringer. Ikke utnyttbart her i dag: verdiene som går
+     gjennom `define:vars` er byggetidskonstanter, ikke brukerinndata.
+     Egen liten skive, ikke en sperre.
+115. **Appen har ingen miljømerking.** `src/lib/supabase.ts` leser
+     `Config.SUPABASE_URL!` fra `.env` uten validering eller miljønavn.
+     Et TestFlight-bygg pekt på et testprosjekt ville sett helt likt ut
+     som produksjon. Bør få samme eksplisitte miljøvalg som nettsiden når
+     punkt 113 er løst — ellers er «test på telefonen» ikke etterprøvbart.
 
 ### Avkreftet
 
@@ -491,11 +526,13 @@ Definert av Brage 2026-09-11. Hver skive er avgrenset og leveres for seg.
 
 **Start her.** Begynn med statusavklaringen øverst i denne fila, så:
 
-1. **Punkt 108–109 først.** Fjern den tause reserveverdien til
-   prod-databasen i `web/src/lib/env.ts`, gjør miljøvalget eksplisitt, og
-   få nettsiden bygget og typesjekket i CI. Kritiske databasekontroller må
-   kunne kjøres mot et separat testmiljø eller lokalt — i dag finnes ikke
-   noe slikt miljø, og det er forutsetningen for å bevise resten trygt.
+1. ~~**Punkt 108–109 først.**~~ **GJORT 2026-09-11** (kode og CI; venter
+   på Vercel-variabler før merge). Reserveverdien er borte, miljøvalget er
+   eksplisitt, nettsiden typesjekkes og bygges i CI, og bevisfila
+   `scripts/verify-web-env.mjs` kjøres automatisk. **Selve testmiljøet er
+   IKKE på plass** — det ble skilt ut som punkt 113 fordi det er blokkert
+   på en installasjon eller et kjøp, ikke på kode. Steg 2 kan forberedes,
+   men ikke bevises, før 113 er løst.
 2. **Deretter 00084** (punkt 97, 111 og de sentrale `search_path`-endringene).
    Dokumentér per funksjon: hva som endres, hvilke kallere som trenger
    tilgang, og hvilke unntak som er tilsiktet. Ta stilling til hvordan nye

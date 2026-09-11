@@ -1,6 +1,97 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 kveld — BACKENDSPORET STARTER: SKIVE 1)
+## ▶️▶️ START HER (2026-09-11 natt — SKIVE 1 STEG 1 LEVERT, VENTER PÅ VERCEL)
+
+**Skive 1, steg 1 (punkt 108 og 109) er ferdig i kode og bevist lokalt.**
+Ingenting er merget og ingenting er i drift. Det står én ting igjen som
+bare Brage kan gjøre, og den må gjøres **før** merge til `main`.
+
+### ⚠️ Gjør dette FØR PR-en merges
+
+Nettsiden har ikke lenger noen reserveverdi. Bygger Vercel uten
+miljøvariabler, **stopper byggingen**. Sett tre variabler i
+**Vercel → Project Settings → Environment Variables**, huket av for
+**både Production og Preview** (og gjerne Development):
+
+    PUBLIC_HEIA_ENV          production
+    PUBLIC_SUPABASE_URL      https://sswncdrbsrfieudkdmhj.supabase.co
+    PUBLIC_SUPABASE_ANON_KEY <anon-nøkkelen, samme som før>
+
+Anon-nøkkelen ligger i `web/.env` lokalt (git-ignorert) og i Supabase →
+Project Settings → API. Den er offentlig per design; den har alltid ligget
+i nettsidens bundle.
+
+**Risiko hvis det glemmes:** Vercel-byggingen feiler. Den *live* siden går
+ikke ned — Vercel beholder forrige vellykkede deploy på domenet. Feilen er
+altså «ny versjon kommer ikke ut», ikke «heiaapp.no er borte».
+
+**Tilbakeføring:** `git revert` av commiten. Ingen databaseendring, ingen
+Edge Function, ingen migrasjon. Variablene kan stå igjen i Vercel uten
+virkning.
+
+### Hva som faktisk ble gjort
+
+- `web/src/lib/env.ts` — hardkodet prod-URL og anon-nøkkel **fjernet**.
+  `PUBLIC_HEIA_ENV` (`production` | `test` | `local`), `PUBLIC_SUPABASE_URL`
+  og `PUBLIC_SUPABASE_ANON_KEY` er påkrevd; mangler eller ugyldig verdi gir
+  en forklarende feil som stopper byggingen. `local` er den eneste som får
+  bruke `http://` (for `supabase start`).
+- **Miljømerke** nede til høyre i `Base.astro` + `global.css`: viser
+  datamiljø og prosjektreferanse. Avsløres av **vertsadressen**, ikke av
+  byggingen — så en forhåndsvisning bygget mot produksjonsdata sier
+  «Produksjonsdata utenfor heiaapp.no». Usynlig på heiaapp.no i et
+  produksjonsbygg. Klikk skjuler det ut fanen (sessionStorage). Bevisst
+  smal og 12 px fra bunnen, så Safari-toningen fra de ni rundene ikke
+  påvirkes. Under `.ui-toast`, over `.ui-modal-backdrop`.
+- `web/.env.example` committet, `web/.env` laget lokalt (git-ignorert,
+  peker på produksjon slik `npm run dev` gjorde stille før).
+- `astro.config.mjs` — advarsel i byggeloggen når Vercel bygger en
+  forhåndsvisning mot `PUBLIC_HEIA_ENV=production`.
+- `web/package.json` — `npm run check` (`astro check`); `@astrojs/check`
+  og `typescript` lagt til som devDependencies.
+- `.github/workflows/ci.yml` — ny `web`-jobb ved siden av `js`.
+- `scripts/verify-web-env.mjs` — bevisfil, kjøres av CI.
+
+### Testbevis (alt kjørt lokalt 2026-09-11)
+
+| Kontroll | Resultat |
+|---|---|
+| `astro check` | 0 feil, 0 advarsler, 3 hint (alle tre fantes fra før) |
+| Bygging uten miljø | **stopper**, exit 1, «PUBLIC_HEIA_ENV mangler» |
+| Ukjent `PUBLIC_HEIA_ENV`, URL uten https, URL med skråstrek, tom nøkkel | stopper, én forklarende melding hver |
+| `local` + `http://127.0.0.1:54321` | bygger · `test` + http stopper |
+| Bygging med testmiljø | exit 0, 12 sider |
+| Prod-referansen i et testbygg | **ingen treff** i 12 sider og 7 bunter |
+| `verify-web-env.mjs` A–D | alt grønt; exit 1 ved brudd (mutasjonstestet) |
+| Merket per vert | skjult på `heiaapp.no`/`www.`; vises på localhost, Vercel-preview og en vert som *ligner* på heiaapp.no |
+| Øyene virker | `/konto/` monterer og tegner innloggingsskjemaet (headless Chrome) |
+| Hele `web`-jobben i CI-rekkefølge | grønn lokalt, inkludert `npm ci` |
+
+### Neste steg, og hvorfor det ikke er startet
+
+Steg 2 er **00084** (punkt 97, 111, `search_path`). Skiveplanen sier at et
+testmiljø er forutsetningen for å bevise det trygt. Det finnes ikke:
+
+- `supabase start` er **blokkert** — CLI-en ligger her (v2.75.0), men
+  maskina har **ingen container-motor** (ingen Docker, OrbStack, Colima
+  eller Podman). Krever en installasjon.
+- Et eget Supabase-testprosjekt krever Brages konto og koster penger.
+
+Det er ført som **punkt 113** i GJENSTÅR. Brage må velge vei. Til da kan
+00084 forberedes og gjennomgås, men den empiriske RLS-avklaringen
+(⚠️ under) kan ikke kjøres uten å røre prod.
+
+Nye funn ført på lista: **113** (testmiljø), **114** (Astro 5.18.2 har en
+kritisk sårbarhetskjede; krever Astro 7), **115** (appen har ingen
+miljømerking — et testbygg ville sett ut som produksjon).
+
+⚠️ **Står fortsatt før 00084 kjøres:** avklar empirisk om en funksjon brukt
+i et RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Metoden
+står i GJENSTÅR under korreksjonene. Den trenger punkt 113.
+
+---
+
+## (forrige START HER — 2026-09-11 kveld — BACKENDSPORET STARTER: SKIVE 1)
 
 **Neste prioritet er backend før pilot og lansering:** kjernefunksjoner,
 caching, databasen, betaling og koblingen app ↔ nettside. Produkt- og

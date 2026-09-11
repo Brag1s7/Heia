@@ -1,8 +1,14 @@
 # Fase B3 — CI-kallvaktene (P9 lag 5 / P13 exit-kriteriet
 # «regresjonstestene grønne i CI på hver PR»).
 #
-# Kjører KUN JS-laget: tsc (typene sjekkes ellers bare i editoren),
-# jest (inkl. regresjonsvaktene for kall-antall fra A0) og eslint.
+# To jobber:
+#   js   appen: tsc (typene sjekkes ellers bare i editoren), jest (inkl.
+#        regresjonsvaktene for kall-antall fra A0) og eslint.
+#   web  nettsiden: astro check (typer + .astro-diagnostikk), bygging med
+#        et EKSPLISITT miljø, og bevisfila for miljøseparasjonen. Lagt til
+#        2026-09-11 for punkt 108-109 i docs/GJENSTAR.md — før dette
+#        typesjekket ingenting `web/src`, og ingen bevisfil gikk automatisk.
+#
 # Ingen native bygg her — pod install/Xcode er bevisst utenfor CI
 # (etablert arbeidsregel: native bygges manuelt av Brage).
 name: CI
@@ -35,3 +41,52 @@ jobs:
 
       - name: Lint (eslint)
         run: npm run lint
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    # Bevisst falske verdier: CI skal bevise at byggingen virker og at
+    # miljøvalget følger med i artefakten, ikke snakke med en database.
+    # Ingen av dem peker på et ekte prosjekt.
+    env:
+      PUBLIC_HEIA_ENV: test
+      PUBLIC_SUPABASE_URL: https://cieksempelprosjekt.supabase.co
+      PUBLIC_SUPABASE_ANON_KEY: ci-ingen-nokkel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Installer avhengigheter
+        run: npm ci
+
+      - name: Typer og Astro-diagnostikk (astro check)
+        run: npm run check
+
+      - name: Ingen reserveverdi — bygging uten miljø MÅ stoppe
+        env:
+          PUBLIC_HEIA_ENV: ''
+          PUBLIC_SUPABASE_URL: ''
+          PUBLIC_SUPABASE_ANON_KEY: ''
+        run: |
+          if npm run build > uten-miljo.log 2>&1; then
+            echo "::error::Nettsiden bygget UTEN PUBLIC_HEIA_ENV. Reserveverdien er tilbake (punkt 108)."
+            exit 1
+          fi
+          grep -q 'PUBLIC_HEIA_ENV mangler' uten-miljo.log
+          echo "Byggingen stoppet med riktig melding."
+          rm -f uten-miljo.log
+
+      - name: Bygg nettsiden med eksplisitt miljø
+        run: npm run build
+
+      - name: Bevis miljøseparasjonen (scripts/verify-web-env.mjs)
+        working-directory: .
+        run: node scripts/verify-web-env.mjs
