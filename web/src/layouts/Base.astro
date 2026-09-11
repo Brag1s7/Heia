@@ -23,10 +23,11 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
 <html lang="nb">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#DFFFF1" />
+    <meta name="theme-color" content="#7dffcb" />
+    <meta name="color-scheme" content="light" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <meta property="og:title" content={fullTitle} />
@@ -81,8 +82,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
               <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">Få laget med</span></a>
             )}
             <button class="menu-btn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="mobile-menu" id="menu-btn">
-              <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-              <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
             </button>
           </nav>
           <div class="mobile-menu" id="mobile-menu">
@@ -115,6 +115,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
           </div>
         </div>
       </div>
+      <div class="menu-scrim" id="menu-scrim" aria-hidden="true"></div>
     </header>
 
     <!-- Kontomenyen i headeren, uten supabase-js: leser sesjonen supabase-js
@@ -214,22 +215,49 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
     <script>
       const btn = document.getElementById('menu-btn');
       const menu = document.getElementById('mobile-menu');
-      if (btn && menu) {
+      const scrim = document.getElementById('menu-scrim');
+      const header = document.querySelector('.site-header') as HTMLElement | null;
+      if (btn && menu && header) {
+        const mq = window.matchMedia('(max-width: 640px)');
+        let isOpen = false;
+        // Siden bak en åpen meny skal stå stille. iOS ignorerer overflow:hidden
+        // på body, så berøringsscroll stoppes ved kilden — men ikke inne i
+        // menyen, som kan rulle selv når den er høyere enn skjermen.
+        const lockTouch = (e: TouchEvent) => { if (!menu.contains(e.target as Node)) e.preventDefault(); };
         const set = (open: boolean) => {
+          if (open === isOpen) return;
+          isOpen = open;
           btn.setAttribute('aria-expanded', String(open));
-          if (open) menu.setAttribute('data-open', ''); else menu.removeAttribute('data-open');
+          header.toggleAttribute('data-open', open);
+          document.documentElement.toggleAttribute('data-menu-open', open);
+          if (open) document.addEventListener('touchmove', lockTouch, {passive: false});
+          else document.removeEventListener('touchmove', lockTouch);
         };
-        btn.addEventListener('click', () => set(!menu.hasAttribute('data-open')));
-        // Frost på mobilheaderen først når siden er scrollet.
-        const header = document.querySelector('.site-header') as HTMLElement | null;
-        const onScroll = () => {
-          if (!header) return;
-          if (window.scrollY > 8) header.setAttribute('data-scrolled', ''); else header.removeAttribute('data-scrolled');
-        };
-        onScroll();
-        window.addEventListener('scroll', onScroll, {passive: true});
-        menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).tagName === 'A') set(false); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+        btn.addEventListener('click', () => set(!isOpen));
+        scrim?.addEventListener('click', () => set(false));
+        menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('a')) set(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) { set(false); btn.focus(); } });
+        mq.addEventListener('change', (e) => { if (!e.matches) set(false); });
+
+        // Frost på mobilheaderen ved scroll. Der nettleseren kan, styres den
+        // kontinuerlig av scrollposisjonen i CSS (animation-timeline). Ellers
+        // en rolig tilstand med hysterese, målt én gang per frame.
+        if (!CSS.supports('animation-timeline: scroll()')) {
+          let ticking = false;
+          const onScroll = () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+              ticking = false;
+              const y = window.scrollY;
+              const scrolled = header.hasAttribute('data-scrolled');
+              if (!scrolled && y > 24) header.setAttribute('data-scrolled', '');
+              else if (scrolled && y < 4) header.removeAttribute('data-scrolled');
+            });
+          };
+          onScroll();
+          window.addEventListener('scroll', onScroll, {passive: true});
+        }
       }
     </script>
 

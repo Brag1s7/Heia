@@ -1,5 +1,52 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️ 2026-09-11 (ettermiddag) — MOBILFORSIDEN + MOBILNAVBAREN: POLISHRUNDE BYGGET, VENTER TELEFONDOM
+
+Brage ba om én samlet designrunde på mobilforsiden (<640 px) og
+hamburgermenyen. Bygget og riggbevist (Chrome 360/430 + ekte iOS-Safari i
+simulatoren, iPhone 17 Pro), tre bilder sendt. Desktop er urørt bortsett
+fra delt copy (overlinje + brødtekst).
+
+- **Hero:** eyebrow m/ glødeprikk → overlinje «Idrettsglede for alle»
+  (`.tagline`, ren typografi + 2 px neon-understrek). Brødtekst kortet ned
+  (laglivet + fellesskap + frivillig støtte). Mobil: primærknapp i full
+  bredde, «Slik fungerer Heia ˅» som kompakt tekstlenke, fire piller →
+  én stille linje «Gratis å bruke · Lukkede lag · Ingen annonser»
+  (`.trust`), pilotnoten flyttet UNDER telefonen (`.hero-note-m`). Mobil
+  viser Hjem-feeden (ikke kampskjermen); telefonens overkant ligger ~500
+  px ned på 393/402 px bredde = synlig i første viewport.
+  `.m-only`/`.m-hide` er nye globale hjelpeklasser.
+- **Header:** frost i `.bar::before` som tones med opacity (backdrop-filter
+  kan ikke tones selv). Kontinuerlig via `animation-timeline: scroll()`
+  der det finnes (Safari 26/Chrome), ellers JS m/ hysterese (24/4 px) og
+  rAF. Myk scroll-kant (14 px maske) i stedet for strek. Hamburger = tre
+  linjer som morfer til kryss, `:active` på pointer-down.
+  `padding-top: env(safe-area-inset-top)` + `viewport-fit=cover`.
+- **Meny:** samme materiale som baren, kant til kant (`top: calc(100% - 1px)`),
+  scrim (`.menu-scrim`, fixed, dempet grønn) + `touchmove`-lås utenfor
+  menyen (iOS ignorerer overflow:hidden). Inn/ut samme vei (translateY
+  -10 px + opacity), reduced-motion/-transparency dekket.
+- **Den grønne stripen** i Brages telefonbilde var vannrett overflow:
+  `.hero-glow` hadde `inset: -10%` sideveis, og `overflow-x: hidden` på
+  body alene stopper ikke iOS. Nå `overflow-x: clip` på html+body og
+  gløden uten sideoverheng.
+- **Statusfeltet i Safari:** målt i simulatoren — Safari maler status- og
+  verktøyfeltet med DOKUMENTETS bakgrunnsfarge, ikke theme-color. html
+  bærer nå `#7dffcb` (toppen av grunnen målt #62ffc3–#88ffcc), body er
+  gjennomsiktig (ellers dekker body-bakgrunnen `.ground`), theme-color
+  samme verdi.
+- Riggen: `scripts/web-shot.mjs` + `xcrun simctl openurl booted …` /
+  `simctl io booted screenshot` (simulatoren kan ikke trykke — åpen meny
+  er bevist i Chrome-emulering, ikke WebKit). `npx astro build` grønn.
+- **IKKE gjort:** reisetesten (51/51) er ikke kjørt på nytt (selektorene
+  `#menu-btn`/`.mobile-menu`/`visible()` er uendret); glødeprikk-eyebrow
+  står igjen i seksjonene under heroen (utenfor skiva).
+
+**NESTE:** Brages telefondom på de tre bildene → evt. runde 2 → så PR
+Brage→main (d4c1649 + denne) som i punktet under.
+
+---
+
 ## ▶️▶️ START HER (2026-09-11 — NETTSIDEN: PR #53 MERGET OG I PROD, `/ops` LIVE, `claim-notify` DEPLOYET, INNLOGGING I HEADEREN BYGGET — VENTER NY MERGE)
 
 **Gjort i denne økta (alt pushet til `origin/Brage`):**

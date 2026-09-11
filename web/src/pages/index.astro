@@ -4,33 +4,37 @@ import Phone from '../components/Phone.astro';
 import {primaryCta, CONTACT_EMAIL, SUPPORT, EXAMPLE_MONTH, EXAMPLE_YEAR, nok} from '../config';
 const cta = primaryCta();
 const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget vårt vil prøve Heia')}`;
+const pilotNote = `Heia er i pilot på iPhone. ${cta.href.startsWith('mailto') ? 'Send oss en e-post om laget, så tar vi dere med.' : cta.note}`;
 const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
 ---
 <Base title="Heia">
   <!-- 1. Hero -->
   <section class="hero">
     <div class="container split">
-      <div>
-        <span class="eyebrow">Appen for laget og alle rundt det</span>
+      <div class="hero-copy">
+        <p class="tagline">Idrettsglede for alle</p>
         <h1>Tettere på laget.</h1>
-        <p class="lead">Treninger, kamper, bilder og små og store øyeblikk — samlet på ett sted, så familien kan følge med, heie og kommentere. Og de som vil, kan gi laget et fast, frivillig bidrag hver måned.</p>
+        <p class="lead">Alt som skjer i laget – treninger, kamper, bilder og øyeblikk – samlet på ett sted. Alle rundt laget kan følge, heie og kommentere. De som vil, kan også støtte laget.</p>
         <div class="cta">
           <a class="btn btn-primary" href={cta.href}>{cta.label}</a>
-          <a class="btn btn-ghost" href="#slik">Slik fungerer Heia</a>
+          <a class="btn btn-ghost m-hide" href="#slik">Slik fungerer Heia</a>
+          <a class="link-more m-only" href="#slik">Slik fungerer Heia<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></a>
         </div>
-        <p class="note">Heia er i pilot på iPhone. {cta.href.startsWith('mailto') ? 'Send oss en e-post om laget, så tar vi dere med.' : cta.note}</p>
-        <div class="chips">
+        <p class="note m-hide">{pilotNote}</p>
+        <div class="chips m-hide">
           <span class="chip neon">Gratis å bruke</span>
           <span class="chip">Frivillig støtte til laget</span>
           <span class="chip">Lukkede lag</span>
           <span class="chip">Ingen annonser</span>
         </div>
+        <p class="trust m-only"><span>Gratis å bruke</span><span>Lukkede lag</span><span>Ingen annonser</span></p>
       </div>
       <div class="hero-phones">
         <div class="hero-glow" aria-hidden="true"></div>
         <Phone variant="feed" />
         <Phone variant="match" />
       </div>
+      <p class="note hero-note-m m-only">{pilotNote}</p>
     </div>
   </section>
 
