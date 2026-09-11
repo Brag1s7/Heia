@@ -1,6 +1,57 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 sen kveld — NETTSIDEN RUNDE 2: MER SYNLIG PRODUKT OG LAGLIV, PUSHET, VENTER BRAGES DOM PÅ PREVIEW FØR MERGE)
+## ▶️▶️ START HER (2026-09-11 kveld — BACKENDSPORET STARTER: SKIVE 1)
+
+**Neste prioritet er backend før pilot og lansering:** kjernefunksjoner,
+caching, databasen, betaling og koblingen app ↔ nettside. Produkt- og
+designretningen er godkjent og skal beholdes.
+
+### Les i denne rekkefølgen
+1. **`docs/GJENSTÅR.md`** — arbeidslista. Toppen har «Der vi står — hva som
+   FAKTISK kjører», skiveplanen, de tatte beslutningene og to korreksjoner.
+2. **`docs/GJENSTÅR.md` § «Skivene i detalj»** — skive 1 er første oppgave.
+3. Denne fila er **historikk**. Søk her når du trenger hvorfor noe ble som
+   det ble; ikke les den forfra.
+
+### Tilstanden i ett blikk (målt kl. 20, ikke antatt)
+- `Brage` = `ac16eb5`, **4 commits foran `main`**, rent tre, pushet.
+- **Ingen av kveldens fikser er i drift.** Nettsiden kjører `main`
+  (`318305e`); `stripe-checkout` står på v10 fra 19. august, så
+  **dobbeltbetalingsfiksen er ikke deployet**; databasen står på `00082`, så
+  `00083` og `00084` er ikke kjørt. Eneste ting som ER i drift fra i kveld:
+  `WEB_INVITE_BASE_URL`.
+- **TestFlight 1.0 (4) er fra 18. august** og mangler Broadcast, cold start,
+  hele designsporet og delelinken. Derfor er punkt 31 blokkert, og derfor
+  kan ytelsesfiksene 88–89 ikke måles før 1.0 (5).
+
+### Avtaler som gjelder
+- Arbeidsgren `Brage` → push → Vercel-preview → **Brage merger selv**.
+  `gh` er ikke innlogget; PR opprettes fra compare-lenken.
+- **Produksjonsendringer forberedes fullt ut** med testbevis og en konkret
+  utrullings- og tilbakeføringsplan, og legges fram for godkjenning.
+  Auto-mode-klassifisereren blokkerer DDL mot prod fra Claudes side — Brage
+  kjører `supabase db push` og `supabase functions deploy`.
+- Bevisfil kjøres **før** `db push`, ikke etter (regelen fra 00075-bommen).
+- Telefonkontroll samles i korte testløp når den faktisk trengs.
+- Nye funn utenfor skiven føres på lista, ikke fikses underveis.
+
+### Første oppgave
+**Skive 1, steg 1:** punkt 108–109 — fjern den tause reserveverdien til
+prod-databasen i `web/src/lib/env.ts`, gjør miljøvalget eksplisitt, og få
+nettsiden bygget og typesjekket i CI (`.github/workflows/ci.yml` dekker i
+dag bare appen). Et separat testmiljø er forutsetningen for å bevise
+00084 trygt i steg 2.
+
+⚠️ **Før 00084 kjøres:** avklar empirisk om en funksjon brukt i et
+RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Svaret
+avgjør om `is_team_member` kan revokes fra `authenticated`. Metoden står i
+GJENSTÅR under korreksjonene.
+
+Ny samtale er trygg å starte herfra.
+
+---
+
+## (forrige START HER — 2026-09-11 sen kveld — NETTSIDEN RUNDE 2: MER SYNLIG PRODUKT OG LAGLIV)
 
 **Tilstand:** `Brage` er ren og pushet, foran `main` uten PR — Brage
 oppretter/merger selv (`gh` er ikke innlogget). Vercel lager preview av
@@ -50,32 +101,8 @@ synlig produkt og lagliv med den kortere teksten. Levert i ÉN commit (se
   header/meny-markup og -skript er urørt i denne runden.
 
 **Riggen:** `scripts/web-shot.mjs` m/ `eval: window.scrollTo({top:N,
-behavior:"instant"})` for viewport-bilder (sips-crop er upålitelig),
-`fullPage:true` for hele siden, `session` + `eval` (heia-web-roles +
-`heia:auth`) for innlogget header. Ekte WebKit: `xcrun simctl openurl
-booted "http://localhost:4321/?v=N#anker"` (cache-bust m/ query) +
-`simctl io booted screenshot`.
-
-**NETTSIDEN ER LUKKET:** Brage merget PR #55 2026-09-11 17:47, og begge
-designrundene er live på heiaapp.no (verifisert: alle flater svarer 200,
-runde 2-markup og demobildene serveres). Branchen er 0 foran og 38 bak
-main — oppdater den fra main før neste kodearbeid.
-
-**▶️ ARBEIDSLISTA BOR NÅ I `docs/GJENSTÅR.md`** (opprettet 2026-09-11):
-86 punkter i 13 seksjoner, samlet fra denne fila, de ni andre
-plandokumentene, koden og minnene, og verifisert mot repo, prod-DB og
-Supabase. DENNE fila er historikken; GJENSTÅR er hva som skal gjøres.
-Kritisk sti: Heia AS → D-U-N-S → Apple-konvertering og Stripe live-KYC →
-live-nøkler → App Store. Eneste harde blokkere mot App Store er de
-juridiske plassholderne og personvernetikettene.
-
-**Anbefalt neste steg: TestFlight 1.0 (5).** Byggnummeret i repoet står
-på 3 mens 1.0 (4) er lastet opp, så det MÅ bumpes til 5 før arkivering.
-
-Ny samtale er trygg å starte herfra.
 
 ---
-
 
 ## (forrige START HER — 2026-09-11 kveld — NETTSIDEN: SAMLET SPRÅK-/LENGDE-/DESIGNRUNDE + MENYFEILEN RETTET)
 

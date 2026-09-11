@@ -12,22 +12,118 @@ kodearbeid.
 
 ---
 
-## Der vi står
+## Der vi står — hva som FAKTISK kjører
 
-| | |
-|---|---|
-| Nettsiden | Live i prod, PR #55 merget 2026-09-11 17:47 |
-| Appen | TestFlight **1.0 (4)** fra 2026-08-18, hos interne + venner og familie |
-| Backend | Migrasjoner t.o.m. `00082` og alle 13 Edge Functions deployet |
-| Prod-bruk | 21 lag · 18 brukere · 821 innlegg · 114 hendelser · 5 aktive støtteavtaler |
-| CI | Kjører `tsc`, `jest` og lint på 92 testfiler |
+_Målt 2026-09-11 kl. 20. Et punkt er ikke i drift fordi koden er pushet.
+Hvert lag deployes for seg._
 
-**Kritisk sti:** Heia AS → D-U-N-S → Apple-konvertering og Stripe live-KYC →
-live-nøkler → App Store-innsending. Alt annet kan gjøres parallelt i testmodus.
+| Lag | I drift nå | Nyere lokalt |
+|---|---|---|
+| **Nettsiden** heiaapp.no | `main` = `318305e` (17:47) | `Brage` er **4 commits foran**. Ingen av kveldens nettsidefikser er live — verifisert: AASA serverer fortsatt `/stott*` og `/betaling*`, `robots.txt` gir 404, og bare Vercels egen HSTS står. |
+| **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · `claim-notify` v8 (11. sep) | **Dobbeltbetalingsfiksen er IKKE deployet.** Koden er committet, funksjonen er ikke. Krever `supabase functions deploy`. |
+| **Databasen** | migrasjoner t.o.m. **`00082`** | `00083` og `00084` er skrevet med bevisfiler, **ikke kjørt**. |
+| **Secrets** | `WEB_INVITE_BASE_URL` satt 11. sep kveld | Eneste ting fra i kveld som ER i drift. |
+| **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
+| **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
 
-**De eneste harde blokkerne mot App Store** er punkt 4 (juridiske
-plassholdere) og punkt 27 (personvernetiketter). Resten er kvalitet, ikke
-sperrer.
+### Det installerte bygget er eldre enn nesten alt
+
+Bygg 1.0 (4) er fra **18. august**. Alt dette kom etterpå og finnes derfor
+**ikke** på noen telefon i dag:
+
+- **26. aug** `8adca43` sesjonskontekst og runtime-config (S2)
+- **30. aug** `b053cce` cold start (S7) · `e4c4b6d` Broadcast-backend (S3a)
+- **1. sep** `df8f0d8` Broadcast i kamp (S3b) · `20d54ef` feed, varsler og kampknapp (S3c)
+- **2.–10. sep** hele designsporet, feedkortet, kampskjermen runde 2, sesongsiden
+- **11. sep** `0e43741` delelinken til heiaapp.no
+
+**To konsekvenser som må styre rekkefølgen:**
+
+1. **Punkt 31 (fjerne `postgres_changes`-publikasjonen) vil BRYTE alle
+   installerte bygg.** 1.0 (4) har ingen Broadcast-klient og leser ikke
+   `runtime_config` i det hele tatt — den bruker `postgres_changes` som
+   hardkodet oppførsel. Publikasjonen kan først tømmes når et bygg med
+   Broadcast er ute og gammel-andelen er ~0. `min_build` (finnes i
+   `runtime_config`, konsumeres ikke ennå) er verktøyet for å måle det.
+2. **Ytelsesfiksene 88 og 89 kan ikke måles før 1.0 (5).** De ligger i kode
+   som ingen telefon kjører.
+
+**Kritisk sti til lansering:** Heia AS → D-U-N-S → Apple-konvertering og
+Stripe live-kontroll → live-nøkler → App Store.
+
+**Harde sperrer mot App Store:** punkt 4 (juridiske plassholdere) og
+punkt 27 (personvernetiketter). Ingen andre.
+
+---
+
+## Prioritert arbeidsrekkefølge (fire skiver)
+
+Avtalt med Brage 2026-09-11. Backend-arbeidet tas i ny samtale.
+Avhengighetene er reelle — skivene kan ikke byttes om fritt.
+
+| Skive | Innhold | Avhenger av | Punkter |
+|---|---|---|---|
+| **1** | Miljøer og databaseautorisasjon | ingenting — start her | 108, 109, 97, 111, 98, 30 |
+| **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | 87, 96, 107, 22 |
+| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
+| **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
+
+### Beslutninger som ER tatt (ikke relitigér)
+
+- **Punkt 99, kaldstart:** appen skal kunne åpne så snart brukerkonteksten
+  er etablert, uten å vente på livekamp-oppslaget. Kampstatus lastes i
+  bakgrunnen. Ukjent eller feilet oppslag betyr **ikke** «ingen kamp», og et
+  sent svar skal ikke flytte brukeren. Dyplenker til kamp og gjenopptakelse
+  av reporterflyten må fortsatt lande riktig.
+- **Punkt 97, dørene:** katalogdrevet oppslag av signaturer er riktig
+  retning. Men funksjonsutvalget og rettighetene må dokumenteres per
+  funksjon — se korreksjonen under.
+- **Punkt 107, deaktivering:** må tåle avbrudd og kunne fortsette, og det
+  må gjøres **før** ekte betalinger åpnes, uavhengig av lagstørrelse.
+- **Produkt- og designretningen er godkjent og skal beholdes.** Ingen av
+  skivene endrer utseende eller oppførsel som er telefongodkjent.
+
+### Arbeidsmåte (avtalt)
+
+- Én avgrenset skive om gangen: kartlegg kallere og dataveier, implementer
+  sammenhengende, kjør målrettede tester, gjør en egen kritisk gjennomgang.
+- Produksjonsendringer forberedes **fullt ut** med testbevis og en konkret
+  utrullings- og tilbakeføringsplan, og legges fram for godkjenning før de
+  kjøres. Jeg ble blokkert av auto-mode-klassifisereren på å skrive DDL mot
+  prod — regn med at Brage kjører selve pushen.
+- Arbeidsgren `Brage` → push → Vercel-preview → Brage merger selv. `gh` er
+  ikke innlogget; PR opprettes av Brage fra compare-lenken.
+- Nye funn utenfor skiven føres her på lista, ikke fikses underveis.
+- Telefonkontroll samles i korte, konkrete testløp når den er nødvendig.
+- Avslutt hver skive med: hva endret seg, hvilke tester gikk, hva er i
+  drift, hva trenger Brages telefon eller godkjenning, og neste steg.
+
+### To korreksjoner fra kontrollen mot prod
+
+**Punkt 22 var feil og er strøket.** Splitten ER låst. Prod viser
+`fee_model = fixed_club_amount`, `club_fixed_minor = 6000` og
+`amount_minor = 7900` på alle aktive tilbud. `fee_bps = 2405` er ikke en
+25 %-plassholder, men den avledede prosenten som gir nøyaktig 19 kr av 79.
+Dokumentene som sier «bps 2500 plassholder» er utdaterte. **60 kr fast til
+klubben gjelder.** Ikke endre betalingsmodellen.
+
+**Punkt 111 løses IKKE av 00084 — GPT har rett.** `inbox_enabled(p_user,
+p_team, p_category)` har ingen `auth.uid()`-sjekk overhodet. Å stenge
+`anon` smalner den bare fra «hvem som helst på internett» til «hvilken som
+helst innlogget Heia-bruker», som fortsatt kan slå opp andres
+varselinnstillinger. Dette avdekker en svakhet i migrasjonen slik den står:
+den gir `authenticated` til ALLE 25 uniformt. Det er riktig for
+bruker-RPC-er, men galt for **interne hjelpere** som `inbox_enabled`,
+`is_team_member`, `is_team_admin` og `is_club_team_admin` — de kalles fra
+triggere og policyer som kjører som eier, og mønsteret i repoet sier at
+slike skal revokes fra alle tre roller.
+
+⚠️ **Må avklares empirisk før 00084 kjøres:** trenger en funksjon som
+brukes i et RLS-uttrykk EXECUTE for rollen som kjører spørringen? Hvis ja,
+kan ikke `is_team_member` revokes fra `authenticated`, og da må skillet
+mellom bruker-RPC og intern hjelper settes for hånd. Test i en transaksjon
+som rulles tilbake: revoke, kjør en `select` mot en RLS-beskyttet tabell
+som `authenticated`, se om den feiler, rull tilbake.
 
 ---
 
@@ -92,8 +188,11 @@ er aldri sett på en telefon.
 20. **Brage — Ridabu gjennom KYC på nytt.** Dagens konto er sandbox.
 21. **Én ekte betaling som røyktest**, med verifisering av pengeveien i
     databasen.
-22. **Splitten er ikke låst.** Ridabu-offeringen har `bps 2500` som
-    plassholder. Fase 6 låser den, og en endring krever ny versjon.
+22. ~~**Splitten er ikke låst.**~~ **STRØKET 2026-09-11** — kontrollert mot
+    prod: alle aktive tilbud har `fee_model = fixed_club_amount`,
+    `club_fixed_minor = 6000`, `amount_minor = 7900`. `fee_bps = 2405` er den
+    avledede prosenten som gir 19 kr av 79, ikke en plassholder. 60 kr fast
+    til klubben gjelder.
 23. **Brage og regnskapsfører — fire avklaringer:** MVA på Heia-andelen,
     disputepolicy som tekst, standard for statement descriptor, og
     varslingsflyt når et lag avvikles.
@@ -125,8 +224,11 @@ er aldri sett på en telefon.
     intern sjekk framfor på rollen. Bevisst utsatt fordi en feil her betyr at
     mål ikke kan rapporteres midt i en kamp. Krever egen skive med egen
     telefonkontroll. Lesestien er riktig lukket.
-31. **S4 — tømme `postgres_changes`-publikasjonen.** Hele flåten kjører
-    Broadcast, men den gamle publikasjonen står igjen som dual-run.
+31. **S4 — tømme `postgres_changes`-publikasjonen.** ⚠️ **BLOKKERT av det
+    installerte bygget.** 1.0 (4) er fra 18. august og har ingen
+    Broadcast-klient — den leser ikke engang `runtime_config`. Tømmes
+    publikasjonen nå, mister alle installerte bygg sanntid. Først etter at
+    et bygg med Broadcast er ute og gammel-andelen er målt til ~0.
 32. **S5 — indekser med planbevis.** Ikke startet.
 33. **S6 — mediavalidering i storage** (D5). Skal være på plass før offentlig
     lansering.
@@ -370,7 +472,9 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 110. **Invitasjonskoden bruker 30 av 31 tegn** i alfabetet, og bygger på
      en vanlig tilfeldighetsgenerator, ikke en kryptografisk.
 111. **`inbox_enabled` svarer på spørsmål om andre brukere** uten å sjekke
-     hvem som spør. Lukkes av 00084.
+     hvem som spør. **Lukkes IKKE av 00084** — å stenge `anon` smalner bare
+     til «hvilken som helst innlogget bruker». Funksjonen har ingen
+     `auth.uid()`-sjekk i det hele tatt. Se korreksjonen øverst.
 
 ### Avkreftet
 
@@ -379,17 +483,83 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      migrasjonsfila. Prod har 10 MB og fire bildetyper. Migrasjonsfila er
      bare ikke oppdatert. Lærdom: sjekk alltid mot prod, ikke mot filene.
 
+## Skivene i detalj
+
+Definert av Brage 2026-09-11. Hver skive er avgrenset og leveres for seg.
+
+### Skive 1 — Kontroll på miljøene og databaseautorisasjonen
+
+**Start her.** Begynn med statusavklaringen øverst i denne fila, så:
+
+1. **Punkt 108–109 først.** Fjern den tause reserveverdien til
+   prod-databasen i `web/src/lib/env.ts`, gjør miljøvalget eksplisitt, og
+   få nettsiden bygget og typesjekket i CI. Kritiske databasekontroller må
+   kunne kjøres mot et separat testmiljø eller lokalt — i dag finnes ikke
+   noe slikt miljø, og det er forutsetningen for å bevise resten trygt.
+2. **Deretter 00084** (punkt 97, 111 og de sentrale `search_path`-endringene).
+   Dokumentér per funksjon: hva som endres, hvilke kallere som trenger
+   tilgang, og hvilke unntak som er tilsiktet. Ta stilling til hvordan nye
+   funksjoner skal unngå samme utilsiktede tilgang senere — en test eller
+   en lint som feiler når en ny SECURITY DEFINER-funksjon er anon-åpen.
+3. **Bevis begge veier.** Ikke bare at uvedkommende avvises, men at
+   legitime handlinger fungerer: trener- og reporterroller, opprette
+   hendelse, starte kamp, rapportere og korrigere mål, medlemsadministrasjon,
+   og tilgang på tvers av lag.
+4. **Migrasjonen rører funksjoner som brukes i RLS og sanntid.** Test
+   berørte lese- og sanntidsflyter, og kompatibilitet med bygg 1.0 (4).
+5. **Punkt 111 særskilt** — se korreksjonen øverst. Å stenge `anon` er ikke
+   nok.
+6. **Punkt 98 planlegges i grupper**, ikke som én stor migrasjon.
+   Punkt 31 røres ikke (se avhengigheten der).
+
+### Skive 2 — Betaling og varsler tåler avbrudd
+
+- **Punkt 87:** verifiser idempotensfiksen med parallelle forespørsler,
+  avbrutte svar og lovlige nye forsøk etter utløp. Kontroller samsvar
+  mellom abonnementer hos Stripe og radene våre. **Merk at fiksen ikke er
+  deployet** — `stripe-checkout` står på v10 fra 19. august.
+- **Punkt 96 (00083):** riktig mottakergruppe, gjentatte webhook-kall skal
+  ikke gi dublett, og feil i varslingen skal ikke velte betalingsstatusen.
+  Triggeren har en exception-fanger for nettopp dette; bevis at den virker.
+- **Punkt 107 er flyttet opp.** Deaktivering må tåle avbrudd og kunne
+  fortsette med uferdige kanselleringer. Det skal være tydelig når
+  deaktivering pågår, og «fullført» skal bety at kanselleringene er
+  bekreftet. Før ekte betalinger åpnes, uavhengig av lagstørrelse.
+- **Punkt 22 er avklart** og krever ikke arbeid. Se korreksjonen øverst.
+
+### Skive 3 — Oppstart, nettverk og caching
+
+- **Punkt 99** etter den avklarte retningen øverst. Lokal cache knyttes til
+  riktig bruker og lag; serveren kontrollerer fortsatt handlingstillatelser.
+- **Punkt 40 samtidig.** Nettverksfeil skal gi en forståelig vei videre. Ved
+  skrivehandlinger må vi tåle at serveren fullførte selv om klienten ikke
+  fikk svar, slik at nye forsøk ikke gir doble mål, innlegg eller betalinger.
+- **Punkt 104 først av målepunktene** — vakten må virke før den brukes.
+- **Mål 88 og 89 i et ekte bygg.** De kan ikke måles før 1.0 (5).
+- **Deretter 100 og 103** (unødvendige kall), så **102 og 101** etter hva
+  målingene faktisk viser. Bevar godkjent utseende og oppførsel.
+
+### Skive 4 — Hele reisen på telefon og nett
+
+- Klargjør 1.0 (5) med riktige flagg og de ferdige endringene (punkt 5–7, 73).
+- Kort gjennomkjøring: invitasjon, innlogging, roller, klubboppsett, støtte,
+  kamp, utlogging — app og nett.
+- **Punkt 49:** avklar hva fjerning fra et lag skal bety når personen
+  fortsatt kjenner koden.
+- **Punkt 43–45:** pek ut hvilke blindveier som må løses før pilotlagene
+  bruker Heia selvstendig.
+- **Punkt 94, 105, 106:** prioriter etter realistiske lastmålinger. Hundre
+  medlemmer er ikke en bevist grense. Logget bortfall av varsler er
+  fortsatt bortfall.
+
+---
+
 ## Anbefalt rekkefølge
 
-1. **TestFlight 1.0 (5)** (punkt 5 til 7). Gir hele designsporet på telefonen,
-   låser opp invitasjonsreisen, og gjør telefontestene i seksjon C mulige.
-2. **Start AS-sporet** (punkt 1 til 3) parallelt. Lengst ledetid, blokkerer alt
-   kommersielt.
-3. **Telefontestene i seksjon C** mens bygget er ferskt.
-4. **Hullene i seksjon G** som er ekte feil, særlig punkt 42 og 43.
-5. **Pre-launch-pakka** (punkt 30 til 34) mens AS-et modnes.
-6. **App Store-materialet** (punkt 26) og **selskapsopplysningene** (punkt 4)
-   rett før innsending.
+Erstattet av skiveplanen over. Rekkefølgen er: **skive 1 → 2 → 3 → 4**, med
+AS-sporet (punkt 1–3) startet parallelt fra dag én fordi det har lengst
+ledetid og blokkerer alt kommersielt.
 
-Ryddeskivene i seksjon I og designrestansene i seksjon H blokkerer ingenting.
-De tas når du vil, og «Øyeblikkene» er den som betyr mest for opplevelsen.
+Ryddeskivene i seksjon I og designrestansene i seksjon H blokkerer
+ingenting. De tas når Brage vil, og «Øyeblikkene» (punkt 57) er den som
+betyr mest for opplevelsen.
