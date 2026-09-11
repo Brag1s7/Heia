@@ -42,7 +42,8 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
       <div class="container">
         <div class="bar">
           <a class="logo" href="/" aria-label="Heia — til forsiden">
-            <img src="/img/logo-green-wordmark.png" alt="Heia" />
+            <img class="logo-d" src="/img/logo-green-wordmark.png" alt="Heia" />
+            <img class="logo-m" src="/img/logo-deep-wordmark.png" alt="Heia" />
           </a>
           {!minimal && (
             <>
@@ -52,7 +53,8 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
                 <a href="/hjelp/">Hjelp</a>
                 <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">Få laget med</span></a>
                 <button class="menu-btn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="mobile-menu" id="menu-btn">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                  <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                  <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
                 </button>
               </nav>
               <div class="mobile-menu" id="mobile-menu">
@@ -62,6 +64,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
                 <a href="/#kom-i-gang">Kom i gang</a>
                 <a href="/hjelp/">Hjelp</a>
                 <a href="/om/">Om Heia</a>
+                <div class="menu-cta"><a class="btn btn-primary" href={cta.href}>{cta.label}</a></div>
               </div>
             </>
           )}
@@ -86,6 +89,14 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
           if (open) menu.setAttribute('data-open', ''); else menu.removeAttribute('data-open');
         };
         btn.addEventListener('click', () => set(!menu.hasAttribute('data-open')));
+        // Frost på mobilheaderen først når siden er scrollet.
+        const header = document.querySelector('.site-header') as HTMLElement | null;
+        const onScroll = () => {
+          if (!header) return;
+          if (window.scrollY > 8) header.setAttribute('data-scrolled', ''); else header.removeAttribute('data-scrolled');
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, {passive: true});
         menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).tagName === 'A') set(false); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
       }

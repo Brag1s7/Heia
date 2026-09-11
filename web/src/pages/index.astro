@@ -53,7 +53,7 @@ const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
       <div class="opal card" style="padding:30px">
         <span class="eyebrow">Slik regner det seg</span>
         <div class="pricebadge mt-2"><b>{SUPPORT.priceNok} kr i måneden — {SUPPORT.clubNok} kr til laget</b><span>Mer enn tre av fire kroner går til laget. Resten dekker Heia, betaling og drift.</span></div>
-        <div class="bar" aria-hidden="true"><i style={`width:${clubPct}%`}></i><b style={`width:${100 - clubPct}%`}></b></div>
+        <div class="split-bar" aria-hidden="true"><i style={`width:${clubPct}%`}></i><b style={`width:${100 - clubPct}%`}></b></div>
         <div class="legend"><span>{SUPPORT.clubNok} kr til laget</span><span class="heia">{SUPPORT.heiaNok} kr Heia + betaling + drift</span></div>
         <div class="calc" aria-label="Regneeksempel">
           <div class="row"><span>{SUPPORT.exampleSupporters} støttespillere rundt laget</span><b>× {SUPPORT.clubNok} kr</b></div>
