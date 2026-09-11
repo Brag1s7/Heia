@@ -43,7 +43,11 @@
    en fast (viewport-forankret) gradient på html: navbarens mint øverst,
    grunnens kremfarge nederst — toppen matcher navbaren, bunnen får ingen
    farge utover grunnen. */
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #f5f8e9 linear-gradient(180deg, #93fccf 0%, #93fccf 20%, #f5f8e9 55%, #f5f8e9 100%) fixed; overflow-x: hidden; overflow-x: clip; }
+/* Canvasen er FLAT krem i hele dokumentet (iOS tiler en root-gradient
+   nedover og leser canvasen for verktøylinja nederst — målt på Brages
+   telefon 2026-09-11), med mint bare i de øverste 200 px av dokumentet så
+   toppen matcher navbaren. */
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #f5f8e9 linear-gradient(#93fccf, #93fccf) no-repeat top / 100% 200px; overflow-x: hidden; overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
@@ -65,6 +69,7 @@ body {
 /* Tint-striper for Safari 26 (se Base.astro): faste, i kantsonene, bak
    grunnen. Ikke opacity:0 (samples likevel) — de ligger under .ground. */
 .tint { display: none; position: fixed; left: 0; width: 100%; z-index: -2; pointer-events: none; }
+.tint-bottom { z-index: 0; }
 .tint-top { top: 0; height: 6px; background-color: #93fccf; }
 .tint-bottom { bottom: -8px; height: 14px; background-color: #f5f8e9; }
 @media (max-width: 640px) { .tint { display: block; } }
