@@ -198,22 +198,35 @@ beforeEach(() => {
   mockGetUnreadCount.mockResolvedValue(5);
 });
 
-afterEach(() => {
+afterEach(async () => {
   // Avmonter FØRST: et tre som fortsatt står, rekker å sende kall inn i
   // neste test. `act` svelges her — er treet alt borte, er det ingenting
   // å gjøre, og en feil i oppryddingen skal ikke skjule testens eget svar.
+  // Avmonteringen MÅ skje inne i `act`. Uten den utsetter React 19
+  // opprydningen av effektene, og `QueryObserver.destroy` kjører da FØRST
+  // etter `clear()` under. En observatør som ødelegges etter tømmingen
+  // kaller `Query.removeObserver → scheduleGc` på en spørring cachen ikke
+  // lenger kjenner, og den gc-timeren (gcTime = 5 min) er det ingen igjen
+  // til å rydde. Målt: fire slike overlevde, og prosessen ble liggende
+  // 5:02 på 0 % CPU etter at testene var ferdige.
   try {
-    mountedRoot?.unmount();
+    await act(async () => {
+      mountedRoot?.unmount();
+    });
   } catch {}
   mountedRoot = undefined;
   abandonSessionContext();
+  // KANSELLER FØR TØMMING — samme årsak som i feedRefetch: `clear()` alene
+  // fjerner spørringene, men ikke en retryer som ligger og sover (appens
+  // `retry: 1` venter ett sekund før nytt forsøk). Tømmes cachen mens den
+  // sover, våkner den foreldreløs, kjører `Query.fetch` på nytt, og
+  // `Query.fetch` planlegger en `scheduleGc` på `gcTime` = 5 minutter. Den
+  // timeren eies av ingen og holder Nodes hendelsesløkke i live.
+  // Målt her før fiksen: testene tok 35 og 24 ms, veggklokka 5:02, 0 % CPU.
+  await queryClient.cancelQueries();
   queryClient.clear();
 });
 
-// 5 s er jests standard, og den er en ANTAGELSE OM MASKINVARE, ikke en
-// kontrakt testen skal håndheve. Lokalt går hele fila på ~1,5 s; på GitHubs
-// tokjerners runner brukte denne ene testen over 5 s og tidsavbrøt. 20 s gir
-// takhøyde på treg maskinvare og fanger fortsatt en ekte henging.
 test('frø-boot fyrer ingen enkeltkall mens konteksten er i flukt — og bruker svaret når det lander', async () => {
   const rpc = deferredRpc();
   // TeamContext har startet kontekst-kallet (frø-boot) …
@@ -257,7 +270,7 @@ test('frø-boot fyrer ingen enkeltkall mens konteksten er i flukt — og bruker 
   expect(mockGetUnreadCount).not.toHaveBeenCalled();
   expect(mockRpc).toHaveBeenCalledTimes(1);
   home.unmount();
-}, 20_000);
+});
 
 test('kontekstfeil: fallback-enkeltkallene starter ETTER forsøket, ingen deadlock', async () => {
   const rpc = deferredRpc();

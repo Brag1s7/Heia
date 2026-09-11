@@ -214,10 +214,28 @@ function Harness() {
 // feiler midtveis (da hadde neste test hengt på ekte async uten at noen
 // flytter klokka). Query-cachen tømmes av samme grunn: en events-cache fra
 // forrige test ville gjort neste tests kallbudsjett løgnaktig lavt.
-afterEach(() => {
+afterEach(async () => {
   jest.useRealTimers();
+  // KANSELLER FØR TØMMING. `clear()` alene fjerner spørringene, men ikke en
+  // retryer som allerede ligger og sover: appens `retry: 1` gjør at en
+  // feilet henting venter ett sekund før nytt forsøk. Tømmer vi cachen i
+  // mellomtiden, våkner retryeren foreldreløs, kjører `Query.fetch` på nytt,
+  // og `Query.fetch` planlegger en `scheduleGc` på `gcTime` — 5 minutter,
+  // appens bevisste standard (`src/lib/queries/queryClient.ts`). Den timeren
+  // eies da av ingen, og holder Nodes hendelsesløkke i live i fem minutter
+  // etter at testene er ferdige.
+  //
+  // Målt før fiksen: jest rapporterte 2 s, veggklokka 5:04 med 0 % CPU, og
+  // `process.getActiveResourcesInfo()` viste fire ventende `Timeout`.
+  // Stakksporene endte i `retryer.sleep` (1000 ms) og
+  // `Query.fetch → scheduleGc` (300000 ms).
+  //
+  // `cancelQueries()` avbryter hentingene MENS de fortsatt står i cachen, og
+  // da finnes det ingen foreldreløs retryer igjen til å planlegge noe nytt.
+  await queryClient.cancelQueries();
   queryClient.clear();
 });
+
 
 test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', async () => {
   jest.useFakeTimers();
@@ -341,10 +359,6 @@ test('TeamHome med bilde i feeden: signering er ÉN batch, reactions ÉN runde',
   });
 });
 
-// Fire faser i én test (reaksjon, post-patch, ny side, resync etter
-// reconnect). 5 s er jests standard og en ANTAGELSE OM MASKINVARE: lokalt
-// går den på ~1 s, på GitHubs tokjerners runner brukte fila 20 s og denne
-// testen tidsavbrøt. 40 s gir takhøyde og fanger fortsatt en ekte henging.
 test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt innlegg, resync ved reconnect', async () => {
   jest.useFakeTimers();
   const {supabase, __fire, __reconnect} = jest.requireMock(
@@ -508,7 +522,7 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();
   });
-}, 40_000);
+});
 
 // ---------------------------------------------------------------------------
 // «DEL MED LAGET» ER EN PERMANENT INNGANG (P4, skive 10)
