@@ -71,7 +71,21 @@ figuren i neon, PNG innbakt), `favicon-32.png`, `apple-touch-icon.png`,
 `icon-192/512.png`, `site.webmanifest`. theme-color tilbake til #dffff1
 (Instagram-toppen Brage likte).
 
-**NESTE:** Brages telefondom på runde 3 → PR Brage→main.
+**RUNDE 4 (samme dag):** Brage: toppen ble HVIT på ekte iPhone (den leser
+html-fargen LIVE — simulatoren fryser den; skript-fargen #f5f8e9 vant) →
+skript-styring FJERNET, én fast `html{background:#93fccf}` = navbarens
+frost. Menyen bygget om til ekte rull: `.mobile-menu` er grid m/
+`grid-template-rows: 0fr→1fr` (`.menu-inner` min-height 0 + overflow
+hidden), `top: 100%` under baren; baren får menymaterialet i eget slør
+`.site-header::after` (transition) uavhengig av scrollfrosten `::before`
+(animasjon) → ingen hopp ved lukking; hårstrek av når åpen. Scrim og
+.ground strekker seg bak Safari-linja (-240 px). ÅPENT: «hvit/grønn flate i
+bunnen ved scroll opp / trykk på meny» — Safari-linjas egen bakgrunn tar
+sidens farge; Brage sendte skjermbilde som IKKE kom fram (for stort) — be
+om det på nytt (mindre). Simulatorfakta: med scrim åpen ble bunnfeltet
+kremhvitt (#dee8d9), ellers html-fargen.
+
+**NESTE:** Brages skjermbilde av bunnen → diagnose → PR Brage→main.
 
 ---
 

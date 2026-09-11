@@ -91,6 +91,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
         </div>
       </div>
       <div class="mobile-menu" id="mobile-menu">
+        <div class="menu-inner">
         {!minimal ? (
           <>
             <a href="/#slik">Slik fungerer Heia</a>
@@ -116,6 +117,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
         <div class="menu-cta">
           <a class="btn btn-ghost" href="/konto/" data-auth="out">Logg inn</a>
           {!minimal && <a class="btn btn-primary" href={cta.href}>{cta.label}</a>}
+        </div>
         </div>
       </div>
       <div class="menu-scrim" id="menu-scrim" aria-hidden="true"></div>
@@ -245,13 +247,9 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
         // Frost på mobilheaderen ved scroll. Der nettleseren kan, styres den
         // kontinuerlig av scrollposisjonen i CSS (animation-timeline); ellers
         // av data-scrolled (hysterese), målt én gang per frame.
-        // iOS-Safari (målt): statusfeltet = html-bakgrunnen fra stilarket ved
-        // første tegning (navbarens frost); bunnlinja = html-bakgrunnen LIVE.
-        // Live-fargen settes til grunnens lyse bunn på mobil, så Safari-linja
-        // nederst aldri blir mint.
-        const applyCanvas = () => { document.documentElement.style.backgroundColor = mq.matches ? '#f5f8e9' : ''; };
-        applyCanvas();
-        mq.addEventListener('change', applyCanvas);
+        // Safari maler status- og verktøyfelt med html-bakgrunnen (ekte
+        // iPhone leser den live, simulatoren fryser den ved første tegning):
+        // én fast farge i stilarket = navbarens frost. Ingen skript her.
         const cssFrost = CSS.supports('animation-timeline: scroll()');
         let ticking = false;
         const onScroll = () => {
