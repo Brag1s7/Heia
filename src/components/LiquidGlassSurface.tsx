@@ -7,6 +7,8 @@ import {
   View,
   requireNativeComponent,
   type LayoutChangeEvent,
+  type DimensionValue,
+  type ImageStyle,
   type StyleProp,
   type ViewProps,
   type ViewStyle,
@@ -455,10 +457,16 @@ export function SilverOptics({
   const seed = React.useRef(Math.random()).current;
   const flipX = seed < 0.5;
   const shift = Math.round(((seed * 13) % 1) * 40) - 20;
-  const texSize = `${Math.round(SILVER.cloud.scale * 100)}%`;
-  const texOffset = `${-Math.round(((SILVER.cloud.scale - 1) / 2) * 100)}%`;
-  const textureStyle = {
-    position: 'absolute' as const,
+  // DimensionValue på selve variabelen: uten annotasjonen utleder TS bred
+  // `string`, og da hjelper det ikke at objektet under er en ImageStyle.
+  const texSize: DimensionValue = `${Math.round(SILVER.cloud.scale * 100)}%`;
+  const texOffset: DimensionValue = `${-Math.round(
+    ((SILVER.cloud.scale - 1) / 2) * 100,
+  )}%`;
+  // ImageStyle som kontekst: uten den blir `${n}%` bred `string`, som
+  // ikke er en DimensionValue. Ren typeannotasjon — verdiene er de samme.
+  const textureStyle: ImageStyle = {
+    position: 'absolute',
     left: texOffset,
     top: texOffset,
     width: texSize,
@@ -797,10 +805,10 @@ export function ArenaOptics({cornerRadius}: {cornerRadius: number}) {
   const flipX = seed < 0.5 ? -1 : 1;
   const flipY = (seed * 7) % 1 < 0.5 ? -1 : 1;
   const shift = Math.round(((seed * 13) % 1) * 40) - 20;
-  const size = `${Math.round(A.scale * 100)}%`;
-  const offset = `${-Math.round(((A.scale - 1) / 2) * 100)}%`;
-  const textureStyle = {
-    position: 'absolute' as const,
+  const size: DimensionValue = `${Math.round(A.scale * 100)}%`;
+  const offset: DimensionValue = `${-Math.round(((A.scale - 1) / 2) * 100)}%`;
+  const textureStyle: ImageStyle = {
+    position: 'absolute',
     left: offset,
     top: offset,
     width: size,
@@ -1034,6 +1042,23 @@ export const LIQUID_GLASS_SUPPORTED = iosMajor >= 26;
  * gjenkjenneren måler i kortets eget rom og kortet følger fingeren.
  * Uten native (Android/eldre iOS) bruker kortet `useGlassPress` i JS.
  */
+// `requireNativeComponent` registrerer viewet i RN-registeret én gang per
+// app-økt; Fast Refresh evaluerer denne modulen på nytt og ville kastet
+// «Tried to register two views with the same name». Derfor caches
+// komponenten globalt, som RN-biblioteker gjør.
+type GlassGlobal = {__heiaLiquidGlass?: React.ComponentType<NativeProps>};
+const glassGlobal = globalThis as unknown as GlassGlobal;
+const NativeGlass = LIQUID_GLASS_SUPPORTED
+  ? (glassGlobal.__heiaLiquidGlass ??= requireNativeComponent<NativeProps>(
+      'HeiaLiquidGlassView',
+    ))
+  : null;
+
+// MERK: `NativeGlass` over MÅ deklareres før denne linja. Sto den under,
+// leste `GLASS_PRESS_NATIVE` variabelen i dens temporale dødsone. Verdien
+// ble tilfeldigvis riktig (`undefined !== null` er true, og på iOS 26 er
+// den riktige verdien også true), men den var riktig ved et uhell — og
+// `tsc` stoppet på den. Ren omstokking; samme verdi i alle miljøer.
 export const GLASS_PRESS_NATIVE =
   LIQUID_GLASS_SUPPORTED && NativeGlass !== null;
 
@@ -1048,7 +1073,10 @@ export function GlassPressSensor({
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 }) {
-  if (!GLASS_PRESS_NATIVE) {
+  // `!NativeGlass` i tillegg til flagget: de er sanne sammen (flagget ER
+  // `… && NativeGlass !== null`), men TS kan ikke utlede det på tvers av
+  // to konstanter, og uten den er `NativeGlass` mulig null i JSX-en under.
+  if (!GLASS_PRESS_NATIVE || !NativeGlass) {
     return <View style={style}>{children}</View>;
   }
   return (
@@ -1091,17 +1119,6 @@ export function useLiquidGlassActive(): boolean {
   return FEED_LIQUID_GLASS_AB && LIQUID_GLASS_SUPPORTED && !reduceTransparency;
 }
 
-// `requireNativeComponent` registrerer viewet i RN-registeret én gang per
-// app-økt; Fast Refresh evaluerer denne modulen på nytt og ville kastet
-// «Tried to register two views with the same name». Derfor caches
-// komponenten globalt, som RN-biblioteker gjør.
-type GlassGlobal = {__heiaLiquidGlass?: React.ComponentType<NativeProps>};
-const glassGlobal = globalThis as unknown as GlassGlobal;
-const NativeGlass = LIQUID_GLASS_SUPPORTED
-  ? (glassGlobal.__heiaLiquidGlass ??= requireNativeComponent<NativeProps>(
-      'HeiaLiquidGlassView',
-    ))
-  : null;
 
 /** Se `HeiaPearlView` i HeiaLiquidGlassView.h — alle tall i PEARL_NATIVE. */
 interface PearlNativeProps extends ViewProps {

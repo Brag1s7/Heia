@@ -162,6 +162,11 @@ export function KalenderScreen() {
     setRefreshing(true);
     // Eksplisitt brukerhandling hopper over staleTime.
     eventsQuery.refetch().finally(() => setRefreshing(false));
+    // `refetch` er stabil i TanStack Query; hele `eventsQuery` er det ikke.
+    // Tar vi med objektet, lages `onRefresh` på nytt hver gang status eller
+    // data endrer seg — altså midt under en pull-to-refresh. Avhengigheten
+    // er med vilje snevrere enn regelen vil ha den.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventsQuery.refetch]);
 
   // -------------------------------------------------------------------------

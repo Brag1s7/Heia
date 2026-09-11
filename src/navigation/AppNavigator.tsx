@@ -462,7 +462,12 @@ export function MainTabs() {
   // Runde 2 (2026-09-07): kampsiden er LYS (dagslysgrunn), så kapselen står
   // i lyst miljø overalt. `match`-miljøet beholdes i TabBarGlass for et
   // eventuelt mørkt rom senere.
-  const environment: TabBarEnvironment = 'light';
+  // `as TabBarEnvironment` og ikke bare annotasjonen: TS smalner en `const`
+  // med literal-initialisering til `'light'` i flytanalysen, og da leser den
+  // `environment === 'match'` under som en umulig sammenligning. Castet holder
+  // den deklarerte typen i live, så `match`-grenene får stå slik kommentaren
+  // over sier de skal. Ingen kjøretidsendring — verdien er `'light'`.
+  const environment = 'light' as TabBarEnvironment;
   const tabBarStyle = useMemo(
     () =>
       TAB_BAR_GLASS_AB

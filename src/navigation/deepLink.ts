@@ -59,11 +59,15 @@ export function openJoinTeamCode(code: string): void {
       return;
     }
     if (rootRoutes.includes('Profil')) {
-      navigationRef.navigate('Profil', {
+      // Samme unnslipp som linja over: en nøstet navigering til et barn i
+      // en annen stack lar seg ikke uttrykke i `RootParamList`. `as never`
+      // sto her før, men det gjorde argumentlista til `["Profil", never]`,
+      // som ikke passer noen overload. Kjøretiden er den samme.
+      (navigationRef as any).navigate('Profil', {
         screen: 'JoinTeamCode',
         params: {prefillCode: code},
         initial: false,
-      } as never);
+      });
       return;
     }
     pendingJoinCode = code;

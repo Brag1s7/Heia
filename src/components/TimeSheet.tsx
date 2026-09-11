@@ -5,6 +5,7 @@ import {
   Pressable,
   Animated,
   StyleSheet,
+  type ScrollView,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
@@ -215,8 +216,10 @@ function Wheel({
   // render kjøres mens hjulet er i bevegelse.
   const scrollY = useRef(new Animated.Value(initialOffset)).current;
 
-  const scrollRef =
-    useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
+  // `ScrollView` direkte, ikke `ComponentRef<typeof Animated.ScrollView>`:
+  // den sistnevnte løser seg i RN 0.83 til `ScrollView | LegacyRef<ScrollView>`,
+  // og da finnes ikke `scrollTo` på typen. Instansen er den samme.
+  const scrollRef = useRef<ScrollView>(null);
 
   /**
    * Verdiene er TRYKKBARE, ikke bare rullbare.

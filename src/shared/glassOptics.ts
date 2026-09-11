@@ -221,6 +221,20 @@ export const FEED_FROST = {
   neon: 0.14,
   /** Indre topphøylys 1,5 pt under kanten. */
   highlight: 0.16,
+  /**
+   * Topphøylys og bunnskygge i det NATIVE frostlaget (`frostTop`/`frostBottom`
+   * i `HeiaLiquidGlassView`). Verdiene er nøyaktig de native standardene
+   * (`_frostTop = 0.24`, `_frostBottom = 0.09` i HeiaLiquidGlassView.m).
+   *
+   * De manglet her, mens JSX-en leste `FEED_FROST.top`/`.bottom` — altså
+   * `undefined`. Under Paper utelates udefinerte props fra props-diffen, så
+   * de native standardene gjaldt uansett. Å skrive dem ned her endrer
+   * derfor ingenting som tegnes; det gjør bare tokenet ærlig og samler
+   * tallene ett sted. (Laget er dessuten skjult i dag: `native` er `false`,
+   * så `frost` er alltid `false` og `_frostView` er `hidden`.)
+   */
+  top: 0.24,
+  bottom: 0.09,
   /** Kantstrøkene (FEED_EDGES) — 0–1. */
   edge: 1,
   /** Spekularbåndet som glir med scrollen (native). 0 = av. Se FEED_SPECULAR. */
