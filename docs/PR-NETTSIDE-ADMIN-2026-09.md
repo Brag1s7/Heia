@@ -42,6 +42,18 @@ fire React-øyer mot samme Supabase-prosjekt som appen:
   parkeres gjennom innlogging (flush ved rotbytte).
 - `InviteCodeCard`: delearket deler https-lenken + koden.
 
+## Status 2026-09-11 (PR #53 merget og i prod — NY PR trengs for `d4c1649`)
+
+PR #53 er merget og live på heiaapp.no. Punkt 1–3 under er gjort: `/ops/`
+og `/ops/claims/<uuid>` svarer 200 i prod, `claim-notify` er deployet
+(v7, `WEB_BASE_URL` var satt fra før). Ny commit `d4c1649` på `Brage`
+legger innlogging og admin-innganger i headeren («Logg inn» i PC-meny og
+hamburger; «Min konto»-meny med Heia-admin/Klubbetalinger etter roller og
+«Logg ut»; arbeidsflatene får Forsiden/Hjelp + kontomeny; «Heia Ops» →
+«Heia-admin»). Reisetest i headless Chrome
+`scripts/verify-web-login-journey.mjs` 51/51. **Opprett ny PR fra samme
+compare-lenke og merge for å publisere.**
+
 ## Status 2026-09-11 kveld (siste commit `09a697e` på `Brage`)
 
 Alt under er committet og pushet. Mobilheaderen er lagt om (fullbredde,
@@ -92,10 +104,13 @@ fra maskinen (`npx vercel login` + `npx vercel link` i `web/` gir det).
 
 ## Gjenstående publiseringspunkter (i rekkefølge)
 
-1. **Merge til main** → Vercel prod-deploy. Sjekk at deployen går grønt og
-   at `/ops/claims/<uuid>` svarer 200 (rewrite).
+1. ✅ **Merge til main** (PR #53) → Vercel prod-deploy grønn; `/ops/` og
+   `/ops/claims/<uuid>` svarer 200 (rewrite virker). **Ny merge trengs for
+   `d4c1649` (innlogging i headeren).**
 2. ✅ Vercel Pro er på plass (2026-09-11).
-3. `supabase functions deploy claim-notify` (ops-lenker → web).
+3. ✅ `supabase functions deploy claim-notify` — v7 deployet 2026-09-11,
+   `WEB_BASE_URL=https://heiaapp.no` var satt → ops-lenken i e-posten er
+   `https://heiaapp.no/ops/claims/<id>`.
 4. **Aktiver invitasjonsreisen** når Brage har prøvd `/invitasjon` selv:
    `supabase secrets set WEB_INVITE_BASE_URL=https://heiaapp.no/invitasjon`
    → deretter `WEB_INVITE_LANDING_LIVE = true` i `src/shared/flags.ts` og

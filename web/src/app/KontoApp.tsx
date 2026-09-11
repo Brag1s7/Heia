@@ -48,7 +48,7 @@ export default function KontoApp() {
           <ul className="mt-1" style={{paddingLeft: 22, color: 'var(--ink-2)', display: 'grid', gap: 6}}>
             <li><b>Klubbetalinger</b> — for klubbens betalingsansvarlige: lagforespørsler, Stripe-oppsett, roller og historikk.</li>
             <li><b>Invitasjoner</b> — «Bli betalingsansvarlig» aksepteres her, med lenken fra e-posten.</li>
-            <li><b>Heia Ops</b> — Heias egen arbeidsflate for søknader og roller.</li>
+            <li><b>Heia-admin</b> — Heias egen arbeidsflate for søknader, klubber og roller.</li>
           </ul>
         </Card>
       </div>
@@ -72,7 +72,7 @@ export default function KontoApp() {
               <li><a className="ui-item link" href="/klubb/"><span><b>Klubbetalinger</b><small>Lagforespørsler, Stripe-oppsett, betalingsansvarlige og historikk</small></span><span>→</span></a></li>
             )}
             {roles.ops && (
-              <li><a className="ui-item link" href="/ops/"><span><b>Heia Ops</b><small>Søknader, klubber og roller</small></span><span>→</span></a></li>
+              <li><a className="ui-item link" href="/ops/"><span><b>Heia-admin</b><small>Søknader, klubber og roller</small></span><span>→</span></a></li>
             )}
             {!roles.manager && !roles.ops && (
               <li className="ui-empty">Kontoen din har ingen roller på web ennå. Laget ditt finner du i Heia-appen. Er du invitert som betalingsansvarlig, åpner du lenken fra e-posten.</li>

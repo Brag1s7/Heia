@@ -1,11 +1,13 @@
 ---
 import '../styles/global.css';
 import {primaryCta, CONTACT_EMAIL, LEGAL, APP_STORE_ID} from '../config';
+import {SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_STORAGE_KEY, ROLES_STORAGE_KEY, AUTH_EVENT} from '../lib/env';
 
 interface Props {
   title: string;
   description?: string;
-  /** true = ingen synlig header/footer-nav ut over det minimale (broer). */
+  /** true = arbeidsflate (konto/ops/klubb …): ingen markedsmeny eller CTA,
+   *  men Forsiden/Hjelp og kontomenyen står. */
   minimal?: boolean;
   /** Ingen tredjeparts- eller ekstra-skript på siden (invitasjon o.l.). */
   noindex?: boolean;
@@ -21,11 +23,15 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
 <html lang="nb">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#DFFFF1" />
+    <meta name="theme-color" content="#93fccf" />
+    <meta name="color-scheme" content="light" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
@@ -37,45 +43,183 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
   </head>
   <body>
     <div class="ground" aria-hidden="true"></div>
+    <!-- Safari 26 (iOS) toner status-/adressefeltet og verktøylinja etter
+         faste elementer inntil 4 px fra toppen / 3 px fra bunnen, ≥80 % brede,
+         ≥3 px høye, med background-color (pseudo-elementer, theme-color og
+         skript etter første tegning ignoreres). To usynlige striper bak
+         grunnen gir toppen navbarens mint og bunnen grunnens kremfarge. -->
+    <div class="tint tint-top" aria-hidden="true"></div>
+    <div class="tint tint-bottom" aria-hidden="true"></div>
 
-    <header class="site-header">
+    <header class="site-header" data-minimal={minimal ? '' : undefined}>
       <div class="container">
         <div class="bar">
           <a class="logo" href="/" aria-label="Heia — til forsiden">
             <img class="logo-d" src="/img/logo-green-wordmark.png" alt="Heia" />
             <img class="logo-m" src="/img/logo-deep-wordmark.png" alt="Heia" />
           </a>
-          {!minimal && (
-            <>
-              <nav aria-label="Hovedmeny">
+          <nav aria-label="Hovedmeny">
+            {!minimal ? (
+              <>
                 <a href="/#slik" class="hide-m">Slik fungerer Heia</a>
                 <a href="/stott-laget/">Støtt laget</a>
                 <a href="/hjelp/">Hjelp</a>
-                <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">Få laget med</span></a>
-                <button class="menu-btn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="mobile-menu" id="menu-btn">
-                  <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-                  <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-                </button>
-              </nav>
-              <div class="mobile-menu" id="mobile-menu">
-                <a href="/#slik">Slik fungerer Heia</a>
-                <a href="/#bidra">Sammen får laget til mer</a>
-                <a href="/stott-laget/">Støtt laget</a>
-                <a href="/#kom-i-gang">Kom i gang</a>
+              </>
+            ) : (
+              <>
+                <a href="/">Forsiden</a>
                 <a href="/hjelp/">Hjelp</a>
-                <a href="/om/">Om Heia</a>
-                <div class="menu-cta"><a class="btn btn-primary" href={cta.href}>{cta.label}</a></div>
+              </>
+            )}
+            {/* Uinnlogget: «Logg inn». Innlogget: «Min konto»-menyen med
+                innganger etter rettigheter. Skiftet gjøres av skriptet under,
+                som leser sesjonen supabase-js har lagret. */}
+            <a class="nav-login" href="/konto/" data-auth="out">Logg inn</a>
+            <details class="acct" data-auth="in" hidden>
+              <summary aria-label="Min konto">
+                <span>Min konto</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+              </summary>
+              <div class="acct-menu">
+                <div class="acct-who"><b data-acct-name></b><small data-acct-email></small></div>
+                <a href="/konto/">Min konto</a>
+                <a href="/ops/" data-role="ops" hidden>Heia-admin</a>
+                <a href="/klubb/" data-role="manager" hidden>Klubbetalinger</a>
+                <button type="button" data-signout>Logg ut</button>
               </div>
-            </>
-          )}
-          {minimal && (
-            <nav aria-label="Meny">
-              <a href="/hjelp/">Hjelp</a>
-            </nav>
-          )}
+            </details>
+            {!minimal && (
+              <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">Få laget med</span></a>
+            )}
+            <button class="menu-btn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="mobile-menu" id="menu-btn">
+              <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
+            </button>
+          </nav>
         </div>
       </div>
+      <div class="mobile-menu" id="mobile-menu">
+        <div class="menu-inner">
+        {!minimal ? (
+          <>
+            <a href="/#slik">Slik fungerer Heia</a>
+            <a href="/#bidra">Sammen får laget til mer</a>
+            <a href="/stott-laget/">Støtt laget</a>
+            <a href="/#kom-i-gang">Kom i gang</a>
+            <a href="/hjelp/">Hjelp</a>
+            <a href="/om/">Om Heia</a>
+          </>
+        ) : (
+          <>
+            <a href="/">Forsiden</a>
+            <a href="/hjelp/">Hjelp</a>
+          </>
+        )}
+        <div class="menu-account" data-auth="in" hidden>
+          <div class="menu-who">Innlogget som <b data-acct-name></b></div>
+          <a href="/konto/">Min konto</a>
+          <a href="/ops/" data-role="ops" hidden>Heia-admin</a>
+          <a href="/klubb/" data-role="manager" hidden>Klubbetalinger</a>
+          <button type="button" data-signout>Logg ut</button>
+        </div>
+        <div class="menu-cta">
+          <a class="btn btn-ghost" href="/konto/" data-auth="out">Logg inn</a>
+          {!minimal && <a class="btn btn-primary" href={cta.href}>{cta.label}</a>}
+        </div>
+        </div>
+      </div>
+      <div class="menu-scrim" id="menu-scrim" aria-hidden="true"></div>
     </header>
+
+    <!-- Kontomenyen i headeren, uten supabase-js: leser sesjonen supabase-js
+         lagrer i localStorage, spør de to rolle-RPC-ene med brukerens token og
+         husker svaret per bruker. Øyene sender AUTH_EVENT ved endring. -->
+    <script is:inline define:vars={{SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_STORAGE_KEY, ROLES_STORAGE_KEY, AUTH_EVENT}}>
+      (function () {
+        var header = document.querySelector('.site-header');
+        if (!header) return;
+        function all(sel, fn) { header.querySelectorAll(sel).forEach(fn); }
+        function readSession() {
+          try {
+            var raw = localStorage.getItem(AUTH_STORAGE_KEY);
+            if (!raw) return null;
+            var s = JSON.parse(raw);
+            return s && s.access_token && s.user && s.user.id ? s : null;
+          } catch (e) { return null; }
+        }
+        function readRoles(uid) {
+          try {
+            var r = JSON.parse(localStorage.getItem(ROLES_STORAGE_KEY) || 'null');
+            return r && r.uid === uid ? r : null;
+          } catch (e) { return null; }
+        }
+        function applyRoles(r) {
+          all('[data-role="ops"]', function (el) { el.hidden = !(r && r.ops); });
+          all('[data-role="manager"]', function (el) { el.hidden = !(r && r.manager); });
+        }
+        function rpc(name, token) {
+          return fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, {
+            method: 'POST',
+            headers: {apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json'},
+            body: '{}',
+          }).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          }).then(function (v) { return v === true; });
+        }
+        var inflight = null;
+        function fetchRoles(s) {
+          if (inflight) return;
+          inflight = Promise.all([rpc('is_ops_admin', s.access_token), rpc('is_payment_manager_anywhere', s.access_token)])
+            .then(function (v) {
+              var r = {uid: s.user.id, ops: v[0], manager: v[1], at: Date.now()};
+              try { localStorage.setItem(ROLES_STORAGE_KEY, JSON.stringify(r)); } catch (e) {}
+              var now = readSession();
+              if (now && now.user.id === s.user.id) applyRoles(r);
+            })
+            .catch(function () {})
+            .then(function () { inflight = null; });
+        }
+        function render() {
+          var s = readSession();
+          all('[data-auth="out"]', function (el) { el.hidden = !!s; });
+          all('[data-auth="in"]', function (el) { el.hidden = !s; });
+          if (!s) { applyRoles(null); return; }
+          var meta = s.user.user_metadata || {};
+          var name = meta.display_name || s.user.email || '';
+          all('[data-acct-name]', function (el) { el.textContent = name; });
+          all('[data-acct-email]', function (el) { el.textContent = s.user.email || ''; });
+          applyRoles(readRoles(s.user.id));
+          // Utløpt token gir 401 — da står cachen til øya har fornyet sesjonen
+          // (den sender AUTH_EVENT, og vi spør på nytt).
+          if (!s.expires_at || s.expires_at * 1000 > Date.now() + 5000) fetchRoles(s);
+        }
+        function signOut() {
+          var s = readSession();
+          var done = function () {
+            try { localStorage.removeItem(AUTH_STORAGE_KEY); localStorage.removeItem(ROLES_STORAGE_KEY); } catch (e) {}
+            location.href = '/';
+          };
+          all('[data-signout]', function (el) { el.disabled = true; });
+          var viaIsland = window.__heiaSignOut;
+          var p = viaIsland
+            ? viaIsland()
+            : s
+              ? fetch(SUPABASE_URL + '/auth/v1/logout', {method: 'POST', headers: {apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token}})
+              : Promise.resolve();
+          Promise.resolve(p).catch(function () {}).then(done);
+        }
+        all('[data-signout]', function (el) { el.addEventListener('click', signOut); });
+        render();
+        window.addEventListener(AUTH_EVENT, render);
+        window.addEventListener('storage', function (e) { if (e.key === AUTH_STORAGE_KEY) render(); });
+
+        var acct = header.querySelector('details.acct');
+        if (acct) {
+          document.addEventListener('click', function (e) { if (acct.open && !acct.contains(e.target)) acct.open = false; });
+          document.addEventListener('keydown', function (e) { if (e.key === 'Escape') acct.open = false; });
+        }
+      })();
+    </script>
 
     <main>
       <slot />
@@ -83,22 +227,52 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
     <script>
       const btn = document.getElementById('menu-btn');
       const menu = document.getElementById('mobile-menu');
-      if (btn && menu) {
+      const scrim = document.getElementById('menu-scrim');
+      const header = document.querySelector('.site-header') as HTMLElement | null;
+      if (btn && menu && header) {
+        const mq = window.matchMedia('(max-width: 640px)');
+        let isOpen = false;
+        // Siden bak en åpen meny skal stå stille. iOS ignorerer overflow:hidden
+        // på body, så berøringsscroll stoppes ved kilden — men ikke inne i
+        // menyen, som kan rulle selv når den er høyere enn skjermen.
+        const lockTouch = (e: TouchEvent) => { if (!menu.contains(e.target as Node)) e.preventDefault(); };
         const set = (open: boolean) => {
+          if (open === isOpen) return;
+          isOpen = open;
           btn.setAttribute('aria-expanded', String(open));
-          if (open) menu.setAttribute('data-open', ''); else menu.removeAttribute('data-open');
+          header.toggleAttribute('data-open', open);
+          document.documentElement.toggleAttribute('data-menu-open', open);
+          if (open) document.addEventListener('touchmove', lockTouch, {passive: false});
+          else document.removeEventListener('touchmove', lockTouch);
         };
-        btn.addEventListener('click', () => set(!menu.hasAttribute('data-open')));
-        // Frost på mobilheaderen først når siden er scrollet.
-        const header = document.querySelector('.site-header') as HTMLElement | null;
+        btn.addEventListener('click', () => set(!isOpen));
+        scrim?.addEventListener('click', () => set(false));
+        menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).closest('a')) set(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) { set(false); btn.focus(); } });
+        mq.addEventListener('change', (e) => { if (!e.matches) set(false); });
+
+        // Frost på mobilheaderen ved scroll. Der nettleseren kan, styres den
+        // kontinuerlig av scrollposisjonen i CSS (animation-timeline); ellers
+        // av data-scrolled (hysterese), målt én gang per frame.
+        // Safari maler status- og verktøyfelt med html-bakgrunnen (ekte
+        // iPhone leser den live, simulatoren fryser den ved første tegning):
+        // én fast farge i stilarket = navbarens frost. Ingen skript her.
+        const cssFrost = CSS.supports('animation-timeline: scroll()');
+        let ticking = false;
         const onScroll = () => {
-          if (!header) return;
-          if (window.scrollY > 8) header.setAttribute('data-scrolled', ''); else header.removeAttribute('data-scrolled');
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            ticking = false;
+            const y = window.scrollY;
+            const scrolled = header.hasAttribute('data-scrolled');
+            if (!scrolled && y > 24) header.setAttribute('data-scrolled', '');
+            else if (scrolled && y < 4) header.removeAttribute('data-scrolled');
+          });
         };
+        if (!cssFrost) header.setAttribute('data-js-frost', '');
         onScroll();
         window.addEventListener('scroll', onScroll, {passive: true});
-        menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).tagName === 'A') set(false); });
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
       }
     </script>
 
@@ -125,6 +299,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
               <li><a href="/hjelp/">Hjelp og spørsmål</a></li>
               <li><a href="/vilkar/">Vilkår for bruk</a></li>
               <li><a href="/personvern/">Personvern</a></li>
+              <li><a href="/konto/">Logg inn</a></li>
               <li><a href={`mailto:${CONTACT_EMAIL}`}>Kontakt oss</a></li>
             </ul>
           </div>

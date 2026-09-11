@@ -1,5 +1,188 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️ 2026-09-11 (ettermiddag) — MOBILFORSIDEN + MOBILNAVBAREN: POLISHRUNDE BYGGET, VENTER TELEFONDOM
+
+Brage ba om én samlet designrunde på mobilforsiden (<640 px) og
+hamburgermenyen. Bygget og riggbevist (Chrome 360/430 + ekte iOS-Safari i
+simulatoren, iPhone 17 Pro), tre bilder sendt. Desktop er urørt bortsett
+fra delt copy (overlinje + brødtekst).
+
+- **Hero:** eyebrow m/ glødeprikk → overlinje «Idrettsglede for alle»
+  (`.tagline`, ren typografi + 2 px neon-understrek). Brødtekst kortet ned
+  (laglivet + fellesskap + frivillig støtte). Mobil: primærknapp i full
+  bredde, «Slik fungerer Heia ˅» som kompakt tekstlenke, fire piller →
+  én stille linje «Gratis å bruke · Lukkede lag · Ingen annonser»
+  (`.trust`), pilotnoten flyttet UNDER telefonen (`.hero-note-m`). Mobil
+  viser Hjem-feeden (ikke kampskjermen); telefonens overkant ligger ~500
+  px ned på 393/402 px bredde = synlig i første viewport.
+  `.m-only`/`.m-hide` er nye globale hjelpeklasser.
+- **Header:** frost i `.bar::before` som tones med opacity (backdrop-filter
+  kan ikke tones selv). Kontinuerlig via `animation-timeline: scroll()`
+  der det finnes (Safari 26/Chrome), ellers JS m/ hysterese (24/4 px) og
+  rAF. Myk scroll-kant (14 px maske) i stedet for strek. Hamburger = tre
+  linjer som morfer til kryss, `:active` på pointer-down.
+  `padding-top: env(safe-area-inset-top)` + `viewport-fit=cover`.
+- **Meny:** samme materiale som baren, kant til kant (`top: calc(100% - 1px)`),
+  scrim (`.menu-scrim`, fixed, dempet grønn) + `touchmove`-lås utenfor
+  menyen (iOS ignorerer overflow:hidden). Inn/ut samme vei (translateY
+  -10 px + opacity), reduced-motion/-transparency dekket.
+- **Den grønne stripen** i Brages telefonbilde var vannrett overflow:
+  `.hero-glow` hadde `inset: -10%` sideveis, og `overflow-x: hidden` på
+  body alene stopper ikke iOS. Nå `overflow-x: clip` på html+body og
+  gløden uten sideoverheng.
+- **Statusfeltet i Safari:** målt i simulatoren — Safari maler status- og
+  verktøyfeltet med DOKUMENTETS bakgrunnsfarge, ikke theme-color. html
+  bærer nå `#7dffcb` (toppen av grunnen målt #62ffc3–#88ffcc), body er
+  gjennomsiktig (ellers dekker body-bakgrunnen `.ground`), theme-color
+  samme verdi.
+- Riggen: `scripts/web-shot.mjs` + `xcrun simctl openurl booted …` /
+  `simctl io booted screenshot` (simulatoren kan ikke trykke — åpen meny
+  er bevist i Chrome-emulering, ikke WebKit). `npx astro build` grønn.
+- **IKKE gjort:** reisetesten (51/51) er ikke kjørt på nytt (selektorene
+  `#menu-btn`/`.mobile-menu`/`visible()` er uendret); glødeprikk-eyebrow
+  står igjen i seksjonene under heroen (utenfor skiva).
+
+**RUNDE 2 (samme dag, etter Brages første dom — seks feil):** grønn bunn
+(html-mint lekket ut under Safari-linja) → `.ground` stikker 120 px utenfor
+viewporten + html/theme-color følger headeren; fade nederst på navbaren →
+HARD kant (hårstrek); for svak frost over hvitt → mettet mint-frost
+rgba(150,250,205,.86); navbar 74 px + logo 42 px + hamburger 48 px; stygg
+lukking → menyen er ETT panel (`.mobile-menu` flyttet ut av `.bar`, dekker
+bar + lenker, z under logo/hamburger), `html[data-menu-open]{overflow}`
+FJERNET (ga hopp på iOS); Safari-toppen skal følge navbaren → MÅLT i
+simulatoren at Safari tar dokumentbakgrunnen KUN ved første tegning og
+ignorerer theme-color for statusfeltet (bunnlinja følger). Derfor: html =
+#7dffcb fra stilarket, `html[data-theme=frost]` #a7fbd4 + theme-color
+settes ved scroll (bunnlinja følger; om toppen følger på EKTE enhet ved
+verktøylinje-kollaps er ikke verifisert — simulatoren kan ikke sveipe).
+
+**RUNDE 3 (samme dag, Brages andre dom):** mint nederst ved scroll opp /
+åpen meny → MÅLT (fire kontrollerte forsøk i simulatoren): Safari bruker
+IKKE theme-color i det hele tatt; STATUSFELTET = html-bakgrunnen fra
+STILARKET ved første tegning (fryses), BUNNLINJA = html-bakgrunnen LIVE.
+Derfor: stilarket `html{background:#93fccf}` = navbarens frost (målt
+#8dfccc scrollet), skriptet setter `html.style.backgroundColor='#f5f8e9'`
+på mobil så bunnlinja er kremhvit. Frost nå rgba(143,252,205,.94) (nesten
+dekkende → stabil farge). Blink ved lukking = scrimen dekket navbaren og
+krysstonet over den → scrim starter under baren. Menyen vokste når
+Safari-linja kollapset = `env(safe-area-inset-bottom)` i panelets padding
+→ fjernet, max-height 100svh. Favicon: `favicon.svg` (dyp grønn, Heia-
+figuren i neon, PNG innbakt), `favicon-32.png`, `apple-touch-icon.png`,
+`icon-192/512.png`, `site.webmanifest`. theme-color tilbake til #dffff1
+(Instagram-toppen Brage likte).
+
+**RUNDE 4 (samme dag):** Brage: toppen ble HVIT på ekte iPhone (den leser
+html-fargen LIVE — simulatoren fryser den; skript-fargen #f5f8e9 vant) →
+skript-styring FJERNET, én fast `html{background:#93fccf}` = navbarens
+frost. Menyen bygget om til ekte rull: `.mobile-menu` er grid m/
+`grid-template-rows: 0fr→1fr` (`.menu-inner` min-height 0 + overflow
+hidden), `top: 100%` under baren; baren får menymaterialet i eget slør
+`.site-header::after` (transition) uavhengig av scrollfrosten `::before`
+(animasjon) → ingen hopp ved lukking; hårstrek av når åpen. Scrim og
+.ground strekker seg bak Safari-linja (-240 px). ÅPENT: «hvit/grønn flate i
+bunnen ved scroll opp / trykk på meny» — Safari-linjas egen bakgrunn tar
+sidens farge; Brage sendte skjermbilde som IKKE kom fram (for stort) — be
+om det på nytt (mindre). Simulatorfakta: med scrim åpen ble bunnfeltet
+kremhvitt (#dee8d9), ellers html-fargen.
+
+**RUNDE 5 (81c93d3):** Brages skjermbilde (ekte iPhone, adressefelt ØVERST)
+viste: topp = html-fargen live (kremhvit i runde 3), og flaten nederst =
+Safaris glass bak verktøylinja, tonet med html-fargen — synlig i den grad
+fargen avviker fra grunnen (VG: hvit på hvit = usynlig). Løsning: navbar-
+frost rgba(196,252,226,.94) og html/theme-color #cafce8 = SAMME lyse mint
+→ toppen matcher navbaren eksakt, flaten nederst nær grunnen. Brage: «alt
+annet godkjent». Ikke verifisert på ekte iPhone etter denne endringen.
+
+**RUNDE 6 (LÅST LØSNING):** Brage: navbaren skal beholde mint-frosten,
+og bunnen skal ikke få farge. MÅLT: Safari leser status-/adressefeltet
+fra canvasens ØVERSTE kant og verktøylinje-glasset fra den NEDERSTE
+(fixed `.ground` klippes til viewporten og når ikke kantene). Løsning:
+`html { background: #f5f8e9 linear-gradient(mint 0–20 % → krem 55–100 %)
+fixed }` — toppen = navbarens mint, bunnen = grunnens krem. Navbar-frost
+rgba(143,252,205,.94), theme-color #93fccf. Simulatoren fryser toppfargen
+per fane (kan ikke måles der lenger), bunnen målt kremhvit.
+
+**RUNDE 7 (dokumentert fiks, Brage ba om nettsøk):** Safari 26 toner
+status-/adressefelt og verktøylinje etter FASTE/STICKY elementer inntil
+4 px fra toppen / 3 px fra bunnen, ≥80 % brede, ≥3 px høye, via
+`background-color` (pseudo-elementer, theme-color og skript etter første
+tegning ignoreres; opacity:0 samples likevel). Kilder: jahir.dev/blog/
+safari-toolbar, nasedk.in/blog/ios26-safari-toolbar-colors,
+github.com/andesco/safari-color-tinting. Bygget: `.tint-top` (mint
+#93fccf, 6 px) og `.tint-bottom` (krem #f5f8e9, 14 px) faste bak grunnen
+(z-index -2), kun <640 px; scrimen slutter 6 px over bunnen så den ikke
+farger linja når menyen åpnes. html-gradienten står som fallback.
+Bunnen målt kremhvit i simulatoren; toppen kan bare sees på ekte telefon.
+
+**RUNDE 8 (4abdff1):** Brages telefonbilde etter runde 7: toppen RIKTIG
+(mint = navbar), men flaten nederst fortsatt synlig, blek mint. Årsak:
+`.ground` (fixed, strakk seg forbi bunnkanten, gjennomsiktig bg + mørk
+glød nederst til høyre) var det Safari leste. Nå: `.ground` stopper 4 px
+over bunnen (kvalifiserer ikke), og de nederste 90 px av grunnen er flat
+krem #f5f8e9 = tint-stripen → flaten har samme farge som det den ligger
+over (VG-prinsippet). Navbaren urørt. Ikke sett på ekte telefon.
+
+**RUNDE 9 (edb614f):** Brages bilde etter runde 8: toppen mint (riktig),
+flaten nederst MINT over krem grunn → Safari leser CANVASEN (html) for
+verktøylinja nederst på hans telefon, og iOS tiler root-gradienten
+nedover dokumentet (attachment fixed ignoreres) → mint ved hans
+scrollposisjon. Nå: `html { background: #f5f8e9 linear-gradient(mint)
+no-repeat top / 100% 200px }` — flat krem overalt, mint kun i toppen av
+dokumentet. `.tint-bottom` z-index 0. Navbaren URØRT (rgba(143,252,205,.94)
+siden runde 3; runde 5 var blekere og ble reversert i runde 6).
+
+**NESTE:** Brage sjekker preview på telefonen → PR Brage→main.
+
+---
+
+## ▶️▶️ START HER (2026-09-11 — NETTSIDEN: PR #53 MERGET OG I PROD, `/ops` LIVE, `claim-notify` DEPLOYET, INNLOGGING I HEADEREN BYGGET — VENTER NY MERGE)
+
+**Gjort i denne økta (alt pushet til `origin/Brage`):**
+- **Steg 1–3 i publiseringsrekkefølgen er LUKKET.** PR #53 (Brage → main)
+  er merget av Brage og Vercel-deployen er live: `heiaapp.no/ops/` og
+  dyplenken `/ops/claims/<uuid>` svarer 200 med OpsApp-øya (rewriten
+  virker), `/klubb/`, `/konto/`, `/invitasjon/` 200. `supabase functions
+  deploy claim-notify` kjørt 2026-09-11 11:3x: versjon 6 → 7 (ny sha),
+  `WEB_BASE_URL` fantes fra før (satt 2026-08-02 = https://heiaapp.no) →
+  ops-lenken i søknads-e-posten er nå `https://heiaapp.no/ops/claims/<id>`.
+- **Innlogging + admin-innganger på nettsiden (`d4c1649`).** Brage fant
+  ingen inngang til innlogging/admin. Nå: PC-toppmenyen har «Logg inn»
+  (samme stil som lenkene, «Få laget ditt med» er fortsatt hovedknapp);
+  hamburgermenyen har «Logg inn» som ghost-knapp over CTA-en. Innlogget:
+  «Min konto ▾»-dropdown (PC) / kontoblokk i hamburgermenyen (mobil) med
+  navn/e-post, «Min konto» (/konto), «Heia-admin» (/ops, kun ops-rolle),
+  «Klubbetalinger» (/klubb, kun betalingsansvarlig — begge vises ved begge
+  roller) og «Logg ut» (→ forsiden). Arbeidsflatene (`minimal`) har nå
+  Forsiden/Hjelp + kontomeny og hamburger på mobil (før: ingen nav på
+  mobil). «Heia Ops» heter «Heia-admin» på web (tittel, h1, tekster).
+  Mekanikk: headeren har IKKE supabase-js — inline-skript i `Base.astro`
+  leser `heia-web-auth` fra localStorage, POST-er `is_ops_admin` og
+  `is_payment_manager_anywhere` via PostgREST med brukerens token og cacher
+  i `heia-web-roles` per uid. `supabase.ts` sender `heia:auth` ved
+  sesjonsendring og registrerer `window.__heiaSignOut`, så headeren og øya
+  på samme side er enige. Konstantene bor i `web/src/lib/env.ts`.
+- **Reisetest i ekte nettleser:** `scripts/verify-web-login-journey.mjs`
+  **51/51** (forsiden → «Logg inn» → /konto-skjema → meny m/ roller →
+  Heia-admin → omlasting beholder innlogging + roller → Klubbetalinger →
+  Logg ut → /ops krever innlogging igjen; ops-only-bruker ser IKKE
+  Klubbetalinger; øyas «Logg ut» oppdaterer headeren; mobil-hamburger
+  uinnlogget/innlogget/Logg ut; ingen JS-feil). Kjøres mot lokal `astro
+  preview` med fixturene fra `verify-web-flows.mjs --keep --sessions=…`
+  (passord settes om, claimant får også ops-rolle); `--cleanup` etterpå —
+  verifisert 0/0/0. Flyttestene 34/34 samme dag.
+
+**NESTE — KREVER NY MERGE FRA BRAGE:** `Brage` er 1 commit foran `main`
+(`d4c1649` + denne handoffen). Opprett PR fra
+https://github.com/Brag1s7/Heia/compare/main...Brage (gh er ikke innlogget
+på maskinen), merge → Vercel deployer → prøv
+https://heiaapp.no → «Logg inn» → https://heiaapp.no/konto/ →
+«Min konto» → https://heiaapp.no/ops/ og https://heiaapp.no/klubb/ med
+egen konto. Deretter punkt 4–7 i `docs/PR-NETTSIDE-ADMIN-2026-09.md`
+(invitasjonsreisen: secret + flagg → TestFlight-bygg → AS-opplysninger →
+App Store-URL). Ny samtale er trygg å starte herfra.
+
+---
+
 ## ▶️▶️ START HER (2026-09-09 sen kveld — TO SKIVER LIGGER UKOMMITTERT OG VENTER TELEFONDOM: KAMPSKJERMEN RUNDE 2 + SESONGSIDEN/HJEM. FRYSEN ETTER «NY KAMP» ER LØST.)
 
 ### Tilstanden i treet akkurat nå (les denne først)

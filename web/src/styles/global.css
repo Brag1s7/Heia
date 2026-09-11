@@ -36,7 +36,18 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+/* html er canvasen. iOS-Safari leser fargen til status-/adressefeltet
+   fra canvasens ØVERSTE kant og glasset bak verktøylinja nederst fra den
+   NEDERSTE kanten (målt 2026-09-11; theme-color brukes ikke, og fixed-
+   elementer som .ground klippes til viewporten og når ikke dit). Derfor
+   en fast (viewport-forankret) gradient på html: navbarens mint øverst,
+   grunnens kremfarge nederst — toppen matcher navbaren, bunnen får ingen
+   farge utover grunnen. */
+/* Canvasen er FLAT krem i hele dokumentet (iOS tiler en root-gradient
+   nedover og leser canvasen for verktøylinja nederst — målt på Brages
+   telefon 2026-09-11), med mint bare i de øverste 200 px av dokumentet så
+   toppen matcher navbaren. */
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #f5f8e9 linear-gradient(#93fccf, #93fccf) no-repeat top / 100% 200px; overflow-x: hidden; overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
@@ -44,18 +55,36 @@ body {
   color: var(--ink);
   line-height: 1.55;
   font-size: 17px;
-  background: var(--daylight);
+  /* Grunnfargen ligger på html (canvas + overscroll/statusfelt på iOS);
+     body er gjennomsiktig så .ground (fixed, z-index -1) synes. */
+  background: transparent;
   min-height: 100vh;
   overflow-x: hidden;
+  overflow-x: clip;
+  -webkit-tap-highlight-color: transparent;
 }
+.m-only { display: none !important; }
+@media (max-width: 640px) { .m-hide { display: none !important; } .m-only { display: block !important; } .m-only.link-more { display: inline-flex !important; } .m-only.trust { display: flex !important; } }
+
+/* Tint-striper for Safari 26 (se Base.astro): faste, i kantsonene, bak
+   grunnen. Ikke opacity:0 (samples likevel) — de ligger under .ground. */
+.tint { display: none; position: fixed; left: 0; width: 100%; z-index: -2; pointer-events: none; }
+.tint-bottom { z-index: 0; }
+.tint-top { top: 0; height: 6px; background-color: #93fccf; }
+.tint-bottom { bottom: -8px; height: 14px; background-color: #f5f8e9; }
+@media (max-width: 640px) { .tint { display: block; } }
 
 /* Dagslysgrunnen: mint-verden, ett stort neonfelt, aqua motsatt side,
    dyp grønn kant nederst — fast bak alt, som i appen. */
 .ground {
   position: fixed;
-  inset: 0;
+  /* Stopper 4 px over bunnkanten: da er det tint-stripen (krem) Safari leser
+     for verktøylinja, ikke grunnen. De nederste 90 px er flat krem = samme
+     farge som stripen, så Safari-flaten får samme farge som det den ligger over. */
+  inset: -160px 0 4px;
   z-index: -1;
   background:
+    linear-gradient(to top, #f5f8e9 0, #f5f8e9 90px, rgba(245, 248, 233, 0) 170px),
     radial-gradient(1100px 700px at 8% 0%, rgba(2, 255, 171, 0.55) 0%, rgba(2, 255, 171, 0) 60%),
     radial-gradient(800px 600px at 96% 22%, rgba(143, 255, 224, 0.75) 0%, rgba(143, 255, 224, 0) 62%),
     radial-gradient(700px 500px at 70% 6%, rgba(207, 255, 116, 0.35) 0%, rgba(207, 255, 116, 0) 60%),
@@ -101,6 +130,18 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
   gap: 8px;
 }
 .eyebrow::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 0 4px rgba(2, 255, 171, 0.25); }
+.tagline {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--deep);
+  text-decoration: underline;
+  text-decoration-color: var(--neon);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 7px;
+}
 .muted { color: var(--ink-3); }
 .small { font-size: 14px; }
 
@@ -271,49 +312,167 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
 .site-header nav a { text-decoration: none; font-weight: 700; font-size: 15px; color: var(--deep); padding: 12px 14px; min-height: 44px; display: inline-flex; align-items: center; border-radius: 999px; white-space: nowrap; }
 .site-header nav a:hover { background: rgba(2, 255, 171, 0.25); }
 .site-header nav .btn { min-height: 48px; padding: 10px 20px; font-size: 15px; margin-left: 6px; }
-.site-header .menu-btn { display: none; width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--deep); place-items: center; cursor: pointer; flex: none; }
-.site-header .menu-btn svg { width: 26px; height: 26px; }
-.site-header .menu-btn[aria-expanded="true"] .ico-open { display: none; }
-.site-header .menu-btn[aria-expanded="false"] .ico-close { display: none; }
-.site-header .mobile-menu { display: none; }
+.site-header .menu-btn {
+  display: none; width: 44px; height: 44px; border-radius: 14px; border: 0; background: transparent; color: var(--deep);
+  place-items: center; cursor: pointer; flex: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease-out, transform 0.12s ease-out;
+}
+.site-header .menu-btn:active { background: rgba(6, 58, 45, 0.08); transform: scale(0.92); transition-duration: 0.05s; }
+.site-header .menu-btn:focus-visible { outline: 3px solid var(--deep); outline-offset: 2px; }
+.site-header .burger { position: relative; width: 22px; height: 16px; display: block; }
+.site-header .burger i {
+  position: absolute; left: 0; width: 22px; height: 2.4px; border-radius: 2px; background: currentColor;
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s ease-out;
+}
+.site-header .burger i:nth-child(1) { top: 0; }
+.site-header .burger i:nth-child(2) { top: 6.8px; }
+.site-header .burger i:nth-child(3) { top: 13.6px; }
+.site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(1) { transform: translateY(6.8px) rotate(45deg); }
+.site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(2) { opacity: 0; transform: scaleX(0.2); }
+.site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(3) { transform: translateY(-6.8px) rotate(-45deg); }
+.site-header .mobile-menu, .site-header .menu-scrim { display: none; }
 .site-header nav .btn .short { display: none; }
 @media (max-width: 860px) { .site-header nav a.hide-m { display: none; } }
 
-/* Mobil: fullbredde header som glir inn i grunnen; frost først ved scroll. */
+/* Kontomenyen: «Logg inn» uinnlogget, «Min konto»-dropdown innlogget (PC);
+   egen blokk i hamburgermenyen på mobil. [hidden] må vinne over display-reglene. */
+.site-header [hidden] { display: none !important; }
+.site-header nav .acct { position: relative; }
+.site-header nav .acct summary {
+  list-style: none; cursor: pointer; user-select: none;
+  font-weight: 700; font-size: 15px; color: var(--deep); padding: 12px 12px 12px 14px; min-height: 44px;
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; white-space: nowrap;
+}
+.site-header nav .acct summary::-webkit-details-marker { display: none; }
+.site-header nav .acct summary:hover, .site-header nav .acct[open] summary { background: rgba(2, 255, 171, 0.25); }
+.site-header nav .acct summary:focus-visible { outline: 3px solid var(--deep); outline-offset: 2px; }
+.site-header nav .acct summary svg { width: 16px; height: 16px; transition: transform 0.2s ease; }
+.site-header nav .acct[open] summary svg { transform: rotate(180deg); }
+.site-header nav .acct-menu {
+  position: absolute; right: 0; top: calc(100% + 12px); min-width: 264px; padding: 8px; z-index: 30;
+  display: grid; gap: 2px; border-radius: 22px;
+  background: rgba(252, 255, 253, 0.98); border: 1px solid rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: 0 18px 44px rgba(6, 58, 45, 0.16);
+}
+.site-header nav .acct-who { padding: 10px 12px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--line); max-width: 320px; }
+.site-header nav .acct-who b { display: block; font-size: 15px; color: var(--deep); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-header nav .acct-who small { display: block; font-size: 13px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.site-header nav .acct-menu a, .site-header nav .acct-menu button {
+  display: flex; align-items: center; width: 100%; min-height: 44px; padding: 0 12px; margin: 0;
+  border-radius: 12px; border: 0; background: none; cursor: pointer; text-align: left;
+  font-family: var(--body); font-weight: 700; font-size: 15px; color: var(--deep); text-decoration: none; white-space: nowrap;
+}
+.site-header nav .acct-menu a:hover, .site-header nav .acct-menu button:hover { background: rgba(2, 255, 171, 0.25); }
+.site-header nav .acct-menu button[data-signout] { color: var(--ink-2); margin-top: 6px; }
+.site-header nav .acct-menu button[data-signout]:disabled { opacity: 0.5; cursor: default; }
+
+/* Mobil: fullbredde header som er del av grunnen øverst og blir til mint-
+   frost ved scroll. Frosten er .site-header::before og tones med opacity
+   (backdrop-filter kan ikke selv tones): kontinuerlig av scrollposisjonen
+   der animation-timeline finnes, ellers data-scrolled. Hard kant nederst.
+   Menyen er ETT panel som dekker baren og lenkene (samme materiale, ingen
+   skjøt); logo og hamburger ligger over panelet. */
 @media (max-width: 640px) {
-  .site-header { padding: 0; }
-  .site-header > .container { width: 100%; }
+  .site-header { padding: env(safe-area-inset-top, 0px) 0 0; --bar-h: 74px; }
+  .site-header > .container { width: 100%; position: relative; z-index: 2; }
   .site-header .bar {
-    min-height: 62px; padding: 0 16px; border-radius: 0; gap: 8px;
+    min-height: var(--bar-h); padding: 0 10px 0 16px; border-radius: 0; gap: 8px;
     background: transparent; border: 0; box-shadow: none;
     backdrop-filter: none; -webkit-backdrop-filter: none;
-    transition: background-color 0.25s ease, box-shadow 0.25s ease;
   }
-  .site-header[data-scrolled] .bar {
-    background: rgba(240, 251, 234, 0.78);
-    backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3);
-    box-shadow: 0 1px 0 rgba(6, 58, 45, 0.08), 0 8px 24px rgba(6, 58, 45, 0.06);
+  .site-header::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--bar-h) + env(safe-area-inset-top, 0px)); z-index: 0;
+    background: rgba(143, 252, 205, 0.94);
+    backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 1px 0 rgba(6, 58, 45, 0.14);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s ease-out;
   }
-  .site-header .logo { height: auto; padding: 0; background: none; box-shadow: none; }
-  .site-header .logo img { height: 26px; }
+  .site-header[data-scrolled]::before { opacity: 1; }
+  @supports (animation-timeline: scroll()) {
+    .site-header:not([data-js-frost])::before { animation: heia-frost-in linear both; animation-timeline: scroll(root block); animation-range: 0px 48px; transition: none; }
+  }
+  /* Menymaterialet på baren: eget slør som tones uavhengig av scrollfrosten,
+     så ingenting hopper når menyen lukkes. Dekker hårstreken under baren. */
+  .site-header::after {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--bar-h) + env(safe-area-inset-top, 0px) + 1px); z-index: 1;
+    background: rgba(214, 252, 236, 0.96);
+    backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease-out 0.08s;
+  }
+  .site-header[data-open]::after { opacity: 1; transition: opacity 0.16s ease-out; }
+  .site-header[data-open]::before { box-shadow: none; }
+
+  .site-header .logo { height: 48px; padding: 0 4px; margin-left: -4px; background: none; box-shadow: none; border-radius: 12px; }
+  .site-header .logo img { height: 42px; }
   .site-header .logo .logo-d { display: none; }
   .site-header .logo .logo-m { display: block; }
   .site-header nav a { display: none; }
   .site-header nav .btn { display: none; }
-  .site-header .menu-btn { display: grid; margin-right: -8px; }
-  .site-header .mobile-menu[data-open] { display: block; }
+  .site-header nav .acct { display: none; }
+  .site-header .menu-btn { display: grid; width: 48px; height: 48px; }
+  .site-header .burger { width: 26px; height: 18px; }
+  .site-header .burger i { width: 26px; height: 2.6px; }
+  .site-header .burger i:nth-child(2) { top: 7.7px; }
+  .site-header .burger i:nth-child(3) { top: 15.4px; }
+  .site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(1) { transform: translateY(7.7px) rotate(45deg); }
+  .site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(3) { transform: translateY(-7.7px) rotate(-45deg); }
+
   .site-header .mobile-menu {
-    position: absolute; left: 0; right: 0; top: 100%; padding: 8px 8px 16px;
-    background: rgba(240, 251, 234, 0.94);
-    backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3);
-    border-bottom: 1px solid rgba(6, 58, 45, 0.1);
-    box-shadow: 0 24px 40px rgba(6, 58, 45, 0.14);
+    display: grid; grid-template-rows: 0fr; position: absolute; left: 0; right: 0; top: 100%; z-index: 1;
+    background: rgba(214, 252, 236, 0.96);
+    backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    box-shadow: 0 1px 0 rgba(6, 58, 45, 0.14), 0 24px 48px rgba(6, 58, 45, 0.16);
+    visibility: hidden;
+    transition: grid-template-rows 0.26s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.26s;
   }
-  .site-header .mobile-menu a { display: flex; align-items: center; min-height: 54px; padding: 0 12px; border-radius: 14px; text-decoration: none; font-weight: 700; font-size: 18px; color: var(--deep); }
-  .site-header .mobile-menu a:hover, .site-header .mobile-menu a:focus-visible { background: rgba(2, 255, 171, 0.25); }
-  .site-header .mobile-menu .menu-cta { margin: 10px 8px 0; }
-  .site-header .mobile-menu .menu-cta .btn { width: 100%; }
+  .site-header .mobile-menu .menu-inner {
+    min-height: 0; overflow: hidden;
+    max-height: calc(100svh - var(--bar-h) - env(safe-area-inset-top, 0px));
+    padding: 0 12px; opacity: 0; transition: opacity 0.14s ease-in;
+  }
+  .site-header .mobile-menu .menu-inner > :first-child { margin-top: 4px; }
+  .site-header .mobile-menu .menu-inner > :last-child { margin-bottom: 18px; }
+  .site-header[data-open] .mobile-menu {
+    grid-template-rows: 1fr; visibility: visible;
+    transition: grid-template-rows 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s;
+  }
+  .site-header[data-open] .mobile-menu .menu-inner { opacity: 1; transition: opacity 0.18s ease-out 0.06s; }
+  .site-header .menu-scrim {
+    display: block; position: fixed; inset: calc(var(--bar-h) + env(safe-area-inset-top, 0px)) 0 6px; z-index: 0;
+    background: rgba(6, 58, 45, 0.3);
+    opacity: 0; visibility: hidden; transition: opacity 0.22s ease-in, visibility 0s linear 0.22s;
+  }
+  .site-header[data-open] .menu-scrim { opacity: 1; visibility: visible; transition: opacity 0.26s ease-out, visibility 0s; }
+
+  .site-header .mobile-menu a {
+    display: flex; align-items: center; min-height: 54px; padding: 0 14px; border-radius: 14px; text-decoration: none;
+    font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -0.005em; color: var(--deep);
+    transition: background-color 0.12s ease-out;
+  }
+  .site-header .mobile-menu a:active, .site-header .mobile-menu a:focus-visible { background: rgba(2, 255, 171, 0.3); }
+  .site-header .mobile-menu .menu-cta { display: grid; gap: 8px; margin: 14px 2px 0; padding-top: 14px; border-top: 1px solid rgba(6, 58, 45, 0.12); }
+  .site-header .mobile-menu .menu-cta .btn { width: 100%; min-height: 54px; }
+  .site-header .mobile-menu .menu-cta .btn-ghost { background: rgba(255, 255, 255, 0.72); border-color: rgba(6, 58, 45, 0.12); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .site-header .mobile-menu .menu-account { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(6, 58, 45, 0.12); }
+  .site-header .mobile-menu .menu-who { padding: 6px 14px 4px; font-size: 13px; color: var(--ink-2); }
+  .site-header .mobile-menu .menu-who b { color: var(--deep); }
+  .site-header .mobile-menu .menu-account button {
+    display: flex; align-items: center; width: 100%; min-height: 54px; padding: 0 14px; border-radius: 14px; border: 0; background: none;
+    font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--ink-2); text-align: left; cursor: pointer;
+  }
+  .site-header .mobile-menu .menu-account button:active { background: rgba(2, 255, 171, 0.3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .site-header .mobile-menu, .site-header .mobile-menu .menu-inner, .site-header .menu-scrim, .site-header .burger i, .site-header::before, .site-header::after { transition-duration: 0.01ms; animation: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .site-header::before { background: #93fccf; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .site-header .mobile-menu, .site-header::after { background: #d9fbec; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
 }
+@keyframes heia-frost-in { from { opacity: 0; } to { opacity: 1; } }
 
 .site-footer { padding: 56px 0 40px; color: var(--ink-2); font-size: 15px; }
 .site-footer .top { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 28px; padding-bottom: 28px; border-bottom: 1px solid var(--line); }
@@ -336,7 +495,30 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
 .hero-phones { display: flex; justify-content: center; align-items: flex-end; gap: 0; position: relative; }
 .hero-phones .phone:nth-child(2) { width: 230px; margin-left: -50px; margin-bottom: -40px; transform: rotate(6deg); z-index: 1; }
 @media (max-width: 900px) { .hero-phones .phone:nth-child(2) { display: none; } }
-.hero-glow { position: absolute; inset: -10% -10% 0; background: radial-gradient(60% 55% at 50% 60%, rgba(2, 255, 171, 0.5), transparent 70%); z-index: -1; filter: blur(10px); }
+.hero-glow { position: absolute; inset: -8% 0 0; background: radial-gradient(60% 55% at 50% 60%, rgba(2, 255, 171, 0.5), transparent 70%); z-index: -1; filter: blur(10px); }
+.link-more { align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; font-family: var(--display); font-weight: 800; font-size: 16px; color: var(--deep); text-decoration: none; }
+.link-more svg { width: 18px; height: 18px; }
+.link-more:active { opacity: 0.6; }
+.trust { flex-wrap: wrap; gap: 4px 0; margin-top: 18px; font-family: var(--display); font-weight: 700; font-size: 13.5px; letter-spacing: 0.01em; color: var(--ink-2); }
+.trust span { display: inline-flex; align-items: center; }
+.trust span + span::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--neon); box-shadow: 0 0 0 1px rgba(6, 58, 45, 0.18); margin: 0 10px; }
+.hero-note-m { margin-top: 20px; text-align: center; font-size: 13px; color: var(--ink-3); }
+
+@media (max-width: 640px) {
+  .hero { padding: 10px 0 40px; }
+  .hero .split { gap: 26px; }
+  .hero h1 { font-size: clamp(38px, 10.6vw, 44px); margin: 12px 0 14px; }
+  .hero .lead { font-size: 17px; line-height: 1.5; max-width: none; }
+  .hero .cta { display: grid; gap: 2px; margin-top: 22px; justify-items: stretch; }
+  .hero .cta .btn-primary { width: 100%; min-height: 54px; font-size: 17px; }
+  .hero .cta .link-more { justify-self: center; }
+  .hero .trust { margin-top: 12px; }
+  .hero-phones { margin-top: 4px; }
+  /* Mobil viser Hjem-feeden (laglivet), ikke kampskjermen som på PC. */
+  .hero-phones .phone { width: min(280px, 100%); }
+  .hero-phones .phone:nth-child(2) { display: block; margin: 0 auto; transform: none; }
+  .hero-phones .phone:nth-child(3) { display: none; }
+}
 
 /* Chips */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
