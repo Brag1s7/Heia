@@ -26,7 +26,7 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#7dffcb" />
+    <meta name="theme-color" content="#7dffcb" id="theme-color" />
     <meta name="color-scheme" content="light" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
@@ -85,34 +85,34 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
               <span class="burger" aria-hidden="true"><i></i><i></i><i></i></span>
             </button>
           </nav>
-          <div class="mobile-menu" id="mobile-menu">
-            {!minimal ? (
-              <>
-                <a href="/#slik">Slik fungerer Heia</a>
-                <a href="/#bidra">Sammen får laget til mer</a>
-                <a href="/stott-laget/">Støtt laget</a>
-                <a href="/#kom-i-gang">Kom i gang</a>
-                <a href="/hjelp/">Hjelp</a>
-                <a href="/om/">Om Heia</a>
-              </>
-            ) : (
-              <>
-                <a href="/">Forsiden</a>
-                <a href="/hjelp/">Hjelp</a>
-              </>
-            )}
-            <div class="menu-account" data-auth="in" hidden>
-              <div class="menu-who">Innlogget som <b data-acct-name></b></div>
-              <a href="/konto/">Min konto</a>
-              <a href="/ops/" data-role="ops" hidden>Heia-admin</a>
-              <a href="/klubb/" data-role="manager" hidden>Klubbetalinger</a>
-              <button type="button" data-signout>Logg ut</button>
-            </div>
-            <div class="menu-cta">
-              <a class="btn btn-ghost" href="/konto/" data-auth="out">Logg inn</a>
-              {!minimal && <a class="btn btn-primary" href={cta.href}>{cta.label}</a>}
-            </div>
-          </div>
+        </div>
+      </div>
+      <div class="mobile-menu" id="mobile-menu">
+        {!minimal ? (
+          <>
+            <a href="/#slik">Slik fungerer Heia</a>
+            <a href="/#bidra">Sammen får laget til mer</a>
+            <a href="/stott-laget/">Støtt laget</a>
+            <a href="/#kom-i-gang">Kom i gang</a>
+            <a href="/hjelp/">Hjelp</a>
+            <a href="/om/">Om Heia</a>
+          </>
+        ) : (
+          <>
+            <a href="/">Forsiden</a>
+            <a href="/hjelp/">Hjelp</a>
+          </>
+        )}
+        <div class="menu-account" data-auth="in" hidden>
+          <div class="menu-who">Innlogget som <b data-acct-name></b></div>
+          <a href="/konto/">Min konto</a>
+          <a href="/ops/" data-role="ops" hidden>Heia-admin</a>
+          <a href="/klubb/" data-role="manager" hidden>Klubbetalinger</a>
+          <button type="button" data-signout>Logg ut</button>
+        </div>
+        <div class="menu-cta">
+          <a class="btn btn-ghost" href="/konto/" data-auth="out">Logg inn</a>
+          {!minimal && <a class="btn btn-primary" href={cta.href}>{cta.label}</a>}
         </div>
       </div>
       <div class="menu-scrim" id="menu-scrim" aria-hidden="true"></div>
@@ -240,24 +240,40 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
         mq.addEventListener('change', (e) => { if (!e.matches) set(false); });
 
         // Frost på mobilheaderen ved scroll. Der nettleseren kan, styres den
-        // kontinuerlig av scrollposisjonen i CSS (animation-timeline). Ellers
-        // en rolig tilstand med hysterese, målt én gang per frame.
-        if (!CSS.supports('animation-timeline: scroll()')) {
-          let ticking = false;
-          const onScroll = () => {
-            if (ticking) return;
-            ticking = true;
-            requestAnimationFrame(() => {
-              ticking = false;
-              const y = window.scrollY;
-              const scrolled = header.hasAttribute('data-scrolled');
-              if (!scrolled && y > 24) header.setAttribute('data-scrolled', '');
-              else if (scrolled && y < 4) header.removeAttribute('data-scrolled');
-            });
-          };
-          onScroll();
-          window.addEventListener('scroll', onScroll, {passive: true});
-        }
+        // kontinuerlig av scrollposisjonen i CSS (animation-timeline); ellers
+        // av data-scrolled (hysterese). Safari maler statusfeltet med
+        // theme-color, så den følger headeren: grunnens mint øverst, frostens
+        // farge når headeren er frostet — samme hysterese, én gang per frame.
+        const themeMeta = document.getElementById('theme-color');
+        const THEME_TOP = '#7dffcb', THEME_FROST = '#a7fbd4';
+        const cssFrost = CSS.supports('animation-timeline: scroll()');
+        let ticking = false;
+        const onScroll = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(() => {
+            ticking = false;
+            const y = window.scrollY;
+            const scrolled = header.hasAttribute('data-scrolled');
+            if (!scrolled && y > 24) header.setAttribute('data-scrolled', '');
+            else if (scrolled && y < 4) header.removeAttribute('data-scrolled');
+            // Safari (iOS 26, målt): statusfeltet = dokumentbakgrunnen ved
+            // første tegning; bunnlinja følger theme-color/bakgrunn løpende.
+            // Begge settes, så det som KAN følge headeren, gjør det.
+            if (mq.matches) {
+              const frost = header.hasAttribute('data-scrolled');
+              const want = frost ? THEME_FROST : THEME_TOP;
+              if (themeMeta && themeMeta.getAttribute('content') !== want) themeMeta.setAttribute('content', want);
+              document.documentElement.toggleAttribute('data-theme', frost);
+              if (frost) document.documentElement.setAttribute('data-theme', 'frost');
+            } else if (document.documentElement.hasAttribute('data-theme')) {
+              document.documentElement.removeAttribute('data-theme');
+            }
+          });
+        };
+        if (!cssFrost) header.setAttribute('data-js-frost', '');
+        onScroll();
+        window.addEventListener('scroll', onScroll, {passive: true});
       }
     </script>
 

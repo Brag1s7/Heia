@@ -42,8 +42,21 @@ fra delt copy (overlinje + brødtekst).
   `#menu-btn`/`.mobile-menu`/`visible()` er uendret); glødeprikk-eyebrow
   står igjen i seksjonene under heroen (utenfor skiva).
 
-**NESTE:** Brages telefondom på de tre bildene → evt. runde 2 → så PR
-Brage→main (d4c1649 + denne) som i punktet under.
+**RUNDE 2 (samme dag, etter Brages første dom — seks feil):** grønn bunn
+(html-mint lekket ut under Safari-linja) → `.ground` stikker 120 px utenfor
+viewporten + html/theme-color følger headeren; fade nederst på navbaren →
+HARD kant (hårstrek); for svak frost over hvitt → mettet mint-frost
+rgba(150,250,205,.86); navbar 74 px + logo 42 px + hamburger 48 px; stygg
+lukking → menyen er ETT panel (`.mobile-menu` flyttet ut av `.bar`, dekker
+bar + lenker, z under logo/hamburger), `html[data-menu-open]{overflow}`
+FJERNET (ga hopp på iOS); Safari-toppen skal følge navbaren → MÅLT i
+simulatoren at Safari tar dokumentbakgrunnen KUN ved første tegning og
+ignorerer theme-color for statusfeltet (bunnlinja følger). Derfor: html =
+#7dffcb fra stilarket, `html[data-theme=frost]` #a7fbd4 + theme-color
+settes ved scroll (bunnlinja følger; om toppen følger på EKTE enhet ved
+verktøylinje-kollaps er ikke verifisert — simulatoren kan ikke sveipe).
+
+**NESTE:** Brages telefondom på runde 2 → PR Brage→main.
 
 ---
 

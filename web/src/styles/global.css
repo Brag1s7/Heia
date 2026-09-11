@@ -36,10 +36,15 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-/* html bærer Heia-mint som canvasfarge: Safari/in-app-nettlesere maler
-   statusfeltet og overscroll med dokumentbakgrunnen, så den skal matche
-   toppen av grunnen (målt #62ffc3–#88ffcc), ikke bunnen. */
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #7dffcb; overflow-x: hidden; overflow-x: clip; }
+/* html er canvasfargen. Målt i iOS 26-simulatoren: Safari maler
+   STATUSFELTET med dokumentbakgrunnen slik den er ved første tegning (og
+   ignorerer theme-color der), mens BUNNLINJA følger theme-color/bakgrunn
+   løpende. Derfor: mint fra stilarket (= toppen av grunnen), og
+   html[data-theme=frost] + theme-color når headeren er frostet (skriptet i
+   Base.astro). .ground stikker 120 px utenfor viewporten så canvasfargen
+   ikke titter fram nederst når Safari-linja kollapser eller siden strekkes. */
+html[data-theme='frost'] { background: #a7fbd4; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #7dffcb; overflow-x: hidden; overflow-x: clip; transition: background-color 0.25s ease-out; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
@@ -55,8 +60,6 @@ body {
   overflow-x: clip;
   -webkit-tap-highlight-color: transparent;
 }
-/* Åpen mobilmeny: siden bak står stille (touchmove stoppes i skriptet). */
-html[data-menu-open] { overflow: hidden; }
 .m-only { display: none !important; }
 @media (max-width: 640px) { .m-hide { display: none !important; } .m-only { display: block !important; } .m-only.link-more { display: inline-flex !important; } .m-only.trust { display: flex !important; } }
 
@@ -64,7 +67,7 @@ html[data-menu-open] { overflow: hidden; }
    dyp grønn kant nederst — fast bak alt, som i appen. */
 .ground {
   position: fixed;
-  inset: 0;
+  inset: -120px 0;
   z-index: -1;
   background:
     radial-gradient(1100px 700px at 8% 0%, rgba(2, 255, 171, 0.55) 0%, rgba(2, 255, 171, 0) 60%),
@@ -349,93 +352,94 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
 .site-header nav .acct-menu button[data-signout] { color: var(--ink-2); margin-top: 6px; }
 .site-header nav .acct-menu button[data-signout]:disabled { opacity: 0.5; cursor: default; }
 
-/* Mobil: fullbredde header som er del av grunnen øverst og rolig blir til
-   frost ved scroll. Frosten ligger i ::before og tones inn med opacity —
-   backdrop-filter kan ikke selv tones, så av/på ville hakke. Nederst er
-   frosten maskert ut over 14 px: en myk scroll-kant, ingen strek. */
+/* Mobil: fullbredde header som er del av grunnen øverst og blir til mint-
+   frost ved scroll. Frosten er .site-header::before og tones med opacity
+   (backdrop-filter kan ikke selv tones): kontinuerlig av scrollposisjonen
+   der animation-timeline finnes, ellers data-scrolled. Hard kant nederst.
+   Menyen er ETT panel som dekker baren og lenkene (samme materiale, ingen
+   skjøt); logo og hamburger ligger over panelet. */
 @media (max-width: 640px) {
-  .site-header { padding: env(safe-area-inset-top, 0px) 0 0; }
-  .site-header > .container { width: 100%; }
+  .site-header { padding: env(safe-area-inset-top, 0px) 0 0; --bar-h: 74px; }
+  .site-header > .container { width: 100%; position: relative; z-index: 2; }
   .site-header .bar {
-    min-height: 60px; padding: 0 12px 0 16px; border-radius: 0; gap: 8px;
+    min-height: var(--bar-h); padding: 0 10px 0 16px; border-radius: 0; gap: 8px;
     background: transparent; border: 0; box-shadow: none;
     backdrop-filter: none; -webkit-backdrop-filter: none;
   }
-  .site-header .bar::before {
-    content: ''; position: absolute; left: 0; right: 0; top: calc(-1 * env(safe-area-inset-top, 0px)); bottom: -14px; z-index: -1;
-    background: rgba(238, 251, 235, 0.82);
-    backdrop-filter: blur(18px) saturate(1.35); -webkit-backdrop-filter: blur(18px) saturate(1.35);
-    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
+  .site-header::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--bar-h) + env(safe-area-inset-top, 0px)); z-index: 0;
+    background: rgba(150, 250, 205, 0.86);
+    backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
+    box-shadow: 0 1px 0 rgba(6, 58, 45, 0.14);
     opacity: 0; pointer-events: none;
-    transition: opacity 0.3s ease-out;
+    transition: opacity 0.25s ease-out;
   }
-  .site-header[data-scrolled] .bar::before { opacity: 1; }
+  .site-header[data-scrolled]::before { opacity: 1; }
   @supports (animation-timeline: scroll()) {
-    .site-header .bar::before { animation: heia-frost-in linear both; animation-timeline: scroll(root block); animation-range: 4px 64px; transition: none; }
-  }
-  .site-header[data-open] .bar::before {
-    animation: none; opacity: 1; bottom: 0; transition: none;
-    background: rgba(240, 252, 238, 0.94);
-    -webkit-mask-image: none; mask-image: none;
+    .site-header:not([data-js-frost])::before { animation: heia-frost-in linear both; animation-timeline: scroll(root block); animation-range: 0px 48px; transition: none; }
   }
 
-  .site-header .logo { height: 44px; padding: 0 4px; margin-left: -4px; background: none; box-shadow: none; border-radius: 10px; }
-  .site-header .logo img { height: 27px; }
+  .site-header .logo { height: 48px; padding: 0 4px; margin-left: -4px; background: none; box-shadow: none; border-radius: 12px; }
+  .site-header .logo img { height: 42px; }
   .site-header .logo .logo-d { display: none; }
   .site-header .logo .logo-m { display: block; }
   .site-header nav a { display: none; }
   .site-header nav .btn { display: none; }
   .site-header nav .acct { display: none; }
-  .site-header .menu-btn { display: grid; }
+  .site-header .menu-btn { display: grid; width: 48px; height: 48px; }
+  .site-header .burger { width: 26px; height: 18px; }
+  .site-header .burger i { width: 26px; height: 2.6px; }
+  .site-header .burger i:nth-child(2) { top: 7.7px; }
+  .site-header .burger i:nth-child(3) { top: 15.4px; }
+  .site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(1) { transform: translateY(7.7px) rotate(45deg); }
+  .site-header .menu-btn[aria-expanded="true"] .burger i:nth-child(3) { transform: translateY(-7.7px) rotate(-45deg); }
 
-  /* Menyen: samme materiale som headeren, kant til kant, rett under baren.
-     Kommer ned fra baren (anker = kilden) og går samme vei ut. */
   .site-header .mobile-menu {
-    display: block; position: absolute; left: 0; right: 0; top: calc(100% - 1px);
-    max-height: calc(100dvh - 60px - env(safe-area-inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
-    padding: 6px 12px calc(18px + env(safe-area-inset-bottom, 0px));
-    background: rgba(240, 252, 238, 0.94);
-    backdrop-filter: blur(24px) saturate(1.35); -webkit-backdrop-filter: blur(24px) saturate(1.35);
-    box-shadow: 0 24px 48px rgba(6, 58, 45, 0.16);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.7);
-    opacity: 0; transform: translateY(-10px); visibility: hidden;
+    display: block; position: absolute; left: 0; right: 0; top: 0; z-index: 1;
+    max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+    padding: calc(var(--bar-h) + env(safe-area-inset-top, 0px) + 4px) 12px calc(18px + env(safe-area-inset-bottom, 0px));
+    background: rgba(214, 252, 236, 0.95);
+    backdrop-filter: blur(24px) saturate(1.4); -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    box-shadow: 0 1px 0 rgba(6, 58, 45, 0.14), 0 24px 48px rgba(6, 58, 45, 0.16);
+    opacity: 0; transform: translateY(-8px); visibility: hidden; will-change: opacity, transform;
     transition: opacity 0.16s ease-in, transform 0.16s ease-in, visibility 0s linear 0.16s;
   }
   .site-header[data-open] .mobile-menu {
     opacity: 1; transform: none; visibility: visible;
-    transition: opacity 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s;
+    transition: opacity 0.2s ease-out, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s;
   }
   .site-header .menu-scrim {
-    display: block; position: fixed; inset: 0; z-index: -2;
-    background: rgba(6, 58, 45, 0.28);
+    display: block; position: fixed; inset: 0; z-index: 0;
+    background: rgba(6, 58, 45, 0.3);
     opacity: 0; visibility: hidden; transition: opacity 0.16s ease-in, visibility 0s linear 0.16s;
   }
-  .site-header[data-open] .menu-scrim { opacity: 1; visibility: visible; transition: opacity 0.22s ease-out, visibility 0s; }
+  .site-header[data-open] .menu-scrim { opacity: 1; visibility: visible; transition: opacity 0.2s ease-out, visibility 0s; }
 
   .site-header .mobile-menu a {
-    display: flex; align-items: center; min-height: 52px; padding: 0 14px; border-radius: 14px; text-decoration: none;
-    font-family: var(--display); font-weight: 800; font-size: 19px; letter-spacing: -0.005em; color: var(--deep);
+    display: flex; align-items: center; min-height: 54px; padding: 0 14px; border-radius: 14px; text-decoration: none;
+    font-family: var(--display); font-weight: 800; font-size: 20px; letter-spacing: -0.005em; color: var(--deep);
     transition: background-color 0.12s ease-out;
   }
-  .site-header .mobile-menu a:active, .site-header .mobile-menu a:focus-visible { background: rgba(2, 255, 171, 0.28); }
-  .site-header .mobile-menu .menu-cta { display: grid; gap: 8px; margin: 14px 2px 0; padding-top: 14px; border-top: 1px solid rgba(6, 58, 45, 0.1); }
+  .site-header .mobile-menu a:active, .site-header .mobile-menu a:focus-visible { background: rgba(2, 255, 171, 0.3); }
+  .site-header .mobile-menu .menu-cta { display: grid; gap: 8px; margin: 14px 2px 0; padding-top: 14px; border-top: 1px solid rgba(6, 58, 45, 0.12); }
   .site-header .mobile-menu .menu-cta .btn { width: 100%; min-height: 54px; }
-  .site-header .mobile-menu .menu-account { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(6, 58, 45, 0.1); }
+  .site-header .mobile-menu .menu-cta .btn-ghost { background: rgba(255, 255, 255, 0.72); border-color: rgba(6, 58, 45, 0.12); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .site-header .mobile-menu .menu-account { margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(6, 58, 45, 0.12); }
   .site-header .mobile-menu .menu-who { padding: 6px 14px 4px; font-size: 13px; color: var(--ink-2); }
   .site-header .mobile-menu .menu-who b { color: var(--deep); }
   .site-header .mobile-menu .menu-account button {
-    display: flex; align-items: center; width: 100%; min-height: 52px; padding: 0 14px; border-radius: 14px; border: 0; background: none;
-    font-family: var(--display); font-weight: 800; font-size: 19px; color: var(--ink-2); text-align: left; cursor: pointer;
+    display: flex; align-items: center; width: 100%; min-height: 54px; padding: 0 14px; border-radius: 14px; border: 0; background: none;
+    font-family: var(--display); font-weight: 800; font-size: 20px; color: var(--ink-2); text-align: left; cursor: pointer;
   }
-  .site-header .mobile-menu .menu-account button:active { background: rgba(2, 255, 171, 0.28); }
+  .site-header .mobile-menu .menu-account button:active { background: rgba(2, 255, 171, 0.3); }
 
   @media (prefers-reduced-motion: reduce) {
-    .site-header .mobile-menu, .site-header .menu-scrim, .site-header .burger i, .site-header .bar::before { transition-duration: 0.01ms; animation: none; }
+    .site-header .mobile-menu, .site-header .menu-scrim, .site-header .burger i, .site-header::before { transition-duration: 0.01ms; animation: none; }
     .site-header .mobile-menu { transform: none; }
   }
   @media (prefers-reduced-transparency: reduce) {
-    .site-header .bar::before, .site-header .mobile-menu { background: #eefbea; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .site-header::before { background: #a7fbd4; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .site-header .mobile-menu { background: #d9fbec; backdrop-filter: none; -webkit-backdrop-filter: none; }
   }
 }
 @keyframes heia-frost-in { from { opacity: 0; } to { opacity: 1; } }
@@ -484,7 +488,6 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
   .hero-phones .phone { width: min(280px, 100%); }
   .hero-phones .phone:nth-child(2) { display: block; margin: 0 auto; transform: none; }
   .hero-phones .phone:nth-child(3) { display: none; }
-  .site-header .mobile-menu .menu-cta .btn-ghost { background: rgba(255, 255, 255, 0.72); border-color: rgba(6, 58, 45, 0.12); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 /* Chips */
