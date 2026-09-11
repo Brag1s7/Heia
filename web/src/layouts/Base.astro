@@ -26,9 +26,12 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#7dffcb" id="theme-color" />
+    <meta name="theme-color" content="#dffff1" />
     <meta name="color-scheme" content="light" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
@@ -241,11 +244,14 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
 
         // Frost på mobilheaderen ved scroll. Der nettleseren kan, styres den
         // kontinuerlig av scrollposisjonen i CSS (animation-timeline); ellers
-        // av data-scrolled (hysterese). Safari maler statusfeltet med
-        // theme-color, så den følger headeren: grunnens mint øverst, frostens
-        // farge når headeren er frostet — samme hysterese, én gang per frame.
-        const themeMeta = document.getElementById('theme-color');
-        const THEME_TOP = '#7dffcb', THEME_FROST = '#a7fbd4';
+        // av data-scrolled (hysterese), målt én gang per frame.
+        // iOS-Safari (målt): statusfeltet = html-bakgrunnen fra stilarket ved
+        // første tegning (navbarens frost); bunnlinja = html-bakgrunnen LIVE.
+        // Live-fargen settes til grunnens lyse bunn på mobil, så Safari-linja
+        // nederst aldri blir mint.
+        const applyCanvas = () => { document.documentElement.style.backgroundColor = mq.matches ? '#f5f8e9' : ''; };
+        applyCanvas();
+        mq.addEventListener('change', applyCanvas);
         const cssFrost = CSS.supports('animation-timeline: scroll()');
         let ticking = false;
         const onScroll = () => {
@@ -257,18 +263,6 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
             const scrolled = header.hasAttribute('data-scrolled');
             if (!scrolled && y > 24) header.setAttribute('data-scrolled', '');
             else if (scrolled && y < 4) header.removeAttribute('data-scrolled');
-            // Safari (iOS 26, målt): statusfeltet = dokumentbakgrunnen ved
-            // første tegning; bunnlinja følger theme-color/bakgrunn løpende.
-            // Begge settes, så det som KAN følge headeren, gjør det.
-            if (mq.matches) {
-              const frost = header.hasAttribute('data-scrolled');
-              const want = frost ? THEME_FROST : THEME_TOP;
-              if (themeMeta && themeMeta.getAttribute('content') !== want) themeMeta.setAttribute('content', want);
-              document.documentElement.toggleAttribute('data-theme', frost);
-              if (frost) document.documentElement.setAttribute('data-theme', 'frost');
-            } else if (document.documentElement.hasAttribute('data-theme')) {
-              document.documentElement.removeAttribute('data-theme');
-            }
           });
         };
         if (!cssFrost) header.setAttribute('data-js-frost', '');

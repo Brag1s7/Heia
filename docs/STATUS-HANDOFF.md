@@ -56,7 +56,22 @@ ignorerer theme-color for statusfeltet (bunnlinja følger). Derfor: html =
 settes ved scroll (bunnlinja følger; om toppen følger på EKTE enhet ved
 verktøylinje-kollaps er ikke verifisert — simulatoren kan ikke sveipe).
 
-**NESTE:** Brages telefondom på runde 2 → PR Brage→main.
+**RUNDE 3 (samme dag, Brages andre dom):** mint nederst ved scroll opp /
+åpen meny → MÅLT (fire kontrollerte forsøk i simulatoren): Safari bruker
+IKKE theme-color i det hele tatt; STATUSFELTET = html-bakgrunnen fra
+STILARKET ved første tegning (fryses), BUNNLINJA = html-bakgrunnen LIVE.
+Derfor: stilarket `html{background:#93fccf}` = navbarens frost (målt
+#8dfccc scrollet), skriptet setter `html.style.backgroundColor='#f5f8e9'`
+på mobil så bunnlinja er kremhvit. Frost nå rgba(143,252,205,.94) (nesten
+dekkende → stabil farge). Blink ved lukking = scrimen dekket navbaren og
+krysstonet over den → scrim starter under baren. Menyen vokste når
+Safari-linja kollapset = `env(safe-area-inset-bottom)` i panelets padding
+→ fjernet, max-height 100svh. Favicon: `favicon.svg` (dyp grønn, Heia-
+figuren i neon, PNG innbakt), `favicon-32.png`, `apple-touch-icon.png`,
+`icon-192/512.png`, `site.webmanifest`. theme-color tilbake til #dffff1
+(Instagram-toppen Brage likte).
+
+**NESTE:** Brages telefondom på runde 3 → PR Brage→main.
 
 ---
 
