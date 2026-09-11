@@ -523,6 +523,24 @@ telefon/PC (preview-URL fra Vercel for grenen), Vercel Pro,
 TestFlight public link, selskapsopplysninger, `/nytt`, deepLink.ts for
 https `/lag?kode=` i appen (W2 app-del), W3 `/konto`+`/invitasjon`.
 
+**2026-09-11 — ADMINLØSNINGEN PÅ WEB BYGGET (blokk 1–3), COMMITTET OG
+PUSHET (`b21df37` backend, `b03df75` web, `0e43741` app).** PR-tekst +
+publiseringsrekkefølge: `docs/PR-NETTSIDE-ADMIN-2026-09.md` (gh er ikke
+innlogget → Brage oppretter PR-en fra compare-lenken). Web: `/konto`,
+`/invitasjon#token`, `/klubb`, `/ops` som React-øyer (`web/src/app/*`,
+API-port i `web/src/lib/api.ts`, auth i `web/src/lib/auth.tsx`). Backend I
+PROD: migrasjon 00082 `peek_manager_invitation` (verify 19/19),
+`stripe-onboarding` m/ `entity_id` + `source=web` (deployet).
+`claim-notify` → https-ops-lenke er KODET, IKKE deployet (venter på main).
+Tilgangstest `scripts/verify-web-access.mjs` 18/18 (anon + rolleløs bruker
+nektes overalt; testbruker opprettes/slettes selv). Ny SQL-kanal:
+`scripts/run-sql.mjs` (management API m/ CLI-token fra nøkkelringen).
+App: delelinken (`parseJoinCodeFromUrl`, `openJoinTeamCode`, flush ved
+rotbytte, delearket deler https-lenke) — trenger nytt TestFlight-bygg.
+IKKE GJORT: positive ops-/manager-flyter i nettleser (krever Brages konto),
+`WEB_INVITE_BASE_URL` + `WEB_INVITE_LANDING_LIVE` (aktiveres etter at Brage
+har prøvd `/invitasjon`), Vercel-kontroll (ingen CLI-innlogging på maskinen).
+
 ▶️ **NESTE (forrige plan, står fortsatt):** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
 lagre → lander på Kalender UTEN frys; laghodet uten chip, sesongsiden («Ny kamp» og Lagkassa uten
 header-hopp, handlingsraden, «Ny kamp»-arket komplett fra første ramme), tilbakeknappen i ro OG kompakt, topp, scroll, fanene, Referat-kortene, «Siste hendelse for N min». Deretter én variabel per
