@@ -1,5 +1,53 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-11 — NETTSIDEN: PR #53 MERGET OG I PROD, `/ops` LIVE, `claim-notify` DEPLOYET, INNLOGGING I HEADEREN BYGGET — VENTER NY MERGE)
+
+**Gjort i denne økta (alt pushet til `origin/Brage`):**
+- **Steg 1–3 i publiseringsrekkefølgen er LUKKET.** PR #53 (Brage → main)
+  er merget av Brage og Vercel-deployen er live: `heiaapp.no/ops/` og
+  dyplenken `/ops/claims/<uuid>` svarer 200 med OpsApp-øya (rewriten
+  virker), `/klubb/`, `/konto/`, `/invitasjon/` 200. `supabase functions
+  deploy claim-notify` kjørt 2026-09-11 11:3x: versjon 6 → 7 (ny sha),
+  `WEB_BASE_URL` fantes fra før (satt 2026-08-02 = https://heiaapp.no) →
+  ops-lenken i søknads-e-posten er nå `https://heiaapp.no/ops/claims/<id>`.
+- **Innlogging + admin-innganger på nettsiden (`d4c1649`).** Brage fant
+  ingen inngang til innlogging/admin. Nå: PC-toppmenyen har «Logg inn»
+  (samme stil som lenkene, «Få laget ditt med» er fortsatt hovedknapp);
+  hamburgermenyen har «Logg inn» som ghost-knapp over CTA-en. Innlogget:
+  «Min konto ▾»-dropdown (PC) / kontoblokk i hamburgermenyen (mobil) med
+  navn/e-post, «Min konto» (/konto), «Heia-admin» (/ops, kun ops-rolle),
+  «Klubbetalinger» (/klubb, kun betalingsansvarlig — begge vises ved begge
+  roller) og «Logg ut» (→ forsiden). Arbeidsflatene (`minimal`) har nå
+  Forsiden/Hjelp + kontomeny og hamburger på mobil (før: ingen nav på
+  mobil). «Heia Ops» heter «Heia-admin» på web (tittel, h1, tekster).
+  Mekanikk: headeren har IKKE supabase-js — inline-skript i `Base.astro`
+  leser `heia-web-auth` fra localStorage, POST-er `is_ops_admin` og
+  `is_payment_manager_anywhere` via PostgREST med brukerens token og cacher
+  i `heia-web-roles` per uid. `supabase.ts` sender `heia:auth` ved
+  sesjonsendring og registrerer `window.__heiaSignOut`, så headeren og øya
+  på samme side er enige. Konstantene bor i `web/src/lib/env.ts`.
+- **Reisetest i ekte nettleser:** `scripts/verify-web-login-journey.mjs`
+  **51/51** (forsiden → «Logg inn» → /konto-skjema → meny m/ roller →
+  Heia-admin → omlasting beholder innlogging + roller → Klubbetalinger →
+  Logg ut → /ops krever innlogging igjen; ops-only-bruker ser IKKE
+  Klubbetalinger; øyas «Logg ut» oppdaterer headeren; mobil-hamburger
+  uinnlogget/innlogget/Logg ut; ingen JS-feil). Kjøres mot lokal `astro
+  preview` med fixturene fra `verify-web-flows.mjs --keep --sessions=…`
+  (passord settes om, claimant får også ops-rolle); `--cleanup` etterpå —
+  verifisert 0/0/0. Flyttestene 34/34 samme dag.
+
+**NESTE — KREVER NY MERGE FRA BRAGE:** `Brage` er 1 commit foran `main`
+(`d4c1649` + denne handoffen). Opprett PR fra
+https://github.com/Brag1s7/Heia/compare/main...Brage (gh er ikke innlogget
+på maskinen), merge → Vercel deployer → prøv
+https://heiaapp.no → «Logg inn» → https://heiaapp.no/konto/ →
+«Min konto» → https://heiaapp.no/ops/ og https://heiaapp.no/klubb/ med
+egen konto. Deretter punkt 4–7 i `docs/PR-NETTSIDE-ADMIN-2026-09.md`
+(invitasjonsreisen: secret + flagg → TestFlight-bygg → AS-opplysninger →
+App Store-URL). Ny samtale er trygg å starte herfra.
+
+---
+
 ## ▶️▶️ START HER (2026-09-09 sen kveld — TO SKIVER LIGGER UKOMMITTERT OG VENTER TELEFONDOM: KAMPSKJERMEN RUNDE 2 + SESONGSIDEN/HJEM. FRYSEN ETTER «NY KAMP» ER LØST.)
 
 ### Tilstanden i treet akkurat nå (les denne først)
