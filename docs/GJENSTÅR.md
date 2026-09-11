@@ -28,8 +28,8 @@ Hvert lag deployes for seg._
 |---|---|---|
 | **Databasen** | migrasjoner t.o.m. **`00084`** (00079–00084 sammenhengende) | ingenting — **i synk** ✅ |
 | **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · øvrige i synk | **to udeployede** — punkt 117 |
-| **Nettsiden** heiaapp.no | `main` = `318305e` (17:47) | `Brage` er **6 commits foran**; miljøseparasjonen venter på tre Vercel-variabler (punkt 108) |
-| **CI** | rød på `main` inntil PR-en merges | **rettet lokalt**: `tsc` 0 feil (var 31), `jest` 1258, `eslint` 0 feil — punkt 116 |
+| **Nettsiden** heiaapp.no | `main` = `318305e` (17:47), uendret og verifisert | `Brage` er **9 commits foran**; preview grønn på `8b2b8bd`, Vercel-variablene satt (punkt 108) |
+| **CI** | rød på `main` til PR-en merges | **grønn lokalt, begge jobber**: `tsc` 0 (var 31), `jest` 1258, `eslint` 0, `astro check` 0, bevisfilene grønne. CI fyrer bare på PR — se punkt 121 |
 | **Secrets** | `WEB_BASE_URL` og `WEB_INVITE_BASE_URL` satt | — |
 | **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
 | **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
@@ -578,15 +578,28 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      arkiveres først, så kanselleres abonnementene serielt uten
      fremdriftsmerking. Et lag som ikke rekker gjennom på ett forsøk,
      rekker aldri gjennom.
-108. ~~**Nettsiden har ingen miljøseparasjon.**~~ **LUKKET i kode
-     2026-09-11, VENTER PÅ VERCEL-VARIABLER.** `web/src/lib/env.ts` har
+108. ~~**Nettsiden har ingen miljøseparasjon.**~~ **LUKKET 2026-09-11 natt
+     — variablene er satt i Vercel, og previewen bygger grønt.** `web/src/lib/env.ts` har
      ingen reserveverdi lenger: `PUBLIC_HEIA_ENV` (`production`/`test`/
      `local`), `PUBLIC_SUPABASE_URL` og `PUBLIC_SUPABASE_ANON_KEY` må
      settes, ellers stopper byggingen med en forklarende feil. Et
      miljømerke nede til høyre viser datamiljø og prosjektreferanse på
      alle verter unntatt heiaapp.no. Bevis: `scripts/verify-web-env.mjs`.
-     **Gjenstår før merge:** Brage setter de tre variablene i Vercel for
-     både Production og Preview — se utrullingsplanen i STATUS-HANDOFF.
+     **Variablene er på plass:** `PUBLIC_HEIA_ENV=production`,
+     `PUBLIC_SUPABASE_URL` og `PUBLIC_SUPABASE_ANON_KEY`, alle for både
+     Production og Preview, alle av typen **Config** (Vercel krevde et
+     eksplisitt valg for `PUBLIC_`-prefikset: anon-nøkkelen SKAL nå
+     nettleseren, så «secret» ville brutt byggingen — Astro eksponerer bare
+     `PUBLIC_`-variabler til klienten). Verdiene er verifisert identiske med
+     `web/.env` ved å hente dem ned igjen.
+
+     **Beviset for at vakten virker, kom fra Vercel selv.** De to previewene
+     før variablene feilet med `[heia/web] PUBLIC_HEIA_ENV mangler`, og
+     Vercel var grønn på commiten før — altså kan ingen forhåndsvisning
+     lenger bygge stille mot produksjon. Byggeloggen på den grønne previewen
+     inneholder dessuten advarselen fra `astro.config.mjs`: «Sett
+     PUBLIC_HEIA_ENV=test for Preview når et testprosjekt finnes». Den
+     skrives bare når Vercel melder «preview» OG miljøet er `production`.
 109. ~~**CI bygger ikke nettsiden.**~~ **LUKKET 2026-09-11 for nettsidens
      del.** `.github/workflows/ci.yml` har en `web`-jobb: `astro check`
      (typer og `.astro`-diagnostikk, 0 feil), en negativ test som krever
@@ -724,6 +737,14 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      sier «skillene er hårlinjer», men `styles.divider` var aldri definert
      — skillet er i dag bare et ekstra `gap`. Tom stil står nå der navnet
      skal fylles. Rent designarbeid.
+121. **CI kjører ikke på pushen til `Brage`.** Arbeidsflyten fyrer bare på
+     `pull_request` og `push` til `main`, så en grønn eller rød CI finnes
+     ikke før PR-en er åpnet. Det er ikke feil, men det betyr at ingen av
+     de nye stegene (`astro check`, `web`-jobben, de to lintene) har vært
+     kjørt av GitHub ennå — bare lokalt, steg for steg i arbeidsflytens
+     egen rekkefølge. Vurder å legge `Brage` til i `push`-triggeren, så
+     grenen får dom uten at det må åpnes PR.
+
 ### Avkreftet
 
 112. **Bøttegrensene er allerede på plass.** Gjennomgangen meldte at

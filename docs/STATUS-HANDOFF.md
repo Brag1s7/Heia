@@ -1,19 +1,32 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 natt, runde 2 — DATABASEN ER I SYNK, TO TING VENTER PÅ BRAGE)
+## ▶️▶️ START HER (2026-09-11 natt, runde 3 — ALT ER GRØNT LOKALT OG PÅ VERCEL; BARE PR-EN GJENSTÅR)
 
-### De to tingene som venter på deg
+### Det ene som gjenstår: åpne PR-en
 
-1. **Tre Vercel-variabler** (Production **og** Preview) — uten dem stopper
-   byggingen av nettsiden. Jeg har ingen Vercel-tilgang: det ligger bare en
-   tom `auth.json` uten token på maskina, og `vercel` er ikke installert.
-   Verdiene står i rammen lenger nede.
-2. ~~CI er rød~~ **RETTET 2026-09-11 natt.** Det var ikke 10 feil, men
-   **31 i 10 filer** — GitHub kapper annotasjonene på ti. Alle er rettet på
-   typenivå, uten funksjonell endring: `tsc` 0 feil, `jest` 1258 bestått,
-   `eslint` 0 feil. Se punkt 116, og 118–120 for de ekte feilene
-   typefeilene skjulte (oppførselen er BEHOLDT; de er ført videre i stedet
-   for å bli rettet i forbifarten).
+`gh` er ikke innlogget, så jeg kan ikke opprette den. **CI fyrer bare på
+`pull_request` og `push` til `main`**, så grenen får ingen dom før PR-en
+finnes:
+
+    https://github.com/Brag1s7/Heia/compare/main...Brage?expand=1
+
+Begge CI-jobbene er kjørt lokalt, steg for steg i arbeidsflytens egen
+rekkefølge, og er grønne — se tabellen under.
+
+### Vercel er koblet opp
+
+CLI-en er innlogget (device-flow), scope `heia1`, prosjekt `heia`,
+Node 24.x. `web/` er lenket; `.vercel` og `.env*` er git-ignorert (CLI-en
+la dem inn selv, jeg la til `!.env.example` så malen fortsatt følger
+repoet). **Ingen prosjektinnstillinger er rørt** — ikke domener, ikke
+produksjonsgren, ikke beskyttelse.
+
+De tre variablene står nå for **Production og Preview**, type **Config**.
+Vercel krevde et eksplisitt valg for `PUBLIC_`-prefikset; anon-nøkkelen
+SKAL nå nettleseren (Astro eksponerer bare `PUBLIC_`-variabler til
+klienten), så «secret» ville brutt byggingen. Nøkkelen er den eksisterende
+anon-nøkkelen fra `web/.env` — kontrollert at JWT-en har `"role":"anon"`.
+`service_role` er aldri rørt.
 
 ### Hva som ER i drift nå
 
@@ -90,95 +103,6 @@ Brage først — se rammen under.
 **Steg 2 (punkt 97, 111, 30 — migrasjon 00084)** er **kjørt i prod** og
 bevist der. Databasen står nå på `00084`. Lukket: punkt 108, 109, 97, 111
 og 30.
-
-### ⚠️ Gjør dette FØR PR-en merges
-
-Nettsiden har ikke lenger noen reserveverdi. Bygger Vercel uten
-miljøvariabler, **stopper byggingen**. Sett tre variabler i
-**Vercel → Project Settings → Environment Variables**, huket av for
-**både Production og Preview** (og gjerne Development):
-
-    PUBLIC_HEIA_ENV          production
-    PUBLIC_SUPABASE_URL      https://sswncdrbsrfieudkdmhj.supabase.co
-    PUBLIC_SUPABASE_ANON_KEY <anon-nøkkelen, samme som før>
-
-Anon-nøkkelen ligger i `web/.env` lokalt (git-ignorert) og i Supabase →
-Project Settings → API. Den er offentlig per design; den har alltid ligget
-i nettsidens bundle.
-
-**Risiko hvis det glemmes:** Vercel-byggingen feiler. Den *live* siden går
-ikke ned — Vercel beholder forrige vellykkede deploy på domenet. Feilen er
-altså «ny versjon kommer ikke ut», ikke «heiaapp.no er borte».
-
-**Tilbakeføring:** `git revert` av commiten. Ingen databaseendring, ingen
-Edge Function, ingen migrasjon. Variablene kan stå igjen i Vercel uten
-virkning.
-
-### Steg 2 er KJØRT I PROD: migrasjon 00084
-
-**Databasen står nå på `00084`.** `00083` er bevisst IKKE kjørt — den hører
-til skive 2. (Konsekvens: neste `supabase db push` kan kreve
-`--include-all`, siden 00083 ligger før 00084 i rekkefølgen.)
-
-**Forutsetningen endret seg:** Brage avklarte at alle 21 lag og 18 brukere i
-prod er hans egne testdata, uten eksterne pilotbrukere, og at eksisterende
-prosjekt brukes videre. Ingen nytt testprosjekt ble opprettet.
-
-**Metoden som erstattet et testmiljø** — og som bør gjenbrukes: kjør
-migrasjonen OG handlingene i en transaksjon som rulles tilbake, og mål begge
-retninger inne i den. Prod var målt ren etterpå: null spor.
-
-**Den empiriske avklaringen ble gjort, og svaret var JA.** En funksjon brukt
-i et RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Etter
-`revoke ... from authenticated` på `is_team_member` feilet en vanlig
-`select count(*) from feed_posts` for en innlogget bruker med 42501, der den
-før ga 296 rader. Korreksjonen i GJENSTÅR hadde rett i at uniform tildeling
-var feil, men pekte på gale funksjoner: vaktene MÅ beholde `authenticated`.
-Hadde 00084 blitt kjørt etter den korreksjonen, ville feed, kamp, kalender
-og realtime-join falt samtidig.
-
-**Tre grupper, ikke én:**
-
-| Gruppe | Funksjoner | Hva som skjedde |
-|---|---|---|
-| A bruker-RPC-er | 19 | GRANT `authenticated`, REVOKE PUBLIC + anon |
-| B vakter i RLS-uttrykk | `is_team_member`, `is_team_admin`, `is_club_team_admin` | BEHOLDER `authenticated`, REVOKE PUBLIC + anon |
-| C interne hjelpere | `inbox_enabled`, `notify_event_change`, `get_payment_account_for_team_space` | REVOKE også fra `authenticated` |
-| D bevisst anon | `lookup_invite_code` | urørt |
-
-Anon-åpne SECURITY DEFINER-funksjoner: **26 → 1**.
-
-**Testbevis (alt målt mot prod):**
-
-| Kontroll | Resultat |
-|---|---|
-| `scripts/verify-00084.sql` før push | utgangspunktet fanget: A1, A5, A7–A11 røde |
-| Tørrkjøring av hele migrasjonen i rullet-tilbake transaksjon | 12/12 grønt |
-| `scripts/verify-00084.sql` etter push | **12/12 grønt** |
-| Etterkontroll mot live tilstand | 12/12 grønt |
-| Legitimt: les feed (296), les kalender (34), `create_event`, `start_match`, `report_match_event` «mål», `upsert_rsvp`, `set_member_role`, `get_session_context`, `get_team_feed` (20) | alle OK som `authenticated` |
-| Avvist: anon → `create_team_from_scratch`, `start_match`, `feed_posts` | 42501 |
-| Punkt 111: innlogget → `inbox_enabled` på en ANNEN bruker | 42501 |
-| Varslingskjeden (A/B i rullet-tilbake transaksjon) | festet innlegg ga **+3 varselrader både med og uten revoke** — triggerveien er uskadd |
-| Tilgang på tvers av lag | 0 rader, ikke feil |
-| Punkt 30: anon → `start_match`, `report_match_event`, `soft_delete_post` | **42501** (var `P0001`) — punktet lukket på kjøpet |
-| Bygg 1.0 (4)-kompatibilitet | de 52 RPC-ene det gamle bygget kaller er en ekte delmengde av HEAD, og ingen av dem er i gruppe C |
-| Prod etterpå | 0 testinnlegg, 0 testhendelser, varselrader tilbake på 2259 |
-
-**Tilbakeføring:** `node scripts/run-sql.mjs scripts/rollback-00084.sql` —
-generert fra den MÅLTE tilstanden før kjøring, ikke skrevet på frihånd.
-Ingen datarader ble rørt; bare rettigheter og `search_path`.
-
-**Vakten mot gjentakelse** ble to ting: `scripts/lint-security-definer.mjs`
-i CI (leser migrasjonsfilene, krever REVOKE eller et bevisst
-`-- lint:anon-ok`-merke; negativt testet på fire varianter) og rad A1 i
-bevisfila (leser databasen, som er sannheten).
-
-**Lukket i denne runden:** punkt 108, 109, 97, 111, 30.
-**Igjen i skive 1:** punkt 98 (83 funksjoner uten `search_path`, tas i
-grupper) og punkt 113 (testmiljø, nedprioritert — se GJENSTÅR).
-
----
 
 ### Hva som faktisk ble gjort
 
