@@ -85,7 +85,16 @@ sidens farge; Brage sendte skjermbilde som IKKE kom fram (for stort) — be
 om det på nytt (mindre). Simulatorfakta: med scrim åpen ble bunnfeltet
 kremhvitt (#dee8d9), ellers html-fargen.
 
-**NESTE:** Brages skjermbilde av bunnen → diagnose → PR Brage→main.
+**RUNDE 5 (81c93d3):** Brages skjermbilde (ekte iPhone, adressefelt ØVERST)
+viste: topp = html-fargen live (kremhvit i runde 3), og flaten nederst =
+Safaris glass bak verktøylinja, tonet med html-fargen — synlig i den grad
+fargen avviker fra grunnen (VG: hvit på hvit = usynlig). Løsning: navbar-
+frost rgba(196,252,226,.94) og html/theme-color #cafce8 = SAMME lyse mint
+→ toppen matcher navbaren eksakt, flaten nederst nær grunnen. Brage: «alt
+annet godkjent». Ikke verifisert på ekte iPhone etter denne endringen.
+
+**NESTE:** Brage sjekker preview på telefonen → PR Brage→main (5 commits
+foran main: d4c1649, d1dc1e6, 10a6619, 0820f4e, 7b1f2b0, 81c93d3 + handoffs).
 
 ---
 
