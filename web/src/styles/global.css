@@ -73,9 +73,13 @@ body {
    dyp grønn kant nederst — fast bak alt, som i appen. */
 .ground {
   position: fixed;
-  inset: -160px 0 -240px;
+  /* Stopper 4 px over bunnkanten: da er det tint-stripen (krem) Safari leser
+     for verktøylinja, ikke grunnen. De nederste 90 px er flat krem = samme
+     farge som stripen, så Safari-flaten får samme farge som det den ligger over. */
+  inset: -160px 0 4px;
   z-index: -1;
   background:
+    linear-gradient(to top, #f5f8e9 0, #f5f8e9 90px, rgba(245, 248, 233, 0) 170px),
     radial-gradient(1100px 700px at 8% 0%, rgba(2, 255, 171, 0.55) 0%, rgba(2, 255, 171, 0) 60%),
     radial-gradient(800px 600px at 96% 22%, rgba(143, 255, 224, 0.75) 0%, rgba(143, 255, 224, 0) 62%),
     radial-gradient(700px 500px at 70% 6%, rgba(207, 255, 116, 0.35) 0%, rgba(207, 255, 116, 0) 60%),
