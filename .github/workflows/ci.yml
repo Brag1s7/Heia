@@ -51,7 +51,7 @@ jobs:
       # Målt lokalt etter at lekkasjene under var rettet: 10,9 s veggklokke
       # mot 9,3 s testtid, null advarsler, exit 0.
       - name: Tester (jest, inkl. kall-antall-vaktene)
-        run: npx jest --ci --runInBand
+        run: npx jest --ci --runInBand --detectOpenHandles
 
       - name: Lint (eslint)
         run: npm run lint
