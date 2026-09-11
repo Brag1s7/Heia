@@ -43,6 +43,13 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
   </head>
   <body>
     <div class="ground" aria-hidden="true"></div>
+    <!-- Safari 26 (iOS) toner status-/adressefeltet og verktøylinja etter
+         faste elementer inntil 4 px fra toppen / 3 px fra bunnen, ≥80 % brede,
+         ≥3 px høye, med background-color (pseudo-elementer, theme-color og
+         skript etter første tegning ignoreres). To usynlige striper bak
+         grunnen gir toppen navbarens mint og bunnen grunnens kremfarge. -->
+    <div class="tint tint-top" aria-hidden="true"></div>
+    <div class="tint tint-bottom" aria-hidden="true"></div>
 
     <header class="site-header" data-minimal={minimal ? '' : undefined}>
       <div class="container">

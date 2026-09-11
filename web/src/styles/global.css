@@ -62,6 +62,13 @@ body {
 .m-only { display: none !important; }
 @media (max-width: 640px) { .m-hide { display: none !important; } .m-only { display: block !important; } .m-only.link-more { display: inline-flex !important; } .m-only.trust { display: flex !important; } }
 
+/* Tint-striper for Safari 26 (se Base.astro): faste, i kantsonene, bak
+   grunnen. Ikke opacity:0 (samples likevel) — de ligger under .ground. */
+.tint { display: none; position: fixed; left: 0; width: 100%; z-index: -2; pointer-events: none; }
+.tint-top { top: 0; height: 6px; background-color: #93fccf; }
+.tint-bottom { bottom: -8px; height: 14px; background-color: #f5f8e9; }
+@media (max-width: 640px) { .tint { display: block; } }
+
 /* Dagslysgrunnen: mint-verden, ett stort neonfelt, aqua motsatt side,
    dyp grønn kant nederst — fast bak alt, som i appen. */
 .ground {
@@ -424,7 +431,7 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
   }
   .site-header[data-open] .mobile-menu .menu-inner { opacity: 1; transition: opacity 0.18s ease-out 0.06s; }
   .site-header .menu-scrim {
-    display: block; position: fixed; inset: calc(var(--bar-h) + env(safe-area-inset-top, 0px)) 0 -240px; z-index: 0;
+    display: block; position: fixed; inset: calc(var(--bar-h) + env(safe-area-inset-top, 0px)) 0 6px; z-index: 0;
     background: rgba(6, 58, 45, 0.3);
     opacity: 0; visibility: hidden; transition: opacity 0.22s ease-in, visibility 0s linear 0.22s;
   }

@@ -102,6 +102,18 @@ fixed }` — toppen = navbarens mint, bunnen = grunnens krem. Navbar-frost
 rgba(143,252,205,.94), theme-color #93fccf. Simulatoren fryser toppfargen
 per fane (kan ikke måles der lenger), bunnen målt kremhvit.
 
+**RUNDE 7 (dokumentert fiks, Brage ba om nettsøk):** Safari 26 toner
+status-/adressefelt og verktøylinje etter FASTE/STICKY elementer inntil
+4 px fra toppen / 3 px fra bunnen, ≥80 % brede, ≥3 px høye, via
+`background-color` (pseudo-elementer, theme-color og skript etter første
+tegning ignoreres; opacity:0 samples likevel). Kilder: jahir.dev/blog/
+safari-toolbar, nasedk.in/blog/ios26-safari-toolbar-colors,
+github.com/andesco/safari-color-tinting. Bygget: `.tint-top` (mint
+#93fccf, 6 px) og `.tint-bottom` (krem #f5f8e9, 14 px) faste bak grunnen
+(z-index -2), kun <640 px; scrimen slutter 6 px over bunnen så den ikke
+farger linja når menyen åpnes. html-gradienten står som fallback.
+Bunnen målt kremhvit i simulatoren; toppen kan bare sees på ekte telefon.
+
 **NESTE:** Brage sjekker preview på telefonen → PR Brage→main.
 
 ---
