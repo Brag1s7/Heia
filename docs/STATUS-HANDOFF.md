@@ -56,9 +56,23 @@ behavior:"instant"})` for viewport-bilder (sips-crop er upålitelig),
 booted "http://localhost:4321/?v=N#anker"` (cache-bust m/ query) +
 `simctl io booted screenshot`.
 
-**IKKE gjort / til Brage:** helhetsdom på preview (mobil + PC); PR
-Brage→main; Safari-flaten nederst (edb614f) fortsatt ikke sett på ekte
-telefon. Ny samtale er trygg å starte herfra.
+**NETTSIDEN ER LUKKET:** Brage merget PR #55 2026-09-11 17:47, og begge
+designrundene er live på heiaapp.no (verifisert: alle flater svarer 200,
+runde 2-markup og demobildene serveres). Branchen er 0 foran og 38 bak
+main — oppdater den fra main før neste kodearbeid.
+
+**▶️ ARBEIDSLISTA BOR NÅ I `docs/GJENSTÅR.md`** (opprettet 2026-09-11):
+86 punkter i 13 seksjoner, samlet fra denne fila, de ni andre
+plandokumentene, koden og minnene, og verifisert mot repo, prod-DB og
+Supabase. DENNE fila er historikken; GJENSTÅR er hva som skal gjøres.
+Kritisk sti: Heia AS → D-U-N-S → Apple-konvertering og Stripe live-KYC →
+live-nøkler → App Store. Eneste harde blokkere mot App Store er de
+juridiske plassholderne og personvernetikettene.
+
+**Anbefalt neste steg: TestFlight 1.0 (5).** Byggnummeret i repoet står
+på 3 mens 1.0 (4) er lastet opp, så det MÅ bumpes til 5 før arkivering.
+
+Ny samtale er trygg å starte herfra.
 
 ---
 
