@@ -273,10 +273,16 @@ Deno.serve(async (req) => {
     return new Response('skipped', {status: 200});
   }
 
-  const opsLink = `heia://ops/claims/${record.id}`;
+  // Heia Ops bor på web (heiaapp.no/ops) når WEB_BASE_URL er satt —
+  // https-lenken virker på PC og telefon uten app. Uten secreten består
+  // appens deep link.
+  const webBase = Deno.env.get('WEB_BASE_URL');
+  const opsLink = webBase
+    ? `${webBase.replace(/\/+$/, '')}/ops/claims/${record.id}`
+    : `heia://ops/claims/${record.id}`;
   const text = `En klubb har søkt om aktivering av støtte i Heia.
 
-ÅPNE I HEIA OPS (på telefonen med Heia installert):
+ÅPNE I HEIA OPS:
 ${opsLink}
 
 Klubb (søknad): ${record.claimed_legal_name}
@@ -294,7 +300,7 @@ ${evidence}
 ----------------------------------------------------------------------
 
 Handlingene (Godkjenn / Be om mer informasjon / Avslå) gjøres i Heia
-Ops-flaten i appen — godkjenning krever at du beskriver hvordan
+Ops på heiaapp.no (eller i appen) — godkjenning krever at du beskriver hvordan
 autorisasjonen ble verifisert, og alt logges. SQL-editoren er kun
 nødfallback (ops-runbooken i PAYMENTS.md §Fase 3).
 `;

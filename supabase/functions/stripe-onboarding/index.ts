@@ -62,14 +62,20 @@ Deno.serve(async (req) => {
   if (!user) return json({error: 'Ikke innlogget.'}, 401);
 
   let teamSpaceId: string | undefined;
+  let entityId: string | undefined;
+  let source: 'app' | 'web' = 'app';
   try {
     const body = await req.json();
     teamSpaceId = body?.team_space_id;
+    entityId = body?.entity_id;
+    if (body?.source === 'web') source = 'web';
   } catch {
     // faller gjennom til valideringen under
   }
-  if (!teamSpaceId || !UUID_RE.test(teamSpaceId)) {
-    return json({error: 'Ugyldig forespørsel (team_space_id mangler).'}, 400);
+  const byTeam = !!teamSpaceId && UUID_RE.test(teamSpaceId);
+  const byEntity = !byTeam && !!entityId && UUID_RE.test(entityId);
+  if (!byTeam && !byEntity) {
+    return json({error: 'Ugyldig forespørsel (team_space_id eller entity_id mangler).'}, 400);
   }
 
   const admin = createClient(
@@ -77,28 +83,43 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   );
 
-  // Kjeden team_space → team → club → aktiv link → enhet → konto.
-  // Kontoraden finnes KUN etter godkjent claim — det er selve gaten.
-  const {data: ts} = await admin
-    .from('team_spaces')
-    .select('team_id, teams(club_id)')
-    .eq('id', teamSpaceId)
-    .maybeSingle();
+  // Kjeden team_space → team → club → aktiv link → enhet → konto (appen),
+  // eller direkte enhet (web: Klubbetalinger kjenner enheten). Kontoraden
+  // finnes KUN etter godkjent claim — det er selve gaten.
   // deno-lint-ignore no-explicit-any
-  const clubId = (ts?.teams as any)?.club_id as string | undefined;
-  if (!clubId) return json({error: 'Fant ikke klubben til laget.'}, 404);
+  let entity: any = null;
+  let legalEntityId: string | undefined;
+  if (byTeam) {
+    const {data: ts} = await admin
+      .from('team_spaces')
+      .select('team_id, teams(club_id)')
+      .eq('id', teamSpaceId)
+      .maybeSingle();
+    // deno-lint-ignore no-explicit-any
+    const clubId = (ts?.teams as any)?.club_id as string | undefined;
+    if (!clubId) return json({error: 'Fant ikke klubben til laget.'}, 404);
 
-  const {data: link} = await admin
-    .from('club_legal_entity_links')
-    .select('legal_club_entity_id, legal_club_entities(verification_status, legal_name)')
-    .eq('club_id', clubId)
-    .eq('status', 'active')
-    .maybeSingle();
-  // deno-lint-ignore no-explicit-any
-  const entity = link?.legal_club_entities as any;
-  if (!link || !entity) {
+    const {data: link} = await admin
+      .from('club_legal_entity_links')
+      .select('legal_club_entity_id, legal_club_entities(verification_status, legal_name)')
+      .eq('club_id', clubId)
+      .eq('status', 'active')
+      .maybeSingle();
+    entity = link?.legal_club_entities ?? null;
+    legalEntityId = link?.legal_club_entity_id;
+  } else {
+    const {data: ent} = await admin
+      .from('legal_club_entities')
+      .select('id, verification_status, legal_name')
+      .eq('id', entityId)
+      .maybeSingle();
+    entity = ent;
+    legalEntityId = ent?.id;
+  }
+  if (!legalEntityId || !entity) {
     return json({error: 'Klubben er ikke godkjent for støtte ennå.'}, 409);
   }
+  const link = {legal_club_entity_id: legalEntityId};
   if (entity.verification_status !== 'verified') {
     return json({error: 'Klubbens godkjenning er ikke gyldig lenger.'}, 409);
   }
@@ -192,8 +213,8 @@ Deno.serve(async (req) => {
     const linkObj = await stripePost('/v1/account_links', {
       account: stripeAccountId!,
       type: 'account_onboarding',
-      return_url: landingUrl('onboarding'),
-      refresh_url: landingUrl('refresh'),
+      return_url: landingUrl('onboarding', source),
+      refresh_url: landingUrl('refresh', source),
     });
 
     return json({url: linkObj.url, expires_at: linkObj.expires_at ?? null});
