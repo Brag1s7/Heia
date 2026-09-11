@@ -29,7 +29,7 @@ Hvert lag deployes for seg._
 | **Databasen** | migrasjoner t.o.m. **`00084`** (00079–00084 sammenhengende) | ingenting — **i synk** ✅ |
 | **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · øvrige i synk | **to udeployede** — punkt 117 |
 | **Nettsiden** heiaapp.no | `main` = `318305e` (17:47) | `Brage` er **6 commits foran**; miljøseparasjonen venter på tre Vercel-variabler (punkt 108) |
-| **CI** | **RØD på `main`** — `tsc` stopper på 10 typefeil i `LiquidGlassSurface.tsx` | punkt 116; blokkerer enhver PR |
+| **CI** | rød på `main` inntil PR-en merges | **rettet lokalt**: `tsc` 0 feil (var 31), `jest` 1258, `eslint` 0 feil — punkt 116 |
 | **Secrets** | `WEB_BASE_URL` og `WEB_INVITE_BASE_URL` satt | — |
 | **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
 | **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
@@ -669,29 +669,36 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      som produksjon. Bør få samme eksplisitte miljøvalg som nettsiden når
      punkt 113 er løst — ellers er «test på telefonen» ikke etterprøvbart.
 
-116. **CI er RØD på `main`, og har vært det hele dagen.** Ikke av noe vi
-     har gjort: jobben stopper på `tsc --noEmit` med **10 typefeil, alle i
-     `src/components/LiquidGlassSurface.tsx`**. Lest ut av GitHubs
-     check-run-annotasjoner (repoet er offentlig, så det går uten
-     innlogging). Feilene kom inn med `70448a3` 2026-09-07 — commiten som
-     lukket feedkortet, og som er telefongodkjent. **Blokkerer enhver PR**,
-     også miljø-PR-en fra skive 1.
+116. ~~**CI er RØD på `main`.**~~ **RETTET 2026-09-11 natt — `tsc` gir nå
+     0 feil (var 31).** GitHub viste 10; annotasjonene er kappet på ti, og
+     det reelle tallet var **31 i 10 filer**: LiquidGlassSurface (10),
+     EventDetailScreen (7), deepLink (3), media (3), LagkassaScreen (2),
+     AppNavigator (2), og én hver i JoinTeamCode, netMetrics, MatchViews og
+     TimeSheet. Alt er rettet på typenivå, uten funksjonell endring.
 
-     De tre gruppene:
-     * `NativeGlass` brukes på linje 1038 i initialiseringen av
-       `GLASS_PRESS_NATIVE`, men deklareres først på linje 1100. I ekte JS
-       er det en temporal-dead-zone-feil, og på iOS 26 (`LIQUID_GLASS_SUPPORTED`
-       = `iosMajor >= 26`) ville `&&` ikke kortslutte den bort. **At
-       telefontestene har vært grønne siden 7. september viser at bundelen
-       ikke kaster** — `const` blir transpilert slik at verdien blir
-       `undefined`, og `undefined !== null` gir `true`, som tilfeldigvis er
-       riktig svar. Det virker ved et uhell, ikke ved design.
-     * `'top'`/`'bottom'` leses av et objekt der de ikke finnes (fire steder).
-     * To `No overload matches this call`.
+     To av dem skjulte ekte feil, og oppførselen er BEHOLDT slik den er på
+     telefonen — feilen er ført videre som punkt 118 og 119 i stedet for å
+     bli rettet i forbifarten:
+     * `NativeGlass` ble lest i sin egen temporale dødsone. Verdien ble
+       tilfeldigvis riktig (`undefined !== null` er true, og på iOS 26 er
+       riktig svar også true). Deklarasjonen er flyttet opp; samme verdi.
+     * `FEED_FROST.top`/`.bottom` ble lest av JSX-en uten å finnes. Under
+       Paper utelates udefinerte props, så de native standardene gjaldt —
+       nå står de samme tallene (0,24 / 0,09) i tokenet.
+     * `styles.divider` fantes ikke, men elementet er ikke dødt: `column`
+       har `gap`, så det tomme viewet legger på ett mellomrom. Lagt til som
+       tom stil, så tegningen er uendret og navnet finnes.
 
-     Fiksen er typenivå og bør ikke endre noe visuelt, men fila er
-     telefongodkjent designkode, så den tas som en egen liten skive med
-     Brages ja — ikke på veien forbi.
+     Samtidig: eslint hadde én feil (`KalenderScreen`) som CI aldri rakk å
+     vise, fordi `tsc` døde først. `refetch` er stabil i TanStack Query,
+     hele `eventsQuery` er det ikke — avhengigheten er med vilje snevrere,
+     nå med skreven begrunnelse. `.eslintignore` utelater `web/dist`, som
+     er git-ignorert og ikke finnes i CI, men lokalt ga 142 «feil» i
+     minifisert kode.
+
+     **Verifisert lokalt:** `tsc` 0 feil, `jest` 1258 bestått / 2 hoppet
+     over, `eslint` 0 feil. **Ikke telefonverifisert** — ingen av
+     endringene endrer noe som tegnes.
 117. **To Edge Functions har ferdig kode som ikke er i drift.**
      `stripe-checkout` står på **v10 (19. aug)** og `push-fanout` på
      **v13 (3. aug)**, mens begge ble endret i `b36030b` 11. september.
@@ -699,6 +706,24 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      push-fanout er det at 500-taket logges i stedet for å kutte stille
      (punkt 94). Alle andre funksjoner er i synk med koden.
 
+118. **Ventetilstanden på «Bli med i lag» har ingen opplesning.**
+     `JoinTeamCodeScreen` sendte `accessible`, `accessibilityRole="progressbar"`
+     og `accessibilityLabel="Søker etter laget"` til `LiquidGlassSurface`,
+     men `GlassSurface` plukker ut de propene den kjenner og slipper resten
+     — de nådde aldri et view. Propene er fjernet så koden sier sant.
+     Fiksen er å la `LiquidGlassSurface` ta imot og videreføre a11y-props.
+     Liten jobb, men den ENDRER hva VoiceOver sier, så den hører til en
+     runde der det kan telefonsjekkes.
+119. **Reporterens selvvalgte avatarfarge slår ikke gjennom på
+     kampskjermen.** `MatchViews` sendte `color={author?.color}`; feltet på
+     `User` heter `avatarColor`. Propen var alltid `undefined`, så avataren
+     har hele tiden brukt navne-hashen. Propen er fjernet (samme tegning);
+     å bytte til `avatarColor` ville endret farger på en telefongodkjent
+     skjerm, så det tas som en egen liten runde. Se [[avatar_upload_slice]].
+120. **Hårlinjene EventDetailScreen lover finnes ikke.** Kommentaren i fila
+     sier «skillene er hårlinjer», men `styles.divider` var aldri definert
+     — skillet er i dag bare et ekstra `gap`. Tom stil står nå der navnet
+     skal fylles. Rent designarbeid.
 ### Avkreftet
 
 112. **Bøttegrensene er allerede på plass.** Gjennomgangen meldte at

@@ -8,12 +8,12 @@
    byggingen av nettsiden. Jeg har ingen Vercel-tilgang: det ligger bare en
    tom `auth.json` uten token på maskina, og `vercel` er ikke installert.
    Verdiene står i rammen lenger nede.
-2. **CI er RØD på `main`, og har vært det hele dagen** — ikke av noe vi har
-   gjort. `tsc --noEmit` stopper på **10 typefeil i
-   `src/components/LiquidGlassSurface.tsx`**, inne fra `70448a3`
-   (7. september, feedkortet — telefongodkjent). Det blokkerer enhver PR.
-   Se punkt 116; fiksen er typenivå, men fila er designkode, så jeg rører
-   den ikke uten at du sier ja.
+2. ~~CI er rød~~ **RETTET 2026-09-11 natt.** Det var ikke 10 feil, men
+   **31 i 10 filer** — GitHub kapper annotasjonene på ti. Alle er rettet på
+   typenivå, uten funksjonell endring: `tsc` 0 feil, `jest` 1258 bestått,
+   `eslint` 0 feil. Se punkt 116, og 118–120 for de ekte feilene
+   typefeilene skjulte (oppførselen er BEHOLDT; de er ført videre i stedet
+   for å bli rettet i forbifarten).
 
 ### Hva som ER i drift nå
 
