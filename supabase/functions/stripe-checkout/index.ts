@@ -301,6 +301,19 @@ Deno.serve(async (req) => {
 
     // --- Checkout-sesjonen (fase 0-spikens eksakte subscription_data) ---
     const feePercent = (offering.fee_bps / 100).toFixed(2);
+    // Idempotens (manglet — de tre andre Stripe-POST-ene her har den):
+    // to parallelle kall (dobbelttrykk, to faner, retry i nettlaget) fant
+    // begge samme checkout_pending-rad UTEN sesjons-id, hoppet begge over
+    // utløps-grenen over, og laget hver sin BETALBARE sesjon. Betalte
+    // brukeren i begge, ble det to abonnementer — og det andre kunne
+    // aldri knyttes til raden (unik-indexen), altså et månedlig trekk
+    // usynlig for oss og for «Min støtte».
+    //
+    // Nøkkelen bærer den forrige sesjons-id-en: førstegangsforsøk deler
+    // nøkkel (duplikater kollapser til ÉN sesjon), mens et lovlig nytt
+    // forsøk etter utløp får ny nøkkel og dermed en ny, betalbar sesjon.
+    const sessionKey =
+      `heia-cosess-${subRow.id}-${subRow.provider_checkout_session_id ?? 'first'}`;
     const session = await stripePost('/v1/checkout/sessions', {
       mode: 'subscription',
       customer: pc.provider_customer_id as string,
@@ -313,7 +326,7 @@ Deno.serve(async (req) => {
       'subscription_data[metadata][support_subscription_id]': subRow.id,
       success_url: landingUrl('success'),
       cancel_url: landingUrl('cancel'),
-    });
+    }, sessionKey);
 
     // Betinget skriving av sesjons-id: har den gamle sesjonen rukket å
     // fullføre (webhooken satte sub-id/status), skal den nye sesjonen

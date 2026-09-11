@@ -113,17 +113,20 @@ export default function KlubbApp() {
   };
 
   const startOnboarding = async (club: ClubPaymentsClub) => {
-    // stripe-onboarding tar team_space_id og finner enheten via laget —
-    // et hvilket som helst lag under enheten duger. Uten lag finnes det
-    // ingenting å koble utbetaling til ennå.
+    // stripe-onboarding tar enten et lag under enheten (appens vei) eller
+    // enheten direkte. Web kjenner enheten, så utbetaling kan settes opp
+    // FØR noe lag har bedt om godkjenning.
     const ts = club.teams[0]?.teamSpaceId ?? club.requests[0]?.teamSpaceId ?? null;
-    if (!ts) {
-      setError('Klubben har ingen lag i Heia ennå. Når et lag ber om godkjenning, kan du sette opp utbetaling.');
+    const entityId = club.entity?.id ?? null;
+    if (!ts && !entityId) {
+      setError('Klubben er ikke koblet til en juridisk enhet ennå. Skriv til oss, så ordner vi det.');
       return;
     }
-    setOnboarding(club.entity?.id ?? 'x');
+    setOnboarding(entityId ?? 'x');
     try {
-      const {url} = await startStripeOnboarding(ts);
+      const {url} = await startStripeOnboarding(
+        ts ? {teamSpaceId: ts} : {entityId: entityId as string},
+      );
       location.assign(url);
     } catch (e) {
       setError((e as Error).message);

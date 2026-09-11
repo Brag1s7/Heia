@@ -160,7 +160,10 @@ export function MediaImage({
     <Image
       style={style}
       source={{uri: url, cacheKey: key}}
-      cachePolicy="disk"
+      // 'disk' er KUN disk — hver montering dekodet bildet på nytt. Med
+      // resirkulerte FlatList-celler ble det en re-dekode per scroll.
+      cachePolicy="memory-disk"
+      recyclingKey={key}
       contentFit={resizeMode}
       onLoadStart={() => {
         loadStartedAt.current = Date.now();

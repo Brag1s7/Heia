@@ -44,8 +44,19 @@ Deno.serve(async (req) => {
   if (ids.length === 0) {
     return new Response('Missing notification_ids', {status: 400});
   }
-  // Én statement er maks ett lags medlemsliste — 500 er romslig vern.
-  ids = ids.slice(0, 500);
+  // Én statement er maks ett lags medlemsliste. Taket verner mot en
+  // uventet kjempe-INSERT, men det SKAL aldri slå inn — og slår det inn,
+  // mistet noen et varsel. Før logget vi ingenting: 100 av 600 mottakere
+  // kunne forsvinne uten spor. Nå er det synlig i loggen og i svaret.
+  const CAP = 500;
+  const droppedCount = Math.max(0, ids.length - CAP);
+  if (droppedCount > 0) {
+    console.error(
+      `push-fanout: TAKET SLO INN — ${ids.length} varsler, ${droppedCount} fikk ALDRI push. ` +
+        'Lagrommet er større enn taket; chunk utsendingen (se docs/GJENSTÅR.md).',
+    );
+    ids = ids.slice(0, CAP);
+  }
 
   const admin = createClient(url, serviceKey);
 

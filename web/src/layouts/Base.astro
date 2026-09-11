@@ -9,7 +9,8 @@ interface Props {
   /** true = arbeidsflate (konto/ops/klubb …): ingen markedsmeny eller CTA,
    *  men Forsiden/Hjelp og kontomenyen står. */
   minimal?: boolean;
-  /** Ingen tredjeparts- eller ekstra-skript på siden (invitasjon o.l.). */
+  /** Kun robots-meta «noindex». MERK: den slår IKKE av skript — legges
+   *  analytics inn senere, må /invitasjon gates eksplisitt (B3). */
   noindex?: boolean;
 }
 const {title, description = 'Heia — appen som samler laget og alle rundt det. Treninger, kamper, bilder og øyeblikk, så familien kan følge med og heie.', minimal = false, noindex = false} = Astro.props;
@@ -200,12 +201,35 @@ const legalLine = LEGAL.companyName && LEGAL.orgNumber
             location.href = '/';
           };
           all('[data-signout]', function (el) { el.disabled = true; });
+          // Markedssidene laster ikke supabase-js, så ingenting fornyer
+          // tokenet der. Er access-tokenet utløpt (typisk: logg inn, les
+          // /hjelp en time, trykk «Logg ut»), svarer /logout 401 — og FØR
+          // ble den feilen svelget mens localStorage ble tømt. Sesjonen
+          // levde videre hos Supabase, og refresh-tokenet utløper ikke av
+          // seg selv. Nå byttes refresh-tokenet inn i et ferskt
+          // access-token FØRST, så logout faktisk tilbakekaller sesjonen.
+          function revoke(sess) {
+            var fresh = Promise.resolve(sess.access_token);
+            var expired = !sess.expires_at || sess.expires_at * 1000 <= Date.now() + 5000;
+            if (expired && sess.refresh_token) {
+              fresh = fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+                method: 'POST',
+                headers: {apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json'},
+                body: JSON.stringify({refresh_token: sess.refresh_token}),
+              })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (j) { return (j && j.access_token) || sess.access_token; })
+                .catch(function () { return sess.access_token; });
+            }
+            return fresh.then(function (token) {
+              return fetch(SUPABASE_URL + '/auth/v1/logout', {
+                method: 'POST',
+                headers: {apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + token},
+              });
+            });
+          }
           var viaIsland = window.__heiaSignOut;
-          var p = viaIsland
-            ? viaIsland()
-            : s
-              ? fetch(SUPABASE_URL + '/auth/v1/logout', {method: 'POST', headers: {apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + s.access_token}})
-              : Promise.resolve();
+          var p = viaIsland ? viaIsland() : s ? revoke(s) : Promise.resolve();
           Promise.resolve(p).catch(function () {}).then(done);
         }
         all('[data-signout]', function (el) { el.addEventListener('click', signOut); });

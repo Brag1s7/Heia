@@ -234,12 +234,13 @@ Brage har bedt om at disse holdes ute av designskivene og tas samlet.
 
 ## J. Nettsiden
 
-73. **Invitasjonsreisen er ikke slått på.** Rekkefølgen: Brage prøver
-    `/invitasjon` selv → `supabase secrets set WEB_INVITE_BASE_URL=https://heiaapp.no/invitasjon`
-    → `WEB_INVITE_LANDING_LIVE = true` i `src/shared/flags.ts` (står `false`)
-    → nytt TestFlight-bygg, siden flagget ikke endrer installerte bygg. Så
-    lenge det står av, er «En annen i klubben» og «Inviter ny
-    betalingsansvarlig» skjult, og ops-flaten viser «IKKE SENDT».
+73. **Invitasjonsreisen er HALVVEIS på.** `WEB_INVITE_BASE_URL` ble satt
+    2026-09-11 kveld, så ops-utstedte invitasjoner sender nå ekte e-post med
+    lenke til `heiaapp.no/invitasjon#token`. Det som gjenstår er appsiden:
+    `WEB_INVITE_LANDING_LIVE = true` i `src/shared/flags.ts` (står `false`)
+    og et nytt TestFlight-bygg, siden flagget ikke endrer installerte bygg.
+    Til da er «En annen i klubben» og «Inviter ny betalingsansvarlig» skjult
+    i appen, mens web-veien virker.
 74. **Brage — analytics er ikke installert og ikke besluttet.** Plausible er
     anbefalt fordi den er cookiefri og dermed slipper samtykkebanner etter
     ekomloven. Må nevnes i personvernerklæringen hvis den tas i bruk.
@@ -286,6 +287,97 @@ Eget spor, ikke startet.
     en `.env` som inneholder sandbox-nøkkelen.
 
 ---
+
+## N. Gjennomgangen 2026-09-11 kveld
+
+Tre parallelle gjennomganger før produksjonssetting: nettsideplanen mot
+prod, caching/egress/ytelse, og dataflyt/sikkerhet. Alt her er verifisert
+mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
+
+### Rettet samme kveld (ligger i treet, VENTER PÅ COMMIT)
+
+87. **Dobbel betaling var mulig.** `stripe-checkout` laget Checkout-sesjonen
+    uten idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
+    samme funksjon. To parallelle kall ga to betalbare sesjoner og kunne
+    ende i to abonnementer, der det andre aldri kunne knyttes til raden.
+88. **Bildene lå kun på disk.** `cachePolicy="disk"` betyr i expo-image
+    KUN disk, så hver resirkulerte listecelle dekodet et 2048 px bilde på
+    nytt. Dette er den mest sannsynlige forklaringen på at appen føltes treg.
+89. **Disk-snapshotet ble skrevet rundt én gang i sekundet** under bruk,
+    utløst av cache-hendelser som ikke bar ny data.
+90. **Lenkefila fanget `/stott*` og `/betaling*`** som appen ikke kan
+    håndtere. En delt lenke til Støtt laget åpnet appen på Hjem.
+91. **Utlogging fra en markedsside tilbakekalte ikke sesjonen.**
+92. **Nettsiden hadde ingen sikkerhetsheadere.** Klikkjacking mot
+    «Deaktiver støtte» var mulig.
+93. **Klubber uten lag kunne ikke sette opp utbetaling**, selv om backend
+    støtter det.
+94. **`push-fanout` kuttet stille på 500 mottakere.** Taket står, men er
+    nå synlig i loggen.
+95. **Småting:** `?flow=toString` traff Object.prototype på
+    betalingssiden; `robots.txt` og sitemap manglet.
+
+### Må pushes til prod av Brage
+
+96. **Migrasjon 00083** — varselet SupportSetup lover når klubben blir
+    klar, finnes ikke i dag. Trigger på overgangen til aktiv konto.
+    Bevisfil: `scripts/verify-00083.sql`.
+97. **Migrasjon 00084** — **25 SECURITY DEFINER-RPC-er kan kalles av
+    `anon`**, målt i prod. Handoffen sa tre. Alle har en fungerende
+    selvvakt i dag, så det er ikke et åpent hull, men selvvakten er den
+    eneste vakten: én omskriving som flytter `auth.uid()`-sjekken, og
+    hvem som helst kan kalle funksjonen med anon-nøkkelen fra nettsidens
+    bundle. Migrasjonen er katalogdrevet, så ingen signatur kan bli feil.
+    Den pinner også `search_path` på de to betalingsfunksjonene og på
+    `is_team_member`/`is_team_admin`. Bevisfil: `scripts/verify-00084.sql`,
+    allerede kjørt mot prod som utgangspunkt.
+
+### Nye punkter, ikke rettet
+
+98. **85 funksjoner mangler `search_path` helt.** 00084 tar de fire
+    viktigste. Resten er en egen skive.
+99. **Kaldstart venter 1,5 sekunder på nett.** Bootfrøet leverer profil og
+    medlemskap fra disk, men navigatoren står på oppstartsskjermen til
+    livekamp-svaret lander eller tidsgrensen slår inn. Hele gevinsten fra
+    cold start-arbeidet spises opp her.
+100. **Feeden koster en ekstra seriell rundtur** fordi «har jeg reagert»
+     ligger utenfor feed-spørringen. Det er 150 til 300 millisekunder lagt
+     til hver eneste feed-åpning på mobilnett.
+101. **Kalenderen er ikke virtualisert**, og henter 30 måneder. Et lag med
+     to treninger i uka monterer rundt 150 kort ved hvert besøk.
+102. **Toppen av skjermen er ikke memoisert.** Hvert tastetrykk i «Del noe
+     med laget» tegner hero-karusellen på nytt. To kontekster øverst i
+     treet lager ny verdi ved hver token-fornyelse.
+103. **Feeden signerer miniatyrbilder den aldri bruker**, og
+     idrettslista hentes ved hver kaldstart for en skjerm de fleste aldri
+     åpner. Begge er gratis å fjerne.
+104. **Testen som vokter oppstartsbudsjettet er blind.** Den påstår seks
+     kall; det reelle tallet er sju til ni, fordi den mocker bort nettopp
+     de kallene den skulle telle.
+105. **Hvert innlegg er O(antall medlemmer) i tre ledd**, og ett av dem
+     kjører synkront i transaksjonen til den som poster. Ved 25 medlemmer
+     er det usynlig. Ved 300 henger «Del»-knappen.
+106. **`get_team_members` og `get_team_authors` er upaginerte**, i
+     motsetning til feeden som er riktig paginert.
+107. **«Deaktiver støtte» kan ikke fullføre for store lag.** Offeringen
+     arkiveres først, så kanselleres abonnementene serielt uten
+     fremdriftsmerking. Et lag som ikke rekker gjennom på ett forsøk,
+     rekker aldri gjennom.
+108. **Nettsiden har ingen miljøseparasjon.** Prod-URL og prod-nøkkel er
+     hardkodet som fallback, så en forhåndsvisning peker på produksjon.
+109. **CI bygger ikke nettsiden.** Ingenting typesjekker `web/src`, og
+     ingen av bevisfilene kjøres automatisk.
+110. **Invitasjonskoden bruker 30 av 31 tegn** i alfabetet, og bygger på
+     en vanlig tilfeldighetsgenerator, ikke en kryptografisk.
+111. **`inbox_enabled` svarer på spørsmål om andre brukere** uten å sjekke
+     hvem som spør. Lukkes av 00084.
+
+### Avkreftet
+
+112. **Bøttegrensene er allerede på plass.** Gjennomgangen meldte at
+     `feed-media` manglet størrelses- og filtypegrense, basert på
+     migrasjonsfila. Prod har 10 MB og fire bildetyper. Migrasjonsfila er
+     bare ikke oppdatert. Lærdom: sjekk alltid mot prod, ikke mot filene.
 
 ## Anbefalt rekkefølge
 

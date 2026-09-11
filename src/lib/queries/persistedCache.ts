@@ -259,6 +259,14 @@ export function restorePersistedQueries(userId: string): Promise<void> {
 function attach(): void {
   if (!unsubscribeCache) {
     unsubscribeCache = queryClient.getQueryCache().subscribe(event => {
+      // Kun ekte dataendringer. TanStack sender observerAdded/-Removed,
+      // observerResultsUpdated og fetch-start på samme kanal; ingen av dem
+      // bærer ny data, men alle utløste før en full dehydrate +
+      // JSON.stringify av hele hvitlisten (feed + 30 mnd hendelser +
+      // roster) på JS-tråden — i praksis ~1 gang i sekundet under bruk.
+      if (event.type !== 'updated') return;
+      const action = (event as {action?: {type?: string}}).action;
+      if (action?.type !== 'success') return;
       if (event.query && isPersistableKey(event.query.queryKey)) {
         scheduleWrite();
       }
