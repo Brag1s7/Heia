@@ -66,4 +66,26 @@ test('hele komponenttreet monteres og tegner faktisk noe', async () => {
    * gå i stykker hver gang noen legger til en View.
    */
   expect(nodes).toBeGreaterThan(5);
+
+  /**
+   * AVMONTER. Uten dette blir hele apptreet stående etter at testen er
+   * ferdig, og da lever effektene videre: `MatchButtonProvider` har en
+   * `setTimeout` på BOOT_MAX_MS (1,5 s) og `TeamProvider` en
+   * AsyncStorage-lesing. Begge rydder korrekt etter seg i opprydningen sin
+   * — men opprydningen kjører bare når treet avmonteres.
+   *
+   * Skjer ikke det, fyrer timeren ETTER at Jest har revet ned miljøet:
+   *   ReferenceError: You are trying to `import` a file after the Jest
+   *   environment has been torn down. From __tests__/App.test.tsx
+   * og arbeideren blir stående. Lokalt force-exit-er jest den med
+   * «A worker process has failed to exit gracefully»; i CI ble hele
+   * jest-steget hengende og jobben traff `timeout-minutes: 15` — siste
+   * testutskrift kom 31 sekunder inn, så var det stille i 14 minutter.
+   *
+   * Produktkoden er uendret: den rydder allerede riktig. Det var testen som
+   * aldri ga den sjansen.
+   */
+  await ReactTestRenderer.act(async () => {
+    renderer?.unmount();
+  });
 });
