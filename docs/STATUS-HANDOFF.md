@@ -1,6 +1,48 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️ 2026-09-11 (ettermiddag) — MOBILFORSIDEN + MOBILNAVBAREN: POLISHRUNDE BYGGET, VENTER TELEFONDOM
+## ▶️▶️ START HER (2026-09-11 ettermiddag — NETTSIDEN: MOBILFORSIDE + MOBILNAVBAR FERDIG I NI RUNDER, ALT PUSHET, ÉN TING UBEKREFTET)
+
+**Tilstand:** `Brage` er ren og pushet, 15 commits foran `main` (fra
+`d4c1649` innlogging i headeren til `4dfed85`). INGEN PR er opprettet —
+`gh` er ikke innlogget, Brage oppretter/merger selv. Vercel lager
+preview-deploy av hver push til `Brage`
+(`heia-<hash>-heia1.vercel.app`); prod kommer først ved merge til `main`.
+
+**Godkjent av Brage:** hele mobilforsiden (hero, copy, produktet i første
+viewport), navbaren, den åpne menyen og rullebevegelsen, favicon.
+Sitat etter runde 7: «Utenom dette er alt godkjent!»
+
+**DET ENESTE ÅPNE:** Safari-flaten NEDERST på skjermen ved scroll oppover
+(iOS 26 «Liquid Glass»-verktøylinje). Ni runder, siste fiks `edb614f`
+(canvas flat krem i hele dokumentet, mint kun øverste 200 px) er IKKE
+sett på Brages telefon. **Be om telefonbilde FØR du rører noe her — ikke
+gjett.** Regelen (dokumentert + målt): Safari 26 toner status-/adressefelt
+og verktøylinje etter FASTE/STICKY elementer inntil 4 px fra toppen / 3 px
+fra bunnen, ≥80 % brede, ≥3 px høye, via `background-color`;
+pseudo-elementer, `theme-color` og skript etter første tegning IGNORERES,
+`opacity: 0` samples likevel. Faller det ikke på et slikt element, brukes
+canvasen (html). Kilder: jahir.dev/blog/safari-toolbar,
+nasedk.in/blog/ios26-safari-toolbar-colors,
+github.com/andesco/safari-color-tinting.
+
+**RØR IKKE:** navbarens frost `rgba(143, 252, 205, 0.94)` (godkjent siden
+runde 3; runde 5 gjorde den blekere og Brage reagerte). Ikke endre
+desktop. Ikke redesign resten av nettsiden.
+
+**Rigg:** `scripts/web-shot.mjs` (CDP, Chrome-emulering — den ENESTE som
+kan klikke, f.eks. åpne menyen) + `xcrun simctl openurl booted <url>` og
+`simctl io booted screenshot` for ekte WebKit (simulatoren kan IKKE
+trykke, og fryser toppfargen per fane). Dev: `npx astro dev` i `web/`.
+Reisetesten `scripts/verify-web-login-journey.mjs` (51/51) er IKKE kjørt
+på nytt etter designrundene — selektorene (`#menu-btn`, `.mobile-menu`,
+`.menu-cta`) er uendret, men `.mobile-menu` har fått en `.menu-inner`
+rundt innholdet.
+
+Detaljene for hver runde står under. Ny samtale er trygg å starte herfra.
+
+---
+
+## 2026-09-11 (ettermiddag) — MOBILFORSIDEN + MOBILNAVBAREN: RUNDE FOR RUNDE
 
 Brage ba om én samlet designrunde på mobilforsiden (<640 px) og
 hamburgermenyen. Bygget og riggbevist (Chrome 360/430 + ekte iOS-Safari i
