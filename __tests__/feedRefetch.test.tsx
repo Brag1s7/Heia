@@ -215,24 +215,32 @@ function Harness() {
 // flytter klokka). Query-cachen tømmes av samme grunn: en events-cache fra
 // forrige test ville gjort neste tests kallbudsjett løgnaktig lavt.
 afterEach(async () => {
+  // RYDD I RIKTIG REKKEFØLGE, ellers henger jest-prosessen i fem minutter
+  // etter at testene er ferdige (målt: jest rapporterte 2 s, veggklokka
+  // 5:04, 0 % CPU, fire ventende `Timeout`).
+  //
+  // Kjeden: en henting feiler → appens `retry: 1` legger retryeren til å
+  // sove ett sekund → `clear()` tømmer cachen mens den sover → retryeren
+  // våkner foreldreløs, kjører `Query.fetch` på nytt, og planlegger en
+  // `scheduleGc` på `gcTime` = 5 minutter. Den timeren eies av ingen, og
+  // holder Nodes hendelsesløkke i live. Bevis: stakksporet til de
+  // overlevende timerne endte i `retryer.sleep` og `Query.fetch →
+  // scheduleGc`.
+  //
+  // Rekkefølgen er derfor: avbryt MENS fake-klokka fortsatt finnes, kjør de
+  // ventende timerne så den sovende retryeren faktisk vekkes og kan avbrytes,
+  // og FØRST DA bytt til ekte klokke og tøm.
+  //
+  // Hvorfor ikke bare `await queryClient.cancelQueries()` etter
+  // `useRealTimers()`: da er fake-klokka kastet, den sovende retryeren kan
+  // aldri settle, og løftet innfris aldri. CI traff `timeout-minutes: 15`
+  // med jest stående i 14m31s.
+  const avbrytes = queryClient.cancelQueries().catch(() => {});
+  if (jest.isMockFunction(setTimeout)) {
+    jest.runOnlyPendingTimers();
+  }
+  await avbrytes;
   jest.useRealTimers();
-  // KANSELLER FØR TØMMING. `clear()` alene fjerner spørringene, men ikke en
-  // retryer som allerede ligger og sover: appens `retry: 1` gjør at en
-  // feilet henting venter ett sekund før nytt forsøk. Tømmer vi cachen i
-  // mellomtiden, våkner retryeren foreldreløs, kjører `Query.fetch` på nytt,
-  // og `Query.fetch` planlegger en `scheduleGc` på `gcTime` — 5 minutter,
-  // appens bevisste standard (`src/lib/queries/queryClient.ts`). Den timeren
-  // eies da av ingen, og holder Nodes hendelsesløkke i live i fem minutter
-  // etter at testene er ferdige.
-  //
-  // Målt før fiksen: jest rapporterte 2 s, veggklokka 5:04 med 0 % CPU, og
-  // `process.getActiveResourcesInfo()` viste fire ventende `Timeout`.
-  // Stakksporene endte i `retryer.sleep` (1000 ms) og
-  // `Query.fetch → scheduleGc` (300000 ms).
-  //
-  // `cancelQueries()` avbryter hentingene MENS de fortsatt står i cachen, og
-  // da finnes det ingen foreldreløs retryer igjen til å planlegge noe nytt.
-  await queryClient.cancelQueries();
   queryClient.clear();
 });
 

@@ -223,7 +223,10 @@ afterEach(async () => {
   // `Query.fetch` planlegger en `scheduleGc` på `gcTime` = 5 minutter. Den
   // timeren eies av ingen og holder Nodes hendelsesløkke i live.
   // Målt her før fiksen: testene tok 35 og 24 ms, veggklokka 5:02, 0 % CPU.
-  await queryClient.cancelQueries();
+  //
+  // IKKE `await` — se samme begrunnelse i feedRefetch: avbruddet er synkront,
+  // mens løftet kan vente evig på en henting som sov på en fake timer.
+  void queryClient.cancelQueries().catch(() => {});
   queryClient.clear();
 });
 
