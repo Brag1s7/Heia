@@ -1,0 +1,63 @@
+---
+import Base from '../layouts/Base.astro';
+// Innholdet er identisk med web/personvern/index.html (ferdigstilt
+// 2026-08-02). Plassholderne byttes når Heia AS er registrert.
+---
+<Base title="Personvern" description="Personvernerklæring for Heia.">
+  <section class="section">
+    <div class="container prose">
+      <h1>Personvern i Heia</h1>
+      <p class="updated">Sist oppdatert 2. august 2026</p>
+
+      <p>Heia er appen som samler ungdomslaget — treninger, kamper, øyeblikk og heiarop på ett sted. For å få det til trenger vi noen opplysninger om deg. Her forklarer vi hvilke, hvorfor, og hva du selv bestemmer over.</p>
+
+      <h2>Hvem er ansvarlig?</h2>
+      <p>[JURIDISK SELSKAPSNAVN], org.nr. [ORGANISASJONSNUMMER], [FORRETNINGSADRESSE], er behandlingsansvarlig for opplysningene i appen. Spørsmål om personvern sendes til <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a>.</p>
+
+      <h2>Hvilke opplysninger vi behandler</h2>
+      <ul>
+        <li><strong>Kontoen din:</strong> e-postadresse, passord (lagret kryptert — vi kan aldri lese det), visningsnavn og eventuelt telefonnummer du selv legger inn. Telefonnummeret er kun synlig for lagets trenere og lagledere.</li>
+        <li><strong>Laget:</strong> hvilke lag du er med i og rollen din der (trener, lagleder, forelder).</li>
+        <li><strong>Barn du legger inn:</strong> foreldre kan legge inn egne barn (navn og fødselsår) for å knytte dem til laget. Barna har ingen egen konto — det er du som forelder som eier og styrer disse opplysningene, og de er kun synlige i lagene barnet er med i.</li>
+        <li><strong>Innhold du deler:</strong> innlegg, bilder, kommentarer, heiarop og oppmøtesvar. Alt innhold er kun synlig for medlemmene i laget det deles i — Heia har ingen offentlige profiler eller åpne feeder.</li>
+        <li><strong>Støtte til laget:</strong> tegner du en støtteavtale, behandles selve betalingen av Stripe. Heia ser og lagrer aldri kortnummeret ditt — vi lagrer avtalen (beløp, lag, status) og transaksjonshistorikken.</li>
+        <li><strong>Varsler:</strong> en enhets-identifikator (push-token) hvis du skrur på varsler.</li>
+        <li><strong>Rapporter:</strong> rapporterer du innhold til Heia, lagres rapporten med en frossen kopi av innholdet, slik at saken kan vurderes selv om innholdet slettes etterpå.</li>
+      </ul>
+
+      <h2>Hva vi bruker dem til</h2>
+      <ul>
+        <li><strong>Å levere Heia</strong> — feeden, kalenderen, kampene og lagkassa (avtalen med deg).</li>
+        <li><strong>Regnskap</strong> — transaksjonshistorikk for støtteavtaler oppbevares slik bokføringsloven krever (rettslig plikt).</li>
+        <li><strong>Trygghet</strong> — å behandle rapporter om upassende innhold (berettiget interesse).</li>
+      </ul>
+      <p>Vi selger aldri opplysningene dine, og Heia har ingen annonser.</p>
+
+      <h2>Barn og unge</h2>
+      <p>Egen konto i Heia krever at du er minst 13 år — den norske aldersgrensen for å samtykke til digitale tjenester selv. Yngre barn deltar gjennom foresattes konto: forelderen legger dem inn i laget, eier opplysningene om dem og kan slette dem når som helst. Heia har ingen offentlige profiler, så innhold om barn er kun synlig for medlemmene i laget.</p>
+
+      <h2>Hvem vi deler med</h2>
+      <p>Kun databehandlerne som trengs for å drive tjenesten: Supabase (database og innlogging), Stripe (betaling) og Apple (varsler). Ingen andre får tilgang.</p>
+
+      <h2>Hvor opplysningene lagres</h2>
+      <p>Databasen, innloggingen og bildene ligger hos Supabase på servere i London. Storbritannia er forhåndsgodkjent av EU-kommisjonen som trygt mottakerland, så GDPR-vernet gjelder fullt ut. Stripe (betaling) og Apple (varsler) er amerikanske selskaper som også behandler opplysninger utenfor EØS — de overføringene skjer på EU-kommisjonens godkjente overføringsgrunnlag.</p>
+
+      <h2>Hvor lenge vi lagrer</h2>
+      <p>Så lenge du har konto. Sletter du kontoen (Profil → Slett konto), skjer dette umiddelbart:</p>
+      <ul>
+        <li>E-post, passord, telefonnummer, medlemskap, oppmøtesvar, varsler og barna du har lagt inn <strong>slettes</strong>.</li>
+        <li>Profilen din <strong>anonymiseres</strong> — innlegg og bilder du har delt med laget blir stående, men uten navnet ditt. Vil du fjerne dem helt, sletter du dem i appen før du sletter kontoen.</li>
+        <li>Aktive støtteavtaler <strong>avsluttes</strong>, og betalingsprofilen hos Stripe slettes.</li>
+        <li>Transaksjonshistorikken beholdes anonymisert så lenge bokføringsloven krever det.</li>
+      </ul>
+
+      <h2>Nettsiden heiaapp.no</h2>
+      <p>Nettsiden bruker ingen informasjonskapsler og ingen analyseverktøy. Sider som krever innlogging (for klubbens betalingsansvarlige og Heia internt) lagrer innloggingen din i nettleseren så lenge du er logget inn — det er nødvendig for at siden skal virke.</p>
+
+      <h2>Rettighetene dine</h2>
+      <p>Du kan når som helst se og endre opplysningene dine i appen, be om innsyn eller kopi, eller slette kontoen din — direkte i appen, uten å spørre noen. Du kan også klage til Datatilsynet hvis du mener vi behandler opplysninger feil, men vi setter pris på om du sier fra til oss først.</p>
+
+      <p class="small muted mt-3">Heia · <a href="mailto:hello@heiaapp.no">hello@heiaapp.no</a> · <a href="/vilkar/">Vilkår for bruk</a></p>
+    </div>
+  </section>
+</Base>

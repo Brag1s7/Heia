@@ -743,6 +743,14 @@ export function AppNavigator() {
     return () => sub.remove();
   }, []);
 
+  // Et parkert mål (f.eks. lagkoden fra en delelink) skal prøves på nytt
+  // når navigatorroten bytter — innlogging remonterer onboarding-stacken og
+  // fyrer ikke onReady igjen. Neste tick, så den nye roten er registrert.
+  useEffect(() => {
+    const t = setTimeout(flushPendingDeepLink, 0);
+    return () => clearTimeout(t);
+  }, [session, hasTeam, onboarded]);
+
   // WelcomeIntent viser lastError for en gjest. Rendres MainTabs eller den
   // lagløse Profil-roten i stedet, ville feilen forsvunnet i stillhet — så
   // vi sier fra her.

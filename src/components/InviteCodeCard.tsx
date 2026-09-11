@@ -23,11 +23,17 @@ export function InviteCodeCard({teamName, inviteCode}: InviteCodeCardProps) {
   // mottakeren dra markører rundt åtte tegn; står den alene, tar ett langt
   // trykk hele linja. (Det som FAKTISK gjør koden blå og trykkbar er en
   // https-lenke, og den krever heiaapp.no — se nettside-prosjektet.)
+  // Lenken er det som blir blått og trykkbart: har mottakeren appen, åpner
+  // Universal Link JoinTeamCode med koden utfylt; har hun den ikke, viser
+  // heiaapp.no/lag koden med kopieringsknapp og veien videre. Koden står i
+  // tillegg alene på egen linje for dem som heller skriver den inn.
+  const shareLink = `https://heiaapp.no/lag?kode=${encodeURIComponent(inviteCode)}`;
   const shareMessage =
     `Bli med i ${teamName} på Heia 💚\n\n` +
+    `${shareLink}\n\n` +
     'Invitasjonskoden din:\n' +
     `${inviteCode}\n\n` +
-    'Last ned Heia og skriv inn koden når du oppretter kontoen.';
+    'Har du ikke Heia ennå? Lenken viser deg hvordan du kommer i gang.';
 
   const handleShare = useCallback(() => {
     Share.share({message: shareMessage}).catch(() => {

@@ -1,0 +1,215 @@
+---
+import Base from '../layouts/Base.astro';
+import Phone from '../components/Phone.astro';
+import {primaryCta, CONTACT_EMAIL, SUPPORT, EXAMPLE_MONTH, EXAMPLE_YEAR, nok} from '../config';
+const cta = primaryCta();
+const pilotMail = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Laget vårt vil prøve Heia')}`;
+const clubPct = Math.round((SUPPORT.clubNok / SUPPORT.priceNok) * 100);
+---
+<Base title="Heia">
+  <!-- 1. Hero -->
+  <section class="hero">
+    <div class="container split">
+      <div>
+        <span class="eyebrow">Appen for laget og alle rundt det</span>
+        <h1>Tettere på laget.</h1>
+        <p class="lead">Treninger, kamper, bilder og små og store øyeblikk — samlet på ett sted, så familien kan følge med, heie og kommentere. Og de som vil, kan gi laget et fast, frivillig bidrag hver måned.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href={cta.href}>{cta.label}</a>
+          <a class="btn btn-ghost" href="#slik">Slik fungerer Heia</a>
+        </div>
+        <p class="note">Heia er i pilot på iPhone. {cta.href.startsWith('mailto') ? 'Send oss en e-post om laget, så tar vi dere med.' : cta.note}</p>
+        <div class="chips">
+          <span class="chip neon">Gratis å bruke</span>
+          <span class="chip">Frivillig støtte til laget</span>
+          <span class="chip">Lukkede lag</span>
+          <span class="chip">Ingen annonser</span>
+        </div>
+      </div>
+      <div class="hero-phones">
+        <div class="hero-glow" aria-hidden="true"></div>
+        <Phone variant="feed" />
+        <Phone variant="match" />
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Sammen får laget til mer -->
+  <section class="section" id="bidra">
+    <div class="container split" style="align-items:start">
+      <div>
+        <span class="eyebrow">Frivillige bidrag</span>
+        <h2>Sammen får laget til mer.</h2>
+        <p class="lead">Et lag med litt penger i kassa kan si ja oftere. Ja til cuphelgen. Ja til nye drakter før sesongen. Ja til at alle blir med, uansett hva familien har råd til. I Heia kan de som vil, gi et fast bidrag hver måned — uten dugnad, kakesalg eller lager i garasjen.</p>
+        <ul class="value-list">
+          <li class="opal"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v4a6 6 0 0 1-12 0V3z"/><path d="M6 5H3v2a4 4 0 0 0 3 3.9M18 5h3v2a4 4 0 0 1-3 3.9"/><path d="M12 13v4M8 21h8M9 17h6"/></svg></div><div><b>Flere opplevelser sammen</b><span>Cuphelger, treningsleir, avslutningsfest. Det er der samholdet bygges — og det er ofte det som stopper på penger.</span></div></li>
+          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M7 17l2-2M15 9l2-2"/></svg></div><div><b>Utstyr som holder</b><span>Baller, vester, kjegler, et nytt mål — og alt det små som treneren ellers legger ut for selv.</span></div></li>
+          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div><div><b>Enklere for flere å være med</b><span>Laget kan velge å bruke kassa til å holde egenandelene nede, så ingen står utenfor på grunn av prisen.</span></div></li>
+          <li class="opal"><div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></div><div><b>Forutsigbart, måned etter måned</b><span>Faste bidrag gir laget en kasse det går an å planlegge med — ikke bare et rykk når dugnaden er over.</span></div></li>
+        </ul>
+        <p class="mt-2 small muted">Hva pengene brukes til, bestemmer laget og klubben. Heia gir kassa — prioriteringene er deres.</p>
+      </div>
+
+      <div class="opal card" style="padding:30px">
+        <span class="eyebrow">Slik regner det seg</span>
+        <div class="pricebadge mt-2"><b>{SUPPORT.priceNok} kr i måneden — {SUPPORT.clubNok} kr til laget</b><span>Mer enn tre av fire kroner går til laget. Resten dekker Heia, betaling og drift.</span></div>
+        <div class="split-bar" aria-hidden="true"><i style={`width:${clubPct}%`}></i><b style={`width:${100 - clubPct}%`}></b></div>
+        <div class="legend"><span>{SUPPORT.clubNok} kr til laget</span><span class="heia">{SUPPORT.heiaNok} kr Heia + betaling + drift</span></div>
+        <div class="calc" aria-label="Regneeksempel">
+          <div class="row"><span>{SUPPORT.exampleSupporters} støttespillere rundt laget</span><b>× {SUPPORT.clubNok} kr</b></div>
+          <div class="arrow" aria-hidden="true">↓</div>
+          <div class="row"><span>Til laget hver måned</span><b>{nok(EXAMPLE_MONTH)}</b></div>
+          <div class="arrow" aria-hidden="true">↓</div>
+          <div class="row sum"><span>Til laget på ett år</span><b>{nok(EXAMPLE_YEAR)}</b></div>
+        </div>
+        <p class="small muted mt-2">Forutsetter {SUPPORT.exampleSupporters} betalende gjennom tolv måneder. Foreldre, besteforeldre, tanter og onkler — de fleste lag har flere rundt seg enn de tror.</p>
+        <ul class="mt-2" style="padding-left:22px;color:var(--ink-2);display:grid;gap:6px;font-size:15px">
+          <li>Helt frivillig. Vanlig bruk av Heia er gratis for alle i laget.</li>
+          <li>Ingen funksjoner låses. Treneren ser bare summen, aldri hvem som gir.</li>
+          <li>Via Stripe. Ingen bindingstid — si opp når du vil.</li>
+        </ul>
+        <a class="btn btn-deep mt-2" href="/stott-laget/">Alt om Støtt laget</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Laglivet -->
+  <section class="section" id="slik">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Hele laglivet</span>
+        <h2>Ikke bare kampdagen. Hele uka.</h2>
+        <p class="lead">Et lag er treninger på tirsdager, kamp på lørdag, pizzakveld på søndag — og alt som skjer imellom. Heia samler det slik at ingen går glipp av noe.</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="opal card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M7 7l2 2M15 15l2 2M7 17l2-2M15 9l2-2"/></svg></div>
+          <h3>Trening</h3>
+          <p>Treningene ligger i kalenderen med tid og sted. Treneren deler en oppsummering eller et bilde etterpå — og de som ikke var der, får være med likevel.</p>
+        </div>
+        <div class="opal card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v4a6 6 0 0 1-12 0V3z"/><path d="M6 5H3v2a4 4 0 0 0 3 3.9M18 5h3v2a4 4 0 0 1-3 3.9"/><path d="M12 13v4M8 21h8M9 17h6"/></svg></div>
+          <h3>Kamp</h3>
+          <p>Stilling, mål og hendelser rapporteres direkte fra sidelinja. Familien følger kampen minutt for minutt, og etterpå ligger referatet der for alltid.</p>
+        </div>
+        <div class="opal card">
+          <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/></svg></div>
+          <h3>Sosialt</h3>
+          <p>Avslutninger, turneringer, cuper og turer. Legg det i kalenderen, se hvem som kommer, og del bildene med laget etterpå.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Følelsen av å være med -->
+  <section class="section">
+    <div class="container split">
+      <div>
+        <span class="eyebrow">Fellesskapet</span>
+        <h2>Vær med, også når du ikke er der.</h2>
+        <p class="lead">Besteforeldre på hytta. Pappa på jobbreise. Søsken hjemme. Alle får se bildene, lese hva som skjedde og sende et «Heia!» til laget.</p>
+        <ul class="mt-2" style="list-style:none;display:grid;gap:14px">
+          <li class="opal" style="padding:16px 18px;display:flex;gap:14px;align-items:center"><div class="icon" style="width:40px;height:40px;border-radius:12px;flex:none">💚</div><div><b>Heia</b> — lagets egen reaksjon. Ett trykk, og laget kjenner at noen heier.</div></li>
+          <li class="opal" style="padding:16px 18px;display:flex;gap:14px;align-items:center"><div class="icon deep" style="width:40px;height:40px;border-radius:12px;flex:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg></div><div><b>Kommentarer</b> — samtalen rundt hvert innlegg, hver kamp og hvert bilde.</div></li>
+          <li class="opal" style="padding:16px 18px;display:flex;gap:14px;align-items:center"><div class="icon deep" style="width:40px;height:40px;border-radius:12px;flex:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><circle cx="12" cy="12" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg></div><div><b>Bilder og innlegg</b> — alle i laget kan dele, bare laget kan se.</div></li>
+        </ul>
+        <p class="mt-2 muted small">Lagene i Heia er lukkede. Ingen offentlige profiler, ingen åpen feed, ingen annonser.</p>
+      </div>
+      <Phone variant="feed" />
+    </div>
+  </section>
+
+  <!-- 5. Kampopplevelsen -->
+  <section class="section">
+    <div class="container">
+      <div class="glass-dark" style="padding:clamp(28px,5vw,64px)">
+        <div class="split reverse">
+          <Phone variant="match" />
+          <div>
+            <span class="eyebrow" style="color:var(--neon)">Kampen, direkte</span>
+            <h2>Én person rapporterer. Alle er med.</h2>
+            <p class="lead">Treneren gir én forelder rollen som reporter. Mål, stilling og hendelser går rett ut til hele laget — med varsel når det skjer noe.</p>
+            <div class="grid grid-2 mt-2" style="gap:14px">
+              <div class="notice dark"><b>Live stilling</b><br />Kampuret og stillingen oppdaterer seg selv. Ingen behov for å trykke oppdater.</div>
+              <div class="notice dark"><b>Hendelser</b><br />Mål, omgang, bilder fra sidelinja — i rekkefølge, med minutt.</div>
+              <div class="notice dark"><b>Referat</b><br />Etter kampen blir alt stående som lagets eget referat, med Heia og kommentarer.</div>
+              <div class="notice dark"><b>Sesongen</b><br />Kampprogram, resultater og lagkassa for hele sesongen, samlet.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Kom i gang -->
+  <section class="section" id="kom-i-gang">
+    <div class="container">
+      <div class="section-head center">
+        <span class="eyebrow">Kom i gang</span>
+        <h2>Tre veier inn i Heia</h2>
+        <p class="lead">Ett lag om gangen. Ingen klubbavtale trengs for å starte — en trener eller lagleder oppretter laget, og resten følger.</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="opal card">
+          <div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M21 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg></div>
+          <h3>For trenere og lagledere</h3>
+          <p>Opprett laget i appen på under ett minutt. Du får en invitasjonskode og en lenke som du deler med foreldrene. Du styrer kalenderen, kampene og hvem som rapporterer.</p>
+          <a class="btn btn-ghost mt-2" href={pilotMail}>Få laget ditt med</a>
+        </div>
+        <div class="opal card">
+          <div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></div>
+          <h3>For familien</h3>
+          <p>Fikk du en kode eller lenke fra laget? Åpne Heia, velg «Bli med i lag» og skriv inn koden. Så er du inne — med alt laget deler.</p>
+          <a class="btn btn-ghost mt-2" href="/lag/">Jeg har en kode</a>
+        </div>
+        <div class="opal card">
+          <div class="icon deep"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M9 21v-6h6v6"/></svg></div>
+          <h3>For klubben</h3>
+          <p>Vil lagene i klubben ta imot støtte? Klubben søker fra appen, Heia godkjenner mot Brønnøysundregistrene, og en betalingsansvarlig i klubben kobler til utbetaling.</p>
+          <a class="btn btn-ghost mt-2" href="/stott-laget/#klubb">Slik aktiverer klubben</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. FAQ + kontakt -->
+  <section class="section">
+    <div class="container split" style="align-items:start">
+      <div>
+        <span class="eyebrow">Spørsmål</span>
+        <h2>Det folk lurer på</h2>
+        <div class="faq mt-2">
+          <details>
+            <summary>Koster det noe å bruke Heia?</summary>
+            <p>Nei. Feeden, kalenderen, kampene og bildene er gratis for alle i laget. Å støtte laget økonomisk er frivillig og skjer i tillegg — {SUPPORT.priceNok} kr i måneden, hvorav {SUPPORT.clubNok} kr går til laget.</p>
+          </details>
+          <details>
+            <summary>Hvem ser det laget deler?</summary>
+            <p>Bare medlemmene i laget. Man blir med via invitasjonskode fra treneren eller laglederen. Heia har ingen offentlige profiler eller åpne feeder.</p>
+          </details>
+          <details>
+            <summary>Finnes Heia for iPhone og Android?</summary>
+            <p>Heia er i pilot på iPhone nå. Android er planlagt, men dato er ikke satt. Vi sier fra på denne siden når det er klart.</p>
+          </details>
+          <details>
+            <summary>Må klubben være med for at laget kan bruke Heia?</summary>
+            <p>Nei. Et lag kan starte alene. Klubben trengs først hvis laget vil ta imot økonomisk støtte — da må klubben godkjennes som mottaker.</p>
+          </details>
+          <details>
+            <summary>Hva med bilder av barn?</summary>
+            <p>Bilder deles bare med laget, aldri offentlig. Del kun bilder du har lov til å dele, og spør før du poster bilder av andres barn. Alt kan slettes og rapporteres fra appen.</p>
+          </details>
+        </div>
+        <p class="mt-2"><a href="/hjelp/">Flere spørsmål og svar →</a></p>
+      </div>
+      <div class="opal card" style="position:sticky;top:104px">
+        <span class="eyebrow">Kontakt</span>
+        <h3 style="margin-top:12px">Vil du ha laget ditt med?</h3>
+        <p>Vi tar med lag i piloten fortløpende. Send oss noen ord om laget — idrett, alder og omtrent hvor mange dere er — så tar vi kontakt.</p>
+        <a class="btn btn-primary mt-2" href={pilotMail}>Skriv til {CONTACT_EMAIL}</a>
+        {cta.href.startsWith('http') && <a class="btn btn-ghost mt-1" href={cta.href}>{cta.label}</a>}
+        <p class="small muted mt-2">Heia er i pilot på iPhone. Nye lag får en tydelig vei inn — vi lover ikke mer enn det som er klart.</p>
+      </div>
+    </div>
+  </section>
+</Base>

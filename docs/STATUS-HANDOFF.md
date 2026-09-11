@@ -499,6 +499,64 @@ refetch-løkke, så den fortjener en egen vurdering.
 ⚠️ Den gamle advarselen om «Brages egne ukommitterte filer» er DØD — de er
 med i `3f8ffa4`. Neste økt starter fra et rent tre.
 
+**2026-09-11 — NETTSIDESPORET STARTET.** Samlet plan, faktastatus,
+kontrakten mot appen, B4-stackanbefaling (Astro statisk + React-øyer +
+supabase-js, ingen SSR), sitemap, jus/analytics og skiveplan W0–W7 ligger i
+`docs/NETTSIDE-PLAN-2026-09.md`. Funn: `origin/main` = `Brage` (PR #52
+merget 2026-09-10) — ingenting å merge; nettsiden gater IKKE på App Store
+(kun CTA-konstanten); Android-ID `com.heia2` er plassholder og byttes som
+egen liten commit; Vercel Hobby forbyr kommersiell bruk → Pro før
+`/stott-laget`. Beslutningene Brage må ta står i planens §9.
+
+**2026-09-11 — W0 + W1 + enkel W2 BYGGET (Brage: «Kjør!», 30-min-økt).**
+`web/` er nå et Astro-prosjekt (statisk, ingen React-øyer ennå): `src/pages/`
+index · stott-laget · om · hjelp · lag (`?kode=`, kopieringsknapp,
+`heia://lag?kode=` på iOS) · betaling (samme flows + `src=web`-nyanse) ·
+vilkar · personvern (innhold identisk, samme layout). AASA ligger i
+`public/.well-known/` og verifisert i `dist/`. `vercel.json` har
+`"framework": "astro"` (Root Directory `web/` består). Konfig i
+`src/config.ts`: TESTFLIGHT_URL/APP_STORE_URL tomme → CTA = kontakt-e-post;
+LEGAL-felt null → «publiseres når bekreftet». Appvisningene er CSS-tegnede
+demoskjermer (`Phone.astro`), ingen ekte lag/barn. Fordelingen 79/60 er
+verifisert mot `heia_support_defaults` (00062). GJENSTÅR: Brages dom på
+telefon/PC (preview-URL fra Vercel for grenen), Vercel Pro,
+TestFlight public link, selskapsopplysninger, `/nytt`, deepLink.ts for
+https `/lag?kode=` i appen (W2 app-del), W3 `/konto`+`/invitasjon`.
+
+**2026-09-11 — ADMINLØSNINGEN PÅ WEB BYGGET (blokk 1–3), COMMITTET OG
+PUSHET (`b21df37` backend, `b03df75` web, `0e43741` app).** PR-tekst +
+publiseringsrekkefølge: `docs/PR-NETTSIDE-ADMIN-2026-09.md` (gh er ikke
+innlogget → Brage oppretter PR-en fra compare-lenken). Web: `/konto`,
+`/invitasjon#token`, `/klubb`, `/ops` som React-øyer (`web/src/app/*`,
+API-port i `web/src/lib/api.ts`, auth i `web/src/lib/auth.tsx`). Backend I
+PROD: migrasjon 00082 `peek_manager_invitation` (verify 19/19),
+`stripe-onboarding` m/ `entity_id` + `source=web` (deployet).
+`claim-notify` → https-ops-lenke er KODET, IKKE deployet (venter på main).
+Tilgangstest `scripts/verify-web-access.mjs` 18/18 (anon + rolleløs bruker
+nektes overalt; testbruker opprettes/slettes selv). Ny SQL-kanal:
+`scripts/run-sql.mjs` (management API m/ CLI-token fra nøkkelringen).
+App: delelinken (`parseJoinCodeFromUrl`, `openJoinTeamCode`, flush ved
+rotbytte, delearket deler https-lenke) — trenger nytt TestFlight-bygg.
+IKKE GJORT: positive ops-/manager-flyter i nettleser (krever Brages konto),
+`WEB_INVITE_BASE_URL` + `WEB_INVITE_LANDING_LIVE` (aktiveres etter at Brage
+har prøvd `/invitasjon`), Vercel-kontroll (ingen CLI-innlogging på maskinen).
+
+**2026-09-11 KVELD — RUNDE 3 FERDIG (siste commit `09a697e`, pushet).**
+Mobilheader lagt om (fullbredde, frost ved scroll, menyflate m/ CTA;
+desktop uendret; `.bar`-kollisjon rettet → `.split-bar`). POSITIVE
+FLYTTESTER mot prod: `scripts/verify-web-flows.mjs` **34/34** (ops-kø →
+info → godkjenn → manager-oversikt → lagforespørsel/avslag → invitasjon →
+forhåndsvisning/aksept → avvik → ops bekrefter → suspender/reaktiver/
+fjern/trekk tilbake → 403 på stripe-onboarding). Egne fixturer (orgnr
+888888888, «VERIFY WEB IL (testfixtur)», verify-flow-*@example.test)
+ryddes selv — verifisert tomt. `scripts/web-shot.mjs` = skjermbilder via
+DevTools Protocol som venter på hydrerte øyer (bruk den, ikke
+`--screenshot`). Vercel: Pro ✅, Root Directory `web` ✅ (Brages
+skjermbilde), preset «Other» overstyres av vercel.json. GJENSTÅR KUN
+BRAGE-STEG: merge → sjekk deploy → deploy claim-notify → prøv /ops og
+/klubb med egen konto → secret + flagg → TestFlight-bygg → AS-opplysninger.
+PR-tekst: `docs/PR-NETTSIDE-ADMIN-2026-09.md`. Neste samtale starter der.
+
 ▶️ **NESTE (forrige plan, står fortsatt):** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
 lagre → lander på Kalender UTEN frys; laghodet uten chip, sesongsiden («Ny kamp» og Lagkassa uten
 header-hopp, handlingsraden, «Ny kamp»-arket komplett fra første ramme), tilbakeknappen i ro OG kompakt, topp, scroll, fanene, Referat-kortene, «Siste hendelse for N min». Deretter én variabel per

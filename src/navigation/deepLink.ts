@@ -18,6 +18,59 @@ let pendingEventId: string | null = null;
 let pendingOpsClaimId: string | null = null;
 let pendingLagkassa = false;
 let pendingNotificationData: Record<string, unknown> | null = null;
+let pendingJoinCode: string | null = null;
+
+/**
+ * Invitasjonskode fra en delelink: `https://heiaapp.no/lag?kode=X`
+ * (Universal Link) eller `heia://lag?kode=X` (knappen på websiden). Ren
+ * funksjon så den kan testes uten navigator. Koden normaliseres til A–Z0–9.
+ */
+export function parseJoinCodeFromUrl(url: string | null): string | null {
+  if (!url) return null;
+  const m = url.match(
+    /^(?:https?:\/\/(?:www\.)?heiaapp\.no\/lag\/?|heia:\/\/lag\/?)\?([^#]*)/i,
+  );
+  if (!m) return null;
+  const params = new URLSearchParams(m[1]);
+  const raw = (params.get('kode') ?? params.get('code') ?? '').trim();
+  const code = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+  return code.length >= 4 ? code : null;
+}
+
+/**
+ * Åpner «Bli med i lag» med koden ferdig utfylt. Skjermen finnes i alle tre
+ * navigatorrøttene (onboarding for gjester, Profil-stacken for lagløse, og
+ * Profil-fanen i MainTabs) — vi prøver den formen som passer roten som står
+ * fremme nå, og parkerer ellers til `flushPendingDeepLink`. Koden overlever
+ * dermed innlogging: gjesten lander på JoinTeamCode med koden, og
+ * onboarding-kontekstens pendingAction bærer selve innmeldingen gjennom Auth.
+ */
+export function openJoinTeamCode(code: string): void {
+  if (!code) return;
+  if (!navigationRef.isReady()) {
+    pendingJoinCode = code;
+    return;
+  }
+  const rootRoutes = navigationRef.getRootState()?.routeNames ?? [];
+  try {
+    if (rootRoutes.includes('JoinTeamCode')) {
+      // Onboarding-stacken eller den lagløse Profil-stacken.
+      (navigationRef as any).navigate('JoinTeamCode', {prefillCode: code});
+      return;
+    }
+    if (rootRoutes.includes('Profil')) {
+      navigationRef.navigate('Profil', {
+        screen: 'JoinTeamCode',
+        params: {prefillCode: code},
+        initial: false,
+      } as never);
+      return;
+    }
+    pendingJoinCode = code;
+  } catch {
+    pendingJoinCode = code;
+  }
+}
 
 /**
  * Åpner kampen hvis mulig, ellers parkerer den til `flushPendingDeepLink`.
@@ -230,6 +283,11 @@ export function openNotificationTarget(data: Record<string, unknown>): void {
  */
 export function handleDeepLinkUrl(url: string | null): void {
   if (!url) return;
+  const joinCode = parseJoinCodeFromUrl(url);
+  if (joinCode) {
+    openJoinTeamCode(joinCode);
+    return;
+  }
   const ops = url.match(/^heia:\/\/ops\/claims\/([0-9a-f-]{36})/i);
   if (ops) {
     openOpsClaim(ops[1]);
@@ -265,6 +323,12 @@ export function flushPendingDeepLink(): void {
   if (pendingLagkassa) {
     pendingLagkassa = false;
     openLagkassa();
+  }
+
+  if (pendingJoinCode !== null) {
+    const code = pendingJoinCode;
+    pendingJoinCode = null;
+    openJoinTeamCode(code);
   }
 
   if (pendingNotificationData !== null) {

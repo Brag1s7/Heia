@@ -1,0 +1,53 @@
+---
+import Base from '../layouts/Base.astro';
+// Stripe-retursiden. Samme URL og samme flows som før migreringen:
+// ?flow=success|cancel|portal|onboarding|refresh. Teksten byttes klientside,
+// «Åpne Heia-appen» (heia://lagkassa) vises kun på iOS. ?src=web (fra
+// web-startede flyter i senere runder) bytter «appen» → «fanen».
+---
+<Base title="Betaling" minimal noindex>
+  <section class="section">
+    <div class="container" style="max-width:520px">
+      <div class="opal card center" style="padding:40px 28px">
+        <div style="font-size:44px" id="emoji">💚</div>
+        <h1 style="font-size:28px;margin:16px 0 10px" id="title">Tusen takk for støtten!</h1>
+        <p class="lead" id="body" style="margin-inline:auto">Betalingen behandles hos Stripe. Statusen i Heia-appen oppdaterer seg av seg selv om et lite øyeblikk.</p>
+        <a class="btn btn-deep mt-2" id="openApp" href="heia://lagkassa" style="display:none">Åpne Heia-appen</a>
+        <a class="btn btn-deep mt-2" id="backWeb" href="/klubb/" style="display:none">Tilbake til Klubbetalinger</a>
+        <p class="small muted mt-2" id="hint">Du kan trygt lukke denne siden.</p>
+      </div>
+    </div>
+  </section>
+
+  <script is:inline>
+    (function () {
+      var flows = {
+        success: {emoji: '💚', title: 'Tusen takk for støtten!',
+          body: 'Betalingen behandles hos Stripe. Statusen i Heia-appen oppdaterer seg av seg selv om et lite øyeblikk.'},
+        cancel: {emoji: '🙂', title: 'Ingen betaling ble gjennomført',
+          body: 'Ombestemmer du deg, står «Støtt laget»-knappen klar i appen når som helst.'},
+        portal: {emoji: '💚', title: 'Alt lagret!',
+          body: 'Endringer i støtten din oppdaterer seg i Heia-appen om et lite øyeblikk.'},
+        onboarding: {emoji: '⚽️', title: 'Det var alt!',
+          body: 'Gå tilbake til Heia-appen — statusen der oppdaterer seg av seg selv.'},
+        refresh: {emoji: '⏳', title: 'Lenken er utløpt',
+          body: 'Lenker fra Stripe varer bare en kort stund. Gå tilbake til Heia-appen og hent en fersk lenke.'}
+      };
+      var params = new URLSearchParams(location.search);
+      var flow = params.get('flow');
+      var f = flows[flow] || flows.success;
+      var body = f.body;
+      if (params.get('src') === 'web') {
+        body = body.replace(/Heia-appen/g, 'Heia-fanen i nettleseren').replace(/i appen/g, 'i nettleseren');
+      }
+      document.getElementById('emoji').textContent = f.emoji;
+      document.getElementById('title').textContent = f.title;
+      document.getElementById('body').textContent = body;
+      if (params.get('src') === 'web') {
+        document.getElementById('backWeb').style.display = 'inline-flex';
+      } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        document.getElementById('openApp').style.display = 'inline-flex';
+      }
+    })();
+  </script>
+</Base>

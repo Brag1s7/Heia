@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/app.css';
+import InvitationApp from '../app/InvitationApp';
+---
+<Base title="Invitasjon" description="Bli betalingsansvarlig for klubben i Heia." minimal noindex>
+  <section class="section" style="padding-top:28px">
+    <div class="container app">
+      <InvitationApp client:only="react" />
+    </div>
+  </section>
+</Base>

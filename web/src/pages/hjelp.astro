@@ -1,0 +1,72 @@
+---
+import Base from '../layouts/Base.astro';
+import {CONTACT_EMAIL, SUPPORT, primaryCta} from '../config';
+const cta = primaryCta();
+---
+<Base title="Hjelp" description="Svar på vanlige spørsmål om Heia: komme i gang, roller, kamp og reporter, bilder, konto og støtte til laget.">
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow">Hjelp</span>
+        <h1 style="margin-top:12px">Spørsmål og svar</h1>
+        <p class="lead">Finner du ikke svaret, skriv til <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Vi svarer normalt innen én virkedag.</p>
+      </div>
+
+      <div class="grid grid-2" style="align-items:start">
+        <div>
+          <h2 style="font-size:24px;margin-bottom:8px">Komme i gang</h2>
+          <div class="faq">
+            <details><summary>Hvordan blir jeg med i et lag?</summary><p>Du trenger en invitasjonskode eller en lenke fra treneren eller laglederen. Åpne Heia, velg «Bli med i lag» og skriv inn koden. Har du fått en lenke, åpner den appen med koden klar — eller viser deg koden hvis du ikke har appen ennå.</p></details>
+            <details><summary>Hvordan oppretter jeg et lag?</summary><p>Velg «Opprett lag» i appen, gi laget navn, idrett og klubb, og velg lagfarge. Du blir trener eller lagleder for laget og får en kode du kan dele med resten.</p></details>
+            <details><summary>Kan jeg være med i flere lag?</summary><p>Ja. Du bytter lag øverst på Hjem. Har du flere barn på ulike lag, ligger alle lagene i samme app.</p></details>
+            <details><summary>Hvordan får jeg Heia?</summary><p>Heia er i pilot på iPhone. {cta.href.startsWith('http') ? <span><a href={cta.href}>{cta.label}</a>. {cta.note}</span> : <span>Send oss en e-post på <a href={cta.href}>{CONTACT_EMAIL}</a>, så tar vi laget ditt med.</span>} Android er planlagt, men dato er ikke satt.</p></details>
+          </div>
+
+          <h2 style="font-size:24px;margin:34px 0 8px">Roller i laget</h2>
+          <div class="faq">
+            <details><summary>Hva kan trener og lagleder gjøre?</summary><p>Opprette og redigere hendelser (trening, kamp, sosialt), starte kamp og velge reporter, fjerne medlemmer og slette innhold i laget. Det er også trener eller lagleder som søker om klubbstøtte.</p></details>
+            <details><summary>Hva er en reporter?</summary><p>Reporteren er den ene personen som rapporterer en kamp: starter kampen, legger inn mål og hendelser, og avslutter. Treneren tildeler rollen per kamp — gjerne til en forelder på sidelinja.</p></details>
+            <details><summary>Hva er en supporter?</summary><p>Et vanlig medlem i laget som har valgt å støtte laget økonomisk. Supportere har nøyaktig samme tilgang som alle andre.</p></details>
+          </div>
+
+          <h2 style="font-size:24px;margin:34px 0 8px">Kamp</h2>
+          <div class="faq">
+            <details><summary>Hvordan følger jeg en kamp direkte?</summary><p>Når reporteren har startet kampen, vises den øverst på Hjem. Stilling og hendelser oppdaterer seg selv, og du kan sende Heia og kommentere underveis.</p></details>
+            <details><summary>Får jeg varsel når det blir mål?</summary><p>Ja, hvis du har skrudd på varsler for Heia. Du velger selv i telefonens innstillinger.</p></details>
+            <details><summary>Reporteren skrev feil. Hva nå?</summary><p>Reporteren kan korrigere mål fra kampen. Korrigeringen oppdaterer stillingen og referatet.</p></details>
+          </div>
+        </div>
+
+        <div>
+          <h2 style="font-size:24px;margin-bottom:8px">Innhold og bilder</h2>
+          <div class="faq">
+            <details><summary>Hvem ser det jeg deler?</summary><p>Bare medlemmene i laget du deler det i. Heia har ingen offentlige profiler eller åpne feeder.</p></details>
+            <details><summary>Kan jeg slette et innlegg eller en kommentar?</summary><p>Ja, dine egne når som helst fra ⋯-menyen. Trenere og lagledere kan slette alt innhold i sitt lag.</p></details>
+            <details><summary>Hvordan rapporterer jeg upassende innhold?</summary><p>Åpne ⋯-menyen på innlegget eller kommentaren og velg «Rapporter». Heia vurderer rapporten, normalt innen 24 timer.</p></details>
+            <details><summary>Hva med bilder av barn?</summary><p>Del bare bilder du har lov til å dele, og spør før du poster bilder av andres barn. Bildene er kun synlige for laget, og kan slettes når som helst.</p></details>
+          </div>
+
+          <h2 style="font-size:24px;margin:34px 0 8px">Konto</h2>
+          <div class="faq">
+            <details><summary>Jeg har glemt passordet.</summary><p>Velg «Glemt passord» på innloggingsskjermen. Du får en 6-sifret kode på e-post som du skriver inn i appen sammen med et nytt passord.</p></details>
+            <details><summary>Hvor gammel må jeg være?</summary><p>13 år for egen konto. Yngre barn deltar gjennom foresattes konto — forelderen legger dem inn i laget.</p></details>
+            <details><summary>Hvordan sletter jeg kontoen min?</summary><p>Profil → Innstillinger → Slett konto. Aktive støtteavtaler avsluttes, opplysningene dine slettes og profilen anonymiseres, som beskrevet i <a href="/personvern/">personvernerklæringen</a>.</p></details>
+            <details><summary>Hvordan forlater jeg et lag?</summary><p>Profil → Dine lag → laget → Forlat laget. Støtter du laget økonomisk, avsluttes avtalen samtidig.</p></details>
+          </div>
+
+          <h2 style="font-size:24px;margin:34px 0 8px">Støtte til laget</h2>
+          <div class="faq">
+            <details><summary>Hva koster det, og hva får laget?</summary><p>{SUPPORT.priceNok} kr i måneden, hvorav {SUPPORT.clubNok} kr går direkte til laget — mer enn tre av fire kroner. Vanlig bruk av Heia er gratis; støtten er frivillig. Alt står på <a href="/stott-laget/">Støtt laget</a>.</p></details>
+            <details><summary>Hvordan sier jeg opp?</summary><p>Profil → Min støtte → Administrer. Ingen bindingstid.</p></details>
+            <details><summary>Jeg finner ikke «Støtt laget» i appen.</summary><p>Da har ikke klubben aktivert støtte for laget ennå. Treneren eller laglederen kan søke fra Laginnstillinger. Les <a href="/stott-laget/#klubb">hvordan klubben aktiverer</a>.</p></details>
+          </div>
+        </div>
+      </div>
+
+      <div class="opal card mt-3" style="display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between">
+        <div><h3>Fortsatt spørsmål?</h3><p>Skriv til oss, så hjelper vi deg.</p></div>
+        <a class="btn btn-primary" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+      </div>
+    </div>
+  </section>
+</Base>

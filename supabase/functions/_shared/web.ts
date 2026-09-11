@@ -16,10 +16,15 @@ export type LandingFlow =
   | 'onboarding'
   | 'refresh';
 
-export function landingUrl(flow: LandingFlow): string {
+/**
+ * `source` = 'web' når flyten ble startet fra heiaapp.no (Klubbetalinger på
+ * web): retursiden sier da «tilbake til fanen», ikke «tilbake til appen».
+ */
+export function landingUrl(flow: LandingFlow, source?: 'app' | 'web'): string {
   const base = Deno.env.get('WEB_BASE_URL');
   if (base) {
-    return `${base.replace(/\/+$/, '')}/betaling?flow=${flow}`;
+    const src = source === 'web' ? '&src=web' : '';
+    return `${base.replace(/\/+$/, '')}/betaling?flow=${flow}${src}`;
   }
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   if (flow === 'onboarding' || flow === 'refresh') {

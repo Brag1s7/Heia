@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/app.css';
+import KlubbApp from '../app/KlubbApp';
+---
+<Base title="Klubbetalinger" description="Klubbens støtteordning i Heia — lag, utbetaling, roller og historikk." minimal noindex>
+  <section class="section" style="padding-top:28px">
+    <div class="container app">
+      <KlubbApp client:only="react" />
+    </div>
+  </section>
+</Base>

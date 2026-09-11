@@ -1,0 +1,139 @@
+---
+import '../styles/global.css';
+import {primaryCta, CONTACT_EMAIL, LEGAL, APP_STORE_ID} from '../config';
+
+interface Props {
+  title: string;
+  description?: string;
+  /** true = ingen synlig header/footer-nav ut over det minimale (broer). */
+  minimal?: boolean;
+  /** Ingen tredjeparts- eller ekstra-skript på siden (invitasjon o.l.). */
+  noindex?: boolean;
+}
+const {title, description = 'Heia — appen som samler laget og alle rundt det. Treninger, kamper, bilder og øyeblikk, så familien kan følge med og heie.', minimal = false, noindex = false} = Astro.props;
+const cta = primaryCta();
+const fullTitle = title === 'Heia' ? 'Heia' : `${title} · Heia`;
+const legalLine = LEGAL.companyName && LEGAL.orgNumber
+  ? `${LEGAL.companyName} · org.nr. ${LEGAL.orgNumber}${LEGAL.address ? ' · ' + LEGAL.address : ''}`
+  : null;
+---
+<!doctype html>
+<html lang="nb">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#DFFFF1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="nb_NO" />
+    <meta property="og:image" content={new URL('/img/og.png', Astro.site)} />
+    {noindex && <meta name="robots" content="noindex" />}
+    {APP_STORE_ID && <meta name="apple-itunes-app" content={`app-id=${APP_STORE_ID}`} />}
+  </head>
+  <body>
+    <div class="ground" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <div class="container">
+        <div class="bar">
+          <a class="logo" href="/" aria-label="Heia — til forsiden">
+            <img class="logo-d" src="/img/logo-green-wordmark.png" alt="Heia" />
+            <img class="logo-m" src="/img/logo-deep-wordmark.png" alt="Heia" />
+          </a>
+          {!minimal && (
+            <>
+              <nav aria-label="Hovedmeny">
+                <a href="/#slik" class="hide-m">Slik fungerer Heia</a>
+                <a href="/stott-laget/">Støtt laget</a>
+                <a href="/hjelp/">Hjelp</a>
+                <a class="btn btn-primary" href={cta.href}><span class="full">{cta.label}</span><span class="short">Få laget med</span></a>
+                <button class="menu-btn" type="button" aria-label="Meny" aria-expanded="false" aria-controls="mobile-menu" id="menu-btn">
+                  <svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                  <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                </button>
+              </nav>
+              <div class="mobile-menu" id="mobile-menu">
+                <a href="/#slik">Slik fungerer Heia</a>
+                <a href="/#bidra">Sammen får laget til mer</a>
+                <a href="/stott-laget/">Støtt laget</a>
+                <a href="/#kom-i-gang">Kom i gang</a>
+                <a href="/hjelp/">Hjelp</a>
+                <a href="/om/">Om Heia</a>
+                <div class="menu-cta"><a class="btn btn-primary" href={cta.href}>{cta.label}</a></div>
+              </div>
+            </>
+          )}
+          {minimal && (
+            <nav aria-label="Meny">
+              <a href="/hjelp/">Hjelp</a>
+            </nav>
+          )}
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+    <script>
+      const btn = document.getElementById('menu-btn');
+      const menu = document.getElementById('mobile-menu');
+      if (btn && menu) {
+        const set = (open: boolean) => {
+          btn.setAttribute('aria-expanded', String(open));
+          if (open) menu.setAttribute('data-open', ''); else menu.removeAttribute('data-open');
+        };
+        btn.addEventListener('click', () => set(!menu.hasAttribute('data-open')));
+        // Frost på mobilheaderen først når siden er scrollet.
+        const header = document.querySelector('.site-header') as HTMLElement | null;
+        const onScroll = () => {
+          if (!header) return;
+          if (window.scrollY > 8) header.setAttribute('data-scrolled', ''); else header.removeAttribute('data-scrolled');
+        };
+        onScroll();
+        window.addEventListener('scroll', onScroll, {passive: true});
+        menu.addEventListener('click', (e) => { if ((e.target as HTMLElement).tagName === 'A') set(false); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') set(false); });
+      }
+    </script>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="top">
+          <div>
+            <a class="logo" href="/" aria-label="Heia"><img src="/img/logo-green-wordmark.png" alt="Heia" /></a>
+            <p>Appen som samler laget og alle rundt det. Følg med, hei på laget og støtt det — også når du ikke er på sidelinja.</p>
+            <p class="mt-1"><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
+          </div>
+          <div>
+            <h4>Heia</h4>
+            <ul>
+              <li><a href="/#slik">Slik fungerer Heia</a></li>
+              <li><a href="/stott-laget/">Støtt laget</a></li>
+              <li><a href="/#kom-i-gang">Kom i gang med laget</a></li>
+              <li><a href="/om/">Om Heia</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Hjelp og vilkår</h4>
+            <ul>
+              <li><a href="/hjelp/">Hjelp og spørsmål</a></li>
+              <li><a href="/vilkar/">Vilkår for bruk</a></li>
+              <li><a href="/personvern/">Personvern</a></li>
+              <li><a href={`mailto:${CONTACT_EMAIL}`}>Kontakt oss</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="legal">
+          <span>© {new Date().getFullYear()} Heia</span>
+          {legalLine ? <span>{legalLine}</span> : <span>Selskapsopplysninger (foretaksnavn, organisasjonsnummer og adresse) publiseres her når de er bekreftet.</span>}
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

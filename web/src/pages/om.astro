@@ -1,0 +1,40 @@
+---
+import Base from '../layouts/Base.astro';
+import {CONTACT_EMAIL, LEGAL} from '../config';
+const hasLegal = LEGAL.companyName && LEGAL.orgNumber;
+---
+<Base title="Om Heia" description="Hvem som står bak Heia, hvorfor vi lager appen, og hvordan du kontakter oss.">
+  <section class="section">
+    <div class="container prose">
+      <span class="eyebrow">Om Heia</span>
+      <h1 style="margin-top:12px">Laget er mer enn kampen.</h1>
+      <p class="lead mt-1">Heia lages av folk som selv står på sidelinja. Vi ville ha ett sted der laget deler hverdagen sin — og der besteforeldre, søsken og alle rundt kan være med, heie og kjenne seg nærmere.</p>
+
+      <h2>Hvorfor Heia</h2>
+      <p>Barne- og ungdomsidretten er full av små øyeblikk som forsvinner: den første scoringen, treningen der alt løsnet, pizzakvelden etter cupen. De havner i ulike gruppechatter, eller ingen steder. Heia samler dem i lagets eget rom, lukket for alle andre.</p>
+      <p>Vi bygger Heia for engasjementet rundt laget — ikke som et administrasjonsverktøy. Kalender og oppmøte er med fordi laget trenger det, men kjernen er feeden, kampene og fellesskapet.</p>
+
+      <h2>Hva vi lover</h2>
+      <ul>
+        <li><strong>Gratis å bruke.</strong> Ingen funksjoner låses bak betaling.</li>
+        <li><strong>Lukkede lag.</strong> Ingen offentlige profiler, ingen åpen feed, ingen annonser.</li>
+        <li><strong>Ærlig om penger.</strong> Vil noen støtte laget, går et fast beløp av hver betaling til klubben, og det står åpent på <a href="/stott-laget/">Støtt laget</a>.</li>
+        <li><strong>Norsk, lagd i Norge.</strong> Bygd for norske klubber, med Brønnøysundregistrene som fasit for hvem som kan ta imot penger.</li>
+      </ul>
+
+      <h2>Hvor vi er nå</h2>
+      <p>Heia er i pilot med utvalgte lag på iPhone. Vi tar med nye lag fortløpende, og lytter til hva de trenger. Android er planlagt, men vi lover ingen dato før den er sikker.</p>
+
+      <h2>Kontakt</h2>
+      <p>Alt går til <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> — spørsmål, lag som vil prøve, klubber som vil aktivere støtte, og rapporter om innhold. Vi svarer normalt innen én virkedag.</p>
+
+      <h2>Selskapsopplysninger</h2>
+      {hasLegal ? (
+        <p>{LEGAL.companyName}, org.nr. {LEGAL.orgNumber}{LEGAL.address ? `, ${LEGAL.address}` : ''}.</p>
+      ) : (
+        <p class="notice">Foretaksnavn, organisasjonsnummer og forretningsadresse publiseres her så snart de er bekreftet. Fram til da er <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a> kontaktpunktet for alle henvendelser, også formelle.</p>
+      )}
+      <p class="small muted">Se også <a href="/vilkar/">vilkår for bruk</a> og <a href="/personvern/">personvernerklæringen</a>.</p>
+    </div>
+  </section>
+</Base>

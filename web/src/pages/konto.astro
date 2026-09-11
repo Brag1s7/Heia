@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import '../styles/app.css';
+import KontoApp from '../app/KontoApp';
+---
+<Base title="Konto" description="Logg inn med Heia-kontoen din." minimal noindex>
+  <section class="section" style="padding-top:28px">
+    <div class="container app">
+      <KontoApp client:only="react" />
+    </div>
+  </section>
+</Base>
