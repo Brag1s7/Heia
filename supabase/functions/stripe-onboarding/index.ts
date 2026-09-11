@@ -210,6 +210,9 @@ Deno.serve(async (req) => {
 
     // Kortlevd lenke, generert nå — landingssiden er heiaapp.no når
     // WEB_BASE_URL er satt, ellers tekstside-søsterfunksjonen.
+    // stripe:ingen-nokkel — og det er MENINGEN. En account_link er en
+    // kortlevd engangslenke; hvert forsøk SKAL få en fersk. En nøkkel ville
+    // gitt brukeren den samme, utløpte lenken om igjen.
     const linkObj = await stripePost('/v1/account_links', {
       account: stripeAccountId!,
       type: 'account_onboarding',

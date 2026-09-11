@@ -1,6 +1,87 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 natt — SKIVE 1: STEG 1 LEVERT, STEG 2 KJØRT I PROD)
+## ▶️▶️ START HER (2026-09-11 natt, runde 2 — DATABASEN ER I SYNK, TO TING VENTER PÅ BRAGE)
+
+### De to tingene som venter på deg
+
+1. **Tre Vercel-variabler** (Production **og** Preview) — uten dem stopper
+   byggingen av nettsiden. Jeg har ingen Vercel-tilgang: det ligger bare en
+   tom `auth.json` uten token på maskina, og `vercel` er ikke installert.
+   Verdiene står i rammen lenger nede.
+2. **CI er RØD på `main`, og har vært det hele dagen** — ikke av noe vi har
+   gjort. `tsc --noEmit` stopper på **10 typefeil i
+   `src/components/LiquidGlassSurface.tsx`**, inne fra `70448a3`
+   (7. september, feedkortet — telefongodkjent). Det blokkerer enhver PR.
+   Se punkt 116; fiksen er typenivå, men fila er designkode, så jeg rører
+   den ikke uten at du sier ja.
+
+### Hva som ER i drift nå
+
+- **Databasen: `00084`, og 00079–00084 er sammenhengende.** 00083 var IKKE
+  med da 00084 ble kjørt — kontrollert tre veier (funksjon, trigger og
+  migrasjonsregister alle tomme) — og ble kjørt for seg etterpå.
+- **Edge Functions: uendret.** `stripe-checkout` står fortsatt på v10.
+- **Nettsiden: uendret.** `Brage` er 6 commits foran `main`.
+
+### 00083 — kontrakten er bevist (8/8, transaksjon rullet tilbake)
+
+Overgangen `onboarding_started → active` ga **2 varsler til nøyaktig de 2
+unike aktive trenerne**; null dubletter per person; null foreldre eller
+supportere; riktig `screen: support_setup`; **0 nye varsler** ved to
+gjentatte `active`-oppdateringer (gjentatt webhook); og med
+varselinnsettingen **sabotert med vilje** overlevde betalingsstatusen
+(`status=active`) — unntaksfangeren virker. Ingen varsler er sendt bakover
+i tid: triggeren fyrer bare på framtidige overganger.
+
+**Eksterne sideeffekter ble kontrollert særskilt.** En varselrad utløser
+`net.http_post` → push-fanout og `realtime.send`. Begge skriver til
+TABELLER som rulles tilbake med transaksjonen, og pg_net-arbeideren leser
+bare committede rader. Målt etterpå: siste ekte pg_net-svar var **19:10**,
+siste broadcast **17:10** — alle testene mine kjørte etter 20:40. **Ingen
+push, ingen e-post og ingen broadcast forlot basen.**
+
+### Punkt 87 — deployklar, ikke deployet
+
+Fiksen er gjennomgått og holder: parallelle førstegangskall deler nøkkel og
+kollapser til én sesjon, et lovlig nytt forsøk får ny nøkkel, og
+parametrene er identiske mellom parallelle kall (`landingUrl()` er
+deterministisk, og produkt/pris/kunde har egne nøkler). Prod er uskadd: 14
+avtalerader, 0 par med flere levende avtaler, 0 aktive uten Stripe-id.
+
+    supabase functions deploy stripe-checkout
+
+Deployen er to filer, +21/−3 mot v10. Tilbakeføring:
+`git checkout e2007241 -- supabase/functions/stripe-checkout` og deploy på
+nytt. **Ikke testet:** et ekte parallelt kall mot Stripe testmodus — det
+krever `STRIPE_SECRET_KEY`, som bare finnes som digest lokalt.
+
+### Punkt 98 — risikosortert, kan vente
+
+**0 av 83** refererer til en public-tabell ukvalifisert, **0 av 12**
+`%rowtype` er ukvalifiserte, og `authenticated`/`anon` kan verken lage
+skjemaer eller objekter i `public`. Eneste navnerom de rår over er
+`pg_temp`, som bare skygger relasjoner — og alle er kvalifiserte. Dette er
+dybdeforsvar, ikke et åpent hull. Gjennomgangen står fortsatt på lista.
+
+### Punkt 114 — minste oppgradering er `astro@7.2.8`
+
+Ikke 7.3.2, som `npm audit fix --force` foreslår. Ti rådgivninger, ingen
+nåbare i vårt oppsett (ingen bildeoptimalisering, ingen View Transitions,
+ingen server islands, ingen spread-props, ingen `base`, `output: 'static'`).
+Tabellen med GHSA-referanser og hvorfor hver enkelt ikke treffer står i
+punkt 114. `@astrojs/react` trenger ikke endres. Krever Node ≥ 22.12.0.
+
+### To nye vakter i CI
+
+`scripts/lint-security-definer.mjs` (en ny SECURITY DEFINER-funksjon må
+stenge PUBLIC/anon eller merkes bevisst) og
+`scripts/lint-stripe-idempotens.mjs` (hvert `stripePost` må ha
+idempotensnøkkel eller en skreven grunn). Begge negativt testet. De fem
+lovlige Stripe-unntakene er nå dokumentert i koden.
+
+---
+
+## (forrige START HER — 2026-09-11 natt — SKIVE 1: STEG 1 LEVERT, STEG 2 KJØRT I PROD)
 
 **Steg 1 (punkt 108–109, nettsidens miljøer + CI)** er ferdig i kode og
 bevist lokalt. Det er **ikke merget og ikke i drift**, og krever én ting av

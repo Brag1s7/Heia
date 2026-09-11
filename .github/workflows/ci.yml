@@ -48,6 +48,12 @@ jobs:
       - name: Dørene på nye SECURITY DEFINER-funksjoner
         run: node scripts/lint-security-definer.mjs
 
+      # Vakt fra skive 2: en Stripe-skriving uten idempotensnøkkel kan lage
+      # to betalbare objekter av ett dobbelttrykk (punkt 87). Unntak er
+      # lovlige, men må være skrevet ned.
+      - name: Idempotens på Stripe-skrivinger
+        run: node scripts/lint-stripe-idempotens.mjs
+
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -6,6 +6,13 @@ sjekket mot repoet, prod-databasen og Supabase samme dag._
 
 **Slik brukes fila:** dette er arbeidslista. `STATUS-HANDOFF.md` er
 historikken. Når et punkt lukkes, stryk det her og skriv hvorfor i handoffen.
+
+**Fire tilstander, og de er ikke det samme.** Et punkt kan være
+**lokalt ferdig** (koden finnes i treet), **CI-verifisert** (en grønn
+kjøring har sett den), **i drift** (deployet — databasen, Edge Functions
+og nettsiden deployes hver for seg) og **telefonverifisert** (sett på en
+ekte telefon). Skriv alltid hvilken. Et punkt er ikke i drift fordi koden
+er pushet.
 **Brage** foran et punkt betyr at det krever noe utenfor koden: Apple,
 Stripe, Brønnøysund, Google, en telefon eller en beslutning. Resten er
 kodearbeid.
@@ -14,10 +21,23 @@ kodearbeid.
 
 ## Der vi står — hva som FAKTISK kjører
 
-_Målt 2026-09-11 kl. 20. Et punkt er ikke i drift fordi koden er pushet.
+_Oppdatert 2026-09-11 natt. Et punkt er ikke i drift fordi koden er pushet.
 Hvert lag deployes for seg._
 
 | Lag | I drift nå | Nyere lokalt |
+|---|---|---|
+| **Databasen** | migrasjoner t.o.m. **`00084`** (00079–00084 sammenhengende) | ingenting — **i synk** ✅ |
+| **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · øvrige i synk | **to udeployede** — punkt 117 |
+| **Nettsiden** heiaapp.no | `main` = `318305e` (17:47) | `Brage` er **6 commits foran**; miljøseparasjonen venter på tre Vercel-variabler (punkt 108) |
+| **CI** | **RØD på `main`** — `tsc` stopper på 10 typefeil i `LiquidGlassSurface.tsx` | punkt 116; blokkerer enhver PR |
+| **Secrets** | `WEB_BASE_URL` og `WEB_INVITE_BASE_URL` satt | — |
+| **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
+| **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
+
+_(Tabellen over er oppdatert 2026-09-11 natt. Den opprinnelige, fra kl. 20,
+står under for sporbarhet.)_
+
+| Lag | I drift kl. 20 | Nyere lokalt |
 |---|---|---|
 | **Nettsiden** heiaapp.no | `main` = `318305e` (17:47) | `Brage` er **4 commits foran**. Ingen av kveldens nettsidefikser er live — verifisert: AASA serverer fortsatt `/stott*` og `/betaling*`, `robots.txt` gir 404, og bare Vercels egen HSTS står. |
 | **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · `claim-notify` v8 (11. sep) | **Dobbeltbetalingsfiksen er IKKE deployet.** Koden er committet, funksjonen er ikke. Krever `supabase functions deploy`. |
@@ -406,6 +426,45 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
     uten idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
     samme funksjon. To parallelle kall ga to betalbare sesjoner og kunne
     ende i to abonnementer, der det andre aldri kunne knyttes til raden.
+
+    **Status: fikset i kode, gjennomgått, DEPLOYKLAR — IKKE DEPLOYET.**
+    `stripe-checkout` står fortsatt på **v10 (19. august)**. Gjennomgangen
+    2026-09-11 natt fant ingen feil i fiksen:
+    * *Parallelle førstegangskall:* begge leser samme rad uten sesjons-id →
+      samme nøkkel `heia-cosess-<rad>-first` → Stripe kollapser til ÉN sesjon.
+    * *Lovlig nytt forsøk etter utløp:* raden bærer nå `sess_A` → nøkkelen
+      blir `…-sess_A` → ny, betalbar sesjon. Riktig.
+    * *Parametrene er identiske mellom parallelle kall*, som Stripe krever
+      for at nøkkelen skal kollapse i stedet for å feile: `landingUrl()` er
+      deterministisk (ingen tidsstempel eller nonce), og produkt, pris og
+      kunde lages alle med sine egne nøkler (`heia-offprod-`,
+      `heia-offprice-`, `heia-cust-`), så id-ene er de samme i begge kall.
+    * *Databasen holder:* `idx_support_subscriptions_one_live` (unik på
+      bruker + lag mens avtalen lever) står i prod.
+    * *Ingen skade har skjedd:* 14 avtalerader, **0** par med flere levende
+      avtaler, **0** aktive rader uten Stripe-abonnements-id, **0**
+      foreldreløse `checkout_pending`.
+
+    **Deployen omfatter nøyaktig to filer** (+21/−3 mot v10):
+    idempotensnøkkelen, og `_shared/web.ts` som fikk et valgfritt
+    `source`-argument — `stripe-checkout` sender det ikke, så URL-ene er
+    byte-identiske. `WEB_BASE_URL` er allerede satt, og secrets når
+    kjørende funksjoner uten redeploy, så landingssidene endrer seg ikke.
+
+    **Kommando:** `supabase functions deploy stripe-checkout`
+    **Tilbakeføring:** `git checkout e2007241 -- supabase/functions/stripe-checkout`
+    og deploy på nytt. Ingen databaseendring, ingen migrasjon.
+
+    **Ikke testet:** et ekte parallelt kall mot Stripe testmodus. Det
+    krever `STRIPE_SECRET_KEY`, som bare finnes som digest lokalt.
+    Anbefales som første steg i punkt 21 (én ekte betaling som røyktest).
+
+    **Vakt mot tilbakefall:** `scripts/lint-stripe-idempotens.mjs` i CI —
+    hvert `stripePost` må ha nøkkel eller en skreven grunn
+    (`// stripe:ingen-nokkel — …`). De fem lovlige unntakene er nå
+    dokumentert i koden: to `/expire`-kall og én abonnementskansellering
+    er idempotente av natur, mens account-link og portalsesjon SKAL gi en
+    fersk lenke hver gang. Negativt testet: fjernes nøkkelen, feiler den.
 88. **Bildene lå kun på disk.** `cachePolicy="disk"` betyr i expo-image
     KUN disk, så hver resirkulerte listecelle dekodet et 2048 px bilde på
     nytt. Dette er den mest sannsynlige forklaringen på at appen føltes treg.
@@ -425,9 +484,21 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 
 ### Må pushes til prod av Brage
 
-96. **Migrasjon 00083** — varselet SupportSetup lover når klubben blir
-    klar, finnes ikke i dag. Trigger på overgangen til aktiv konto.
-    Bevisfil: `scripts/verify-00083.sql`.
+96. ~~**Migrasjon 00083**~~ **KJØRT I PROD 2026-09-11 natt.** Den var
+    IKKE med da 00084 ble kjørt — det ble kontrollert tre veier (funksjon,
+    trigger og migrasjonsregister alle tomme), og 00083 ble så kjørt for
+    seg. Databasen står nå på en sammenhengende rekke 00079–00084.
+    Trigger og funksjon er på plass, `search_path` er pinnet, `anon` er
+    revoked. Kontrakten er bevist i en transaksjon som ble rullet tilbake:
+    overgangen `onboarding_started → active` ga 2 varsler til nøyaktig de
+    2 unike aktive trenerne, null dubletter per person, null foreldre
+    eller supportere i mottakergruppa, riktig `screen: support_setup`,
+    **0 nye varsler** ved to gjentatte `active`-oppdateringer (gjentatt
+    webhook), og — med varselinnsettingen sabotert med vilje —
+    **betalingsstatusen overlevde** (`status=active`, unntaksfangeren
+    virker). Ingen varsler er sendt bakover i tid: triggeren fyrer bare på
+    framtidige overganger, og de tre kontoene som alt er `active` rører
+    den ikke.
 97. ~~**Migrasjon 00084**~~ **KJØRT I PROD 2026-09-11.** 25 SECURITY
     DEFINER-RPC-er kunne kalles av `anon`; nå kan bare `lookup_invite_code`
     det (gruppe D, bevisst — onboarding slår opp koden før innlogging).
@@ -455,9 +526,31 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 ### Nye punkter, ikke rettet
 
 98. **83 funksjoner mangler `search_path` helt** (var 85; 00084 tok de fire
-    viktigste). Resten er en egen skive, og skal tas i grupper, ikke som én
-    migrasjon. Måletallet står i `scripts/verify-00084.sql` rad B1, så neste
-    samtale slipper å telle på nytt.
+    viktigste). Måletallet står i `scripts/verify-00084.sql` rad B1.
+
+    **RISIKOSORTERT 2026-09-11 natt — ingen av dem er konkret utsatt i dag,
+    så resten kan vente.** Angrepet er ikke «mangler sti» i seg selv.
+    `pg_temp` søkes implisitt FØRST for **relasjoner** (tabeller, views,
+    typer) når den ikke står eksplisitt i stien — men aldri for funksjoner.
+    En angriper må altså kunne (a) lage et objekt som skygger for et navn,
+    og (b) få en SECURITY DEFINER-funksjon til å slå opp det navnet
+    **ukvalifisert**. Målt i prod:
+    * **0 av 83** refererer til en public-tabell uten `public.`-prefiks.
+      Kodebasen kvalifiserer konsekvent. Detektoren ble kontrollert mot
+      konstruerte strenger begge veier før tallet ble trodd.
+    * **0 av 12** `%rowtype`-referanser er ukvalifiserte.
+    * `authenticated` og `anon` kan **ikke** lage skjemaer
+      (`has_database_privilege … CREATE` = false) og **ikke** lage objekter
+      i `public`. Eneste navnerom de rår over er `pg_temp`, som bare
+      skygger relasjoner og typer — og alle er kvalifiserte.
+    * De 12 trigger-funksjonene i lista er fortsatt kallbare av PUBLIC,
+      men PostgREST eksponerer ikke funksjoner som returnerer `trigger`,
+      og et direkte kall utenfor triggerkontekst feiler uansett.
+
+    Konklusjonen er at dette er dybdeforsvar, ikke et åpent hull.
+    **Gjennomgangen står fortsatt på lista** og bør tas i grupper når
+    det passer — for da er neste funksjon som glemmer `public.`-prefikset
+    ikke lenger et problem.
 99. **Kaldstart venter 1,5 sekunder på nett.** Bootfrøet leverer profil og
     medlemskap fra disk, men navigatoren står på oppstartsskjermen til
     livekamp-svaret lander eller tidsgrensen slår inn. Hele gevinsten fra
@@ -533,17 +626,78 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      gjenbrukes: kjør migrasjonen og handlingene i en transaksjon som
      RULLES TILBAKE, og mål begge retninger inne i den. Det avdekket
      RLS-svaret som ville tatt ned feeden, og det etterlot null spor.
-114. **Astro 5.18.2 har en åpen sårbarhetskjede** — ti rådgivninger, én
-     kritisk (XSS i `define:vars`, som Base.astro bruker), pluss `sharp`
-     og `esbuild`. `npm audit fix` krever Astro 7, altså en versjonssprang
-     med brytende endringer. Ikke utnyttbart her i dag: verdiene som går
-     gjennom `define:vars` er byggetidskonstanter, ikke brukerinndata.
-     Egen liten skive, ikke en sperre.
+114. **Astro 5.18.2 har ti åpne rådgivninger — ingen av dem er nåbare i
+     Heias oppsett.** Gjennomgått konkret 2026-09-11 natt.
+
+     | GHSA | Alvor | Fikset i | Krever | Heia |
+     |---|---|---|---|---|
+     | `GHSA-26w7-cxv4-gfx2` | kritisk | 7.2.8 | `astro:assets`-bildeoptimalisering med AVIF | ingen `<Image>`, `<Picture>` eller `getImage` — bildene ligger statisk i `public/` |
+     | `GHSA-2pvr-wf23-7pc7` | høy | 6.4.6 | SSR som henter en prerendret feilside | `output: 'static'`, ingen adapter, ingen egen 404/500 |
+     | `GHSA-8hv8-536x-4wqp` | høy | 6.3.3 | dynamisk slot-navn | ingen `slot={…}` |
+     | `GHSA-j687-52p2-xcff` | moderat | 6.1.6 | angriperstyrt streng i `define:vars` | ett kall, med fem byggetidskonstanter |
+     | `GHSA-jrpj-wcv7-9fh9` | moderat | 6.4.6 | spread-props med styrte attributtNAVN | ingen `{...}`-spread i noen `.astro` |
+     | `GHSA-f48w-9m4c-m7f5` | moderat | 7.0.6 | samme, i `renderHTMLElement` | samme |
+     | `GHSA-4g3v-8h47-v7g6` | moderat | 7.0.10 | View Transitions | ikke i bruk |
+     | `GHSA-7pw4-f3q4-r2p2` | lav | 7.0.4 | `transition:*`-direktiver | ikke i bruk (CSS-`transition` er noe annet) |
+     | `GHSA-376h-93r7-7g6f` | moderat | 7.2.4 | `base` satt i konfigurasjonen | `base` er ikke satt |
+     | `GHSA-xr5h-phrj-8vxv` | lav | 6.1.10 | server islands (`server:defer`) | ikke i bruk |
+
+     Pluss to transitive: `GHSA-g7r4-m6w7-qqqr` (esbuild, kun
+     dev-serveren på Windows) og `GHSA-f88m-g3jw-g9cj` +
+     `GHSA-rgj7-g3m4-5g8c` (sharp/libvips/libheif, `sharp` 0.34.5 →
+     trenger 0.35.4). `sharp` er en valgfri avhengighet som bare kjøres av
+     bildeoptimaliseringen — som vi ikke bruker.
+
+     **Minste oppgradering som retter alt: `astro@7.2.8`** — ikke 7.3.2,
+     som `npm audit fix --force` foreslår. Den er drevet av den ene
+     kritiske (AVIF, fikset i 7.2.8); alle de andre er fikset tidligere.
+     `astro@7.2.8` trekker `esbuild ^0.28.0`, som løser esbuild-funnet.
+     **`@astrojs/react` trenger ikke endres** — siste er 6.0.5, som vi
+     allerede har, og den har ingen `astro`-peer. Det gjør spranget mindre
+     enn «to hovedversjoner» høres ut som.
+     **Én forutsetning:** `astro@7.2.8` krever **Node ≥ 22.12.0**. CI
+     kjører Node 22, maskina kjører 24 — men Vercels Node-versjon må
+     bekreftes før oppgraderingen.
+
+     Ikke hastverk, men bør tas før lansering, siden «ikke nåbar i dag»
+     avhenger av at vi aldri tar i bruk bildeoptimalisering, View
+     Transitions eller `base`.
+
 115. **Appen har ingen miljømerking.** `src/lib/supabase.ts` leser
      `Config.SUPABASE_URL!` fra `.env` uten validering eller miljønavn.
      Et TestFlight-bygg pekt på et testprosjekt ville sett helt likt ut
      som produksjon. Bør få samme eksplisitte miljøvalg som nettsiden når
      punkt 113 er løst — ellers er «test på telefonen» ikke etterprøvbart.
+
+116. **CI er RØD på `main`, og har vært det hele dagen.** Ikke av noe vi
+     har gjort: jobben stopper på `tsc --noEmit` med **10 typefeil, alle i
+     `src/components/LiquidGlassSurface.tsx`**. Lest ut av GitHubs
+     check-run-annotasjoner (repoet er offentlig, så det går uten
+     innlogging). Feilene kom inn med `70448a3` 2026-09-07 — commiten som
+     lukket feedkortet, og som er telefongodkjent. **Blokkerer enhver PR**,
+     også miljø-PR-en fra skive 1.
+
+     De tre gruppene:
+     * `NativeGlass` brukes på linje 1038 i initialiseringen av
+       `GLASS_PRESS_NATIVE`, men deklareres først på linje 1100. I ekte JS
+       er det en temporal-dead-zone-feil, og på iOS 26 (`LIQUID_GLASS_SUPPORTED`
+       = `iosMajor >= 26`) ville `&&` ikke kortslutte den bort. **At
+       telefontestene har vært grønne siden 7. september viser at bundelen
+       ikke kaster** — `const` blir transpilert slik at verdien blir
+       `undefined`, og `undefined !== null` gir `true`, som tilfeldigvis er
+       riktig svar. Det virker ved et uhell, ikke ved design.
+     * `'top'`/`'bottom'` leses av et objekt der de ikke finnes (fire steder).
+     * To `No overload matches this call`.
+
+     Fiksen er typenivå og bør ikke endre noe visuelt, men fila er
+     telefongodkjent designkode, så den tas som en egen liten skive med
+     Brages ja — ikke på veien forbi.
+117. **To Edge Functions har ferdig kode som ikke er i drift.**
+     `stripe-checkout` står på **v10 (19. aug)** og `push-fanout` på
+     **v13 (3. aug)**, mens begge ble endret i `b36030b` 11. september.
+     For checkout er det dobbeltbetalingsfiksen (punkt 87). For
+     push-fanout er det at 500-taket logges i stedet for å kutte stille
+     (punkt 94). Alle andre funksjoner er i synk med koden.
 
 ### Avkreftet
 

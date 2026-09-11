@@ -57,6 +57,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // stripe:ingen-nokkel — og det er MENINGEN. En portalsesjon er en
+    // kortlevd engangslenke; hvert forsøk SKAL få en fersk. Ingen penger
+    // flyttes av at det finnes to lenker.
     const session = await stripePost('/v1/billing_portal/sessions', {
       customer: pc.provider_customer_id as string,
       return_url: landingUrl('portal'),

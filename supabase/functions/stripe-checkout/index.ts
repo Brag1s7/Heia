@@ -266,6 +266,9 @@ Deno.serve(async (req) => {
       // best-effort så to betalbare sesjoner aldri lever samtidig.
       if (subRow.provider_checkout_session_id) {
         try {
+          // stripe:ingen-nokkel — idempotent av natur: utløper en BESTEMT
+          // sesjon. Er den alt utløpt eller fullført, svarer Stripe med feil,
+          // og den fanges av catch-en under.
           await stripePost(
             `/v1/checkout/sessions/${subRow.provider_checkout_session_id}/expire`,
             {},
@@ -341,6 +344,7 @@ Deno.serve(async (req) => {
     if (updErr) throw new Error(`sesjonsskriving: ${updErr.message}`);
     if (!updated || updated.length === 0) {
       try {
+        // stripe:ingen-nokkel — idempotent av natur: utløper en BESTEMT sesjon.
         await stripePost(`/v1/checkout/sessions/${session.id}/expire`, {});
       } catch {
         // best-effort — sesjonen dør uansett av seg selv
