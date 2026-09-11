@@ -42,6 +42,14 @@ fire React-øyer mot samme Supabase-prosjekt som appen:
   parkeres gjennom innlogging (flush ved rotbytte).
 - `InviteCodeCard`: delearket deler https-lenken + koden.
 
+## Status 2026-09-11 kveld (siste commit `09a697e` på `Brage`)
+
+Alt under er committet og pushet. Mobilheaderen er lagt om (fullbredde,
+frost ved scroll, menyflate). To nye verktøy: `scripts/web-shot.mjs`
+(skjermbilder via DevTools Protocol som venter på hydrerte øyer) og
+`scripts/verify-web-flows.mjs` (positive flyttester mot prod med egne
+fixturer og full opprydding).
+
 ## Tester
 
 - `scripts/verify-00082.sql` via `scripts/run-sql.mjs`: **19/19 grønne**
@@ -54,17 +62,39 @@ fire React-øyer mot samme Supabase-prosjekt som appen:
 - `__tests__/deepLinkJoinCode.test.ts`: 3/3 grønne.
 - Headless Chrome: alle fire flater rendrer innloggingstilstanden uten
   JS-feil; markedssidene på PC (1440) og mobil (390).
-- IKKE testet (krever konto med rolle): positive ops-/manager-flyter i
-  nettleseren. RPC-ene er de samme som appen bruker og er telefontestet
-  (A2/A3), men web-UI-et rundt dem må Brage prøve med sin ops-konto.
+- `scripts/verify-web-flows.mjs`: **34/34 grønne** mot prod — ops
+  (kø, detalj, be om info, godkjenning uten tekst avvist, godkjenn →
+  rolle), betalingsansvarlig (oversikt, lagforespørsel, godkjenning før
+  Stripe avvist av backend, avslag m/ logg, invitasjon), invitert
+  (forhåndsvisning m/ e-postmatch, aksept, gjentatt aksept → invalid,
+  videre til Klubbetalinger), avvik (annen konto → awaiting_review, ingen
+  rolle før ops bekrefter, bekreft → aktiv), suspender (kan ikke
+  invitere), reaktiver, fjern, utsted + trekk tilbake, hendelseslogg,
+  stripe-onboarding-gate (403 for fjernet manager). Fixturene (fire
+  throwaway-brukere, klubbrad, søknad m/ orgnr 888888888, lag) ryddes
+  fullstendig — verifisert 0/0/0 igjen.
+- Skjermbilder med ferdig lastet innhold (ops-kø, søknadsdetalj, klubber
+  og roller, enhetsdetalj, Klubbetalinger, konto, brukt invitasjon) på PC
+  og mobil — tatt med de samme testfixturene.
+- IKKE testet i nettleser: selve klikkene i UI-et (dialogene) mot prod —
+  handlingene er testet gjennom nøyaktig de RPC-kallene knappene gjør.
+  Stripe Account Link er ikke opprettet i testen (ville laget en
+  sandbox-konto hos Stripe).
+
+## Vercel (kontrollert 2026-09-11 fra Brages skjermbilde)
+
+Team HEIA er på **Pro**. Prosjekt `heia`: Root Directory `web` ✅,
+Framework Preset «Other» uten build-overstyring — `vercel.json` setter
+`"framework": "astro"`, som vinner over dashboardet, så bygget blir
+`astro build` → `dist`. Ikke verifisert: at første prod-deploy fra main
+faktisk går grønt (sjekkes i Deployments etter merge). Ingen CLI-tilgang
+fra maskinen (`npx vercel login` + `npx vercel link` i `web/` gir det).
 
 ## Gjenstående publiseringspunkter (i rekkefølge)
 
-1. **Merge til main** → Vercel prod-deploy. Sjekk at Framework Preset er
-   Astro/auto (vercel.json setter `"framework": "astro"`), Root Directory
-   `web`.
-2. **Vercel Pro** før markedsføring av Støtt laget (Hobby forbyr kommersiell
-   bruk).
+1. **Merge til main** → Vercel prod-deploy. Sjekk at deployen går grønt og
+   at `/ops/claims/<uuid>` svarer 200 (rewrite).
+2. ✅ Vercel Pro er på plass (2026-09-11).
 3. `supabase functions deploy claim-notify` (ops-lenker → web).
 4. **Aktiver invitasjonsreisen** når Brage har prøvd `/invitasjon` selv:
    `supabase secrets set WEB_INVITE_BASE_URL=https://heiaapp.no/invitasjon`

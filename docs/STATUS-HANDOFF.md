@@ -541,6 +541,22 @@ IKKE GJORT: positive ops-/manager-flyter i nettleser (krever Brages konto),
 `WEB_INVITE_BASE_URL` + `WEB_INVITE_LANDING_LIVE` (aktiveres etter at Brage
 har prøvd `/invitasjon`), Vercel-kontroll (ingen CLI-innlogging på maskinen).
 
+**2026-09-11 KVELD — RUNDE 3 FERDIG (siste commit `09a697e`, pushet).**
+Mobilheader lagt om (fullbredde, frost ved scroll, menyflate m/ CTA;
+desktop uendret; `.bar`-kollisjon rettet → `.split-bar`). POSITIVE
+FLYTTESTER mot prod: `scripts/verify-web-flows.mjs` **34/34** (ops-kø →
+info → godkjenn → manager-oversikt → lagforespørsel/avslag → invitasjon →
+forhåndsvisning/aksept → avvik → ops bekrefter → suspender/reaktiver/
+fjern/trekk tilbake → 403 på stripe-onboarding). Egne fixturer (orgnr
+888888888, «VERIFY WEB IL (testfixtur)», verify-flow-*@example.test)
+ryddes selv — verifisert tomt. `scripts/web-shot.mjs` = skjermbilder via
+DevTools Protocol som venter på hydrerte øyer (bruk den, ikke
+`--screenshot`). Vercel: Pro ✅, Root Directory `web` ✅ (Brages
+skjermbilde), preset «Other» overstyres av vercel.json. GJENSTÅR KUN
+BRAGE-STEG: merge → sjekk deploy → deploy claim-notify → prøv /ops og
+/klubb med egen konto → secret + flagg → TestFlight-bygg → AS-opplysninger.
+PR-tekst: `docs/PR-NETTSIDE-ADMIN-2026-09.md`. Neste samtale starter der.
+
 ▶️ **NESTE (forrige plan, står fortsatt):** Brage tester på telefon (Cmd+R): «Ny kamp» fra Sesongen →
 lagre → lander på Kalender UTEN frys; laghodet uten chip, sesongsiden («Ny kamp» og Lagkassa uten
 header-hopp, handlingsraden, «Ny kamp»-arket komplett fra første ramme), tilbakeknappen i ro OG kompakt, topp, scroll, fanene, Referat-kortene, «Siste hendelse for N min». Deretter én variabel per
