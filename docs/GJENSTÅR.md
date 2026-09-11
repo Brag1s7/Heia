@@ -294,7 +294,7 @@ Tre parallelle gjennomganger før produksjonssetting: nettsideplanen mot
 prod, caching/egress/ytelse, og dataflyt/sikkerhet. Alt her er verifisert
 mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 
-### Rettet samme kveld (ligger i treet, VENTER PÅ COMMIT)
+### Rettet samme kveld (committet og pushet som `b36030b`)
 
 87. **Dobbel betaling var mulig.** `stripe-checkout` laget Checkout-sesjonen
     uten idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
