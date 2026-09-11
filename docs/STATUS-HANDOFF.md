@@ -1,10 +1,14 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 natt — SKIVE 1 STEG 1 LEVERT, VENTER PÅ VERCEL)
+## ▶️▶️ START HER (2026-09-11 natt — SKIVE 1: STEG 1 LEVERT, STEG 2 KJØRT I PROD)
 
-**Skive 1, steg 1 (punkt 108 og 109) er ferdig i kode og bevist lokalt.**
-Ingenting er merget og ingenting er i drift. Det står én ting igjen som
-bare Brage kan gjøre, og den må gjøres **før** merge til `main`.
+**Steg 1 (punkt 108–109, nettsidens miljøer + CI)** er ferdig i kode og
+bevist lokalt. Det er **ikke merget og ikke i drift**, og krever én ting av
+Brage først — se rammen under.
+
+**Steg 2 (punkt 97, 111, 30 — migrasjon 00084)** er **kjørt i prod** og
+bevist der. Databasen står nå på `00084`. Lukket: punkt 108, 109, 97, 111
+og 30.
 
 ### ⚠️ Gjør dette FØR PR-en merges
 
@@ -28,6 +32,72 @@ altså «ny versjon kommer ikke ut», ikke «heiaapp.no er borte».
 **Tilbakeføring:** `git revert` av commiten. Ingen databaseendring, ingen
 Edge Function, ingen migrasjon. Variablene kan stå igjen i Vercel uten
 virkning.
+
+### Steg 2 er KJØRT I PROD: migrasjon 00084
+
+**Databasen står nå på `00084`.** `00083` er bevisst IKKE kjørt — den hører
+til skive 2. (Konsekvens: neste `supabase db push` kan kreve
+`--include-all`, siden 00083 ligger før 00084 i rekkefølgen.)
+
+**Forutsetningen endret seg:** Brage avklarte at alle 21 lag og 18 brukere i
+prod er hans egne testdata, uten eksterne pilotbrukere, og at eksisterende
+prosjekt brukes videre. Ingen nytt testprosjekt ble opprettet.
+
+**Metoden som erstattet et testmiljø** — og som bør gjenbrukes: kjør
+migrasjonen OG handlingene i en transaksjon som rulles tilbake, og mål begge
+retninger inne i den. Prod var målt ren etterpå: null spor.
+
+**Den empiriske avklaringen ble gjort, og svaret var JA.** En funksjon brukt
+i et RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Etter
+`revoke ... from authenticated` på `is_team_member` feilet en vanlig
+`select count(*) from feed_posts` for en innlogget bruker med 42501, der den
+før ga 296 rader. Korreksjonen i GJENSTÅR hadde rett i at uniform tildeling
+var feil, men pekte på gale funksjoner: vaktene MÅ beholde `authenticated`.
+Hadde 00084 blitt kjørt etter den korreksjonen, ville feed, kamp, kalender
+og realtime-join falt samtidig.
+
+**Tre grupper, ikke én:**
+
+| Gruppe | Funksjoner | Hva som skjedde |
+|---|---|---|
+| A bruker-RPC-er | 19 | GRANT `authenticated`, REVOKE PUBLIC + anon |
+| B vakter i RLS-uttrykk | `is_team_member`, `is_team_admin`, `is_club_team_admin` | BEHOLDER `authenticated`, REVOKE PUBLIC + anon |
+| C interne hjelpere | `inbox_enabled`, `notify_event_change`, `get_payment_account_for_team_space` | REVOKE også fra `authenticated` |
+| D bevisst anon | `lookup_invite_code` | urørt |
+
+Anon-åpne SECURITY DEFINER-funksjoner: **26 → 1**.
+
+**Testbevis (alt målt mot prod):**
+
+| Kontroll | Resultat |
+|---|---|
+| `scripts/verify-00084.sql` før push | utgangspunktet fanget: A1, A5, A7–A11 røde |
+| Tørrkjøring av hele migrasjonen i rullet-tilbake transaksjon | 12/12 grønt |
+| `scripts/verify-00084.sql` etter push | **12/12 grønt** |
+| Etterkontroll mot live tilstand | 12/12 grønt |
+| Legitimt: les feed (296), les kalender (34), `create_event`, `start_match`, `report_match_event` «mål», `upsert_rsvp`, `set_member_role`, `get_session_context`, `get_team_feed` (20) | alle OK som `authenticated` |
+| Avvist: anon → `create_team_from_scratch`, `start_match`, `feed_posts` | 42501 |
+| Punkt 111: innlogget → `inbox_enabled` på en ANNEN bruker | 42501 |
+| Varslingskjeden (A/B i rullet-tilbake transaksjon) | festet innlegg ga **+3 varselrader både med og uten revoke** — triggerveien er uskadd |
+| Tilgang på tvers av lag | 0 rader, ikke feil |
+| Punkt 30: anon → `start_match`, `report_match_event`, `soft_delete_post` | **42501** (var `P0001`) — punktet lukket på kjøpet |
+| Bygg 1.0 (4)-kompatibilitet | de 52 RPC-ene det gamle bygget kaller er en ekte delmengde av HEAD, og ingen av dem er i gruppe C |
+| Prod etterpå | 0 testinnlegg, 0 testhendelser, varselrader tilbake på 2259 |
+
+**Tilbakeføring:** `node scripts/run-sql.mjs scripts/rollback-00084.sql` —
+generert fra den MÅLTE tilstanden før kjøring, ikke skrevet på frihånd.
+Ingen datarader ble rørt; bare rettigheter og `search_path`.
+
+**Vakten mot gjentakelse** ble to ting: `scripts/lint-security-definer.mjs`
+i CI (leser migrasjonsfilene, krever REVOKE eller et bevisst
+`-- lint:anon-ok`-merke; negativt testet på fire varianter) og rad A1 i
+bevisfila (leser databasen, som er sannheten).
+
+**Lukket i denne runden:** punkt 108, 109, 97, 111, 30.
+**Igjen i skive 1:** punkt 98 (83 funksjoner uten `search_path`, tas i
+grupper) og punkt 113 (testmiljø, nedprioritert — se GJENSTÅR).
+
+---
 
 ### Hva som faktisk ble gjort
 
@@ -67,27 +137,23 @@ virkning.
 | Øyene virker | `/konto/` monterer og tegner innloggingsskjemaet (headless Chrome) |
 | Hele `web`-jobben i CI-rekkefølge | grønn lokalt, inkludert `npm ci` |
 
-### Neste steg, og hvorfor det ikke er startet
+### Neste steg
 
-Steg 2 er **00084** (punkt 97, 111, `search_path`). Skiveplanen sier at et
-testmiljø er forutsetningen for å bevise det trygt. Det finnes ikke:
+**Skive 1 er nesten ferdig.** Igjen: punkt 98 (`search_path` på de
+resterende 83, i grupper — ikke én migrasjon) og punkt 113 (testmiljø,
+nedprioritert til ekte pilotlag kommer).
 
-- `supabase start` er **blokkert** — CLI-en ligger her (v2.75.0), men
-  maskina har **ingen container-motor** (ingen Docker, OrbStack, Colima
-  eller Podman). Krever en installasjon.
-- Et eget Supabase-testprosjekt krever Brages konto og koster penger.
+**Før PR-en merges:** de tre Vercel-variablene over. Uten dem stopper
+byggingen av nettsiden.
 
-Det er ført som **punkt 113** i GJENSTÅR. Brage må velge vei. Til da kan
-00084 forberedes og gjennomgås, men den empiriske RLS-avklaringen
-(⚠️ under) kan ikke kjøres uten å røre prod.
+**Deretter skive 2** — betaling og varsler tåler avbrudd: punkt 87
+(idempotensfiksen er committet, men `stripe-checkout` står fortsatt på v10
+fra 19. august og må deployes), 96 (00083, skrevet med bevisfil, ikke kjørt)
+og 107 (deaktivering må tåle avbrudd).
 
-Nye funn ført på lista: **113** (testmiljø), **114** (Astro 5.18.2 har en
-kritisk sårbarhetskjede; krever Astro 7), **115** (appen har ingen
-miljømerking — et testbygg ville sett ut som produksjon).
-
-⚠️ **Står fortsatt før 00084 kjøres:** avklar empirisk om en funksjon brukt
-i et RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Metoden
-står i GJENSTÅR under korreksjonene. Den trenger punkt 113.
+Nye funn ført på lista: **113** (testmiljø, nedprioritert), **114** (Astro
+5.18.2 har en kritisk sårbarhetskjede; krever Astro 7), **115** (appen har
+ingen miljømerking).
 
 ---
 

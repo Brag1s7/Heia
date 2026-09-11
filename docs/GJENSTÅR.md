@@ -63,7 +63,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 
 | Skive | Innhold | Avhenger av | Punkter |
 |---|---|---|---|
-| **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, 113, 97, 111, 98, 30 |
+| **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, ~~97~~, ~~111~~, ~~30~~ · igjen: 98, 113 |
 | **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | 87, 96, 107, 22 |
 | **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
@@ -118,12 +118,15 @@ bruker-RPC-er, men galt for **interne hjelpere** som `inbox_enabled`,
 triggere og policyer som kjører som eier, og mønsteret i repoet sier at
 slike skal revokes fra alle tre roller.
 
-⚠️ **Må avklares empirisk før 00084 kjøres:** trenger en funksjon som
-brukes i et RLS-uttrykk EXECUTE for rollen som kjører spørringen? Hvis ja,
-kan ikke `is_team_member` revokes fra `authenticated`, og da må skillet
-mellom bruker-RPC og intern hjelper settes for hånd. Test i en transaksjon
-som rulles tilbake: revoke, kjør en `select` mot en RLS-beskyttet tabell
-som `authenticated`, se om den feiler, rull tilbake.
+✅ **AVKLART EMPIRISK 2026-09-11, svaret var JA.** En funksjon som brukes i
+et RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Målt i en
+transaksjon som ble rullet tilbake: etter `revoke ... from authenticated` på
+`is_team_member` feilet `select count(*) from feed_posts` for en innlogget
+bruker med 42501, der den før ga 296 rader. `is_team_member`, `is_team_admin`
+og `is_club_team_admin` kan derfor IKKE behandles som interne hjelpere — de
+er gruppe B i 00084 og beholder `authenticated`. Korreksjonen over hadde rett
+i at uniform tildeling var feil, men galt i hvilke funksjoner det gjaldt:
+`inbox_enabled` og `notify_event_change` er interne, vaktene er det ikke.
 
 ---
 
@@ -219,11 +222,12 @@ er aldri sett på en telefon.
 
 ## F. Teknisk før lansering
 
-30. **Dørene på tre skrive-RPC-er.** `start_match`, `report_match_event` og
-    `soft_delete_post` svarer `P0001` og ikke `42501`, altså stopper de på en
-    intern sjekk framfor på rollen. Bevisst utsatt fordi en feil her betyr at
-    mål ikke kan rapporteres midt i en kamp. Krever egen skive med egen
-    telefonkontroll. Lesestien er riktig lukket.
+30. ~~**Dørene på tre skrive-RPC-er.**~~ **LUKKET 2026-09-11 av 00084.**
+    `start_match`, `report_match_event` og `soft_delete_post` svarte `P0001`
+    (intern sjekk) i stedet for `42501` (rollen). Alle tre svarer nå `42501`
+    for `anon`, målt i prod etter migrasjonen. De legitime veiene ble testet
+    i samme runde: trener oppretter hendelse, starter kamp, rapporterer mål
+    og svarer på oppmøte — alt grønt.
 31. **S4 — tømme `postgres_changes`-publikasjonen.** ⚠️ **BLOKKERT av det
     installerte bygget.** 1.0 (4) er fra 18. august og har ingen
     Broadcast-klient — den leser ikke engang `runtime_config`. Tømmes
@@ -424,20 +428,36 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 96. **Migrasjon 00083** — varselet SupportSetup lover når klubben blir
     klar, finnes ikke i dag. Trigger på overgangen til aktiv konto.
     Bevisfil: `scripts/verify-00083.sql`.
-97. **Migrasjon 00084** — **25 SECURITY DEFINER-RPC-er kan kalles av
-    `anon`**, målt i prod. Handoffen sa tre. Alle har en fungerende
-    selvvakt i dag, så det er ikke et åpent hull, men selvvakten er den
-    eneste vakten: én omskriving som flytter `auth.uid()`-sjekken, og
-    hvem som helst kan kalle funksjonen med anon-nøkkelen fra nettsidens
-    bundle. Migrasjonen er katalogdrevet, så ingen signatur kan bli feil.
-    Den pinner også `search_path` på de to betalingsfunksjonene og på
-    `is_team_member`/`is_team_admin`. Bevisfil: `scripts/verify-00084.sql`,
-    allerede kjørt mot prod som utgangspunkt.
+97. ~~**Migrasjon 00084**~~ **KJØRT I PROD 2026-09-11.** 25 SECURITY
+    DEFINER-RPC-er kunne kalles av `anon`; nå kan bare `lookup_invite_code`
+    det (gruppe D, bevisst — onboarding slår opp koden før innlogging).
+    Migrasjonen er katalogdrevet, så ingen signatur kan bli feil, og den
+    deler i **tre grupper** i stedet for én:
+    **A** 19 bruker-RPC-er → `authenticated`, revoke PUBLIC + anon.
+    **B** 3 vakter i RLS-uttrykk (`is_team_member`, `is_team_admin`,
+    `is_club_team_admin`) → BEHOLDER `authenticated`.
+    **C** 3 interne hjelpere (`inbox_enabled`, `notify_event_change`,
+    `get_payment_account_for_team_space`) → revoke også fra `authenticated`.
+    `search_path` er pinnet på de fire viktigste. Bevis:
+    `scripts/verify-00084.sql` 12/12 grønt, pluss 18 ekstra kontroller i
+    transaksjoner som ble rullet tilbake. Tilbakeføring:
+    `scripts/rollback-00084.sql`, generert fra den målte tilstanden FØR.
+
+    ⚠️ **Den empiriske avklaringen er gjort, og svaret var JA.** En funksjon
+    brukt i et RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen.
+    Målt: etter `revoke ... from authenticated` på `is_team_member` feilet en
+    vanlig `select count(*) from feed_posts` for en innlogget bruker med
+    42501, der den før ga 296 rader. Derfor gruppe B. Hadde 00084 blitt kjørt
+    slik den først var skrevet — eller med den «rett» korreksjonen om å
+    revoke interne hjelpere fra alle roller — ville feed, kamp, kalender og
+    realtime-join falt samtidig.
 
 ### Nye punkter, ikke rettet
 
-98. **85 funksjoner mangler `search_path` helt.** 00084 tar de fire
-    viktigste. Resten er en egen skive.
+98. **83 funksjoner mangler `search_path` helt** (var 85; 00084 tok de fire
+    viktigste). Resten er en egen skive, og skal tas i grupper, ikke som én
+    migrasjon. Måletallet står i `scripts/verify-00084.sql` rad B1, så neste
+    samtale slipper å telle på nytt.
 99. **Kaldstart venter 1,5 sekunder på nett.** Bootfrøet leverer profil og
     medlemskap fra disk, men navigatoren står på oppstartsskjermen til
     livekamp-svaret lander eller tidsgrensen slår inn. Hele gevinsten fra
@@ -483,22 +503,36 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      kjøres fortsatt for hånd — de trenger et testmiljø, se punkt 113.
 110. **Invitasjonskoden bruker 30 av 31 tegn** i alfabetet, og bygger på
      en vanlig tilfeldighetsgenerator, ikke en kryptografisk.
-111. **`inbox_enabled` svarer på spørsmål om andre brukere** uten å sjekke
-     hvem som spør. **Lukkes IKKE av 00084** — å stenge `anon` smalner bare
-     til «hvilken som helst innlogget bruker». Funksjonen har ingen
-     `auth.uid()`-sjekk i det hele tatt. Se korreksjonen øverst.
+111. ~~**`inbox_enabled` svarer på spørsmål om andre brukere.**~~
+     **LUKKET 2026-09-11.** Løsningen ble ikke en `auth.uid()`-vakt — den
+     ville vært feil medisin, for funksjonen kalles av triggere på vegne av
+     andre brukere enn den som utløste dem, og en slik vakt ville slått ut
+     varslingen. Riktig fiks var å ta EXECUTE fra alle tre klientroller
+     (gruppe C i 00084). Målt etter kjøring: en innlogget bruker som slår opp
+     en annens varselinnstilling får 42501. At varslingen fortsatt virker er
+     bevist med en A/B i en transaksjon som ble rullet tilbake: et festet
+     innlegg i et lag med tre andre medlemmer ga +3 varselrader både med og
+     uten revoke.
 
 ### Nytt fra skive 1 (2026-09-11 kveld)
 
-113. **Det finnes ikke noe testmiljø å bevise i.** Forutsetningen for å
-     kjøre 00084 og de andre databasekontrollene trygt. To veier:
-     **(a)** `supabase start` lokalt — CLI-en ligger på maskina (v2.75.0),
-     men **ingen container-motor er installert** (verken Docker Desktop,
-     OrbStack, Colima eller Podman), så den er blokkert på en
-     installasjon. **(b)** Et eget Supabase-prosjekt som testmiljø —
-     koster penger og krever Brages konto. Nettsiden er nå klar for
-     begge: `PUBLIC_HEIA_ENV=local` godtar `http://127.0.0.1:54321`,
-     `test` krever https.
+113. **Det finnes ikke noe testmiljø.** **Nedprioritert av Brage
+     2026-09-11:** alle 21 lag og 18 brukere i prod er hans egne testdata,
+     det er ingen eksterne pilotbrukere, og eksisterende prosjekt brukes
+     videre. Ingen nytt prosjekt ble opprettet. Punktet står fordi det
+     kommer tilbake i det øyeblikket ekte pilotlag tas inn — da kan ikke
+     databasekontroller lenger kjøres mot samme base. Veiene når den tid
+     kommer: **(a)** `supabase start` lokalt — CLI-en ligger på maskina
+     (v2.75.0), men **ingen container-motor er installert** (verken Docker
+     Desktop, OrbStack, Colima eller Podman). **(b)** Et eget
+     Supabase-prosjekt. Nettsiden er allerede klar for begge:
+     `PUBLIC_HEIA_ENV=local` godtar `http://127.0.0.1:54321`, `test`
+     krever https.
+
+     Arbeidsmåten som erstattet et testmiljø i denne runden, og som bør
+     gjenbrukes: kjør migrasjonen og handlingene i en transaksjon som
+     RULLES TILBAKE, og mål begge retninger inne i den. Det avdekket
+     RLS-svaret som ville tatt ned feeden, og det etterlot null spor.
 114. **Astro 5.18.2 har en åpen sårbarhetskjede** — ti rådgivninger, én
      kritisk (XSS i `define:vars`, som Base.astro bruker), pluss `sharp`
      og `esbuild`. `npm audit fix` krever Astro 7, altså en versjonssprang
@@ -524,20 +558,26 @@ Definert av Brage 2026-09-11. Hver skive er avgrenset og leveres for seg.
 
 ### Skive 1 — Kontroll på miljøene og databaseautorisasjonen
 
+**STATUS 2026-09-11 natt: steg 1 og 2 er ferdige.** Punkt 108, 109, 97, 111
+og 30 er lukket. Igjen i skiva: punkt 98 (`search_path` på resten, i
+grupper) og punkt 113 (testmiljø — Brage bestemte at eksisterende prosjekt
+brukes videre, siden alle 21 lag og 18 brukere er hans egne testdata; kravet
+om et separat miljø blokkerer derfor ikke).
+
 **Start her.** Begynn med statusavklaringen øverst i denne fila, så:
 
 1. ~~**Punkt 108–109 først.**~~ **GJORT 2026-09-11** (kode og CI; venter
    på Vercel-variabler før merge). Reserveverdien er borte, miljøvalget er
    eksplisitt, nettsiden typesjekkes og bygges i CI, og bevisfila
-   `scripts/verify-web-env.mjs` kjøres automatisk. **Selve testmiljøet er
-   IKKE på plass** — det ble skilt ut som punkt 113 fordi det er blokkert
-   på en installasjon eller et kjøp, ikke på kode. Steg 2 kan forberedes,
-   men ikke bevises, før 113 er løst.
-2. **Deretter 00084** (punkt 97, 111 og de sentrale `search_path`-endringene).
-   Dokumentér per funksjon: hva som endres, hvilke kallere som trenger
-   tilgang, og hvilke unntak som er tilsiktet. Ta stilling til hvordan nye
-   funksjoner skal unngå samme utilsiktede tilgang senere — en test eller
-   en lint som feiler når en ny SECURITY DEFINER-funksjon er anon-åpen.
+   `scripts/verify-web-env.mjs` kjøres automatisk. Testmiljøet ble skilt ut
+   som punkt 113; Brage avgjorde samme kveld at eksisterende prosjekt brukes
+   videre, så det blokkerte ikke steg 2.
+2. ~~**Deretter 00084.**~~ **GJORT og KJØRT I PROD 2026-09-11.** Gruppene,
+   kallerne og de tilsiktede unntakene står dokumentert i migrasjonens
+   hode. Vakten mot gjentakelse ble to ting: `scripts/lint-security-definer.mjs`
+   i CI (leser migrasjonsfilene, krever REVOKE eller et bevisst
+   `-- lint:anon-ok`-merke; negativt testet) og rad A1 i
+   `scripts/verify-00084.sql` (leser databasen, som er sannheten).
 3. **Bevis begge veier.** Ikke bare at uvedkommende avvises, men at
    legitime handlinger fungerer: trener- og reporterroller, opprette
    hendelse, starte kamp, rapportere og korrigere mål, medlemsadministrasjon,

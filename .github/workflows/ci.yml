@@ -42,6 +42,12 @@ jobs:
       - name: Lint (eslint)
         run: npm run lint
 
+      # Vakt fra skive 1: en SECURITY DEFINER-funksjon fødes kallbar av
+      # PUBLIC, altså av anon. Denne fanger det i migrasjonsfila, før
+      # `db push`. Sannheten måles av scripts/verify-00084.sql (A1).
+      - name: Dørene på nye SECURITY DEFINER-funksjoner
+        run: node scripts/lint-security-definer.mjs
+
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 15
