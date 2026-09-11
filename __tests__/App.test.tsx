@@ -24,6 +24,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../src/app/App';
+import {queryClient} from '../src/lib/queries/queryClient';
 
 /** Bare formen vi trenger av `toJSON()`, så testen slipper `any`. */
 interface TestNode {
@@ -88,4 +89,17 @@ test('hele komponenttreet monteres og tegner faktisk noe', async () => {
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();
   });
+
+  /**
+   * …og tøm cachen. Avmonteringen ødelegger observatørene, og TanStack
+   * planlegger da en opprydningstimer per spørring som blir uten
+   * observatør — `gcTime` er 5 minutter (appens bevisste standard, se
+   * `src/lib/queries/queryClient.ts`). Den timeren er ekte, så den holder
+   * Nodes hendelsesløkke i live i fem minutter etter at testen er ferdig.
+   * `clear()` ødelegger spørringene og rydder timerne med dem.
+   *
+   * Målt: én overlevende `Timeout` på 300000 ms med stakkspor
+   * `QueryObserver.destroy → removeObserver → scheduleGc`.
+   */
+  queryClient.clear();
 });

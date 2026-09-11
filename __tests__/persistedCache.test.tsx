@@ -176,8 +176,29 @@ beforeEach(async () => {
   await AsyncStorage.clear();
 });
 
+/**
+ * Siste tre som ble montert. `probe.unmount()` inne i testene kalles UTENFOR
+ * `act`, og da utsetter React 19 opprydningen av effektene: `QueryObserver`
+ * blir først ødelagt ETTER `clear()` under. En observatør som ødelegges etter
+ * tømmingen kaller `Query.removeObserver → scheduleGc` på en spørring cachen
+ * ikke lenger kjenner, og den gc-timeren (gcTime = 5 min, appens bevisste
+ * standard) er det ingen igjen til å rydde.
+ *
+ * Målt før fiksen: jest brukte 9 s på testene, prosessen levde i 302 s, og
+ * stakksporet til de overlevende timerne endte i
+ * `InfiniteQueryObserver.destroy → removeObserver → scheduleGc`.
+ */
+let mountedRoot: ReactTestRenderer.ReactTestRenderer | undefined;
+
 afterEach(async () => {
   stopPersistenceForTests();
+  // Avmonter inne i `act`, så observatørene er borte FØR tømmingen.
+  try {
+    await ReactTestRenderer.act(async () => {
+      mountedRoot?.unmount();
+    });
+  } catch {}
+  mountedRoot = undefined;
   queryClient.clear();
 });
 
@@ -401,6 +422,7 @@ async function renderProbe(): Promise<{
       </QueryClientProvider>,
     );
   });
+  mountedRoot = root;
   return {
     latest: () => current as FeedHook,
     unmount: () => root?.unmount(),
