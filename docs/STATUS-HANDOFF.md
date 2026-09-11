@@ -122,6 +122,15 @@ over bunnen (kvalifiserer ikke), og de nederste 90 px av grunnen er flat
 krem #f5f8e9 = tint-stripen → flaten har samme farge som det den ligger
 over (VG-prinsippet). Navbaren urørt. Ikke sett på ekte telefon.
 
+**RUNDE 9 (edb614f):** Brages bilde etter runde 8: toppen mint (riktig),
+flaten nederst MINT over krem grunn → Safari leser CANVASEN (html) for
+verktøylinja nederst på hans telefon, og iOS tiler root-gradienten
+nedover dokumentet (attachment fixed ignoreres) → mint ved hans
+scrollposisjon. Nå: `html { background: #f5f8e9 linear-gradient(mint)
+no-repeat top / 100% 200px }` — flat krem overalt, mint kun i toppen av
+dokumentet. `.tint-bottom` z-index 0. Navbaren URØRT (rgba(143,252,205,.94)
+siden runde 3; runde 5 var blekere og ble reversert i runde 6).
+
 **NESTE:** Brage sjekker preview på telefonen → PR Brage→main.
 
 ---
