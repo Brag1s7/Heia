@@ -114,6 +114,14 @@ github.com/andesco/safari-color-tinting. Bygget: `.tint-top` (mint
 farger linja når menyen åpnes. html-gradienten står som fallback.
 Bunnen målt kremhvit i simulatoren; toppen kan bare sees på ekte telefon.
 
+**RUNDE 8 (4abdff1):** Brages telefonbilde etter runde 7: toppen RIKTIG
+(mint = navbar), men flaten nederst fortsatt synlig, blek mint. Årsak:
+`.ground` (fixed, strakk seg forbi bunnkanten, gjennomsiktig bg + mørk
+glød nederst til høyre) var det Safari leste. Nå: `.ground` stopper 4 px
+over bunnen (kvalifiserer ikke), og de nederste 90 px av grunnen er flat
+krem #f5f8e9 = tint-stripen → flaten har samme farge som det den ligger
+over (VG-prinsippet). Navbaren urørt. Ikke sett på ekte telefon.
+
 **NESTE:** Brage sjekker preview på telefonen → PR Brage→main.
 
 ---
