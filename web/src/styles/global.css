@@ -36,14 +36,14 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-/* html er canvasfargen. Safari maler status-/adressefelt OG glasset bak
-   verktøylinja nederst med den (theme-color brukes ikke; simulatoren
-   fryser fargen ved første tegning, ekte iPhone leser den live — målt
-   2026-09-11). Flaten nederst er Safaris egen og synes i den grad fargen
-   avviker fra grunnen (VG: hvit på hvit = usynlig). Derfor: navbarens
-   frost og html deler én lys mint — toppen matcher navbaren eksakt, og
-   flaten nederst har minst mulig kontrast mot grunnen. */
-html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #cafce8; overflow-x: hidden; overflow-x: clip; }
+/* html er canvasen. iOS-Safari leser fargen til status-/adressefeltet
+   fra canvasens ØVERSTE kant og glasset bak verktøylinja nederst fra den
+   NEDERSTE kanten (målt 2026-09-11; theme-color brukes ikke, og fixed-
+   elementer som .ground klippes til viewporten og når ikke dit). Derfor
+   en fast (viewport-forankret) gradient på html: navbarens mint øverst,
+   grunnens kremfarge nederst — toppen matcher navbaren, bunnen får ingen
+   farge utover grunnen. */
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; background: #f5f8e9 linear-gradient(180deg, #93fccf 0%, #93fccf 20%, #f5f8e9 55%, #f5f8e9 100%) fixed; overflow-x: hidden; overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 
 body {
@@ -367,7 +367,7 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
   }
   .site-header::before {
     content: ''; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--bar-h) + env(safe-area-inset-top, 0px)); z-index: 0;
-    background: rgba(196, 252, 226, 0.94);
+    background: rgba(143, 252, 205, 0.94);
     backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
     box-shadow: 0 1px 0 rgba(6, 58, 45, 0.14);
     opacity: 0; pointer-events: none;
@@ -452,7 +452,7 @@ h3 { font-size: clamp(20px, 2.4vw, 24px); line-height: 1.2; }
     .site-header .mobile-menu, .site-header .mobile-menu .menu-inner, .site-header .menu-scrim, .site-header .burger i, .site-header::before, .site-header::after { transition-duration: 0.01ms; animation: none; }
   }
   @media (prefers-reduced-transparency: reduce) {
-    .site-header::before { background: #cafce8; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .site-header::before { background: #93fccf; backdrop-filter: none; -webkit-backdrop-filter: none; }
     .site-header .mobile-menu, .site-header::after { background: #d9fbec; backdrop-filter: none; -webkit-backdrop-filter: none; }
   }
 }
