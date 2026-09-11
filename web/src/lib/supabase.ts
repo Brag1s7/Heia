@@ -1,22 +1,27 @@
 import {createClient} from '@supabase/supabase-js';
+import {AUTH_EVENT, AUTH_STORAGE_KEY, SUPABASE_ANON_KEY, SUPABASE_URL} from './env';
 
-// Samme Supabase-prosjekt som appen. Anon-nøkkelen er offentlig per design
-// (all autorisasjon skjer i Postgres via RLS og RPC-er); env-variablene
-// overstyrer om prosjektet noen gang byttes. `detectSessionInUrl` er AV så
-// klienten aldri tolker invitasjonstokenet i URL-fragmentet som en
-// auth-respons (B3 i autoritetsmodellen).
-const url =
-  import.meta.env.PUBLIC_SUPABASE_URL ??
-  'https://sswncdrbsrfieudkdmhj.supabase.co';
-const anonKey =
-  import.meta.env.PUBLIC_SUPABASE_ANON_KEY ??
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNzd25jZHJic3JmaWV1ZGtkbWhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NjIxMTEsImV4cCI6MjA5MDQzODExMX0.PUOFfLNkqivvSR_y_REvnffjxUEw35ZkkABNtT7yuBM';
-
-export const supabase = createClient(url, anonKey, {
+// Samme Supabase-prosjekt som appen. `detectSessionInUrl` er AV så klienten
+// aldri tolker invitasjonstokenet i URL-fragmentet som en auth-respons (B3 i
+// autoritetsmodellen).
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: false,
-    storageKey: 'heia-web-auth',
+    storageKey: AUTH_STORAGE_KEY,
   },
 });
+
+// Headeren (Base.astro) leser sesjonen rett fra localStorage og har ikke
+// supabase-js. Si fra når sesjonen endres (innlogging, utlogging, fornyet
+// token) så «Logg inn» ↔ «Min konto» følger med uten omlasting — og la
+// headerens «Logg ut» bruke denne klienten når den finnes på siden, så
+// øya på samme side får beskjed med én gang.
+if (typeof window !== 'undefined') {
+  supabase.auth.onAuthStateChange(() => {
+    window.dispatchEvent(new Event(AUTH_EVENT));
+  });
+  (window as unknown as {__heiaSignOut?: () => Promise<unknown>}).__heiaSignOut = () =>
+    supabase.auth.signOut();
+}

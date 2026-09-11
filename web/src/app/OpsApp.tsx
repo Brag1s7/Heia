@@ -126,7 +126,7 @@ export default function OpsApp() {
   if (!session) {
     return (
       <Card>
-        <AuthPanel reason="Heia Ops er Heias interne arbeidsflate. Logg inn med ops-kontoen din." />
+        <AuthPanel reason="Heia-admin er Heias interne arbeidsflate. Logg inn med ops-kontoen din." />
       </Card>
     );
   }
@@ -134,7 +134,7 @@ export default function OpsApp() {
   if (!ops) {
     return (
       <Card title="Ingen tilgang" aside={<Button type="button" onClick={() => signOut()}>Logg ut</Button>}>
-        <p className="muted">Kontoen <b>{session.user.email}</b> er ikke registrert i Heia Ops. Tilgangen håndheves i databasen — ingen data er hentet.</p>
+        <p className="muted">Kontoen <b>{session.user.email}</b> er ikke registrert i Heia-admin. Tilgangen håndheves i databasen — ingen data er hentet.</p>
       </Card>
     );
   }
@@ -151,11 +151,12 @@ export default function OpsApp() {
     <div className="app">
       <div className="app-head">
         <div>
-          <h1>Heia Ops</h1>
+          <h1>Heia-admin</h1>
           <p className="sub">{session.user.email}</p>
         </div>
         <div className="app-nav">
           <Tabs value={tab} onChange={(t) => setView(t === 'claims' ? {kind: 'claims'} : {kind: 'entities'})} items={[{key: 'claims', label: 'Søknader'}, {key: 'entities', label: 'Klubber og roller'}]} />
+          <a href="/konto/">Konto</a>
           <button type="button" onClick={() => signOut()}>Logg ut</button>
         </div>
       </div>
