@@ -93,8 +93,16 @@ frost rgba(196,252,226,.94) og html/theme-color #cafce8 = SAMME lyse mint
 → toppen matcher navbaren eksakt, flaten nederst nær grunnen. Brage: «alt
 annet godkjent». Ikke verifisert på ekte iPhone etter denne endringen.
 
-**NESTE:** Brage sjekker preview på telefonen → PR Brage→main (5 commits
-foran main: d4c1649, d1dc1e6, 10a6619, 0820f4e, 7b1f2b0, 81c93d3 + handoffs).
+**RUNDE 6 (LÅST LØSNING):** Brage: navbaren skal beholde mint-frosten,
+og bunnen skal ikke få farge. MÅLT: Safari leser status-/adressefeltet
+fra canvasens ØVERSTE kant og verktøylinje-glasset fra den NEDERSTE
+(fixed `.ground` klippes til viewporten og når ikke kantene). Løsning:
+`html { background: #f5f8e9 linear-gradient(mint 0–20 % → krem 55–100 %)
+fixed }` — toppen = navbarens mint, bunnen = grunnens krem. Navbar-frost
+rgba(143,252,205,.94), theme-color #93fccf. Simulatoren fryser toppfargen
+per fane (kan ikke måles der lenger), bunnen målt kremhvit.
+
+**NESTE:** Brage sjekker preview på telefonen → PR Brage→main.
 
 ---
 
