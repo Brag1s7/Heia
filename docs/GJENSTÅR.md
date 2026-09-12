@@ -85,7 +85,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 |---|---|---|---|
 | **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, ~~97~~, ~~111~~, ~~30~~ · igjen: 98, 113 |
 | **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | ~~87~~, ~~96~~, ~~107~~, ~~22~~ — **FERDIG 2026-09-12** |
-| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
+| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | ~~104~~, ~~99~~, ~~103~~, ~~40 (klient)~~ · igjen: 100 (migrasjon, venter godkjenning), 88, 89, 102, 101 |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
 
 ### Beslutninger som ER tatt (ikke relitigér)
@@ -269,8 +269,17 @@ er aldri sett på en telefon.
 39. **Oppryddingsjobb for media** som er soft-slettet, og for foreldreløse
     filer. Kommentaren i migrasjon 00010 lover en jobb som ikke finnes.
     Feed-sletting og klubblogo er best-effort mot storage i dag.
-40. **Supabase-klienten har ingen fetch-timeout.** Fjorten QUIC-timeouts på
-    null byte og 180 til 360 sekunder er observert.
+40. ~~**Supabase-klienten har ingen fetch-timeout.**~~ **KLIENTDELEN LUKKET
+    2026-09-12 (38b87b2).** `trackedFetch` avbryter nå på 20 s (Edge
+    Functions 60 s) og viderefører kallerens eget `signal` urørt.
+    Nettverksfeil oversettes ett sted (`shared/errorMessage`), og en
+    SKRIVING som ikke fikk svar påstår aldri at den feilet —
+    `uncertainWriteMessage` sier «Vi vet ikke om målet ble lagret». Bevis:
+    7 nye tester i `netMetrics.test.ts`.
+    **IGJEN (krever migrasjon, ikke startet):** ekte idempotens på skriving
+    — `client_request_id` på `match_events` og `feed_posts`, så et nytt
+    forsøk etter et tidsavbrudd ikke kan gi to mål eller to innlegg.
+    Betalinger er allerede dekket av punkt 87.
 41. **Brage — Sentry-lesetilgang for meg.** Bevisst utsatt til første ekte
     feil, krever et User Auth Token.
 
@@ -553,24 +562,79 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
     **Gjennomgangen står fortsatt på lista** og bør tas i grupper når
     det passer — for da er neste funksjon som glemmer `public.`-prefikset
     ikke lenger et problem.
-99. **Kaldstart venter 1,5 sekunder på nett.** Bootfrøet leverer profil og
-    medlemskap fra disk, men navigatoren står på oppstartsskjermen til
-    livekamp-svaret lander eller tidsgrensen slår inn. Hele gevinsten fra
-    cold start-arbeidet spises opp her.
+99. ~~**Kaldstart venter 1,5 sekunder på nett.**~~ **LUKKET 2026-09-12
+    (38b87b2).** Porten (`bootReady`) er fjernet fra `AppNavigator`, og med
+    den `BOOT_MAX_MS`. Påstanden den skulle hindre er fortsatt borte der
+    den hører hjemme: `matchButton.ts` har `unknown` (ingen ord, ingen
+    glød, samme mørke flate som hvile) og `shouldNudge` sier nei til sprett
+    på det første svaret. Et sent svar bytter etikett — `handleMatchPress`
+    er det eneste som flytter brukeren, og det krever et trykk. Dyplenker
+    og reporterflyten går gjennom `flushPendingDeepLink` som før, nå
+    tidligere. Bevis: `bootHttpBudget.test.tsx` §punkt 99 (verifisert at
+    den feiler hvis porten settes tilbake).
 100. **Feeden koster en ekstra seriell rundtur** fordi «har jeg reagert»
      ligger utenfor feed-spørringen. Det er 150 til 300 millisekunder lagt
-     til hver eneste feed-åpning på mobilnett.
+     til hver eneste feed-åpning på mobilnett. **Målt og bekreftet
+     2026-09-12:** `GET /rest/v1/reactions` står i alle tre scenariene i
+     `bootHttpBudget.test.tsx`, og den går ETTER at feeden er hentet — den
+     kan ikke parallelliseres, for den trenger post-id-ene.
+
+     **FORSLAG, VENTER GODKJENNING (migrasjon 00086).** Mønsteret finnes
+     allerede i huset: `get_match_feed` (00071) returnerer `my_reactions` i
+     samme rad, og kommentaren i `api/feed.ts` peker eksplisitt på at det er
+     «derfor "har jeg heiet" ikke koster en ekstra spørring slik feeden
+     gjør». Feeden skal gjøre det samme.
+
+     - **Endringen:** `get_team_feed` får en kolonne `i_reacted boolean`.
+       Returtypen endres, så funksjonen må DROPPES og gjenskapes — og da må
+       GRANT/REVOKE gjentas for den nye signaturen (se
+       `docs/`-notatet om RPC-dører: GRANT stenger ingenting, `pg_temp`
+       sist, verify FØR push).
+     - **Klienten tåler begge:** `getTeamFeed` bruker `i_reacted` når
+       kolonnen finnes, og faller ellers tilbake til dagens ekstra
+       spørring. Bygg 1.0 (4), som står på telefonene i dag, leser JSON og
+       bryr seg ikke om en ekstra nøkkel — den fortsetter som før.
+     - **Rekkefølge:** migrasjonen først (bakoverkompatibel alene),
+       klientendringen i 1.0 (5).
+     - **Tilbakeføring:** `git checkout <sha> -- supabase/migrations` +
+       gjenskap forrige definisjon; klienten faller da tilbake av seg selv.
+     - **Gevinst:** −1 seriell rundtur på HVER feed-åpning, ikke bare ved
+       oppstart. Kaldstart 6 → 5 kall, gjentatt kaldstart 4 → 3.
 101. **Kalenderen er ikke virtualisert**, og henter 30 måneder. Et lag med
      to treninger i uka monterer rundt 150 kort ved hvert besøk.
 102. **Toppen av skjermen er ikke memoisert.** Hvert tastetrykk i «Del noe
      med laget» tegner hero-karusellen på nytt. To kontekster øverst i
      treet lager ny verdi ved hver token-fornyelse.
-103. **Feeden signerer miniatyrbilder den aldri bruker**, og
-     idrettslista hentes ved hver kaldstart for en skjerm de fleste aldri
-     åpner. Begge er gratis å fjerne.
-104. **Testen som vokter oppstartsbudsjettet er blind.** Den påstår seks
-     kall; det reelle tallet er sju til ni, fordi den mocker bort nettopp
-     de kallene den skulle telle.
+103. ~~**Feeden signerer miniatyrbilder den aldri bruker**, og
+     idrettslista hentes ved hver kaldstart.~~ **LUKKET 2026-09-12
+     (38b87b2).** Feeden varmer kun `display` — både `FeedCard` og
+     `CommentThread` ber eksplisitt om den varianten, og kampflatene varmer
+     sine egne i `getMatchPhotos`. Idrettslista ligger nå på disk mellom
+     øktene (`primeSportsFromDisk`, aldri nett); kravet fra 2026-09-04 om
+     at pillene står fra første render er uendret.
+     Funnet på kjøpet: badgen tok et eget HEAD-kall ved frø-boot fordi
+     regelen sto i mount-effekten og ikke der HTTP-et sendes. Flyttet til
+     `refreshUnread`, som gjelder mount, fokus OG lagbytte.
+104. ~~**Testen som vokter oppstartsbudsjettet er blind.**~~ **LUKKET
+     2026-09-12 (38b87b2).** `bootHttpBudget.test.tsx` teller på
+     `global.fetch` med hele apptreet montert — ingen api- eller
+     query-modul er mocket, kun transporten, auth-sesjonen og
+     realtime-kanalen (websocket, ikke HTTP). Tre scenarier er låst som
+     EKSAKTE lister, ikke som tall, så et nytt kall i boot krever en
+     bevisst beslutning:
+
+     | Scenario | Før skive 3 | Etter |
+     |---|---|---|
+     | Kaldstart, tom disk | 7 | **6** |
+     | Gjentatt kaldstart (frø + snapshot) | 6 | **4** |
+     | Kontekst-RPC feiler | «7–9» (feil) | **12**, målt |
+
+     Anslaget «sju til ni» var altså for LAVT i feilstien: når 00079-kallet
+     ryker, slår hele fallback-viften inn samtidig (profil, medlemskap,
+     `getLiveMatch`, lagkassa, unread-HEAD, medlemstall-HEAD).
+     `bootBudget.test.tsx` beholder rollen sin — den vokter orkestreringen
+     (ingen duplikate enkeltkall mens konteksten er i flukt) — og den
+     falske ≤6-påstanden er strøket fra fila.
 105. **Hvert innlegg er O(antall medlemmer) i tre ledd**, og ett av dem
      kjører synkront i transaksjonen til den som poster. Ved 25 medlemmer
      er det usynlig. Ved 300 henger «Del»-knappen.
@@ -858,15 +922,23 @@ om et separat miljø blokkerer derfor ikke).
 
 ### Skive 3 — Oppstart, nettverk og caching
 
-- **Punkt 99** etter den avklarte retningen øverst. Lokal cache knyttes til
-  riktig bruker og lag; serveren kontrollerer fortsatt handlingstillatelser.
-- **Punkt 40 samtidig.** Nettverksfeil skal gi en forståelig vei videre. Ved
-  skrivehandlinger må vi tåle at serveren fullførte selv om klienten ikke
-  fikk svar, slik at nye forsøk ikke gir doble mål, innlegg eller betalinger.
-- **Punkt 104 først av målepunktene** — vakten må virke før den brukes.
+**Status 2026-09-12: 104, 99, 103 og klientdelen av 40 er LUKKET (38b87b2).**
+
+- ~~Punkt 104~~ — vakten virker nå, og den måler. Se punktet for tallene.
+- ~~Punkt 99~~ — 1,5 s borte fra hver kaldstart. **Trenger telefondom:**
+  pillen i tab-baren står tom (`unknown`) i det sekundet kampsvaret er
+  underveis, der den før lå bak oppstartsflaten. Det er den avklarte
+  retningen, men det er også den ENESTE synlige endringen i skiva.
+- ~~Punkt 103~~ — idrettslista fra disk, ingen thumb-signering i feeden.
+- ~~Punkt 40, klientdelen~~ — tidsgrense + ærlige feilmeldinger.
+- **Punkt 40, resten:** ekte idempotens på skriving krever en migrasjon.
+  Ikke startet — se punktet.
+- **Punkt 100 er neste, og den krever en migrasjon** (`i_reacted` inn i
+  `get_team_feed`). Forslaget står i punktet; den skal godkjennes før den
+  kjøres.
 - **Mål 88 og 89 i et ekte bygg.** De kan ikke måles før 1.0 (5).
-- **Deretter 100 og 103** (unødvendige kall), så **102 og 101** etter hva
-  målingene faktisk viser. Bevar godkjent utseende og oppførsel.
+- **Så 102 og 101** etter hva målingene faktisk viser. Bevar godkjent
+  utseende og oppførsel.
 
 ### Skive 4 — Hele reisen på telefon og nett
 

@@ -1,5 +1,73 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 kveld — SKIVE 3: 104, 99, 103 OG KLIENT-40 LUKKET)
+
+### Les i denne rekkefølgen
+1. **`docs/GJENSTÅR.md`** — arbeidslista. Toppen har «Der vi står» og
+   § «Skive 3», som nå har status per punkt.
+2. Denne fila er historikk. Søk, ikke les forfra.
+
+### Det som betyr noe: oppstarten er 1,5 sekunder raskere, og målt
+
+Commit `38b87b2` på `Brage` (ikke pushet). Alt under er MÅLT, ikke anslått.
+
+| Scenario | Før | Etter |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **6** |
+| Gjentatt kaldstart (frø + snapshot) | 6 kall | **4** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **12**, målt |
+| Ventetid før appen tegnes | **+1,5 s** | **0** |
+
+- **Punkt 104 (først, fordi vakten må virke før den brukes).**
+  `bootBudget.test.tsx` påsto seks kall mens den mocket bort api-modulene
+  kallene ville gått gjennom. Ny fil `__tests__/bootHttpBudget.test.tsx`
+  teller på `global.fetch` med HELE apptreet montert — kun transporten,
+  auth-sesjonen og realtime-kanalen er byttet ut. Tre scenarier er låst som
+  EKSAKTE lister, ikke tall: et nytt kall i boot gjør testen rød og krever
+  en beslutning. Den falske ≤6-påstanden er strøket fra den gamle fila,
+  som beholder sin ekte rolle (orkestreringen).
+- **Punkt 99.** `bootReady` og `BOOT_MAX_MS` er borte. Påstanden porten
+  skulle hindre («KAMP» = ingen kamp) er fortsatt borte der den hører
+  hjemme: `unknown` i `matchButton.ts` + `shouldNudge`. Et sent svar bytter
+  etikett; bare et TRYKK flytter brukeren. Dyplenker/reporterflyt går
+  gjennom `flushPendingDeepLink` som før, nå tidligere.
+  ⚠️ **Testen er verifisert å ha tenner** — porten ble satt tilbake
+  midlertidig, og testen ble rød på «Laster Heia».
+- **Punkt 103.** Idrettslista fra DISK (`primeSportsFromDisk`, aldri nett);
+  kravet fra 2026-09-04 står. Feeden signerer ikke lenger miniatyrbilder
+  den aldri tegner. På kjøpet: badgen tok et eget HEAD-kall ved frø-boot
+  fordi regelen sto i mount-effekten og ikke der HTTP-et sendes — flyttet
+  til `refreshUnread`, gjelder nå mount, fokus OG lagbytte.
+- **Punkt 40, klientdelen.** `trackedFetch` avbryter på 20 s (Edge
+  Functions 60 s) og viderefører kallerens eget `signal` urørt.
+  Nettverksfeil oversettes ÉTT sted (`shared/errorMessage`), og en SKRIVING
+  som ikke fikk svar påstår aldri at den feilet — `uncertainWriteMessage`
+  gir «Vi vet ikke om målet ble lagret — sjekk før du prøver på nytt».
+  Databasens egne vaktmeldinger står urørt (den gamle regelen fra A3).
+
+Suiten **1268/1268** (5 s), eslint **0 feil** (13 warnings, samme som før).
+
+### Trenger Brage
+
+1. **Telefondom på ÉN ting:** kampknappens pille står tom (`unknown`,
+   mørk flate + Activity-glyf) i det sekundet kampsvaret er underveis, der
+   den før lå bak oppstartsflaten. Det er den avklarte retningen for punkt
+   99 — og den eneste synlige endringen i hele skiva.
+2. **Godkjenning av migrasjon 00086** (punkt 100). Forslaget med
+   rekkefølge, dører og tilbakeføring står i punkt 100 i GJENSTÅR.
+
+### Neste
+Punkt 100 (etter godkjenning), så 102/101 etter måling. 88 og 89 kan
+fortsatt ikke måles før bygg 1.0 (5).
+
+### Arbeidsmåte-notat til meg selv
+Jest er IKKE tregt: 1268 tester på 5 sekunder. Tiden i denne økta gikk til
+å legge jest-kjøringer i bakgrunnen og så vente på tidsavbrudd på
+kjøringer som tok 1,4 sekunder. Kjør dem i forgrunnen.
+
+---
+
+
 ## ▶️▶️ START HER (2026-09-12 — PUNKT 122 LØST (CI HELGRØNN); SKIVE 2 FERDIG OG I DRIFT)
 
 ### Punkt 122 er LUKKET — årsaken var Node-versjonen, ikke testen alene
