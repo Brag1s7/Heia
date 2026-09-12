@@ -29,5 +29,12 @@
  * PÅ-betingelse (LÅST): invitasjonslandingen er live OG
  * `WEB_INVITE_BASE_URL` er satt. Da flippes denne til `true` — backend
  * støtter allerede begge veier (00062/00064), så flippen er ren JS.
+ *
+ * ✅ PÅ FRA 2026-09-12. Begge betingelsene er KONTROLLERT, ikke antatt:
+ *   · `heiaapp.no/invitasjon` svarer 200 med tittelen «Invitasjon · Heia»
+ *   · `WEB_INVITE_BASE_URL` står i Supabase-secrets (satt 2026-09-11)
+ *
+ * Flippen når ingen før et nytt bygg — den endrer ikke installerte bygg —
+ * og går derfor sammen med 1.0 (5).
  */
-export const WEB_INVITE_LANDING_LIVE: boolean = false;
+export const WEB_INVITE_LANDING_LIVE: boolean = true;
