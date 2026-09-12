@@ -36,22 +36,13 @@ jobs:
       - name: Typer (tsc --noEmit)
         run: npx tsc --noEmit
 
-      # `--runInBand`: ÉN prosess, ingen arbeidere. Alle 93 suiter og alle
-      # 1258 testene kjøres som før — dette er en kjøremodus, ikke en
-      # innsnevring.
-      #
-      # Hvorfor: jest lar arbeiderprosesser rydde seg selv, og en arbeider
-      # som ikke avslutter blir stående. Lokalt dreper jest den etter et
-      # sekund med «A worker process has failed to exit gracefully»; på
-      # GitHubs runner ventet den i stedet til jobben traff
-      # `timeout-minutes: 15` — målt tre ganger, der siste testutskrift kom
-      # etter 31 sekunder og så var det stille i fjorten minutter.
-      #
-      # Serielt finnes ikke problemet: da er det ingen arbeider å vente på.
-      # Målt lokalt etter at lekkasjene under var rettet: 10,9 s veggklokke
-      # mot 9,3 s testtid, null advarsler, exit 0.
+      # Parallelt, som før. `--runInBand` ble prøvd for å unngå en arbeider
+      # som ikke avsluttet, men gjorde det verre: serielt finnes ingen
+      # arbeider jest kan tvangsavslutte, så ett gjenværende håndtak låser
+      # hele prosessen til jobben treffer `timeout-minutes: 15`. Parallelt
+      # force-exit-er jest arbeideren og går videre.
       - name: Tester (jest, inkl. kall-antall-vaktene)
-        run: npx jest --ci --runInBand
+        run: npx jest --ci
 
       - name: Lint (eslint)
         run: npm run lint
