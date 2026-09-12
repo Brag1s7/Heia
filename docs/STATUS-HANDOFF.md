@@ -3,10 +3,10 @@
 ## ▶️▶️ START HER (2026-09-12 kveld, runde 3 — SKIVE 3 LUKKET)
 
 ### Tilstanden, i fire linjer
-- **PR #58 er grønn på `aa97656`** og venter på Brage. Ingenting er merget.
-- **Migrasjon 00086 er IKKE kjørt.** Tørrkjørt 19/19 grønt, prod bevist urørt.
-- **Skive 3 er ferdig:** 104, 99, 103, 100 og klientdelen av 40.
-- **Databasen står på 00085.** `push-fanout` er eneste udeployede funksjon.
+- **Skive 3 er lukket:** 104, 99, 103, 100 og klientdelen av 40.
+- **Databasen står på 00086** — kjørt i prod 2026-09-12 kveld og bevist der.
+- **PR #58 er grønn** (`f8098ac`). Brage merger selv.
+- `push-fanout` er eneste udeployede Edge Function (punkt 117).
 
 ### Det ene som gjenstår her: én telefonsjekk
 Kampknappen blinket ved oppstart. Årsaken var IKKE animasjonen, og heller
@@ -33,15 +33,24 @@ Forrige vakt sammenliknet tallene som gikk INN i tegningen
 (`matchButtonGeometry`) og ble grønn mens blinket sto igjen på telefonen.
 Vakter for noe VISUELT må sammenlikne det som faktisk tegnes.
 
-### Slik kjøres 00086 når du gir klarsignal
-```
-node scripts/run-sql.mjs supabase/migrations/00086_feedens_egne_reaksjoner.sql
-node scripts/run-sql.mjs scripts/verify-00086.sql   # skal si 19/19 GRØNT
-```
-Tilbakeføring: `node scripts/run-sql.mjs scripts/rollback-00086.sql` —
-gjenskaper 00072-definisjonen ordrett (uten `search_path`, slik prod
-faktisk sto) pluss ACL-en. Bygg 1.0 (4) er upåvirket: signaturen er
-uendret og kolonnen lagt til sist.
+### 00086 ER I DRIFT (kjørt 2026-09-12 kveld)
+Kjørt med `npx supabase db push --include-all`, så basen OG
+migrasjonsregisteret er i synk (registeret står på 00086).
+
+Bevist i tre trinn: tørrkjøring før push (19/19, prod urørt etterpå),
+`scripts/verify-00086-i-drift.sql` mot den levende funksjonen (**13/13**),
+og en røyktest på EKTE data — 20 rader for et ekte medlem, ingen
+`my_reactions` som er NULL, og på en ekte 👏 er RPC-en og
+`reactions`-tabellen enige.
+
+⚠️ **Ikke kjør `scripts/verify-00086.sql` nå** — den er en TØRRKJØRING som
+bare gir mening FØR migrasjonen. Etter push er
+`scripts/verify-00086-i-drift.sql` den riktige.
+
+Tilbakeføring: `node scripts/run-sql.mjs scripts/rollback-00086.sql`, og
+deretter `delete from supabase_migrations.schema_migrations where version
+= '00086';` — ellers tror registeret at den fortsatt er der. Bygg 1.0 (4)
+er upåvirket: signaturen er uendret og kolonnen lagt til sist.
 
 ### Oppstartsbudsjettet, målt (`__tests__/bootHttpBudget.test.tsx`)
 | Scenario | Før skive 3 | Nå |
@@ -62,6 +71,7 @@ Ikke rørt — utenfor skiva. Se punkt 124 i GJENSTÅR.
 
 ### Neste samtale
 Start med `docs/GJENSTÅR.md` § «Skive 4 — Hele reisen på telefon og nett».
+Databasen er i synk med filene; ingenting udeployet der.
 Punkt 102 og 101 står igjen fra skive 3 og skal måles før de fikses.
 
 ---

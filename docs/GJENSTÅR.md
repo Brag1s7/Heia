@@ -29,7 +29,7 @@ og `supabase functions list`) — ikke skrevet av hukommelsen._
 
 | Lag | I drift nå | Nyere lokalt |
 |---|---|---|
-| **Databasen** | migrasjoner t.o.m. **`00085`** (00079–00085 sammenhengende) | **`00086`** er skrevet og tørrkjørt, **ikke kjørt** — venter grønn CI + klarsignal |
+| **Databasen** | migrasjoner t.o.m. **`00086`** (00079–00086 sammenhengende) | ingenting — **i synk** ✅ |
 | **Edge Functions** | `stripe-checkout` **v11** og `club-support-deactivate` **v6** (begge deployet i skive 2) · `push-fanout` **v13 (3. aug)** · øvrige i synk | **én udeployet**: `push-fanout` — punkt 117 |
 | **Nettsiden** heiaapp.no | `main` = `c8791e5` (PR #57 merget) | `Brage` er 4 commits foran (skive 3) — PR #58 |
 | **CI** | grønn på `main` etter #57 | PR #58 kjører. Lokalt: `jest` **1279**, `eslint` 0. CI fyrer bare på PR — se punkt 121 |
@@ -590,29 +590,44 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      `bootHttpBudget.test.tsx`, og den går ETTER at feeden er hentet — den
      kan ikke parallelliseres, for den trenger post-id-ene.
 
-     **GODKJENT OG BYGGET — MIGRASJONEN VENTER PÅ KLARSIGNAL.** Kolonnen
-     heter `my_reactions`, ikke `i_reacted`, og det er et bevisst valg:
-     mønsteret finnes
-     allerede i huset: `get_match_feed` (00071) returnerer `my_reactions` i
-     samme rad, og kommentaren i `api/feed.ts` peker eksplisitt på at det er
-     «derfor "har jeg heiet" ikke koster en ekstra spørring slik feeden
-     gjør». Feeden skal gjøre det samme.
+     **LUKKET 2026-09-12: 00086 er kjørt i prod og bevist der.**
 
-     - **Endringen:** `get_team_feed` får en kolonne `i_reacted boolean`.
-       Returtypen endres, så funksjonen må DROPPES og gjenskapes — og da må
-       GRANT/REVOKE gjentas for den nye signaturen (se
-       `docs/`-notatet om RPC-dører: GRANT stenger ingenting, `pg_temp`
-       sist, verify FØR push).
-     - **Klienten tåler begge:** `getTeamFeed` bruker `i_reacted` når
-       kolonnen finnes, og faller ellers tilbake til dagens ekstra
-       spørring. Bygg 1.0 (4), som står på telefonene i dag, leser JSON og
-       bryr seg ikke om en ekstra nøkkel — den fortsetter som før.
-     - **Rekkefølge:** migrasjonen først (bakoverkompatibel alene),
-       klientendringen i 1.0 (5).
-     - **Tilbakeføring:** `git checkout <sha> -- supabase/migrations` +
-       gjenskap forrige definisjon; klienten faller da tilbake av seg selv.
-     - **Gevinst:** −1 seriell rundtur på HVER feed-åpning, ikke bare ved
-       oppstart. Kaldstart 6 → 5 kall, gjentatt kaldstart 4 → 3.
+     Kolonnen heter `my_reactions`, ikke `i_reacted`, og det er et bevisst
+     valg: 00071 tok samme valg for kampfeeden og skrev ned hvorfor — 👏 bor
+     ETT sted (`HEIA_EMOJI` i `src/lib/api/feed.ts`), og et ferdig
+     `i_reacted` ville gitt emojien et hjem nummer to. Klienten avgjør
+     fortsatt hva som er et HEIA.
+
+     **Bevisføring, i tre trinn:**
+     1. `scripts/verify-00086.sql` — TØRRKJØRING før push: hele migrasjonen
+        OG tilbakeføringen i én subtransaksjon som ble rullet tilbake,
+        **19/19 grønt**, og prod bevist urørt etterpå (samme md5, ingen
+        fixturrader). Sammenliknet gammelt og nytt svar BIT FOR BIT utenom
+        den nye kolonnen, og beviste at tilbakeføringen gir byte-identisk
+        definisjon og ACL.
+     2. `scripts/verify-00086-i-drift.sql` — ETTER push, mot den levende
+        funksjonen: **13/13 grønt**. Signatur, kolonnerekkefølge,
+        SECURITY DEFINER/STABLE, `search_path`, dørene (anon NEI,
+        authenticated JA, PUBLIC NEI — 00061-fella), registrering i
+        migrasjonsregisteret, rekkefølge, paginering, og `my_reactions`
+        riktig på reagert/ureagert/andres.
+     3. Røyktest på EKTE prod-data: 20 rader hentet for et ekte medlem,
+        null `my_reactions` som er NULL, og på en ekte 👏 er RPC-en og
+        `reactions`-tabellen enige.
+
+     **Tilbakeføring:** `node scripts/run-sql.mjs scripts/rollback-00086.sql`
+     — gjenskaper 00072-definisjonen ordrett (uten `search_path`, slik prod
+     faktisk sto) pluss ACL-en. Kjøres den, må registerraden fjernes
+     manuelt: `delete from supabase_migrations.schema_migrations where
+     version = '00086';`
+
+     **Bygg 1.0 (4) er upåvirket:** signaturen er uendret og kolonnen lagt
+     til sist. Klienten i 1.0 (5) tåler begge baser — voktet begge veier av
+     `__tests__/feedMineReaksjoner.test.ts`.
+
+     Gevinst: −1 seriell rundtur på HVER feed-åpning. Kaldstart 6 → 5 kall,
+     gjentatt kaldstart 4 → 3.
+
 101. **Kalenderen er ikke virtualisert**, og henter 30 måneder. Et lag med
      to treninger i uka monterer rundt 150 kort ved hvert besøk.
 102. **Toppen av skjermen er ikke memoisert.** Hvert tastetrykk i «Del noe
@@ -958,9 +973,8 @@ om et separat miljø blokkerer derfor ikke).
 - ~~Punkt 40, klientdelen~~ — tidsgrense + ærlige feilmeldinger.
 - **Punkt 40, resten:** ekte idempotens på skriving krever en migrasjon.
   Ikke startet — se punktet.
-- ~~Punkt 100~~ — **koden er ferdig og CI-grønn (PR #58); MIGRASJONEN ER
-  IKKE KJØRT.** Tørrkjørt mot prod, 19/19 grønt, og prod bevist urørt
-  etterpå. Se punktet for kjøre- og tilbakeføringskommandoene.
+- ~~Punkt 100~~ — **LUKKET. 00086 er kjørt i prod 2026-09-12 og bevist der
+  (13/13 grønt + røyktest på ekte data).** Se punktet.
 - **Mål 88 og 89 i et ekte bygg.** De kan ikke måles før 1.0 (5).
 - **Så 102 og 101** etter hva målingene faktisk viser. Bevar godkjent
   utseende og oppførsel. **Begge står igjen etter skive 3** — de var
