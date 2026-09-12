@@ -1,0 +1,5 @@
+# Bygget utdata fra nettsiden. Git-ignorert, så det finnes ikke i CI — men
+# lokalt lintet `eslint .` det og ga 142 «feil» i minifisert kode som ingen
+# skal rette. Uten denne lista ser lokal lint annerledes ut enn CI.
+web/dist/
+web/.astro/

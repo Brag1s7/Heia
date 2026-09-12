@@ -343,10 +343,14 @@ function EventCard({
       ) : (
         <>
           <View style={styles.meta}>
+            {/* `author.color` finnes ikke på `User` — feltet heter
+                `avatarColor`. `color`-propen var altså alltid `undefined`,
+                og avataren har hele tiden brukt navne-hashen. Fjernet, så
+                koden sier det den gjør; at reporterens SELVVALGTE farge
+                ikke slår gjennom her er ført som eget punkt i GJENSTÅR. */}
             <Avatar
               name={author?.name ?? 'Reporter'}
               media={avatarRef(author?.avatarPath)}
-              color={author?.color}
               size="sm"
               style={styles.avatar}
             />

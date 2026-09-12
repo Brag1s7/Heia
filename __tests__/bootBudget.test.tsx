@@ -142,6 +142,16 @@ function Probe({onRender}: {onRender: (s: Snapshot) => void}) {
   return null;
 }
 
+/**
+ * Siste tre som ble montert. Uten denne overlever et tre som IKKE ble
+ * avmontert — for eksempel fordi testen tidsavbrøt før `unmount()` — inn i
+ * neste test, og fyrer sine egne spørringer der. Det er nøyaktig det som
+ * skjedde i CI 2026-09-11: testen over tidsavbrøt, og den neste feilet på
+ * `expect(mockGetLiveMatch).not.toHaveBeenCalled()` med ett kall for
+ * «ts-1» — laget fra treet som fortsatt sto montert.
+ */
+let mountedRoot: ReactTestRenderer.ReactTestRenderer | undefined;
+
 async function renderHome(): Promise<{
   latest: () => Snapshot;
   unmount: () => void;
@@ -157,9 +167,13 @@ async function renderHome(): Promise<{
       </QueryClientProvider>,
     );
   });
+  mountedRoot = root;
   return {
     latest: () => current as Snapshot,
-    unmount: () => root?.unmount(),
+    unmount: () => {
+      root?.unmount();
+      if (mountedRoot === root) mountedRoot = undefined;
+    },
   };
 }
 
@@ -184,7 +198,23 @@ beforeEach(() => {
   mockGetUnreadCount.mockResolvedValue(5);
 });
 
-afterEach(() => {
+afterEach(async () => {
+  // Avmonter FØRST: et tre som fortsatt står, rekker å sende kall inn i
+  // neste test. `act` svelges her — er treet alt borte, er det ingenting
+  // å gjøre, og en feil i oppryddingen skal ikke skjule testens eget svar.
+  // Avmonteringen MÅ skje inne i `act`. Uten den utsetter React 19
+  // opprydningen av effektene, og `QueryObserver.destroy` kjører da FØRST
+  // etter `clear()` under. En observatør som ødelegges etter tømmingen
+  // kaller `Query.removeObserver → scheduleGc` på en spørring cachen ikke
+  // lenger kjenner, og den gc-timeren (gcTime = 5 min) er det ingen igjen
+  // til å rydde. Målt: fire slike overlevde, og prosessen ble liggende
+  // 5:02 på 0 % CPU etter at testene var ferdige.
+  try {
+    await act(async () => {
+      mountedRoot?.unmount();
+    });
+  } catch {}
+  mountedRoot = undefined;
   abandonSessionContext();
   queryClient.clear();
 });

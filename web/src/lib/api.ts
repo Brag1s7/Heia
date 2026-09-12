@@ -301,10 +301,17 @@ export async function issueManagerInvitation(input: {
  * aktiv betalingsansvarlig for enheten (+ ops). `source: 'web'` gir en
  * retur til /betaling som sier «gå tilbake til fanen», ikke «til appen».
  */
-export async function startStripeOnboarding(teamSpaceId: string): Promise<{url: string}> {
-  const {data, error} = await supabase.functions.invoke('stripe-onboarding', {
-    body: {team_space_id: teamSpaceId, source: 'web'},
-  });
+export async function startStripeOnboarding(
+  target: {teamSpaceId: string} | {entityId: string},
+): Promise<{url: string}> {
+  // Funksjonen tar begge veier: laget (som appen bruker) eller enheten
+  // direkte. Web kjenner enheten, så en klubb UTEN lag i Heia kan sette
+  // opp utbetaling på forhånd i stedet for å møte en vegg.
+  const body =
+    'teamSpaceId' in target
+      ? {team_space_id: target.teamSpaceId, source: 'web'}
+      : {entity_id: target.entityId, source: 'web'};
+  const {data, error} = await supabase.functions.invoke('stripe-onboarding', {body});
   if (error) throw new ApiError(await edgeMessage(error, 'Kunne ikke hente onboarding-lenke.'));
   if (!data?.url) throw new ApiError('Fikk ingen onboarding-lenke — prøv igjen om litt.');
   return {url: data.url};

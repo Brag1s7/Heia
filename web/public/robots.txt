@@ -1,0 +1,13 @@
+# heiaapp.no — markedssidene skal indekseres. Broene og arbeidsflatene
+# (/konto, /klubb, /ops, /invitasjon, /lag, /betaling) bærer allerede
+# robots: noindex i HTML-en; dette er beltet i tillegg til selene.
+User-agent: *
+Allow: /
+Disallow: /konto
+Disallow: /klubb
+Disallow: /ops
+Disallow: /invitasjon
+Disallow: /lag
+Disallow: /betaling
+
+Sitemap: https://heiaapp.no/sitemap.xml

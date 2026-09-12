@@ -249,14 +249,17 @@ export function JoinTeamCodeScreen() {
         {/* Skjelettet har SAMME geometri som lagkortet under, så laget glir
             inn i formen som allerede står der i stedet for å dukke opp under
             en spinner. Dette er øyeblikket forelderen finner laget sitt. */}
+        {/* `LiquidGlassSurface` tar ikke imot a11y-props: `GlassSurface`
+            plukker ut de propene den kjenner og slipper resten, så
+            `accessible`/`accessibilityRole`/`accessibilityLabel` ble forkastet
+            før de nådde noe view. De sto her og gjorde ingenting. Fjernet for
+            at koden skal si sant — at ventetilstanden mangler opplesning er
+            ført som eget punkt i docs/GJENSTÅR.md. */}
         {loading && (
           <LiquidGlassSurface
             variant="sheet"
             wrapStyle={styles.resultBlock}
-            style={styles.resultPanel}
-            accessible
-            accessibilityRole="progressbar"
-            accessibilityLabel="Søker etter laget">
+            style={styles.resultPanel}>
             <View style={styles.teamCard}>
               <Skeleton width={44} height={44} style={styles.badgeBone} />
               <View style={styles.teamInfoBones}>

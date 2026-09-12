@@ -1,6 +1,219 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-11 sen kveld — NETTSIDEN RUNDE 2: MER SYNLIG PRODUKT OG LAGLIV, PUSHET, VENTER BRAGES DOM PÅ PREVIEW FØR MERGE)
+## ▶️▶️ START HER (2026-09-11 natt, runde 3 — ALT ER GRØNT LOKALT OG PÅ VERCEL; BARE PR-EN GJENSTÅR)
+
+### Det ene som gjenstår: åpne PR-en
+
+`gh` er ikke innlogget, så jeg kan ikke opprette den. **CI fyrer bare på
+`pull_request` og `push` til `main`**, så grenen får ingen dom før PR-en
+finnes:
+
+    https://github.com/Brag1s7/Heia/compare/main...Brage?expand=1
+
+Begge CI-jobbene er kjørt lokalt, steg for steg i arbeidsflytens egen
+rekkefølge, og er grønne — se tabellen under.
+
+### Vercel er koblet opp
+
+CLI-en er innlogget (device-flow), scope `heia1`, prosjekt `heia`,
+Node 24.x. `web/` er lenket; `.vercel` og `.env*` er git-ignorert (CLI-en
+la dem inn selv, jeg la til `!.env.example` så malen fortsatt følger
+repoet). **Ingen prosjektinnstillinger er rørt** — ikke domener, ikke
+produksjonsgren, ikke beskyttelse.
+
+De tre variablene står nå for **Production og Preview**, type **Config**.
+Vercel krevde et eksplisitt valg for `PUBLIC_`-prefikset; anon-nøkkelen
+SKAL nå nettleseren (Astro eksponerer bare `PUBLIC_`-variabler til
+klienten), så «secret» ville brutt byggingen. Nøkkelen er den eksisterende
+anon-nøkkelen fra `web/.env` — kontrollert at JWT-en har `"role":"anon"`.
+`service_role` er aldri rørt.
+
+### Hva som ER i drift nå
+
+- **Databasen: `00084`, og 00079–00084 er sammenhengende.** 00083 var IKKE
+  med da 00084 ble kjørt — kontrollert tre veier (funksjon, trigger og
+  migrasjonsregister alle tomme) — og ble kjørt for seg etterpå.
+- **Edge Functions: uendret.** `stripe-checkout` står fortsatt på v10.
+- **Nettsiden: uendret.** `Brage` er 6 commits foran `main`.
+
+### 00083 — kontrakten er bevist (8/8, transaksjon rullet tilbake)
+
+Overgangen `onboarding_started → active` ga **2 varsler til nøyaktig de 2
+unike aktive trenerne**; null dubletter per person; null foreldre eller
+supportere; riktig `screen: support_setup`; **0 nye varsler** ved to
+gjentatte `active`-oppdateringer (gjentatt webhook); og med
+varselinnsettingen **sabotert med vilje** overlevde betalingsstatusen
+(`status=active`) — unntaksfangeren virker. Ingen varsler er sendt bakover
+i tid: triggeren fyrer bare på framtidige overganger.
+
+**Eksterne sideeffekter ble kontrollert særskilt.** En varselrad utløser
+`net.http_post` → push-fanout og `realtime.send`. Begge skriver til
+TABELLER som rulles tilbake med transaksjonen, og pg_net-arbeideren leser
+bare committede rader. Målt etterpå: siste ekte pg_net-svar var **19:10**,
+siste broadcast **17:10** — alle testene mine kjørte etter 20:40. **Ingen
+push, ingen e-post og ingen broadcast forlot basen.**
+
+### Punkt 87 — deployklar, ikke deployet
+
+Fiksen er gjennomgått og holder: parallelle førstegangskall deler nøkkel og
+kollapser til én sesjon, et lovlig nytt forsøk får ny nøkkel, og
+parametrene er identiske mellom parallelle kall (`landingUrl()` er
+deterministisk, og produkt/pris/kunde har egne nøkler). Prod er uskadd: 14
+avtalerader, 0 par med flere levende avtaler, 0 aktive uten Stripe-id.
+
+    supabase functions deploy stripe-checkout
+
+Deployen er to filer, +21/−3 mot v10. Tilbakeføring:
+`git checkout e2007241 -- supabase/functions/stripe-checkout` og deploy på
+nytt. **Ikke testet:** et ekte parallelt kall mot Stripe testmodus — det
+krever `STRIPE_SECRET_KEY`, som bare finnes som digest lokalt.
+
+### Punkt 98 — risikosortert, kan vente
+
+**0 av 83** refererer til en public-tabell ukvalifisert, **0 av 12**
+`%rowtype` er ukvalifiserte, og `authenticated`/`anon` kan verken lage
+skjemaer eller objekter i `public`. Eneste navnerom de rår over er
+`pg_temp`, som bare skygger relasjoner — og alle er kvalifiserte. Dette er
+dybdeforsvar, ikke et åpent hull. Gjennomgangen står fortsatt på lista.
+
+### Punkt 114 — minste oppgradering er `astro@7.2.8`
+
+Ikke 7.3.2, som `npm audit fix --force` foreslår. Ti rådgivninger, ingen
+nåbare i vårt oppsett (ingen bildeoptimalisering, ingen View Transitions,
+ingen server islands, ingen spread-props, ingen `base`, `output: 'static'`).
+Tabellen med GHSA-referanser og hvorfor hver enkelt ikke treffer står i
+punkt 114. `@astrojs/react` trenger ikke endres. Krever Node ≥ 22.12.0.
+
+### To nye vakter i CI
+
+`scripts/lint-security-definer.mjs` (en ny SECURITY DEFINER-funksjon må
+stenge PUBLIC/anon eller merkes bevisst) og
+`scripts/lint-stripe-idempotens.mjs` (hvert `stripePost` må ha
+idempotensnøkkel eller en skreven grunn). Begge negativt testet. De fem
+lovlige Stripe-unntakene er nå dokumentert i koden.
+
+---
+
+## (forrige START HER — 2026-09-11 natt — SKIVE 1: STEG 1 LEVERT, STEG 2 KJØRT I PROD)
+
+**Steg 1 (punkt 108–109, nettsidens miljøer + CI)** er ferdig i kode og
+bevist lokalt. Det er **ikke merget og ikke i drift**, og krever én ting av
+Brage først — se rammen under.
+
+**Steg 2 (punkt 97, 111, 30 — migrasjon 00084)** er **kjørt i prod** og
+bevist der. Databasen står nå på `00084`. Lukket: punkt 108, 109, 97, 111
+og 30.
+
+### Hva som faktisk ble gjort
+
+- `web/src/lib/env.ts` — hardkodet prod-URL og anon-nøkkel **fjernet**.
+  `PUBLIC_HEIA_ENV` (`production` | `test` | `local`), `PUBLIC_SUPABASE_URL`
+  og `PUBLIC_SUPABASE_ANON_KEY` er påkrevd; mangler eller ugyldig verdi gir
+  en forklarende feil som stopper byggingen. `local` er den eneste som får
+  bruke `http://` (for `supabase start`).
+- **Miljømerke** nede til høyre i `Base.astro` + `global.css`: viser
+  datamiljø og prosjektreferanse. Avsløres av **vertsadressen**, ikke av
+  byggingen — så en forhåndsvisning bygget mot produksjonsdata sier
+  «Produksjonsdata utenfor heiaapp.no». Usynlig på heiaapp.no i et
+  produksjonsbygg. Klikk skjuler det ut fanen (sessionStorage). Bevisst
+  smal og 12 px fra bunnen, så Safari-toningen fra de ni rundene ikke
+  påvirkes. Under `.ui-toast`, over `.ui-modal-backdrop`.
+- `web/.env.example` committet, `web/.env` laget lokalt (git-ignorert,
+  peker på produksjon slik `npm run dev` gjorde stille før).
+- `astro.config.mjs` — advarsel i byggeloggen når Vercel bygger en
+  forhåndsvisning mot `PUBLIC_HEIA_ENV=production`.
+- `web/package.json` — `npm run check` (`astro check`); `@astrojs/check`
+  og `typescript` lagt til som devDependencies.
+- `.github/workflows/ci.yml` — ny `web`-jobb ved siden av `js`.
+- `scripts/verify-web-env.mjs` — bevisfil, kjøres av CI.
+
+### Testbevis (alt kjørt lokalt 2026-09-11)
+
+| Kontroll | Resultat |
+|---|---|
+| `astro check` | 0 feil, 0 advarsler, 3 hint (alle tre fantes fra før) |
+| Bygging uten miljø | **stopper**, exit 1, «PUBLIC_HEIA_ENV mangler» |
+| Ukjent `PUBLIC_HEIA_ENV`, URL uten https, URL med skråstrek, tom nøkkel | stopper, én forklarende melding hver |
+| `local` + `http://127.0.0.1:54321` | bygger · `test` + http stopper |
+| Bygging med testmiljø | exit 0, 12 sider |
+| Prod-referansen i et testbygg | **ingen treff** i 12 sider og 7 bunter |
+| `verify-web-env.mjs` A–D | alt grønt; exit 1 ved brudd (mutasjonstestet) |
+| Merket per vert | skjult på `heiaapp.no`/`www.`; vises på localhost, Vercel-preview og en vert som *ligner* på heiaapp.no |
+| Øyene virker | `/konto/` monterer og tegner innloggingsskjemaet (headless Chrome) |
+| Hele `web`-jobben i CI-rekkefølge | grønn lokalt, inkludert `npm ci` |
+
+### Neste steg
+
+**Skive 1 er nesten ferdig.** Igjen: punkt 98 (`search_path` på de
+resterende 83, i grupper — ikke én migrasjon) og punkt 113 (testmiljø,
+nedprioritert til ekte pilotlag kommer).
+
+**Før PR-en merges:** de tre Vercel-variablene over. Uten dem stopper
+byggingen av nettsiden.
+
+**Deretter skive 2** — betaling og varsler tåler avbrudd: punkt 87
+(idempotensfiksen er committet, men `stripe-checkout` står fortsatt på v10
+fra 19. august og må deployes), 96 (00083, skrevet med bevisfil, ikke kjørt)
+og 107 (deaktivering må tåle avbrudd).
+
+Nye funn ført på lista: **113** (testmiljø, nedprioritert), **114** (Astro
+5.18.2 har en kritisk sårbarhetskjede; krever Astro 7), **115** (appen har
+ingen miljømerking).
+
+---
+
+## (forrige START HER — 2026-09-11 kveld — BACKENDSPORET STARTER: SKIVE 1)
+
+**Neste prioritet er backend før pilot og lansering:** kjernefunksjoner,
+caching, databasen, betaling og koblingen app ↔ nettside. Produkt- og
+designretningen er godkjent og skal beholdes.
+
+### Les i denne rekkefølgen
+1. **`docs/GJENSTÅR.md`** — arbeidslista. Toppen har «Der vi står — hva som
+   FAKTISK kjører», skiveplanen, de tatte beslutningene og to korreksjoner.
+2. **`docs/GJENSTÅR.md` § «Skivene i detalj»** — skive 1 er første oppgave.
+3. Denne fila er **historikk**. Søk her når du trenger hvorfor noe ble som
+   det ble; ikke les den forfra.
+
+### Tilstanden i ett blikk (målt kl. 20, ikke antatt)
+- `Brage` = `ac16eb5`, **4 commits foran `main`**, rent tre, pushet.
+- **Ingen av kveldens fikser er i drift.** Nettsiden kjører `main`
+  (`318305e`); `stripe-checkout` står på v10 fra 19. august, så
+  **dobbeltbetalingsfiksen er ikke deployet**; databasen står på `00082`, så
+  `00083` og `00084` er ikke kjørt. Eneste ting som ER i drift fra i kveld:
+  `WEB_INVITE_BASE_URL`.
+- **TestFlight 1.0 (4) er fra 18. august** og mangler Broadcast, cold start,
+  hele designsporet og delelinken. Derfor er punkt 31 blokkert, og derfor
+  kan ytelsesfiksene 88–89 ikke måles før 1.0 (5).
+
+### Avtaler som gjelder
+- Arbeidsgren `Brage` → push → Vercel-preview → **Brage merger selv**.
+  `gh` er ikke innlogget; PR opprettes fra compare-lenken.
+- **Produksjonsendringer forberedes fullt ut** med testbevis og en konkret
+  utrullings- og tilbakeføringsplan, og legges fram for godkjenning.
+  Auto-mode-klassifisereren blokkerer DDL mot prod fra Claudes side — Brage
+  kjører `supabase db push` og `supabase functions deploy`.
+- Bevisfil kjøres **før** `db push`, ikke etter (regelen fra 00075-bommen).
+- Telefonkontroll samles i korte testløp når den faktisk trengs.
+- Nye funn utenfor skiven føres på lista, ikke fikses underveis.
+
+### Første oppgave
+**Skive 1, steg 1:** punkt 108–109 — fjern den tause reserveverdien til
+prod-databasen i `web/src/lib/env.ts`, gjør miljøvalget eksplisitt, og få
+nettsiden bygget og typesjekket i CI (`.github/workflows/ci.yml` dekker i
+dag bare appen). Et separat testmiljø er forutsetningen for å bevise
+00084 trygt i steg 2.
+
+⚠️ **Før 00084 kjøres:** avklar empirisk om en funksjon brukt i et
+RLS-uttrykk trenger EXECUTE for rollen som kjører spørringen. Svaret
+avgjør om `is_team_member` kan revokes fra `authenticated`. Metoden står i
+GJENSTÅR under korreksjonene.
+
+Ny samtale er trygg å starte herfra.
+
+---
+
+## (forrige START HER — 2026-09-11 sen kveld — NETTSIDEN RUNDE 2: MER SYNLIG PRODUKT OG LAGLIV)
 
 **Tilstand:** `Brage` er ren og pushet, foran `main` uten PR — Brage
 oppretter/merger selv (`gh` er ikke innlogget). Vercel lager preview av
@@ -50,18 +263,8 @@ synlig produkt og lagliv med den kortere teksten. Levert i ÉN commit (se
   header/meny-markup og -skript er urørt i denne runden.
 
 **Riggen:** `scripts/web-shot.mjs` m/ `eval: window.scrollTo({top:N,
-behavior:"instant"})` for viewport-bilder (sips-crop er upålitelig),
-`fullPage:true` for hele siden, `session` + `eval` (heia-web-roles +
-`heia:auth`) for innlogget header. Ekte WebKit: `xcrun simctl openurl
-booted "http://localhost:4321/?v=N#anker"` (cache-bust m/ query) +
-`simctl io booted screenshot`.
-
-**IKKE gjort / til Brage:** helhetsdom på preview (mobil + PC); PR
-Brage→main; Safari-flaten nederst (edb614f) fortsatt ikke sett på ekte
-telefon. Ny samtale er trygg å starte herfra.
 
 ---
-
 
 ## (forrige START HER — 2026-09-11 kveld — NETTSIDEN: SAMLET SPRÅK-/LENGDE-/DESIGNRUNDE + MENYFEILEN RETTET)
 

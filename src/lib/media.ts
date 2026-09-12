@@ -4,6 +4,7 @@ import {
   launchImageLibrary,
   type Asset,
   type ImagePickerResponse,
+  type PhotoQuality,
 } from 'react-native-image-picker';
 import {Image as ImageCompressor} from 'react-native-compressor';
 import type {ImagePostInput} from './api/feed';
@@ -23,7 +24,11 @@ const PICKER_OPTIONS = {
   selectionLimit: 1,
   maxWidth: 2048,
   maxHeight: 2048,
-  quality: 0.85,
+  // `PhotoQuality` i react-native-image-picker er en union med ÉN desimal
+  // (0, 0.1 … 1). 0,85 er utenfor den, men helt gyldig for native, som bare
+  // får et flyttall. Castet holder verdien uendret og gjør typen lovlig —
+  // å runde til 0,8 eller 0,9 ville endret filstørrelsen på hvert bilde.
+  quality: 0.85 as PhotoQuality,
 } as const;
 
 // Logoer rendres 32–40 pt — 512 px er rikelig, og headeren skal ikke laste

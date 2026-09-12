@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
+  type StyleProp,
   type ViewStyle,
   type TextStyle,
 } from 'react-native';
@@ -22,7 +23,9 @@ interface ButtonProps {
   size?: ButtonSize;
   disabled?: boolean;
   loading?: boolean;
-  style?: ViewStyle;
+  /** `StyleProp`, ikke `ViewStyle`: kallerne sender allerede arrays med
+   *  betingede ledd (`[base, cond && quiet]`), og de flates ut av RN. */
+  style?: StyleProp<ViewStyle>;
 }
 
 export function Button({

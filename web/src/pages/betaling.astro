@@ -35,7 +35,8 @@ import Base from '../layouts/Base.astro';
       };
       var params = new URLSearchParams(location.search);
       var flow = params.get('flow');
-      var f = flows[flow] || flows.success;
+      // Egen nøkkel, ikke arv fra Object.prototype (?flow=toString traff før).
+      var f = Object.prototype.hasOwnProperty.call(flows, flow) ? flows[flow] : flows.success;
       var body = f.body;
       if (params.get('src') === 'web') {
         body = body.replace(/Heia-appen/g, 'Heia-fanen i nettleseren').replace(/i appen/g, 'i nettleseren');

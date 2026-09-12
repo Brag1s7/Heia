@@ -82,6 +82,10 @@ Deno.serve(async (req) => {
   const failed: string[] = [];
   for (const id of subIds) {
     try {
+      // stripe:ingen-nokkel — idempotent av natur: setter samme felt på
+      // en BESTEMT subscription-id. Gjentatt kall skriver samme verdi, og
+      // det er nettopp det som gjør at neste forsøk kan ta dem som
+      // gjenstår (punkt 107).
       await stripePost(`/v1/subscriptions/${id}`, {
         cancel_at_period_end: 'true',
       });

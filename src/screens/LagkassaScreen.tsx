@@ -56,7 +56,10 @@ function formatRenewal(iso: string): string {
 const lagkassaCache = new Map<string, LagkassaData>();
 
 /** Sentinel: oppslaget feilet — ikke det samme som «ingen støtteavtale». */
-const UNKNOWN_SUB = Symbol('unknown-subscription');
+// `unique symbol` eksplisitt: uten den utvides typen til `symbol` gjennom
+// `Promise.all`, og da klarer ikke TS å smalne den bort igjen i
+// `sub === UNKNOWN_SUB ? … : sub`. Ren typeannotasjon.
+const UNKNOWN_SUB: unique symbol = Symbol('unknown-subscription');
 
 /**
  * Lagkassa (betalingssporet fase 5) — lagets støtteside for ALLE medlemmer,
@@ -107,7 +110,9 @@ export function LagkassaScreen() {
         // feil, beholder vi forrige kjente svar — ellers forsvinner
         // kvitteringen til en som faktisk betaler, og skjermen påstår det
         // motsatte av sannheten.
-        getMySupportSubscription(activeTeamSpaceId).catch(() => UNKNOWN_SUB),
+        getMySupportSubscription(activeTeamSpaceId).catch(
+          (): typeof UNKNOWN_SUB => UNKNOWN_SUB,
+        ),
       ]);
       const nextSub = sub === UNKNOWN_SUB ? mySubRef.current : sub;
       lagkassaCache.set(cacheKey, {

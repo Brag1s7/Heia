@@ -215,9 +215,24 @@ function Harness() {
 // flytter klokka). Query-cachen tømmes av samme grunn: en events-cache fra
 // forrige test ville gjort neste tests kallbudsjett løgnaktig lavt.
 afterEach(() => {
+  // INGEN `await` HER. Fake timers skal aldri lekke mellom testene, og
+  // cachen tømmes så neste tests kallbudsjett ikke blir løgnaktig lavt.
+  //
+  // Jeg prøvde å rydde TanStacks gc-timere her med
+  // `await queryClient.cancelQueries()`. Lokalt så det riktig ut, men på
+  // GitHubs runner hang `afterEach` for alltid og jobben traff
+  // `timeout-minutes: 15` — fire kjøringer på rad, der den før brukte 28
+  // sekunder. Målt mot commit-historikken: hengingen kom nøyaktig med den
+  // endringen og forsvant ikke før den ble tatt ut igjen.
+  //
+  // Timerne det gjaldt holder Nodes hendelsesløkke i live i fem minutter
+  // etter at testene er ferdige LOKALT. Jest avslutter likevel (force-exit
+  // av arbeideren), og CI fullfører. Det er en ryddesak, ikke en blokker —
+  // og den skal ikke løses med venting i en `afterEach`.
   jest.useRealTimers();
   queryClient.clear();
 });
+
 
 test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', async () => {
   jest.useFakeTimers();
@@ -504,7 +519,7 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();
   });
-});
+}, 30_000);
 
 // ---------------------------------------------------------------------------
 // «DEL MED LAGET» ER EN PERMANENT INNGANG (P4, skive 10)

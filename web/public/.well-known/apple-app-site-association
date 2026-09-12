@@ -4,7 +4,7 @@
     "details": [
       {
         "appID": "D86MWL7V3S.no.heiaapp.heia",
-        "paths": ["/betaling*", "/lag*", "/stott*"]
+        "paths": ["/lag*"]
       }
     ]
   }

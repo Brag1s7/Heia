@@ -1985,6 +1985,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   /**
+   * SKILLET. `styles.divider` ble lest to steder i denne fila, men fantes
+   * ikke — `<View style={undefined} />`. Elementet er likevel IKKE dødt:
+   * `column` har `gap`, så den tomme viewet legger på ett ekstra mellomrom.
+   * Det er slik skjermen ser ut i dag, og slik den er telefongodkjent.
+   *
+   * Derfor står den her som en tom stil: samme tegning, men navnet finnes.
+   * Hårlinja kommentaren over lover («skillene er hårlinjer») er aldri
+   * laget — ført som eget punkt i docs/GJENSTÅR.md.
+   */
+  divider: {},
+  /**
    * DEN STILLE KNAPPEN. `secondary` er en lysegrå omriss laget for den
    * kremede grunnen — på kortet forsvinner den, og `ghost` er bare tekst
    * (Brage: «ser ikke ut som klikkbare knapper»). Denne gir en ekte, lys
