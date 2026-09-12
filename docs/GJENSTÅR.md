@@ -874,6 +874,52 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      jest. «Grønt lokalt» beviste ingenting: arbeidstreet hadde
      `@types/node` og `.astro/` som en ren `npm ci` ikke har. Verifiser
      slike steg i en ren klone.
+126. **Hjem-feeden hakker under scroll — MÅLT, og det er IKKE materialet.**
+     Funnet av Brage på TestFlight 1.0 (5) 2026-09-12, og målt samme kveld
+     på enhet med RN Perf Monitor under rask scroll:
+
+     | | |
+     |---|---|
+     | **UI** | **39 fps** |
+     | **JS** | **44 fps** |
+     | RAM | **566 MB** |
+
+     **Begge trådene er nede.** Det er altså ikke ett problem, men minst to
+     — og RAM-tallet er et funn i seg selv.
+
+     **To hypoteser er AVKREFTET med A/B på telefon** (én variabel hver,
+     Brage bekreftet at han så endringen begge ganger, så bryterne traff):
+     · `FEED_CARD_FLAT_DIAGNOSTIC` — feedkortenes materialkropp byttet med
+       flat `View` med identiske mål. **Ingen forskjell.**
+     · `TAB_BAR_GLASS_AB = false` — glasskapselen byttet med solid bar.
+       **Ingen forskjell.**
+     Nativt glass er dermed sannsynligvis ikke kostnaden i det hele tatt.
+     Frost-kortets skygge tegnes inne i det native laget (ikke en egen
+     offscreen-runde), så den er også frikjent.
+
+     **Det som står igjen, og som IKKE er prøvd:**
+     · **RAM 566 MB** peker mot at bilder holdes i minnet i full oppløsning.
+       `cachePolicy="memory-disk"` er riktig (punkt 88 er fikset), men
+       ingenting forteller expo-image hvilken STØRRELSE bildet skal dekodes
+       til — en 2048 px master dekodes til 2048 px selv i en 350 pt rad.
+     · Lista har **ingen `getItemLayout`** og ingen `removeClippedSubviews`,
+       så hver variable korthøyde måles ved montering, med `windowSize={7}`.
+     · `DaylightGround` (923 linjer SVG, fullskjerm) UNDER lista og
+       `MastheadField` (SVG på `absoluteFill`) OVER den — to fullskjerms
+       gjennomsiktige lag å blande hver ramme.
+
+     **ANBEFALT REKKEFØLGE, og poenget er at de tre første ikke endrer
+     utseendet med en eneste piksel:**
+     1. Dekodestørrelse på bilder (RAM først — den drar trolig begge tråder)
+     2. `getItemLayout` på feedlista
+     3. Mål på nytt FØR noe visuelt røres
+     4. Først da: vurder lagene, med Instruments — ikke flere blindtester
+
+     ⚠️ **Dette er en egen skive, ikke en sidesak i skive 4.** Den trenger
+     ekte profilering (Instruments/Time Profiler), ikke flere A/B-brytere.
+     Diagnosebryteren `FEED_CARD_FLAT_DIAGNOSTIC` står igjen i koden som
+     måleutstyr — den er `false` og endrer ingenting.
+
 125. **Sømmen launch-skjerm → hjemskjerm er et hardt kutt.** Observert av
      Brage på TestFlight 1.0 (5), 2026-09-12, og MÅLT bilde for bilde i
      hans egen skjermopptak:
