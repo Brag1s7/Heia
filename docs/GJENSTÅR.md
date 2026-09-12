@@ -24,12 +24,15 @@ kodearbeid.
 _Oppdatert 2026-09-11 natt. Et punkt er ikke i drift fordi koden er pushet.
 Hvert lag deployes for seg._
 
+_Kontrollert mot prod 2026-09-12 kveld (`supabase_migrations.schema_migrations`
+og `supabase functions list`) — ikke skrevet av hukommelsen._
+
 | Lag | I drift nå | Nyere lokalt |
 |---|---|---|
-| **Databasen** | migrasjoner t.o.m. **`00084`** (00079–00084 sammenhengende) | ingenting — **i synk** ✅ |
-| **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · øvrige i synk | **to udeployede** — punkt 117 |
-| **Nettsiden** heiaapp.no | `main` = `318305e` (17:47), uendret og verifisert | `Brage` er **9 commits foran**; preview grønn på `8b2b8bd`, Vercel-variablene satt (punkt 108) |
-| **CI** | rød på `main` til PR-en merges | **grønn lokalt, begge jobber**: `tsc` 0 (var 31), `jest` 1258, `eslint` 0, `astro check` 0, bevisfilene grønne. CI fyrer bare på PR — se punkt 121 |
+| **Databasen** | migrasjoner t.o.m. **`00085`** (00079–00085 sammenhengende) | **`00086`** er skrevet og tørrkjørt, **ikke kjørt** — venter grønn CI + klarsignal |
+| **Edge Functions** | `stripe-checkout` **v11** og `club-support-deactivate` **v6** (begge deployet i skive 2) · `push-fanout` **v13 (3. aug)** · øvrige i synk | **én udeployet**: `push-fanout` — punkt 117 |
+| **Nettsiden** heiaapp.no | `main` = `c8791e5` (PR #57 merget) | `Brage` er 4 commits foran (skive 3) — PR #58 |
+| **CI** | grønn på `main` etter #57 | PR #58 kjører. Lokalt: `jest` **1279**, `eslint` 0. CI fyrer bare på PR — se punkt 121 |
 | **Secrets** | `WEB_BASE_URL` og `WEB_INVITE_BASE_URL` satt | — |
 | **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
 | **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
@@ -287,10 +290,18 @@ er aldri sett på en telefon.
 
 Funksjoner som er lovet i grensesnittet, eller som mangler en vei ut.
 
-42. **Varselet som aldri kommer.** «Støtt laget»-oppsettet lover «Du får varsel
-    her når klubben er klar», men `stripe-webhook` oppretter ingen
-    notifikasjon når kontoen blir aktiv. Verifisert i koden i dag. Treneren
-    venter på noe som aldri skjer.
+42. ~~**Varselet som aldri kommer.**~~ **LØST AV PUNKT 96 (migrasjon 00083),
+    kjørt i prod 2026-09-11.** Punktet ble skrevet før 00083 og er siden
+    blitt stående i motstrid med 96 — de beskriver det samme varselet.
+    Løsningen ble en TRIGGER på `club_payment_accounts`, ikke en endring i
+    `stripe-webhook`, og derfor stemmer den opprinnelige kodeobservasjonen
+    fortsatt: webhooken oppretter ingen notifikasjon. Triggeren gjør det.
+    Kontrollert i prod 2026-09-12: `trg_notify_club_payment_active` →
+    `notify_on_club_payment_active` står på `club_payment_accounts`.
+    Bevisføringen (riktige mottakere, ingen dubletter, ingen varsler
+    bakover i tid) står i punkt 96.
+    **Gjenstår, og det er noe annet:** selve trykket på varselet er ikke
+    telefontestet — se punkt 14.
 43. **«Legg ned laget» og ops-verktøyene for dormante lag er ikke bygget.**
     Tre dokumenterte blindveier ender alle her: trener i et lag med bare
     spillerkontoer, tidligere trener som nå er forelder, og trenerforespørsel
@@ -579,7 +590,9 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      `bootHttpBudget.test.tsx`, og den går ETTER at feeden er hentet — den
      kan ikke parallelliseres, for den trenger post-id-ene.
 
-     **FORSLAG, VENTER GODKJENNING (migrasjon 00086).** Mønsteret finnes
+     **GODKJENT OG BYGGET — MIGRASJONEN VENTER PÅ KLARSIGNAL.** Kolonnen
+     heter `my_reactions`, ikke `i_reacted`, og det er et bevisst valg:
+     mønsteret finnes
      allerede i huset: `get_match_feed` (00071) returnerer `my_reactions` i
      samme rad, og kommentaren i `api/feed.ts` peker eksplisitt på at det er
      «derfor "har jeg heiet" ikke koster en ekstra spørring slik feeden
@@ -787,6 +800,7 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      minifisert kode.
 
      **Verifisert lokalt:** `tsc` 0 feil, `jest` 1258 bestått / 2 hoppet
+     (tallet den gangen; suiten er 1279 etter skive 3)
      over, `eslint` 0 feil. **Ikke telefonverifisert** — ingen av
      endringene endrer noe som tegnes.
 117. **Én Edge Function har ferdig kode som ikke er i drift.**
@@ -933,9 +947,9 @@ om et separat miljø blokkerer derfor ikke).
 - ~~Punkt 40, klientdelen~~ — tidsgrense + ærlige feilmeldinger.
 - **Punkt 40, resten:** ekte idempotens på skriving krever en migrasjon.
   Ikke startet — se punktet.
-- **Punkt 100 er neste, og den krever en migrasjon** (`i_reacted` inn i
-  `get_team_feed`). Forslaget står i punktet; den skal godkjennes før den
-  kjøres.
+- ~~Punkt 100~~ — **koden er ferdig og CI-grønn (PR #58); MIGRASJONEN ER
+  IKKE KJØRT.** Tørrkjørt mot prod, 19/19 grønt, og prod bevist urørt
+  etterpå. Se punktet for kjøre- og tilbakeføringskommandoene.
 - **Mål 88 og 89 i et ekte bygg.** De kan ikke måles før 1.0 (5).
 - **Så 102 og 101** etter hva målingene faktisk viser. Bevar godkjent
   utseende og oppførsel.

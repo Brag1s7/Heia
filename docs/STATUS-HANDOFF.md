@@ -1,5 +1,65 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 kveld, runde 2 — SKIVE 3 FERDIG, PR #58 GRØNN)
+
+**PR #58 er grønn** (js, web, Vercel) og venter på Brage. Ingenting er merget.
+
+### ⚠️ MIGRASJON 00086 ER IKKE KJØRT
+Den er skrevet, tørrkjørt og bevist — men står ukjørt til Brage gir
+klarsignal. Kjøres med:
+
+    node scripts/run-sql.mjs supabase/migrations/00086_feedens_egne_reaksjoner.sql
+    node scripts/run-sql.mjs scripts/verify-00086.sql   # skal si 19/19 GRØNT
+
+Tilbakeføring: `node scripts/run-sql.mjs scripts/rollback-00086.sql`.
+Den gjenskaper 00072-definisjonen ORDRETT (uten `search_path`, slik prod
+faktisk sto) pluss ACL-en. `git checkout` gjør ingenting med en funksjon
+som ligger i basen.
+
+**Tørrkjøringen (19/19 grønt)** kjørte HELE migrasjonen OG tilbakeføringen i
+én subtransaksjon som ble rullet tilbake, og beviste etterpå at prod er
+urørt: samme md5 (`eb06f48c…`), ingen fixturrader, fortsatt ingen
+`search_path`. Den sammenliknet svaret fra den gamle og den nye funksjonen
+BIT FOR BIT (utenom den nye kolonnen), og tilbakeføringen ga byte-identisk
+definisjon og identisk ACL.
+
+**Gammel klient er trygg:** signaturen er uendret og `my_reactions` er lagt
+til SIST. Bygg 1.0 (4) leser JSON, ser ikke nøkkelen, og gjør sin egen
+reactions-spørring som før. Klienten i 1.0 (5) tåler begge baser — voktet
+av `__tests__/feedMineReaksjoner.test.ts`, begge veier.
+
+### Kontrollert mot prod samme kveld (ikke hukommelse)
+- Databasen står på **00085**. 00086 er IKKE registrert.
+- `stripe-checkout` **v11** og `club-support-deactivate` **v6** — begge
+  deployet i skive 2. `push-fanout` står fortsatt på **v13** (punkt 117).
+- `trg_notify_club_payment_active` finnes → **punkt 42 er løst av punkt 96**
+  (00083). De to punktene beskrev samme varsel; 42 er nå strøket med
+  forklaring på hvorfor den gamle kodeobservasjonen fortsatt stemmer
+  (løsningen ble en trigger, ikke en webhook-endring).
+
+### Telefonfunn og fiks, samme kveld
+«Kampknappen spretter litt når man åpner appen» — målt, ikke gjettet, og
+det var IKKE animasjonen: pillen måles på etiketten, og `unknown` hadde
+ingen. 66,7 pt → 84,7 pt på 390 pt skjerm, i ett bilde. `unknown` får nå
+`layoutLabel: 'KAMP'` og reserverer plassen; ordet tegnes fortsatt ikke.
+Vakten krever identisk geometri på seks skjermbredder × to fontskalaer.
+**Gjenstår telefondom på om spretten faktisk er borte (commit 0441239).**
+
+### Oppstartsbudsjettet nå (målt, `bootHttpBudget.test.tsx`)
+| Scenario | Før skive 3 | Etter |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **5** |
+| Gjentatt kaldstart | 6 kall | **3** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **11**, målt |
+| Ventetid før appen tegnes | +1,5 s | **0** |
+
+Suiten **1279/1279**, eslint 0 feil.
+
+### Neste
+102 og 101 etter måling. 88/89 kan ikke måles før bygg 1.0 (5).
+
+---
+
 ## ▶️▶️ START HER (2026-09-12 kveld — SKIVE 3: 104, 99, 103 OG KLIENT-40 LUKKET)
 
 ### Les i denne rekkefølgen
