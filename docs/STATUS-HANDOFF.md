@@ -1,5 +1,71 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 kveld, runde 3 — SKIVE 3 LUKKET)
+
+### Tilstanden, i fire linjer
+- **PR #58 er grønn på `aa97656`** og venter på Brage. Ingenting er merget.
+- **Migrasjon 00086 er IKKE kjørt.** Tørrkjørt 19/19 grønt, prod bevist urørt.
+- **Skive 3 er ferdig:** 104, 99, 103, 100 og klientdelen av 40.
+- **Databasen står på 00085.** `push-fanout` er eneste udeployede funksjon.
+
+### Det ene som gjenstår her: én telefonsjekk
+Kampknappen blinket ved oppstart. Årsaken var IKKE animasjonen, og heller
+ikke den jeg trodde i runde én: `g.width` settes på den YTRE wrapperen,
+mens pillen man SER er innholdsstyrt (padding + glyf + tekst). Med tom
+etikett var den ~41 pt og vokste til ~85 når ordet kom.
+
+`unknown` viser nå «KAMP · Sesongen» fra første bilde, og er
+**pikselidentisk** med `idle` — bevist ved å sammenlikne de rendrede
+trærne (`__tests__/matchTabButtonUnknown.test.tsx`).
+
+⚠️ **Det motsier ikke august**, da `KAMP` ble tatt bort fordi det betydde
+«ingen kamp pågår». Trykket går til Sesongen i BEGGE tilstander, så ordet
+beskriver knappen. Påstanden ligger i STILLINGEN, og den kommer først når
+vi vet. `kind` er fortsatt `unknown` — manglende svar er ikke «ingen kamp»
+— og skjermleseren hører forskjellen.
+
+**Brage: last appen på nytt og se om blinket er borte.** Er det der
+fortsatt, kjører telefonen et gammelt bygg: de to tilstandene kan ikke
+lenger tegne ulikt.
+
+### Lærdom verdt å ta med
+Forrige vakt sammenliknet tallene som gikk INN i tegningen
+(`matchButtonGeometry`) og ble grønn mens blinket sto igjen på telefonen.
+Vakter for noe VISUELT må sammenlikne det som faktisk tegnes.
+
+### Slik kjøres 00086 når du gir klarsignal
+```
+node scripts/run-sql.mjs supabase/migrations/00086_feedens_egne_reaksjoner.sql
+node scripts/run-sql.mjs scripts/verify-00086.sql   # skal si 19/19 GRØNT
+```
+Tilbakeføring: `node scripts/run-sql.mjs scripts/rollback-00086.sql` —
+gjenskaper 00072-definisjonen ordrett (uten `search_path`, slik prod
+faktisk sto) pluss ACL-en. Bygg 1.0 (4) er upåvirket: signaturen er
+uendret og kolonnen lagt til sist.
+
+### Oppstartsbudsjettet, målt (`__tests__/bootHttpBudget.test.tsx`)
+| Scenario | Før skive 3 | Nå |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **5** |
+| Gjentatt kaldstart | 6 kall | **3** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **11**, målt |
+| Ventetid før appen tegnes | +1,5 s | **0** |
+
+Suiten **1282/1282**, eslint 0 feil.
+
+### Sett på telefonen, IKKE rørt (nye punkter på lista)
+Ved oppstart fylles også to andre flater etter at grunnen er tegnet:
+lagkassa-kortet (skjelett → «Bli lagets første støttespiller») og
+laghodets undertekst (`Fotball · 2012` → `Fotball · 4 medlemmer`). Begge
+er ekte lasting, ikke feil, men de er samme SLAGS pop-in som knappen var.
+Ikke rørt — utenfor skiva. Se punkt 124 i GJENSTÅR.
+
+### Neste samtale
+Start med `docs/GJENSTÅR.md` § «Skive 4 — Hele reisen på telefon og nett».
+Punkt 102 og 101 står igjen fra skive 3 og skal måles før de fikses.
+
+---
+
 ## ▶️▶️ START HER (2026-09-12 kveld, runde 2 — SKIVE 3 FERDIG, PR #58 GRØNN)
 
 **PR #58 er grønn** (js, web, Vercel) og venter på Brage. Ingenting er merget.

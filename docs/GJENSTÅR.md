@@ -859,6 +859,17 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      jest. «Grønt lokalt» beviste ingenting: arbeidstreet hadde
      `@types/node` og `.astro/` som en ren `npm ci` ikke har. Verifiser
      slike steg i en ren klone.
+124. **Pop-in på Hjem ved oppstart — to flater til.** Sett på telefonen
+     2026-09-12, ikke rørt (utenfor skive 3). Lagkassa-kortet går fra
+     skjelett til «Bli lagets første støttespiller», og laghodets
+     undertekst fra `Fotball · 2012` til `Fotball · 4 medlemmer`, etter at
+     grunnen er tegnet. Begge er ekte lasting — ikke feil — men det er
+     samme SLAGS uro som kampknappen hadde, og medlemstallet er verre enn
+     de andre: `2012` er et ÅRSTALL som byttes med et ANTALL, så teksten
+     endrer betydning og ikke bare verdi. Vurder å vise sport · årsklasse
+     til tallet er der (fallbacken finnes allerede i `TeamContext`), i
+     stedet for å bytte til den.
+
 123. **`A worker process has failed to exit gracefully` står igjen.** Den
      fantes før dette arbeidet, opptrer i begge halvdeler av testlista hver
      for seg, forsvinner helt når suiten kjøres serielt, og jest avslutter
@@ -952,7 +963,10 @@ om et separat miljø blokkerer derfor ikke).
   etterpå. Se punktet for kjøre- og tilbakeføringskommandoene.
 - **Mål 88 og 89 i et ekte bygg.** De kan ikke måles før 1.0 (5).
 - **Så 102 og 101** etter hva målingene faktisk viser. Bevar godkjent
-  utseende og oppførsel.
+  utseende og oppførsel. **Begge står igjen etter skive 3** — de var
+  bevisst nedprioritert til målingene forelå, og målingene sier at
+  oppstarten nå koster 5 kall / 0 ventetid. 101 (kalenderen henter 30
+  måneder, ~150 kort) er den av de to som har et målt tall bak seg.
 
 ### Skive 4 — Hele reisen på telefon og nett
 
