@@ -84,7 +84,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 | Skive | Innhold | Avhenger av | Punkter |
 |---|---|---|---|
 | **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, ~~97~~, ~~111~~, ~~30~~ · igjen: 98, 113 |
-| **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | 87, 96, 107, 22 |
+| **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | ~~87~~, ~~96~~, ~~107~~, ~~22~~ — **FERDIG 2026-09-12** |
 | **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
 
@@ -422,14 +422,16 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 
 ### Rettet samme kveld (committet og pushet som `b36030b`)
 
-87. **Dobbel betaling var mulig.** `stripe-checkout` laget Checkout-sesjonen
-    uten idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
-    samme funksjon. To parallelle kall ga to betalbare sesjoner og kunne
-    ende i to abonnementer, der det andre aldri kunne knyttes til raden.
-
-    **Status: fikset i kode, gjennomgått, DEPLOYKLAR — IKKE DEPLOYET.**
-    `stripe-checkout` står fortsatt på **v10 (19. august)**. Gjennomgangen
-    2026-09-11 natt fant ingen feil i fiksen:
+87. ~~**Dobbel betaling var mulig.**~~ **DEPLOYET 2026-09-12** —
+    `supabase functions deploy stripe-checkout` kjørt (v10 → ny versjon;
+    diffen mot v10 var nøyaktig de to gjennomgåtte filene pluss
+    lint-annotasjonene `stripe:ingen-nokkel`, kontrollert linje for linje
+    før deploy). Historikk: Checkout-sesjonen ble laget uten
+    idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
+    samme funksjon; to parallelle kall ga to betalbare sesjoner og kunne
+    ende i to abonnementer. Gjenstår kun røyktesten mot Stripe testmodus
+    (hører til punkt 21). Gjennomgangen 2026-09-11 natt fant ingen feil
+    i fiksen:
     * *Parallelle førstegangskall:* begge leser samme rad uten sesjons-id →
       samme nøkkel `heia-cosess-<rad>-first` → Stripe kollapser til ÉN sesjon.
     * *Lovlig nytt forsøk etter utløp:* raden bærer nå `sess_A` → nøkkelen
@@ -574,10 +576,21 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      er det usynlig. Ved 300 henger «Del»-knappen.
 106. **`get_team_members` og `get_team_authors` er upaginerte**, i
      motsetning til feeden som er riktig paginert.
-107. **«Deaktiver støtte» kan ikke fullføre for store lag.** Offeringen
-     arkiveres først, så kanselleres abonnementene serielt uten
-     fremdriftsmerking. Et lag som ikke rekker gjennom på ett forsøk,
-     rekker aldri gjennom.
+107. ~~**«Deaktiver støtte» kan ikke fullføre for store lag.**~~
+     **LUKKET 2026-09-12 av 00085 (kjørt i prod, verify 7/7 grønn).**
+     Rotfeilen: `deactivate_team_support_data` returnerte ALLE levende
+     abonnementer hver gang, så et nytt forsøk gjorde hele jobben om
+     igjen — et lag som ikke rakk gjennom på ett forsøk, rakk det aldri.
+     Nå filtrerer RPC-en på `cancel_at IS NULL` (webhookens bokføring er
+     fasit for «ferdig»): hvert forsøk tar KUN resten, et avbrutt forsøk
+     fortsetter der det slapp, og fremdriften bor der sannheten bor —
+     ingen ny tilstandstabell. Bevist i prod i rullet-tilbake-transaksjon:
+     kall 2 etter simulert webhook ga 1 → 0. Kontrollkjøringen FØR push
+     beviste også prod-feilen (1 → 1). Edge-funksjonen
+     `club-support-deactivate` er deployet med `remaining` i svaret og
+     ærligere feilmelding; skjermteksten sier nå «ikke fullført ennå» og
+     lover fortsettelse, ikke omkamp. Dørene målt før push og beholdt:
+     service-role-only, search_path pinnet med pg_temp sist.
 108. ~~**Nettsiden har ingen miljøseparasjon.**~~ **LUKKET 2026-09-11 natt
      — variablene er satt i Vercel, og previewen bygger grønt.** `web/src/lib/env.ts` har
      ingen reserveverdi lenger: `PUBLIC_HEIA_ENV` (`production`/`test`/
@@ -712,12 +725,12 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      **Verifisert lokalt:** `tsc` 0 feil, `jest` 1258 bestått / 2 hoppet
      over, `eslint` 0 feil. **Ikke telefonverifisert** — ingen av
      endringene endrer noe som tegnes.
-117. **To Edge Functions har ferdig kode som ikke er i drift.**
-     `stripe-checkout` står på **v10 (19. aug)** og `push-fanout` på
-     **v13 (3. aug)**, mens begge ble endret i `b36030b` 11. september.
-     For checkout er det dobbeltbetalingsfiksen (punkt 87). For
-     push-fanout er det at 500-taket logges i stedet for å kutte stille
-     (punkt 94). Alle andre funksjoner er i synk med koden.
+117. **Én Edge Function har ferdig kode som ikke er i drift.**
+     ~~`stripe-checkout`~~ (deployet 2026-09-12, punkt 87) —
+     `push-fanout` står fortsatt på **v13 (3. aug)**: 500-taket skal
+     logges i stedet for å kutte stille (punkt 94). Alle andre
+     funksjoner er i synk med koden (club-support-deactivate deployet
+     2026-09-12 sammen med 00085).
 
 118. **Ventetilstanden på «Bli med i lag» har ingen opplesning.**
      `JoinTeamCodeScreen` sendte `accessible`, `accessibilityRole="progressbar"`

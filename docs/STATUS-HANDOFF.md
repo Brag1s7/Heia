@@ -1,6 +1,6 @@
 # Heia — statusoverlevering (for ny chat)
 
-## ▶️▶️ START HER (2026-09-12 — PUNKT 122 LØST OG BEVIST; SKIVE 2 I GANG)
+## ▶️▶️ START HER (2026-09-12 — PUNKT 122 LØST (CI HELGRØNN); SKIVE 2 FERDIG OG I DRIFT)
 
 ### Punkt 122 er LUKKET — årsaken var Node-versjonen, ikke testen alene
 
@@ -29,14 +29,33 @@ reproduserte hengingen deterministisk — og ble målt helt inn:
   var IKKE beslektet: det er gc-timere (5 min) + håndtak, målt til ~6 min
   etterheng in-band.
 
-### Neste: SKIVE 2 — betaling og varsler tåler avbrudd
+### SKIVE 2 ER FERDIG (samme dag): 87 deployet, 107 lukket med 00085
 
-- **Punkt 87 først:** fiksen er gjennomgått og deployklar —
-  `supabase functions deploy stripe-checkout` (v10 → ny). Tilbakeføring og
-  bevisføring står i punktet og i blokka under (2026-09-12 natt).
-- **Så punkt 107:** «Deaktiver støtte» skal tåle avbrudd og kunne
-  fortsette; «fullført» = kanselleringene er bekreftet.
-- Punkt 22 er avklart og krever ikke arbeid.
+- **Punkt 87 DEPLOYET:** `stripe-checkout` v10 → ny versjon. Diffen mot
+  v10 kontrollert linje for linje før deploy (nøyaktig de to gjennomgåtte
+  filene + `stripe:ingen-nokkel`-annotasjonene). Tilbakeføring:
+  `git checkout e2007241 -- supabase/functions/stripe-checkout` + deploy.
+  Røyktest mot Stripe testmodus gjenstår (punkt 21).
+- **Punkt 107 LUKKET:** migrasjon **00085** kjørt i prod og bevist med
+  `scripts/verify-00085.sql` — **7/7 grønn**, mutasjonene rullet tilbake.
+  Rotfeilen var at RPC-en returnerte ALLE levende abonnementer hver gang;
+  nå filtrerer den på `cancel_at IS NULL`, så hvert forsøk tar KUN resten
+  og et avbrutt forsøk fortsetter der det slapp (webhookens bokføring er
+  fasit — ingen ny tilstandstabell). Kontrollkjøringen FØR push beviste
+  prod-feilen empirisk (kall 2 krympet ikke: 1 → 1; etter push: 1 → 0).
+  `club-support-deactivate` deployet med `remaining` i svaret; skjermen
+  sier «ikke fullført ennå» og lover fortsettelse, ikke omkamp.
+  Dør-funn underveis: funksjonen var allerede service-role-only i prod
+  (strammere enn 00084-gruppe A) — migrasjonen GJENTAR den målte
+  tilstanden i stedet for å åpne for authenticated.
+- Punkt 22 var avklart fra før og krevde ikke arbeid. Databasen står nå
+  på **00085**; `push-fanout` (punkt 94/117) er eneste udeployede.
+- Verifisert: suiten 1258/1258 (Node 24 og Node 22.23.2), `npm run lint`
+  0 feil, prettier-husstilen fulgt.
+
+### Neste (skive 3 — oppstart, nettverk og caching, i NY samtale)
+Punktene 99, 40, 104 først (se § «Skive 3» i GJENSTÅR) — 88/89 kan
+fortsatt ikke måles før bygg 1.0 (5).
 
 ---
 
