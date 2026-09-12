@@ -65,7 +65,6 @@ const mockPress = jest.fn();
 jest.mock('../src/context/MatchButtonContext', () => ({
   useMatchButton: () => ({
     state: mockState,
-    bootReady: true,
     inMatch: mockInMatch,
     press: mockPress,
     enterMatch: jest.fn(),

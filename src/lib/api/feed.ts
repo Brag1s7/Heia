@@ -225,6 +225,16 @@ export async function getTeamFeed(
   // Bilde-poster: media[] (jsonb fra RPC) → MediaRef (P4). UI-et får path,
   // aldri URL — men URL-ene varmes opp HER, i ÉN batch per skjermlast, så
   // MediaImage treffer cachen i stedet for å signere per bilde.
+  //
+  // ⚠️ KUN `display` VARMES (punkt 103). `thumbPath` ble signert med i samme
+  // batch, men feeden tegner aldri thumb-varianten: både `FeedCard` og
+  // `CommentThread` ber eksplisitt om `variant="display"`. Det doblet
+  // signeringslista på hver eneste feed-åpning for bilder ingen ser.
+  //
+  // Thumb-en er IKKE borte fra dataen — `ref.thumbPath` står som før, så et
+  // kallsted som en dag vil ha den, får den (resolveren signerer den da
+  // alene). Kampflatene, som faktisk BRUKER thumb (railen, forløpet,
+  // galleriet), varmer begge variantene selv i `getMatchPhotos`.
   const paths: string[] = [];
   rows.forEach((r: any, i: number) => {
     const media = (r.media ?? []) as any[];
@@ -235,7 +245,6 @@ export async function getTeamFeed(
     };
     items[i].media = ref;
     paths.push(ref.path);
-    if (ref.thumbPath) paths.push(ref.thumbPath);
   });
   if (paths.length > 0) {
     await primeMediaUrls(paths);

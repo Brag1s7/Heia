@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {supabase} from '../supabase';
 import {uploadFileToBucket} from '../media/upload';
 import type {
@@ -442,14 +443,72 @@ export async function searchClubs(query: string): Promise<ClubSearchResult[]> {
   }));
 }
 
-// Idretter er statisk referansedata — cache i minnet for hele app-økten,
-// med dedup av samtidige kall, så CreateTeam-velgeren kan vises uten spinner.
+// ---------------------------------------------------------------------------
+// IDRETTENE — statisk referansedata, og den eneste lista i appen som aldri
+// endrer seg mellom to app-starter.
+//
+// Brage 2026-09-04: «det er bare knapper som alltid skal være der.» Pillene
+// skal stå fra første render av «Opprett lag», ikke dukke opp etterpå.
+//
+// ⚠️ DET KRAVET KOSTET ET NETTKALL PÅ HVER KALDSTART (punkt 103), fordi
+// oppvarmingen gikk rett på nettet — for en skjerm de aller fleste aldri
+// åpner. Nå ligger lista på DISK mellom øktene: oppstarten leser derfra
+// (`primeSportsFromDisk`, aldri nett), og nettet spørres kun den ene gangen
+// disken er tom. Kravet står, kallet er borte.
+// ---------------------------------------------------------------------------
+
+const SPORTS_CACHE_KEY = 'heia:sports:v1';
+
 let sportsCache: Sport[] | null = null;
 let sportsInflight: Promise<Sport[]> | null = null;
 
 /** Synkron lesing av cachede idretter (null hvis ikke lastet ennå). */
 export function getCachedSports(): Sport[] | null {
   return sportsCache;
+}
+
+function isSportList(value: unknown): value is Sport[] {
+  return (
+    Array.isArray(value) &&
+    value.every(
+      s =>
+        !!s &&
+        typeof (s as Sport).id === 'string' &&
+        typeof (s as Sport).slug === 'string' &&
+        typeof (s as Sport).displayName === 'string',
+    )
+  );
+}
+
+/**
+ * OPPSTARTENS OPPVARMING — DISK, ALDRI NETT.
+ *
+ * Finnes ingenting på disken (første gang appen kjører på telefonen), gjør
+ * den ingenting: onboardingen og «Opprett lag» kaller `getSports()`, som
+ * henter og legger lista på disk for alle senere oppstarter.
+ *
+ * Ingen utløpstid: idrettslista er ikke ferskvare. Nye idretter kommer inn
+ * neste gang noen faktisk åpner en skjerm som spør (`getSports` under
+ * skriver alltid over), og en idrett som forsvinner er uansett ikke noe en
+ * eksisterende bruker velger.
+ */
+export async function primeSportsFromDisk(): Promise<void> {
+  if (sportsCache) {
+    return;
+  }
+  try {
+    const raw = await AsyncStorage.getItem(SPORTS_CACHE_KEY);
+    if (raw == null) {
+      return;
+    }
+    const parsed: unknown = JSON.parse(raw);
+    // Et nettsvar som alt har landet vinner (samme regel som bootfrøet).
+    if (!sportsCache && isSportList(parsed) && parsed.length > 0) {
+      sportsCache = parsed;
+    }
+  } catch {
+    // Korrupt fil: la den ligge, `getSports` henter ferskt ved behov.
+  }
 }
 
 /** Idretts-picker. Cacher resultatet; kall den tidlig for å forhåndslaste. */
@@ -474,12 +533,25 @@ export async function getSports(): Promise<Sport[]> {
         slug: row.slug,
         displayName: row.display_name,
       }));
+      // Neste kaldstart leser denne i stedet for å ringe.
+      AsyncStorage.setItem(SPORTS_CACHE_KEY, JSON.stringify(sportsCache)).catch(
+        () => {},
+      );
       return sportsCache;
     } finally {
       sportsInflight = null;
     }
   })();
   return sportsInflight;
+}
+
+/**
+ * KUN for tester: glem øktcachen for idretter — simulerer en app-omstart,
+ * så en kaldstart kan telles uten at forrige test har varmet cachen.
+ */
+export function _resetSportsCacheForTests(): void {
+  sportsCache = null;
+  sportsInflight = null;
 }
 
 /** Oppretter klubb (finn/opprett) + team + team_space + trener-membership i én RPC. */

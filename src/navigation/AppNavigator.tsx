@@ -725,7 +725,6 @@ export function MainTabs() {
 // ---------------------------------------------------------------------------
 export function AppNavigator() {
   const {session, profile, loading} = useAuth();
-  const {bootReady} = useMatchButton();
   const {userMemberships, loading: teamLoading} = useActiveTeam();
   const {pendingAction, lastError, setLastError} = useOnboarding();
 
@@ -766,19 +765,28 @@ export function AppNavigator() {
     }
   }, [lastError, hasTeam, onboarded, setLastError]);
 
-  // Vent på profil + memberships så vi ikke blinker innom feil skjerm.
-  // ⚠️ KAMPKNAPPEN MÅ VÆRE PÅ PLASS FØR APPEN VISES (Brage 2026-08-21).
-  // «viser knappen først kamp, deretter hopper den over til stillingen» —
-  // og `KAMP` betyr «ingen kamp pågår». Å gjøre hoppet penere hjalp ikke;
-  // det eneste som fjerner det er å ikke tegne baren før svaret er der.
-  // `bootReady` har sitt eget tak, så en treg forbindelse aldri kan holde
-  // appen igjen (se `MatchButtonContext`).
-  if (
-    loading ||
-    (session && !profile) ||
-    (session && teamLoading) ||
-    (session && profile && !bootReady)
-  ) {
+  /**
+   * Vent på profil + memberships så vi ikke blinker innom feil skjerm — og
+   * IKKE på noe mer enn det (punkt 99).
+   *
+   * ⚠️ HER STO KAMPSVARET FØR, og det kostet opptil 1,5 sekunder av HVER
+   * kaldstart. Bakgrunnen var ekte (Brage 2026-08-21: «viser knappen først
+   * kamp, deretter hopper den over til stillingen» — og `KAMP` betyr «ingen
+   * kamp pågår»), men medisinen var feil adresse: problemet var at flaten
+   * PÅSTO noe den ikke hadde dekning for, ikke at den ble tegnet.
+   *
+   * Påstanden er borte for godt, og den er borte i kilden: `matchButton.ts`
+   * har `unknown` — ingen ord, ingen glød, samme mørke flate som hvile — og
+   * `shouldNudge` sier eksplisitt nei til sprett på det første svaret. Det
+   * er ikke et hopp å gå fra «vi vet ikke ennå» til det vi vet.
+   *
+   * Kampstatus lastes altså i bakgrunnen, og et sent svar flytter ingen:
+   * knappen bytter etikett, den navigerer ikke (se `handleMatchPress` — alt
+   * som flytter brukeren krever et TRYKK). Dyplenker er uberørt; de går
+   * gjennom `flushPendingDeepLink`, som nå kjører TIDLIGERE fordi
+   * navigatoren monterer tidligere.
+   */
+  if (loading || (session && !profile) || (session && teamLoading)) {
     return <BootScreen />;
   }
 

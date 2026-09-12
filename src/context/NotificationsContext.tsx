@@ -128,18 +128,80 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
   // få prøve igjen.
   const unreadFetchedAtRef = useRef(0);
 
+  // Kanalen (lenger ned) er BRUKER-scopet, ikke lag-scopet — derfor leses
+  // `activeTeamSpaceId` og `refreshUnread` via refs i callbackene (S1-f).
+  // Sto de i effect-deps, ville hvert lagbytte revet og gjenoppbygget
+  // WS-kanalen for et abonnement som er identisk uansett lag. Lagbyttets
+  // unread-refresh skjer fortsatt: mount-effekten under fyrer når
+  // `refreshUnread` bytter identitet.
+  const activeTeamSpaceIdRef = useRef(activeTeamSpaceId);
+  activeTeamSpaceIdRef.current = activeTeamSpaceId;
+
   const refreshUnread = useCallback(() => {
-    if (!userId || !activeTeamSpaceId) {
+    const teamSpaceId = activeTeamSpaceId;
+    if (!userId || !teamSpaceId) {
       setUnreadCount(0);
       return;
     }
+    /**
+     * ⚠️ HOPP PÅ KONTEKST-KALLET I FLUKT, ALDRI ET EGET (punkt 103).
+     *
+     * Vakten sto bare i mount-effekten under, og det holdt så lenge
+     * navigatoren ventet på kontekst-svaret: da rakk peeken å stemple
+     * telleren før noen fane fikk fokus. Etter punkt 99 åpner appen på
+     * frøet MENS kallet er i flukt — og da fyrte tab-barens fokuslytter
+     * (`refreshUnreadIfStale`, som ser et ustemplet 0) et HEAD-kall for et
+     * tall som var på vei inn i det samme sekundet. Målt i
+     * `bootHttpBudget.test.tsx`: ett kall for mye på hver gjentatte
+     * kaldstart.
+     *
+     * Regelen bor derfor HER, der HTTP-et faktisk sendes, og gjelder alle
+     * kallstedene — mount, fokus og lagbytte.
+     */
+    // Konteksten LANDET nettopp (typisk: fanen fikk fokus like etter at
+    // RPC-en svarte) — tallet ligger i minnet, og et HEAD-kall ville bare
+    // spurt om det samme på nytt.
+    const hit = peekSessionContext(teamSpaceId);
+    if (hit && hit.ctx.unreadCount != null) {
+      unreadFetchedAtRef.current = hit.fetchedAt;
+      setUnreadCount(hit.ctx.unreadCount);
+      return;
+    }
+    const pending = pendingSessionContext();
+    if (pending) {
+      pending.then(ctx => {
+        // Lagbytte mens vi ventet: svaret gjelder et annet lag nå.
+        if (activeTeamSpaceIdRef.current !== teamSpaceId) {
+          return;
+        }
+        if (
+          ctx &&
+          ctx.coveredTeamSpaceId === teamSpaceId &&
+          ctx.unreadCount != null
+        ) {
+          unreadFetchedAtRef.current = Date.now();
+          setUnreadCount(ctx.unreadCount);
+          return;
+        }
+        // Udekket eller feilet: dagens HEAD-kall, ETTER forsøket.
+        fetchUnread(teamSpaceId);
+      });
+      return;
+    }
+    fetchUnread(teamSpaceId);
+
     // Svelger feil med vilje: en badge skal aldri kunne velte appen.
-    getUnreadCount(activeTeamSpaceId)
-      .then(count => {
-        unreadFetchedAtRef.current = Date.now();
-        setUnreadCount(count);
-      })
-      .catch(() => {});
+    function fetchUnread(ts: string): void {
+      getUnreadCount(ts)
+        .then(count => {
+          if (activeTeamSpaceIdRef.current !== ts) {
+            return;
+          }
+          unreadFetchedAtRef.current = Date.now();
+          setUnreadCount(count);
+        })
+        .catch(() => {});
+    }
   }, [userId, activeTeamSpaceId]);
 
   // 60 s-porten (S1-a) — samme regel som `useScreenFocusRefetch`. Raske
@@ -151,62 +213,20 @@ export function NotificationsProvider({children}: {children: ReactNode}) {
     }
   }, [refreshUnread]);
 
-  // Kanalen (lenger ned) er BRUKER-scopet, ikke lag-scopet — derfor leses
-  // `activeTeamSpaceId` og `refreshUnread` via refs i callbackene (S1-f).
-  // Sto de i effect-deps, ville hvert lagbytte revet og gjenoppbygget
-  // WS-kanalen for et abonnement som er identisk uansett lag. Lagbyttets
-  // unread-refresh skjer fortsatt: mount-effekten under fyrer når
-  // `refreshUnread` bytter identitet.
-  const activeTeamSpaceIdRef = useRef(activeTeamSpaceId);
-  activeTeamSpaceIdRef.current = activeTeamSpaceId;
   const refreshUnreadRef = useRef(refreshUnread);
   refreshUnreadRef.current = refreshUnread;
 
-  // Fyrer ved boot (laget blir valgt) OG ved lagbytte. S2: ved boot ligger
-  // telleren allerede i kontekst-svaret TeamContext hentet — peek er et
-  // rent minneoppslag og koster null HTTP. Ved lagbytte dekker svaret det
-  // GAMLE laget → miss → dagens HEAD-kall. RPC-feil/manglende 00079 gir
-  // også miss → samme HEAD-kall som før S2.
+  // Fyrer ved boot (laget blir valgt) OG ved lagbytte.
+  //
+  // ⚠️ REGELEN BOR I `refreshUnread`, IKKE HER. Den sto begge steder, og da
+  // gjaldt den bare for de kallstedene som husket den: tab-barens
+  // fokuslytter gikk utenom og sendte et HEAD-kall for et tall som lå i
+  // minnet (målt i `bootHttpBudget.test.tsx` etter punkt 99, da appen
+  // begynte å åpne før kontekst-svaret var inne). Ett sted som avgjør om
+  // badgen koster nettverk — resten kaller bare.
   useEffect(() => {
-    if (userId && activeTeamSpaceId) {
-      const hit = peekSessionContext(activeTeamSpaceId);
-      if (hit && hit.ctx.unreadCount != null) {
-        unreadFetchedAtRef.current = hit.fetchedAt;
-        setUnreadCount(hit.ctx.unreadCount);
-        return;
-      }
-      // S7b: frø-boot velger laget FØR kontekst-kallet har landet (peek
-      // miss selv om kallet er i flukt) — badgen venter på svaret som
-      // uansett bærer telleren, i stedet for et duplikat HEAD-kall
-      // (bootbudsjettet ≤7, §0.1-3). Mens vi venter står badgen skjult —
-      // «venter», aldri et påstått 0. Dekker svaret ikke laget, eller
-      // feiler kallet (null — promiset resolver alltid), tas dagens
-      // HEAD-kall som fallback ETTER forsøket.
-      const pending = pendingSessionContext();
-      if (pending) {
-        let cancelled = false;
-        pending.then(ctx => {
-          if (cancelled || activeTeamSpaceIdRef.current !== activeTeamSpaceId) {
-            return;
-          }
-          if (
-            ctx &&
-            ctx.coveredTeamSpaceId === activeTeamSpaceId &&
-            ctx.unreadCount != null
-          ) {
-            unreadFetchedAtRef.current = Date.now();
-            setUnreadCount(ctx.unreadCount);
-          } else {
-            refreshUnreadRef.current();
-          }
-        });
-        return () => {
-          cancelled = true;
-        };
-      }
-    }
     refreshUnread();
-  }, [userId, activeTeamSpaceId, refreshUnread]);
+  }, [refreshUnread]);
 
   // Varsler kommer mens appen ligger i bakgrunnen — resync når den kommer
   // tilbake, ellers ville badgen ligget etter til neste fanebytte. S2:

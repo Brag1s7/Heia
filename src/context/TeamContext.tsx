@@ -15,7 +15,7 @@ import {registerTeamSwitcher} from '../navigation/deepLink';
 import {
   getUserMemberships,
   getTeamMemberCount,
-  getSports,
+  primeSportsFromDisk,
 } from '../lib/api/teams';
 import {refreshSessionContext} from '../lib/queries/sessionContext';
 import {
@@ -179,7 +179,7 @@ export function TeamProvider({children}: PropsWithChildren) {
               return;
             }
             // Aktivt lag settes I SAMME commit som slippet: ellers ville
-            // navigatoren rukket å tegne MainTabs uten lag (bootReady sann)
+            // navigatoren rukket å tegne MainTabs uten lag
             // og så hoppet tilbake til BootScreen når laget kom til.
             const stored = await readStoredActiveTeamSpaceId();
             if (freshApplied) {
@@ -207,12 +207,15 @@ export function TeamProvider({children}: PropsWithChildren) {
       // S7b endrer ikke dette: kallet starter umiddelbart uansett frø.
       //
       // IDRETTENE (Brage 2026-09-04: «det er bare knapper som alltid skal
-      // være der»): statisk referansedata, cachet for hele økten i
-      // lib/api/teams. Varmes HER ved boot (ikke først når «Opprett lag»
-      // åpnes), så pillene står der fra første render på siden — som alt
-      // annet innhold der. Onboardingen gjør det samme i WelcomeIntent.
+      // være der»): statisk referansedata, så pillene står der fra første
+      // render på «Opprett lag» — som alt annet innhold der.
+      //
+      // ⚠️ FRA DISK, IKKE FRA NETT (punkt 103). Oppvarmingen var et
+      // `getSports()` — altså et HTTP-kall i hver eneste kaldstart, for en
+      // skjerm de fleste aldri åpner. Lista overlever nå på disk mellom
+      // øktene, og nettet spørres først når noen faktisk trenger den.
       if (!isRefresh) {
-        getSports().catch(() => {});
+        primeSportsFromDisk().catch(() => {});
       }
       const ctx = await refreshSessionContext(activeTeamSpaceIdRef.current, {
         bootPrefetchUserId: isRefresh ? undefined : userId,
