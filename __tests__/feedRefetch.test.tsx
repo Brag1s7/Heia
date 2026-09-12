@@ -214,26 +214,21 @@ function Harness() {
 // feiler midtveis (da hadde neste test hengt på ekte async uten at noen
 // flytter klokka). Query-cachen tømmes av samme grunn: en events-cache fra
 // forrige test ville gjort neste tests kallbudsjett løgnaktig lavt.
-afterEach(async () => {
-  // RYDD I RIKTIG REKKEFØLGE. `clear()` alene lot en retryer som lå og sov
-  // (appens `retry: 1`) overleve; den våknet foreldreløs, kjørte
-  // `Query.fetch` på nytt og planla en `scheduleGc` på `gcTime` = 5 minutter.
-  // Den timeren eide ingen, og holdt Nodes hendelsesløkke i live — målt:
-  // jest rapporterte 2 s, veggklokka 5:04 med 0 % CPU.
+afterEach(() => {
+  // INGEN `await` HER. Fake timers skal aldri lekke mellom testene, og
+  // cachen tømmes så neste tests kallbudsjett ikke blir løgnaktig lavt.
   //
-  // Rekkefølgen er derfor: avbryt MENS fake-klokka fortsatt finnes, kjør de
-  // ventende timerne så den sovende retryeren vekkes og faktisk kan avbrytes,
-  // og FØRST DA bytt til ekte klokke og tøm.
+  // Jeg prøvde å rydde TanStacks gc-timere her med
+  // `await queryClient.cancelQueries()`. Lokalt så det riktig ut, men på
+  // GitHubs runner hang `afterEach` for alltid og jobben traff
+  // `timeout-minutes: 15` — fire kjøringer på rad, der den før brukte 28
+  // sekunder. Målt mot commit-historikken: hengingen kom nøyaktig med den
+  // endringen og forsvant ikke før den ble tatt ut igjen.
   //
-  // Prøvd og forkastet: (a) avbryte etter `useRealTimers()` — da kan løftet
-  // aldri innfris, og `afterEach` hang; (b) synkron `q.destroy()` uten
-  // venting — da rekker ikke avbruddet gjennom, og lekkasjen kom tilbake
-  // (303 s målt).
-  const avbrytes = queryClient.cancelQueries().catch(() => {});
-  if (jest.isMockFunction(setTimeout)) {
-    jest.runOnlyPendingTimers();
-  }
-  await avbrytes;
+  // Timerne det gjaldt holder Nodes hendelsesløkke i live i fem minutter
+  // etter at testene er ferdige LOKALT. Jest avslutter likevel (force-exit
+  // av arbeideren), og CI fullfører. Det er en ryddesak, ikke en blokker —
+  // og den skal ikke løses med venting i en `afterEach`.
   jest.useRealTimers();
   queryClient.clear();
 });

@@ -216,22 +216,6 @@ afterEach(async () => {
   } catch {}
   mountedRoot = undefined;
   abandonSessionContext();
-  // KANSELLER FØR TØMMING — samme årsak som i feedRefetch: `clear()` alene
-  // fjerner spørringene, men ikke en retryer som ligger og sover (appens
-  // `retry: 1` venter ett sekund før nytt forsøk). Tømmes cachen mens den
-  // sover, våkner den foreldreløs, kjører `Query.fetch` på nytt, og
-  // `Query.fetch` planlegger en `scheduleGc` på `gcTime` = 5 minutter. Den
-  // timeren eies av ingen og holder Nodes hendelsesløkke i live.
-  // Målt her før fiksen: testene tok 35 og 24 ms, veggklokka 5:02, 0 % CPU.
-  //
-  // IKKE `await` — se samme begrunnelse i feedRefetch: avbruddet er synkront,
-  // mens løftet kan vente evig på en henting som sov på en fake timer.
-  // Synkront, se samme begrunnelse i feedRefetch: `destroy()` rydder
-  // gc-timeren og avbryter retryeren uten å vente på noe som helst.
-  queryClient
-    .getQueryCache()
-    .getAll()
-    .forEach(q => q.destroy());
   queryClient.clear();
 });
 
