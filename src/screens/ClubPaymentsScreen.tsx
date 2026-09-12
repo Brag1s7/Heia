@@ -288,7 +288,8 @@ export function ClubPaymentsScreen() {
 
   // DELFEIL-FIKSEN (gamle K2): et deaktivert lag med levende abonnementer
   // uten cancel_at betyr at noen Stripe-kall ikke gikk igjennom. Samme
-  // idempotente funksjon kjøres på nytt — den tar kun de som mangler.
+  // idempotente funksjon kjøres på nytt — og fra 00085 (punkt 107) tar
+  // den faktisk kun de som gjenstår, så hvert trykk krymper jobben.
   const handleFinishDeactivation = useCallback(
     (team: ClubPaymentTeam) => {
       const n = team.unresolvedCancellations;
@@ -503,14 +504,15 @@ export function ClubPaymentsScreen() {
                   <View style={styles.warnRow}>
                     <AlertTriangle size={15} color={colors.goldInk} />
                     <Text style={styles.warnBoxTitle}>
-                      Deaktiveringen ble ikke fullført
+                      Deaktiveringen er ikke fullført ennå
                     </Text>
                   </View>
                   <Text style={styles.warnText}>
                     {team.unresolvedCancellations === 1
                       ? '1 støtteavtale er fortsatt løpende'
                       : `${team.unresolvedCancellations} støtteavtaler er fortsatt løpende`}{' '}
-                    og trekkes videre. Trykk under, så prøver vi på nytt.
+                    og trekkes videre. Trykk under, så fortsetter vi med akkurat
+                    dem — de som alt er i orden, røres ikke.
                   </Text>
                   <Button
                     title="Fullfør deaktiveringen"

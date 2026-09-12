@@ -1,5 +1,117 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 — PUNKT 122 LØST (CI HELGRØNN); SKIVE 2 FERDIG OG I DRIFT)
+
+### Punkt 122 er LUKKET — årsaken var Node-versjonen, ikke testen alene
+
+`feedRefetch` «payload-først (B3)» hang på CI fordi **runneren kjører
+Node 22 og Macen Node 24**. Med CI-ens eksakte Node (22.23.2) lokalt
+reproduserte hengingen deterministisk — og ble målt helt inn:
+
+- Retry-hypotesen fra punkt 122 er **motbevist**: null fake timers
+  utestående under hengingen (`jest.getTimerCount()`), og et 120 s-spark
+  på fake-klokka løsnet ingenting.
+- Den virkelige mekanismen: Reacts asynkrone `act` planlegger
+  fortsettelsen sin med `setImmediate`. Jests `useFakeTimers()` faker som
+  standard ALT — også immediates — og på Node 22 kjørte den planlagte
+  fortsettelsen aldri: `await act(...)` hang for alltid. Node 24 tilgir
+  det; derfor «101 ms lokalt, 30 000+ ms på runneren».
+- Fiksen (i `__tests__/feedRefetch.test.tsx`): begge fake-timer-oppsettene
+  bruker nå `doNotFake: ['setImmediate', 'clearImmediate']` — testene
+  trenger bare setTimeout-familien (debounce 400 ms, notify, retry, gc).
+- **Bevis:** kontroll hang 2/2, fiksen grønn 5/5 + 3/3 på Node 22.23.2;
+  hele suiten **1258/1258** på både Node 22 (`--maxWorkers=3`, CI-form)
+  og Node 24. eslint 0, prettier-husstilen fulgt.
+- **Metode for neste gang:** last ned runnerens Node-dur
+  (`nodejs.org/dist/v22.x/node-v22.x-darwin-arm64.tar.gz`), legg `bin/`
+  først i PATH og kjør jest med den — CI-heng skal jages lokalt, ikke med
+  15-minutters CI-runder. Punkt 123 (worker-exit-støyen) står igjen og
+  var IKKE beslektet: det er gc-timere (5 min) + håndtak, målt til ~6 min
+  etterheng in-band.
+
+### SKIVE 2 ER FERDIG (samme dag): 87 deployet, 107 lukket med 00085
+
+- **Punkt 87 DEPLOYET:** `stripe-checkout` v10 → ny versjon. Diffen mot
+  v10 kontrollert linje for linje før deploy (nøyaktig de to gjennomgåtte
+  filene + `stripe:ingen-nokkel`-annotasjonene). Tilbakeføring:
+  `git checkout e2007241 -- supabase/functions/stripe-checkout` + deploy.
+  Røyktest mot Stripe testmodus gjenstår (punkt 21).
+- **Punkt 107 LUKKET:** migrasjon **00085** kjørt i prod og bevist med
+  `scripts/verify-00085.sql` — **7/7 grønn**, mutasjonene rullet tilbake.
+  Rotfeilen var at RPC-en returnerte ALLE levende abonnementer hver gang;
+  nå filtrerer den på `cancel_at IS NULL`, så hvert forsøk tar KUN resten
+  og et avbrutt forsøk fortsetter der det slapp (webhookens bokføring er
+  fasit — ingen ny tilstandstabell). Kontrollkjøringen FØR push beviste
+  prod-feilen empirisk (kall 2 krympet ikke: 1 → 1; etter push: 1 → 0).
+  `club-support-deactivate` deployet med `remaining` i svaret; skjermen
+  sier «ikke fullført ennå» og lover fortsettelse, ikke omkamp.
+  Dør-funn underveis: funksjonen var allerede service-role-only i prod
+  (strammere enn 00084-gruppe A) — migrasjonen GJENTAR den målte
+  tilstanden i stedet for å åpne for authenticated.
+- Punkt 22 var avklart fra før og krevde ikke arbeid. Databasen står nå
+  på **00085**; `push-fanout` (punkt 94/117) er eneste udeployede.
+- Verifisert: suiten 1258/1258 (Node 24 og Node 22.23.2), `npm run lint`
+  0 feil, prettier-husstilen fulgt.
+
+### Neste (skive 3 — oppstart, nettverk og caching, i NY samtale)
+Punktene 99, 40, 104 først (se § «Skive 3» i GJENSTÅR) — 88/89 kan
+fortsatt ikke måles før bygg 1.0 (5).
+
+---
+
+## ▶️▶️ START HER (2026-09-12 natt — SKIVE 1 FERDIG OG MERGET; NESTE ER SKIVE 2)
+
+### Les i denne rekkefølgen
+1. **`docs/GJENSTÅR.md`** — arbeidslista. Toppen har «Der vi står», skivene
+   og de tatte beslutningene.
+2. **`docs/GJENSTÅR.md` § «Skive 2 — Betaling og varsler tåler avbrudd»**.
+3. Denne fila er historikk. Søk, ikke les forfra.
+
+### Hva som ER i drift
+
+- **Databasen: `00084`**, og 00079–00084 er sammenhengende. Både `00083`
+  (varselet når klubben blir klar) og `00084` (anon-døren, tre grupper) er
+  kjørt i prod og bevist der — 12/12 og 8/8 i transaksjoner som ble rullet
+  tilbake. Anon-åpne SECURITY DEFINER-funksjoner: **26 → 1**.
+- **Nettsiden**: `Brage` merget til `main`. Vercel-variablene står for
+  Production og Preview, previewen bygger grønt, produksjon uendret.
+- **Edge Functions: uendret.** `stripe-checkout` står fortsatt på **v10**
+  (19. aug) og `push-fanout` på **v13** (3. aug). Begge har ferdig, udeployet
+  kode — punkt 117.
+
+### Lukket i skive 1
+108, 109 (miljøseparasjon + nettsiden i CI), 97, 111, 30 (00084), 96
+(00083), 116 (31 typefeil som hadde holdt CI rød siden 19. august).
+Risikosortert og parkert: 98 (`search_path`, ingen konkret utsatt), 114
+(Astro-rådgivningene, minste oppgradering er `astro@7.2.8`).
+
+### DET FØRSTE DU BØR TA: punkt 122
+CI er grønn overalt unntatt **én test**: `feedRefetch` «payload-først (B3)»
+tidsavbryter på GitHubs runner (101 ms lokalt, over 30 000 ms i CI).
+1257 av 1258 passerer. Hypotesen og hva som IKKE virker står i punkt 122 —
+les den før du rører testen. Kort: ikke hev grensen mer, og ikke bruk
+`--runInBand`.
+
+### Så: SKIVE 2 — betaling og varsler tåler avbrudd
+- **Punkt 87** er gjennomgått og **deployklar, ikke deployet**:
+  `supabase functions deploy stripe-checkout`. Tilbakeføring og hele
+  bevisføringen står i punktet.
+- **Punkt 107**: «Deaktiver støtte» må tåle avbrudd og kunne fortsette.
+- **Punkt 22 er avklart** og krever ikke arbeid.
+
+### Arbeidsmåter som kostet tid i natt — les disse
+- **Verifiser CI-steg i en REN KLONE.** «Grønt lokalt» beviste ingenting:
+  arbeidstreet hadde `@types/node` og `.astro/` som `npm ci` ikke gir.
+- **Ikke iterér mot CI.** Hver runde tar opptil 15 minutter. Mål lokalt,
+  bevis årsaken, og push én gang.
+- **`gh` er nå innlogget** (scopes: repo, workflow) — bruk
+  `gh run view --log-failed` i stedet for å be Brage lese logger.
+- **Vercel-CLI er innlogget** via `npx vercel`, scope `heia1`, prosjekt
+  `heia`. Ingen prosjektinnstillinger er rørt.
+
+---
+
+
 ## ▶️▶️ START HER (2026-09-11 natt, runde 3 — ALT ER GRØNT LOKALT OG PÅ VERCEL; BARE PR-EN GJENSTÅR)
 
 ### Det ene som gjenstår: åpne PR-en

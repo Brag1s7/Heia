@@ -84,7 +84,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 | Skive | Innhold | Avhenger av | Punkter |
 |---|---|---|---|
 | **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, ~~97~~, ~~111~~, ~~30~~ · igjen: 98, 113 |
-| **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | 87, 96, 107, 22 |
+| **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | ~~87~~, ~~96~~, ~~107~~, ~~22~~ — **FERDIG 2026-09-12** |
 | **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
 
@@ -422,14 +422,16 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
 
 ### Rettet samme kveld (committet og pushet som `b36030b`)
 
-87. **Dobbel betaling var mulig.** `stripe-checkout` laget Checkout-sesjonen
-    uten idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
-    samme funksjon. To parallelle kall ga to betalbare sesjoner og kunne
-    ende i to abonnementer, der det andre aldri kunne knyttes til raden.
-
-    **Status: fikset i kode, gjennomgått, DEPLOYKLAR — IKKE DEPLOYET.**
-    `stripe-checkout` står fortsatt på **v10 (19. august)**. Gjennomgangen
-    2026-09-11 natt fant ingen feil i fiksen:
+87. ~~**Dobbel betaling var mulig.**~~ **DEPLOYET 2026-09-12** —
+    `supabase functions deploy stripe-checkout` kjørt (v10 → ny versjon;
+    diffen mot v10 var nøyaktig de to gjennomgåtte filene pluss
+    lint-annotasjonene `stripe:ingen-nokkel`, kontrollert linje for linje
+    før deploy). Historikk: Checkout-sesjonen ble laget uten
+    idempotensnøkkel, i motsetning til de tre andre Stripe-kallene i
+    samme funksjon; to parallelle kall ga to betalbare sesjoner og kunne
+    ende i to abonnementer. Gjenstår kun røyktesten mot Stripe testmodus
+    (hører til punkt 21). Gjennomgangen 2026-09-11 natt fant ingen feil
+    i fiksen:
     * *Parallelle førstegangskall:* begge leser samme rad uten sesjons-id →
       samme nøkkel `heia-cosess-<rad>-first` → Stripe kollapser til ÉN sesjon.
     * *Lovlig nytt forsøk etter utløp:* raden bærer nå `sess_A` → nøkkelen
@@ -574,10 +576,21 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      er det usynlig. Ved 300 henger «Del»-knappen.
 106. **`get_team_members` og `get_team_authors` er upaginerte**, i
      motsetning til feeden som er riktig paginert.
-107. **«Deaktiver støtte» kan ikke fullføre for store lag.** Offeringen
-     arkiveres først, så kanselleres abonnementene serielt uten
-     fremdriftsmerking. Et lag som ikke rekker gjennom på ett forsøk,
-     rekker aldri gjennom.
+107. ~~**«Deaktiver støtte» kan ikke fullføre for store lag.**~~
+     **LUKKET 2026-09-12 av 00085 (kjørt i prod, verify 7/7 grønn).**
+     Rotfeilen: `deactivate_team_support_data` returnerte ALLE levende
+     abonnementer hver gang, så et nytt forsøk gjorde hele jobben om
+     igjen — et lag som ikke rakk gjennom på ett forsøk, rakk det aldri.
+     Nå filtrerer RPC-en på `cancel_at IS NULL` (webhookens bokføring er
+     fasit for «ferdig»): hvert forsøk tar KUN resten, et avbrutt forsøk
+     fortsetter der det slapp, og fremdriften bor der sannheten bor —
+     ingen ny tilstandstabell. Bevist i prod i rullet-tilbake-transaksjon:
+     kall 2 etter simulert webhook ga 1 → 0. Kontrollkjøringen FØR push
+     beviste også prod-feilen (1 → 1). Edge-funksjonen
+     `club-support-deactivate` er deployet med `remaining` i svaret og
+     ærligere feilmelding; skjermteksten sier nå «ikke fullført ennå» og
+     lover fortsettelse, ikke omkamp. Dørene målt før push og beholdt:
+     service-role-only, search_path pinnet med pg_temp sist.
 108. ~~**Nettsiden har ingen miljøseparasjon.**~~ **LUKKET 2026-09-11 natt
      — variablene er satt i Vercel, og previewen bygger grønt.** `web/src/lib/env.ts` har
      ingen reserveverdi lenger: `PUBLIC_HEIA_ENV` (`production`/`test`/
@@ -712,12 +725,12 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      **Verifisert lokalt:** `tsc` 0 feil, `jest` 1258 bestått / 2 hoppet
      over, `eslint` 0 feil. **Ikke telefonverifisert** — ingen av
      endringene endrer noe som tegnes.
-117. **To Edge Functions har ferdig kode som ikke er i drift.**
-     `stripe-checkout` står på **v10 (19. aug)** og `push-fanout` på
-     **v13 (3. aug)**, mens begge ble endret i `b36030b` 11. september.
-     For checkout er det dobbeltbetalingsfiksen (punkt 87). For
-     push-fanout er det at 500-taket logges i stedet for å kutte stille
-     (punkt 94). Alle andre funksjoner er i synk med koden.
+117. **Én Edge Function har ferdig kode som ikke er i drift.**
+     ~~`stripe-checkout`~~ (deployet 2026-09-12, punkt 87) —
+     `push-fanout` står fortsatt på **v13 (3. aug)**: 500-taket skal
+     logges i stedet for å kutte stille (punkt 94). Alle andre
+     funksjoner er i synk med koden (club-support-deactivate deployet
+     2026-09-12 sammen med 00085).
 
 118. **Ventetilstanden på «Bli med i lag» har ingen opplesning.**
      `JoinTeamCodeScreen` sendte `accessible`, `accessibilityRole="progressbar"`
@@ -744,6 +757,45 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      kjørt av GitHub ennå — bare lokalt, steg for steg i arbeidsflytens
      egen rekkefølge. Vurder å legge `Brage` til i `push`-triggeren, så
      grenen får dom uten at det må åpnes PR.
+
+122. ~~**Én test tidsavbryter på CI: `feedRefetch` «payload-først (B3)».**~~
+     **LUKKET 2026-09-12.** Årsaken var IKKE retry-hypotesen (motbevist:
+     null fake timers utestående under hengingen, og et 120 s-spark på
+     fake-klokka løsnet ingenting) — den var **Node-versjonen**: runneren
+     kjører Node 22, Macen 24. Med CI-ens eksakte Node (22.23.2) lokalt
+     reproduserte hengingen deterministisk; på 24 finnes den ikke. Målt
+     helt inn: Reacts asynkrone `act` planlegger fortsettelsen sin med
+     `setImmediate`, og med jests standard-faking (som faker ALT, også
+     immediates) kjørte den planlagte fortsettelsen aldri på Node 22 —
+     `await act(...)` hang for alltid. Fiksen i `feedRefetch.test.tsx`:
+     `jest.useFakeTimers({doNotFake: ['setImmediate', 'clearImmediate']})`
+     — testene trenger bare setTimeout-familien (debounce/notify/retry).
+     Bevis: kontroll hang 2/2, fiksen grønn 5/5 + 3/3 på Node 22.23.2;
+     hele suiten 1258/1258 på både Node 22 (`--maxWorkers=3`, CI-form) og
+     Node 24. **Lærdom:** «grønt lokalt» må også bety SAMME Node-dur som
+     runneren — hent `node-v22.x-darwin-arm64` og kjør jest med den i
+     PATH før en CI-heng jages i blinde.
+
+     **Lærdom verdt å ta med (fra før):** CI hadde vært rød sammenhengende
+     siden 19. august uten at noen visste det, fordi `tsc` stoppet før
+     jest. «Grønt lokalt» beviste ingenting: arbeidstreet hadde
+     `@types/node` og `.astro/` som en ren `npm ci` ikke har. Verifiser
+     slike steg i en ren klone.
+123. **`A worker process has failed to exit gracefully` står igjen.** Den
+     fantes før dette arbeidet, opptrer i begge halvdeler av testlista hver
+     for seg, forsvinner helt når suiten kjøres serielt, og jest avslutter
+     uansett med 0. Den blokkerer ingenting, men den er et symptom på at
+     noe fortsatt ikke ryddes. (Var antatt beslektet med punkt 122 — det
+     stemte ikke: 122 var Node 22 + fakede immediates i `act`, se punktet.)
+     Målt 2026-09-12: én enkelt suite in-band holder prosessen i live i
+     **~6 minutter** etter grønt resultat — TanStacks gc-timere (5 min)
+     pluss øvrige håndtak. Det er dette som gjorde `--runInBand` fatal i
+     CI, og det er ryddesaken som gjenstår her.
+
+     ⚠️ **Ikke prøv `--runInBand` som fiks.** Det ble prøvd: serielt finnes
+     ingen arbeider jest kan tvangsavslutte, så ett gjenværende håndtak
+     låser hele prosessen til jobben treffer `timeout-minutes: 15`. Fire
+     kjøringer hang slik.
 
 ### Avkreftet
 

@@ -42,7 +42,9 @@ export interface ClubPaymentTeam {
    * DELFEIL-FIKSEN (00062 §11): levende abonnementer UTEN `cancel_at` på et
    * lag som ER deaktivert = Stripe-kallet nådde ikke frem for alle. Tallet
    * er veien tilbake — «Fullfør deaktiveringen» kjører samme idempotente
-   * Edge-funksjon på nytt. 0 for alt annet enn deaktiverte lag.
+   * Edge-funksjon på nytt, og fra 00085 (punkt 107) tar den KUN de som
+   * gjenstår: hvert trykk krymper arbeidsmengden, uansett lagstørrelse.
+   * 0 for alt annet enn deaktiverte lag.
    */
   unresolvedCancellations: number;
   /**
@@ -67,7 +69,13 @@ export interface ClubPaymentManager {
 export interface ClubPaymentInvitation {
   id: string;
   invitedName: string;
-  status: 'pending' | 'awaiting_review' | 'accepted' | 'declined' | 'revoked' | 'expired';
+  status:
+    | 'pending'
+    | 'awaiting_review'
+    | 'accepted'
+    | 'declined'
+    | 'revoked'
+    | 'expired';
   source: 'claim' | 'ops' | 'manager';
   /** NULL = e-posten er ikke sendt (web-landingen finnes ikke ennå). */
   sentAt: string | null;
@@ -125,7 +133,7 @@ function mapClub(raw: any): ClubPaymentsClub {
         }
       : null,
     club: raw.club ? {id: raw.club.id, name: raw.club.name} : null,
-    clubs: ((raw.clubs ?? []) as any[]).map((c) => ({id: c.id, name: c.name})),
+    clubs: ((raw.clubs ?? []) as any[]).map(c => ({id: c.id, name: c.name})),
     account: raw.account
       ? {
           status: raw.account.status,
@@ -133,7 +141,7 @@ function mapClub(raw: any): ClubPaymentsClub {
         }
       : null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    requests: ((raw.requests ?? []) as any[]).map((r) => ({
+    requests: ((raw.requests ?? []) as any[]).map(r => ({
       id: r.id,
       teamSpaceId: r.team_space_id,
       teamName: r.team_name,
@@ -144,7 +152,7 @@ function mapClub(raw: any): ClubPaymentsClub {
       requestedAt: r.requested_at,
     })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    teams: ((raw.teams ?? []) as any[]).map((t) => ({
+    teams: ((raw.teams ?? []) as any[]).map(t => ({
       teamSpaceId: t.team_space_id,
       teamName: t.team_name,
       ageGroup: t.age_group ?? null,
@@ -153,14 +161,14 @@ function mapClub(raw: any): ClubPaymentsClub {
       unresolvedCancellations: t.unresolved_cancellations ?? 0,
       dormantAt: t.dormant_at ?? null,
     })),
-    managers: ((raw.managers ?? []) as any[]).map((m) => ({
+    managers: ((raw.managers ?? []) as any[]).map(m => ({
       userId: m.user_id,
       name: m.name,
       status: m.status,
       source: m.source ?? null,
       isMe: !!m.is_me,
     })),
-    invitations: ((raw.invitations ?? []) as any[]).map((i) => ({
+    invitations: ((raw.invitations ?? []) as any[]).map(i => ({
       id: i.id,
       invitedName: i.invited_name,
       status: i.status,
@@ -170,7 +178,7 @@ function mapClub(raw: any): ClubPaymentsClub {
       createdAt: i.created_at,
     })),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    log: ((raw.log ?? []) as any[]).map((l) => ({
+    log: ((raw.log ?? []) as any[]).map(l => ({
       action: l.action,
       teamName: l.team_name,
       actor: l.actor,
@@ -239,8 +247,11 @@ export async function pauseTeamSupport(
  * «Deaktiver støtte for laget» — nye stoppes + eksisterende settes til
  * kansellering ved periodeslutt (Stripe-kall i Edge Function). Ingen
  * refusjon av betalt periode. Feiler noen Stripe-kall er det trygt å
- * trykke igjen (idempotent) — det er nettopp det «Fullfør deaktiveringen»
- * gjør når `unresolvedCancellations > 0`.
+ * trykke igjen — fra 00085 (punkt 107) tar hvert nye forsøk KUN de som
+ * gjenstår (webhookens `cancel_at` er fasit for «ferdig»), så også et
+ * avbrutt forsøk (nettglipp, veggklokke) fortsetter der det slapp. Det
+ * er nettopp det «Fullfør deaktiveringen» gjør når
+ * `unresolvedCancellations > 0`. `count` = hvor mange kallet omfattet.
  */
 export async function deactivateTeamSupport(
   teamSpaceId: string,
