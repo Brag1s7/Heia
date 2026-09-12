@@ -874,6 +874,35 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      jest. «Grønt lokalt» beviste ingenting: arbeidstreet hadde
      `@types/node` og `.astro/` som en ren `npm ci` ikke har. Verifiser
      slike steg i en ren klone.
+125. **Sømmen launch-skjerm → hjemskjerm er et hardt kutt.** Observert av
+     Brage på TestFlight 1.0 (5), 2026-09-12, og MÅLT bilde for bilde i
+     hans egen skjermopptak:
+
+     | | |
+     |---|---|
+     | 0,72 s | trykk, iOS starter ikon-zoomen |
+     | 0,96 s | launch-skjermen (mørkegrønn + Heia-lockup) |
+     | 1,08 s | launch-skjermen står stille |
+     | **1,20 s** | **hjemskjermen ferdig tegnet, med ekte innhold** |
+
+     Altså **~0,5 s fra trykk til ferdig skjerm**, og launch-skjermen
+     synlig i 0,2–0,3 s. Sømmen har alltid vært der; før punkt 99 holdt
+     `BootScreen` samme bilde i opptil 1,5 s etterpå, så kuttet skjedde
+     senere og øyet hadde slått seg til ro. Ruheten er kontrasten:
+     mørkegrønn sentrert lockup → lys dagslysgrunn full av innhold.
+
+     **IKKE en feil — det er gevinsten som gjør sømmen synlig.** To måter
+     å myke den på, begge med en ekte kostnad:
+     · tone inn appen over ~180 ms — ingen native modul, men den FØLES
+       180 ms tregere, altså spiser den av det punkt 99 vant
+     · bytte launch-bildet så det ligner hjemskjermens grunn — koster null
+       tid, men endrer godkjent merkevarebilde
+
+     **Anbefaling: la det stå til hele reisen i skive 4 er gått gjennom.**
+     Da vet Brage om det faktisk plager ham, eller om det bare var uvant
+     fordi det ble så raskt. Tallene over er her så beslutningen har
+     dekning når den tas.
+
 124. **Pop-in på Hjem ved oppstart — to flater til.** Sett på telefonen
      2026-09-12, ikke rørt (utenfor skive 3). Lagkassa-kortet går fra
      skjelett til «Bli lagets første støttespiller», og laghodets

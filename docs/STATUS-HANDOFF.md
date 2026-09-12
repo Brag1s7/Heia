@@ -1,5 +1,46 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 — BYGG 1.0 (5) ER PÅ TESTFLIGHT)
+
+### Det store: gapet fra 18. august er lukket
+**1.0 (5) er lastet opp og installert, og det virker.** Alt fra skive 1–3
+og hele designsporet er nå på en ekte telefon for første gang.
+
+Arkivet ble kontrollert FØR distribusjon, ikke etterpå: `main.jsbundle`
+lå der (8,89 MB, skrevet 14:47), versjon 1.0 (5), bundle-ID
+`no.heiaapp.heia` — og bunten ble grep'et for strenger som bare finnes
+etter skive 3 (`heia/timeout`, `my_reactions`, `Henter kampstatus`) med
+`bootReady` bevist BORTE. Byggnummeret ble bumpet 3 → 5 og
+`WEB_INVITE_LANDING_LIVE` flippet til `true` (punkt 5 og 73, commit
+`1c4e792`) — begge betingelsene for flippen ble kontrollert, ikke antatt.
+
+### Kaldstarten, målt på ekte enhet (Brages skjermopptak)
+| | |
+|---|---|
+| 0,72 s | trykk, iOS starter ikon-zoomen |
+| 1,08 s | launch-skjermen står stille |
+| **1,20 s** | **hjemskjermen ferdig, med ekte innhold** |
+
+**~0,5 s fra trykk til ferdig skjerm.** Punkt 99 er dermed bekreftet i
+felten, ikke bare i en test. Kampknappen står stille — ingen blink.
+
+⚠️ Brage merket sømmen launch-skjerm → hjemskjerm (hardt kutt). Det er
+IKKE en feil; se punkt 125 med målingene og anbefalingen (la det stå til
+hele reisen er gått gjennom).
+
+### Neste
+Skive 4 fortsetter: kort gjennomkjøring av hele reisen — invitasjon,
+innlogging, roller, klubboppsett, støtte, kamp, utlogging — app og nett.
+Og telefontestene som endelig er mulige: punkt 11–17, og særlig **punkt
+14** (push-trykk på rollevarsel, kan bare testes i TestFlight) og
+**punkt 88/89** (kan først måles nå).
+
+Rett også notatet om hvilket byggnummer som lå der fra før: arkivet fra
+18. august har `CFBundleVersion = 3`, mens dokumentene sier 1.0 (4) ble
+lastet opp. Sjekk App Store Connect.
+
+---
+
 ## ▶️▶️ START HER (2026-09-12 — SKIVE 3 HELT LUKKET, MERGET OG TELEFONGODKJENT)
 
 ### Tilstanden
