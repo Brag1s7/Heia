@@ -49,9 +49,13 @@ import {
 /** Flate og blekk per tilstand — prototypens `.matchbtn`-klasser. */
 const SKIN: Record<MatchButtonKind, {bg: string; ink: string; glow?: boolean}> =
   {
-    // Før vi vet: samme mørke flate som hvile, men uten ord og uten glød.
-    // En rolig plass, ikke et svar — se `unknown` i `matchButton.ts`.
-    unknown: {bg: colors.heiaDeep, ink: colors.heia},
+    // Før vi vet: NØYAKTIG samme flate som hvile. `glow: false` står her
+    // eksplisitt og ikke som et utelatt felt — `undefined && …` gir
+    // `undefined` der `false && …` gir `false`, og da er ikke de to
+    // stilarrayene like lenger. Usynlig på skjermen, men det er nettopp
+    // slike forskjeller `matchTabButtonUnknown.test.tsx` skal kunne stole
+    // på at ikke finnes.
+    unknown: {bg: colors.heiaDeep, ink: colors.heia, glow: false},
     // Mørk med mint blekk: hvilende, men tydelig at den hører kampen til.
     idle: {bg: colors.heiaDeep, ink: colors.heia, glow: false},
     // Coral = live-status, låst fargesemantikk i Heia.

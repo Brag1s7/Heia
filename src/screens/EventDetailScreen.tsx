@@ -97,6 +97,7 @@ import {
 } from '../lib/api/feed';
 import {pickTeamImage, type PickedImage} from '../lib/media';
 import {isTeamAdmin} from '../shared/roles';
+import {isNetworkError, uncertainWriteMessage} from '../shared/errorMessage';
 import {
   allowsHeia,
   buildMatchEngagement,
@@ -221,10 +222,32 @@ const ACTION_DONE: Record<ReporterActionType, string> = {
 };
 
 /**
+ * Samme handlinger, som SUBSTANTIV — brukt i den ene setningen som må være
+ * ærlig når nettet ikke svarte: «Vi vet ikke om målet ble lagret.»
+ */
+const REPORT_NOUN: Record<ReporterActionType, string> = {
+  mål_oss: 'målet',
+  mål_dem: 'målet imot',
+  pause: 'pausen',
+  andre_omgang: 'omgangsbyttet',
+  slutt: 'sluttsignalet',
+  melding: 'oppdateringen',
+};
+
+/**
  * RPC-ene kaster med engelske meldinger. Oversett de vi kan handle på, og fall
  * tilbake på noe generelt — en rå Postgres-feil hjelper ingen på sidelinjen.
+ *
+ * ⚠️ NETTVERKSFEIL BEHANDLES FØRST, OG ANNERLEDES (punkt 40). Fallbacken her
+ * var «Sjekk nettforbindelsen og prøv igjen» — et råd som er direkte farlig
+ * ved et TIDSAVBRUDD: da vet vi ikke om serveren rakk å registrere målet, og
+ * «prøv igjen» er oppskriften på 3–1 der det står 2–1. `action` er hva
+ * handlingen het, i setningen «Vi vet ikke om MÅLET ble lagret».
  */
-function matchErrorText(e: unknown, fallback: string): string {
+function matchErrorText(e: unknown, fallback: string, action?: string): string {
+  if (action && isNetworkError(e)) {
+    return uncertainWriteMessage(e, action);
+  }
   const message = (e as {message?: string} | null)?.message ?? '';
   if (message.includes('Match already started')) {
     return 'Kampen er allerede i gang.';
@@ -1029,7 +1052,11 @@ export function EventDetailScreen({route, navigation}: Props) {
       } catch (e) {
         Alert.alert(
           next ? 'Kunne ikke avlyse kampen' : 'Kunne ikke sette den opp igjen',
-          matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+          matchErrorText(
+            e,
+            'Sjekk nettforbindelsen og prøv igjen.',
+            next ? 'avlysningen' : 'endringen',
+          ),
         );
       } finally {
         setSavingCancelled(false);
@@ -1070,7 +1097,7 @@ export function EventDetailScreen({route, navigation}: Props) {
     } catch (e) {
       Alert.alert(
         'Kunne ikke starte kampen',
-        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.', 'starten'),
       );
     } finally {
       setStartingMatch(false);
@@ -1131,7 +1158,11 @@ export function EventDetailScreen({route, navigation}: Props) {
       setMatchToast(null);
       Alert.alert(
         'Kunne ikke rapportere',
-        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+        matchErrorText(
+          e,
+          'Sjekk nettforbindelsen og prøv igjen.',
+          REPORT_NOUN[type],
+        ),
       );
     } finally {
       setSavingAction(false);
@@ -1191,7 +1222,11 @@ export function EventDetailScreen({route, navigation}: Props) {
     } catch (e) {
       Alert.alert(
         'Kunne ikke korrigere målet',
-        matchErrorText(e, 'Sjekk nettforbindelsen og prøv igjen.'),
+        matchErrorText(
+          e,
+          'Sjekk nettforbindelsen og prøv igjen.',
+          'korrigeringen',
+        ),
       );
     } finally {
       setSavingCorrection(false);

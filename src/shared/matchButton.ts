@@ -117,10 +117,49 @@ const IDLE: MatchButtonState = {
 
 const UNKNOWN: MatchButtonState = {
   kind: 'unknown',
-  // Tom etikett: pillen står som en rolig plass til svaret lander. Et ord
-  // her ville vært det samme hoppet, bare med en annen tekst.
-  label: '',
-  tabLabel: 'Kamp',
+  /**
+   * ⚠️ «KAMP» SOM NØYTRAL KNAPPETEKST — IKKE SOM PÅSTAND.
+   *
+   * Historien er verdt å ha med, for dette har gått fram og tilbake.
+   *
+   * 2026-08-21 sa knappen `KAMP` før første svar, og Brage så den hoppe til
+   * stillingen. Konklusjonen den gangen var at `KAMP` BETYR «ingen kamp
+   * pågår», altså en påstand uten dekning — så etiketten ble tom, og
+   * navigatoren ventet på svaret bak oppstartsflaten.
+   *
+   * Punkt 99 tok bort ventingen, og da kom problemet tilbake i en annen
+   * form: pillen tegnet seg TOM og fikk ordet et øyeblikk etter. Først var
+   * fiksen å reservere bredden (`layoutLabel`), men den satt på feil boks —
+   * ytterslottet sto stille mens selve pillen, som er innholdsstyrt, vokste
+   * fra ~41 til ~85 pt. Blinket sto.
+   *
+   * Brage 2026-09-12, etter å ha sett det på telefonen: la «KAMP» stå som
+   * NØYTRAL KNAPPETEKST fra første bilde, og bytt til livevisning hvis en
+   * kamp finnes.
+   *
+   * Det er riktig, og det motsier ikke august. Forskjellen er hva ordet
+   * GJØR her: et trykk går til Sesongen i BEGGE tilstander (se
+   * `handleMatchPress`), så «KAMP · Sesongen» er en sann beskrivelse av
+   * knappen — ikke en påstand om at det ikke pågår noen kamp. Påstanden
+   * ligger i STILLINGEN, og den kommer først når vi vet.
+   *
+   * `kind` er fortsatt `unknown`, og det er ikke kosmetikk: manglende svar
+   * betyr ikke «ingen kamp». Skjermleseren hører forskjellen
+   * (`a11yLabel`), `shouldNudge` nekter sprett på det første svaret, og
+   * ethvert kallsted som trenger å vite om vi har dekning, spør `kind`.
+   */
+  label: 'KAMP',
+  /**
+   * Samme grunn: trykket fører til Sesongen allerede nå, så etiketten sier
+   * hvor du havner. Sto det «Kamp» her, ville underteksten byttet ord i
+   * samme bilde som pillen — to bevegelser i stedet for null.
+   */
+  tabLabel: 'Sesongen',
+  /**
+   * ⚠️ MEN SKJERMLESEREN FÅR SANNHETEN. Det er her `unknown` fortsatt
+   * skiller seg fra `idle`: «Åpner Sesongen» ville lovet et innhold vi
+   * ikke har sjekket ennå.
+   */
   a11yLabel: 'Kamp. Henter kampstatus',
   disabled: false,
 };

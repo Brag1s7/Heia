@@ -79,12 +79,17 @@ describe('Opprett lag: idrettene er der fra første render', () => {
     // der når man går inn på siden første gangen». Svaret er at cachen
     // varmes ved boot, ikke først når siden åpnes. Forsvinner dette kallet,
     // kommer skjelettet tilbake på første besøk.
+    //
+    // ⚠️ FRA DISK, IKKE FRA NETT (punkt 103): oppvarmingen var et
+    // `getSports()`, altså et HTTP-kall i hver kaldstart for en skjerm de
+    // fleste aldri åpner. Kravet er det samme — pillene skal stå der — men
+    // lista overlever nå på disk mellom øktene.
     const src = fs.readFileSync(
       path.join(__dirname, '../src/context/TeamContext.tsx'),
       'utf8',
     );
     expect(src).toMatch(
-      /if \(!isRefresh\) \{\s*getSports\(\)\.catch\(\(\) => \{\}\);\s*\}/,
+      /if \(!isRefresh\) \{\s*primeSportsFromDisk\(\)\.catch\(\(\) => \{\}\);\s*\}/,
     );
   });
 });

@@ -48,16 +48,6 @@ import {
 interface MatchButtonContextValue {
   state: MatchButtonState;
   /**
-   * Kampknappen VET hva den skal vise, og appen kan trygt tegnes.
-   *
-   * ⚠️ Brages egen løsning etter tredje telefonrunde: «Hva om den først må ha
-   * fått på plass knappen før den kan vise appen?» Alt annet vi prøvde —
-   * en nøytral mellomtilstand, ingen sprett — gjorde bare hoppet mindre
-   * synlig. Det ENESTE som fjerner det er å ikke tegne baren før svaret er
-   * der. `BootScreen` står allerede der i de hundredelene det tar.
-   */
-  bootReady: boolean;
-  /**
    * Du står INNE i en pågående kamp (kampskjermen er fokusert og kampen er
    * i gang). Tab-baren leser den for å bytte MILJØ — mørkt stadionglass over
    * kampens grunn — aldri for å endre geometri eller kampknappens tilstand.
@@ -72,9 +62,6 @@ interface MatchButtonContextValue {
   press: () => void;
 }
 
-/** Hvor lenge oppstarten får vente på kampsvaret før appen vises uansett. */
-const BOOT_MAX_MS = 1500;
-
 const MatchButtonContext = createContext<MatchButtonContextValue | null>(null);
 
 export function MatchButtonProvider({children}: {children: ReactNode}) {
@@ -84,17 +71,6 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
   const [appActive, setAppActive] = useState(
     () => AppState.currentState === 'active',
   );
-  /**
-   * ⚠️ TAKET ER IKKE VALGFRITT. Uten det ville en treg forbindelse — eller
-   * en telefon uten nett — holdt HELE appen på oppstartsflaten. En knapp som
-   * ikke vet er en liten feil; en app som ikke starter er en stor en.
-   */
-  const [bootTimedOut, setBootTimedOut] = useState(false);
-  useEffect(() => {
-    const id = setTimeout(() => setBootTimedOut(true), BOOT_MAX_MS);
-    return () => clearTimeout(id);
-  }, []);
-
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => {
       const active = s === 'active';
@@ -224,25 +200,12 @@ export function MatchButtonProvider({children}: {children: ReactNode}) {
   const value = useMemo(
     () => ({
       state,
-      // Uten lagrom finnes det ingen kamp å vente på — da er vi klare med
-      // én gang, og onboarding/dormant-flatene slipper å vente på et kall
-      // som aldri kommer.
-      bootReady: !activeTeamSpaceId || known || bootTimedOut,
       inMatch,
       enterMatch,
       leaveMatch,
       press,
     }),
-    [
-      state,
-      activeTeamSpaceId,
-      known,
-      bootTimedOut,
-      inMatch,
-      enterMatch,
-      leaveMatch,
-      press,
-    ],
+    [state, inMatch, enterMatch, leaveMatch, press],
   );
 
   return (

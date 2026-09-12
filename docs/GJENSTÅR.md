@@ -24,12 +24,15 @@ kodearbeid.
 _Oppdatert 2026-09-11 natt. Et punkt er ikke i drift fordi koden er pushet.
 Hvert lag deployes for seg._
 
+_Kontrollert mot prod 2026-09-12 kveld (`supabase_migrations.schema_migrations`
+og `supabase functions list`) — ikke skrevet av hukommelsen._
+
 | Lag | I drift nå | Nyere lokalt |
 |---|---|---|
-| **Databasen** | migrasjoner t.o.m. **`00084`** (00079–00084 sammenhengende) | ingenting — **i synk** ✅ |
-| **Edge Functions** | `stripe-checkout` **v10 (19. aug)** · `push-fanout` **v13 (3. aug)** · øvrige i synk | **to udeployede** — punkt 117 |
-| **Nettsiden** heiaapp.no | `main` = `318305e` (17:47), uendret og verifisert | `Brage` er **9 commits foran**; preview grønn på `8b2b8bd`, Vercel-variablene satt (punkt 108) |
-| **CI** | rød på `main` til PR-en merges | **grønn lokalt, begge jobber**: `tsc` 0 (var 31), `jest` 1258, `eslint` 0, `astro check` 0, bevisfilene grønne. CI fyrer bare på PR — se punkt 121 |
+| **Databasen** | migrasjoner t.o.m. **`00086`** (00079–00086 sammenhengende) | ingenting — **i synk** ✅ |
+| **Edge Functions** | `stripe-checkout` **v11** og `club-support-deactivate` **v6** (begge deployet i skive 2) · `push-fanout` **v13 (3. aug)** · øvrige i synk | **én udeployet**: `push-fanout` — punkt 117 |
+| **Nettsiden** heiaapp.no | `main` = `c8791e5` (PR #57 merget) | `Brage` er 4 commits foran (skive 3) — PR #58 |
+| **CI** | grønn på `main` etter #57 | PR #58 kjører. Lokalt: `jest` **1279**, `eslint` 0. CI fyrer bare på PR — se punkt 121 |
 | **Secrets** | `WEB_BASE_URL` og `WEB_INVITE_BASE_URL` satt | — |
 | **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
 | **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
@@ -85,7 +88,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 |---|---|---|---|
 | **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, ~~97~~, ~~111~~, ~~30~~ · igjen: 98, 113 |
 | **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | ~~87~~, ~~96~~, ~~107~~, ~~22~~ — **FERDIG 2026-09-12** |
-| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | 99, 40, 104, 88, 89, 100, 103, 102, 101 |
+| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | ~~104~~, ~~99~~, ~~103~~, ~~40 (klient)~~ · igjen: 100 (migrasjon, venter godkjenning), 88, 89, 102, 101 |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
 
 ### Beslutninger som ER tatt (ikke relitigér)
@@ -269,8 +272,17 @@ er aldri sett på en telefon.
 39. **Oppryddingsjobb for media** som er soft-slettet, og for foreldreløse
     filer. Kommentaren i migrasjon 00010 lover en jobb som ikke finnes.
     Feed-sletting og klubblogo er best-effort mot storage i dag.
-40. **Supabase-klienten har ingen fetch-timeout.** Fjorten QUIC-timeouts på
-    null byte og 180 til 360 sekunder er observert.
+40. ~~**Supabase-klienten har ingen fetch-timeout.**~~ **KLIENTDELEN LUKKET
+    2026-09-12 (38b87b2).** `trackedFetch` avbryter nå på 20 s (Edge
+    Functions 60 s) og viderefører kallerens eget `signal` urørt.
+    Nettverksfeil oversettes ett sted (`shared/errorMessage`), og en
+    SKRIVING som ikke fikk svar påstår aldri at den feilet —
+    `uncertainWriteMessage` sier «Vi vet ikke om målet ble lagret». Bevis:
+    7 nye tester i `netMetrics.test.ts`.
+    **IGJEN (krever migrasjon, ikke startet):** ekte idempotens på skriving
+    — `client_request_id` på `match_events` og `feed_posts`, så et nytt
+    forsøk etter et tidsavbrudd ikke kan gi to mål eller to innlegg.
+    Betalinger er allerede dekket av punkt 87.
 41. **Brage — Sentry-lesetilgang for meg.** Bevisst utsatt til første ekte
     feil, krever et User Auth Token.
 
@@ -278,10 +290,18 @@ er aldri sett på en telefon.
 
 Funksjoner som er lovet i grensesnittet, eller som mangler en vei ut.
 
-42. **Varselet som aldri kommer.** «Støtt laget»-oppsettet lover «Du får varsel
-    her når klubben er klar», men `stripe-webhook` oppretter ingen
-    notifikasjon når kontoen blir aktiv. Verifisert i koden i dag. Treneren
-    venter på noe som aldri skjer.
+42. ~~**Varselet som aldri kommer.**~~ **LØST AV PUNKT 96 (migrasjon 00083),
+    kjørt i prod 2026-09-11.** Punktet ble skrevet før 00083 og er siden
+    blitt stående i motstrid med 96 — de beskriver det samme varselet.
+    Løsningen ble en TRIGGER på `club_payment_accounts`, ikke en endring i
+    `stripe-webhook`, og derfor stemmer den opprinnelige kodeobservasjonen
+    fortsatt: webhooken oppretter ingen notifikasjon. Triggeren gjør det.
+    Kontrollert i prod 2026-09-12: `trg_notify_club_payment_active` →
+    `notify_on_club_payment_active` står på `club_payment_accounts`.
+    Bevisføringen (riktige mottakere, ingen dubletter, ingen varsler
+    bakover i tid) står i punkt 96.
+    **Gjenstår, og det er noe annet:** selve trykket på varselet er ikke
+    telefontestet — se punkt 14.
 43. **«Legg ned laget» og ops-verktøyene for dormante lag er ikke bygget.**
     Tre dokumenterte blindveier ender alle her: trener i et lag med bare
     spillerkontoer, tidligere trener som nå er forelder, og trenerforespørsel
@@ -553,24 +573,96 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
     **Gjennomgangen står fortsatt på lista** og bør tas i grupper når
     det passer — for da er neste funksjon som glemmer `public.`-prefikset
     ikke lenger et problem.
-99. **Kaldstart venter 1,5 sekunder på nett.** Bootfrøet leverer profil og
-    medlemskap fra disk, men navigatoren står på oppstartsskjermen til
-    livekamp-svaret lander eller tidsgrensen slår inn. Hele gevinsten fra
-    cold start-arbeidet spises opp her.
+99. ~~**Kaldstart venter 1,5 sekunder på nett.**~~ **LUKKET 2026-09-12
+    (38b87b2).** Porten (`bootReady`) er fjernet fra `AppNavigator`, og med
+    den `BOOT_MAX_MS`. Påstanden den skulle hindre er fortsatt borte der
+    den hører hjemme: `matchButton.ts` har `unknown` (ingen ord, ingen
+    glød, samme mørke flate som hvile) og `shouldNudge` sier nei til sprett
+    på det første svaret. Et sent svar bytter etikett — `handleMatchPress`
+    er det eneste som flytter brukeren, og det krever et trykk. Dyplenker
+    og reporterflyten går gjennom `flushPendingDeepLink` som før, nå
+    tidligere. Bevis: `bootHttpBudget.test.tsx` §punkt 99 (verifisert at
+    den feiler hvis porten settes tilbake).
 100. **Feeden koster en ekstra seriell rundtur** fordi «har jeg reagert»
      ligger utenfor feed-spørringen. Det er 150 til 300 millisekunder lagt
-     til hver eneste feed-åpning på mobilnett.
+     til hver eneste feed-åpning på mobilnett. **Målt og bekreftet
+     2026-09-12:** `GET /rest/v1/reactions` står i alle tre scenariene i
+     `bootHttpBudget.test.tsx`, og den går ETTER at feeden er hentet — den
+     kan ikke parallelliseres, for den trenger post-id-ene.
+
+     **LUKKET 2026-09-12: 00086 er kjørt i prod og bevist der.**
+
+     Kolonnen heter `my_reactions`, ikke `i_reacted`, og det er et bevisst
+     valg: 00071 tok samme valg for kampfeeden og skrev ned hvorfor — 👏 bor
+     ETT sted (`HEIA_EMOJI` i `src/lib/api/feed.ts`), og et ferdig
+     `i_reacted` ville gitt emojien et hjem nummer to. Klienten avgjør
+     fortsatt hva som er et HEIA.
+
+     **Bevisføring, i tre trinn:**
+     1. `scripts/verify-00086.sql` — TØRRKJØRING før push: hele migrasjonen
+        OG tilbakeføringen i én subtransaksjon som ble rullet tilbake,
+        **19/19 grønt**, og prod bevist urørt etterpå (samme md5, ingen
+        fixturrader). Sammenliknet gammelt og nytt svar BIT FOR BIT utenom
+        den nye kolonnen, og beviste at tilbakeføringen gir byte-identisk
+        definisjon og ACL.
+     2. `scripts/verify-00086-i-drift.sql` — ETTER push, mot den levende
+        funksjonen: **13/13 grønt**. Signatur, kolonnerekkefølge,
+        SECURITY DEFINER/STABLE, `search_path`, dørene (anon NEI,
+        authenticated JA, PUBLIC NEI — 00061-fella), registrering i
+        migrasjonsregisteret, rekkefølge, paginering, og `my_reactions`
+        riktig på reagert/ureagert/andres.
+     3. Røyktest på EKTE prod-data: 20 rader hentet for et ekte medlem,
+        null `my_reactions` som er NULL, og på en ekte 👏 er RPC-en og
+        `reactions`-tabellen enige.
+
+     **Tilbakeføring:** `node scripts/run-sql.mjs scripts/rollback-00086.sql`
+     — gjenskaper 00072-definisjonen ordrett (uten `search_path`, slik prod
+     faktisk sto) pluss ACL-en. Kjøres den, må registerraden fjernes
+     manuelt: `delete from supabase_migrations.schema_migrations where
+     version = '00086';`
+
+     **Bygg 1.0 (4) er upåvirket:** signaturen er uendret og kolonnen lagt
+     til sist. Klienten i 1.0 (5) tåler begge baser — voktet begge veier av
+     `__tests__/feedMineReaksjoner.test.ts`.
+
+     Gevinst: −1 seriell rundtur på HVER feed-åpning. Kaldstart 6 → 5 kall,
+     gjentatt kaldstart 4 → 3.
+
 101. **Kalenderen er ikke virtualisert**, og henter 30 måneder. Et lag med
      to treninger i uka monterer rundt 150 kort ved hvert besøk.
 102. **Toppen av skjermen er ikke memoisert.** Hvert tastetrykk i «Del noe
      med laget» tegner hero-karusellen på nytt. To kontekster øverst i
      treet lager ny verdi ved hver token-fornyelse.
-103. **Feeden signerer miniatyrbilder den aldri bruker**, og
-     idrettslista hentes ved hver kaldstart for en skjerm de fleste aldri
-     åpner. Begge er gratis å fjerne.
-104. **Testen som vokter oppstartsbudsjettet er blind.** Den påstår seks
-     kall; det reelle tallet er sju til ni, fordi den mocker bort nettopp
-     de kallene den skulle telle.
+103. ~~**Feeden signerer miniatyrbilder den aldri bruker**, og
+     idrettslista hentes ved hver kaldstart.~~ **LUKKET 2026-09-12
+     (38b87b2).** Feeden varmer kun `display` — både `FeedCard` og
+     `CommentThread` ber eksplisitt om den varianten, og kampflatene varmer
+     sine egne i `getMatchPhotos`. Idrettslista ligger nå på disk mellom
+     øktene (`primeSportsFromDisk`, aldri nett); kravet fra 2026-09-04 om
+     at pillene står fra første render er uendret.
+     Funnet på kjøpet: badgen tok et eget HEAD-kall ved frø-boot fordi
+     regelen sto i mount-effekten og ikke der HTTP-et sendes. Flyttet til
+     `refreshUnread`, som gjelder mount, fokus OG lagbytte.
+104. ~~**Testen som vokter oppstartsbudsjettet er blind.**~~ **LUKKET
+     2026-09-12 (38b87b2).** `bootHttpBudget.test.tsx` teller på
+     `global.fetch` med hele apptreet montert — ingen api- eller
+     query-modul er mocket, kun transporten, auth-sesjonen og
+     realtime-kanalen (websocket, ikke HTTP). Tre scenarier er låst som
+     EKSAKTE lister, ikke som tall, så et nytt kall i boot krever en
+     bevisst beslutning:
+
+     | Scenario | Før skive 3 | Etter |
+     |---|---|---|
+     | Kaldstart, tom disk | 7 | **6** |
+     | Gjentatt kaldstart (frø + snapshot) | 6 | **4** |
+     | Kontekst-RPC feiler | «7–9» (feil) | **12**, målt |
+
+     Anslaget «sju til ni» var altså for LAVT i feilstien: når 00079-kallet
+     ryker, slår hele fallback-viften inn samtidig (profil, medlemskap,
+     `getLiveMatch`, lagkassa, unread-HEAD, medlemstall-HEAD).
+     `bootBudget.test.tsx` beholder rollen sin — den vokter orkestreringen
+     (ingen duplikate enkeltkall mens konteksten er i flukt) — og den
+     falske ≤6-påstanden er strøket fra fila.
 105. **Hvert innlegg er O(antall medlemmer) i tre ledd**, og ett av dem
      kjører synkront i transaksjonen til den som poster. Ved 25 medlemmer
      er det usynlig. Ved 300 henger «Del»-knappen.
@@ -723,6 +815,7 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      minifisert kode.
 
      **Verifisert lokalt:** `tsc` 0 feil, `jest` 1258 bestått / 2 hoppet
+     (tallet den gangen; suiten er 1279 etter skive 3)
      over, `eslint` 0 feil. **Ikke telefonverifisert** — ingen av
      endringene endrer noe som tegnes.
 117. **Én Edge Function har ferdig kode som ikke er i drift.**
@@ -781,6 +874,17 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      jest. «Grønt lokalt» beviste ingenting: arbeidstreet hadde
      `@types/node` og `.astro/` som en ren `npm ci` ikke har. Verifiser
      slike steg i en ren klone.
+124. **Pop-in på Hjem ved oppstart — to flater til.** Sett på telefonen
+     2026-09-12, ikke rørt (utenfor skive 3). Lagkassa-kortet går fra
+     skjelett til «Bli lagets første støttespiller», og laghodets
+     undertekst fra `Fotball · 2012` til `Fotball · 4 medlemmer`, etter at
+     grunnen er tegnet. Begge er ekte lasting — ikke feil — men det er
+     samme SLAGS uro som kampknappen hadde, og medlemstallet er verre enn
+     de andre: `2012` er et ÅRSTALL som byttes med et ANTALL, så teksten
+     endrer betydning og ikke bare verdi. Vurder å vise sport · årsklasse
+     til tallet er der (fallbacken finnes allerede i `TeamContext`), i
+     stedet for å bytte til den.
+
 123. **`A worker process has failed to exit gracefully` står igjen.** Den
      fantes før dette arbeidet, opptrer i begge halvdeler av testlista hver
      for seg, forsvinner helt når suiten kjøres serielt, og jest avslutter
@@ -858,15 +962,25 @@ om et separat miljø blokkerer derfor ikke).
 
 ### Skive 3 — Oppstart, nettverk og caching
 
-- **Punkt 99** etter den avklarte retningen øverst. Lokal cache knyttes til
-  riktig bruker og lag; serveren kontrollerer fortsatt handlingstillatelser.
-- **Punkt 40 samtidig.** Nettverksfeil skal gi en forståelig vei videre. Ved
-  skrivehandlinger må vi tåle at serveren fullførte selv om klienten ikke
-  fikk svar, slik at nye forsøk ikke gir doble mål, innlegg eller betalinger.
-- **Punkt 104 først av målepunktene** — vakten må virke før den brukes.
+**Status 2026-09-12: 104, 99, 103 og klientdelen av 40 er LUKKET (38b87b2).**
+
+- ~~Punkt 104~~ — vakten virker nå, og den måler. Se punktet for tallene.
+- ~~Punkt 99~~ — 1,5 s borte fra hver kaldstart. **Trenger telefondom:**
+  pillen i tab-baren står tom (`unknown`) i det sekundet kampsvaret er
+  underveis, der den før lå bak oppstartsflaten. Det er den avklarte
+  retningen, men det er også den ENESTE synlige endringen i skiva.
+- ~~Punkt 103~~ — idrettslista fra disk, ingen thumb-signering i feeden.
+- ~~Punkt 40, klientdelen~~ — tidsgrense + ærlige feilmeldinger.
+- **Punkt 40, resten:** ekte idempotens på skriving krever en migrasjon.
+  Ikke startet — se punktet.
+- ~~Punkt 100~~ — **LUKKET. 00086 er kjørt i prod 2026-09-12 og bevist der
+  (13/13 grønt + røyktest på ekte data).** Se punktet.
 - **Mål 88 og 89 i et ekte bygg.** De kan ikke måles før 1.0 (5).
-- **Deretter 100 og 103** (unødvendige kall), så **102 og 101** etter hva
-  målingene faktisk viser. Bevar godkjent utseende og oppførsel.
+- **Så 102 og 101** etter hva målingene faktisk viser. Bevar godkjent
+  utseende og oppførsel. **Begge står igjen etter skive 3** — de var
+  bevisst nedprioritert til målingene forelå, og målingene sier at
+  oppstarten nå koster 5 kall / 0 ventetid. 101 (kalenderen henter 30
+  måneder, ~150 kort) er den av de to som har et målt tall bak seg.
 
 ### Skive 4 — Hele reisen på telefon og nett
 

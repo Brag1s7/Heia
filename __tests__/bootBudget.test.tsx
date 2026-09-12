@@ -13,11 +13,16 @@
  *      enkeltkall (getLiveMatch/getTeamSupportSummary/getUnreadCount), og
  *      flatene står i «venter» (isPending / badge skjult) — aldri falskt 0.
  *   2. SUKSESS: promiset løses → cache/badge oppdateres fra svaret,
- *      fortsatt null enkeltkall. Totalen for hele scenariet er ETT
- *      HTTP-kall (RPC-en) — innenfor det LÅSTE ≤7-budsjettet (§0.1-3):
- *      kontekst 1 + feed 1 + events 2 + signering ≤2 = ≤6 ved frø-boot.
+ *      fortsatt null enkeltkall.
  *   3. FEILSTI: promiset feiler → fallback-enkeltkallene starter ETTER
  *      forsøket (ingen deadlock, ingen permanent disabled query).
+ *
+ * ⚠️ DENNE TELLER IKKE BUDSJETTET, og påsto tidligere at den gjorde det
+ * («≤6 ved frø-boot»). Den kan ikke: feed, hendelser, signering og
+ * idrettslista går gjennom api-moduler som er mocket bort her — nettopp de
+ * kallene et budsjett skulle telle. Det reelle tallet var sju til ni
+ * (punkt 104). Budsjettet måles i `bootHttpBudget.test.tsx`, på
+ * `global.fetch`, med hele apptreet montert.
  */
 
 import React, {useEffect} from 'react';
@@ -254,9 +259,8 @@ test('frø-boot fyrer ingen enkeltkall mens konteksten er i flukt — og bruker 
     expect.objectContaining({supporters: 4, monthlyToClubMinor: 24_000}),
   );
 
-  // Budsjettet: fortsatt NULL enkeltkall, og RPC-en gikk én gang. Hele
-  // frø-boot-scenariet = kontekst 1 (+ feed/events/signering fra
-  // boot-trioen, uendret fra S2) — innenfor det låste ≤7.
+  // Orkestreringen: fortsatt NULL enkeltkall, og RPC-en gikk én gang.
+  // (Hva hele oppstarten koster i HTTP, står i `bootHttpBudget.test.tsx`.)
   expect(mockGetLiveMatch).not.toHaveBeenCalled();
   expect(mockGetTeamSupportSummary).not.toHaveBeenCalled();
   expect(mockGetUnreadCount).not.toHaveBeenCalled();

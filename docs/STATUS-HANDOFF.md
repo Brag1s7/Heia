@@ -1,5 +1,209 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 kveld, runde 3 — SKIVE 3 LUKKET)
+
+### Tilstanden, i fire linjer
+- **Skive 3 er lukket:** 104, 99, 103, 100 og klientdelen av 40.
+- **Databasen står på 00086** — kjørt i prod 2026-09-12 kveld og bevist der.
+- **PR #58 er grønn** (`f8098ac`). Brage merger selv.
+- `push-fanout` er eneste udeployede Edge Function (punkt 117).
+
+### Det ene som gjenstår her: én telefonsjekk
+Kampknappen blinket ved oppstart. Årsaken var IKKE animasjonen, og heller
+ikke den jeg trodde i runde én: `g.width` settes på den YTRE wrapperen,
+mens pillen man SER er innholdsstyrt (padding + glyf + tekst). Med tom
+etikett var den ~41 pt og vokste til ~85 når ordet kom.
+
+`unknown` viser nå «KAMP · Sesongen» fra første bilde, og er
+**pikselidentisk** med `idle` — bevist ved å sammenlikne de rendrede
+trærne (`__tests__/matchTabButtonUnknown.test.tsx`).
+
+⚠️ **Det motsier ikke august**, da `KAMP` ble tatt bort fordi det betydde
+«ingen kamp pågår». Trykket går til Sesongen i BEGGE tilstander, så ordet
+beskriver knappen. Påstanden ligger i STILLINGEN, og den kommer først når
+vi vet. `kind` er fortsatt `unknown` — manglende svar er ikke «ingen kamp»
+— og skjermleseren hører forskjellen.
+
+**Brage: last appen på nytt og se om blinket er borte.** Er det der
+fortsatt, kjører telefonen et gammelt bygg: de to tilstandene kan ikke
+lenger tegne ulikt.
+
+### Lærdom verdt å ta med
+Forrige vakt sammenliknet tallene som gikk INN i tegningen
+(`matchButtonGeometry`) og ble grønn mens blinket sto igjen på telefonen.
+Vakter for noe VISUELT må sammenlikne det som faktisk tegnes.
+
+### 00086 ER I DRIFT (kjørt 2026-09-12 kveld)
+Kjørt med `npx supabase db push --include-all`, så basen OG
+migrasjonsregisteret er i synk (registeret står på 00086).
+
+Bevist i tre trinn: tørrkjøring før push (19/19, prod urørt etterpå),
+`scripts/verify-00086-i-drift.sql` mot den levende funksjonen (**13/13**),
+og en røyktest på EKTE data — 20 rader for et ekte medlem, ingen
+`my_reactions` som er NULL, og på en ekte 👏 er RPC-en og
+`reactions`-tabellen enige.
+
+⚠️ **Ikke kjør `scripts/verify-00086.sql` nå** — den er en TØRRKJØRING som
+bare gir mening FØR migrasjonen. Etter push er
+`scripts/verify-00086-i-drift.sql` den riktige.
+
+Tilbakeføring: `node scripts/run-sql.mjs scripts/rollback-00086.sql`, og
+deretter `delete from supabase_migrations.schema_migrations where version
+= '00086';` — ellers tror registeret at den fortsatt er der. Bygg 1.0 (4)
+er upåvirket: signaturen er uendret og kolonnen lagt til sist.
+
+### Oppstartsbudsjettet, målt (`__tests__/bootHttpBudget.test.tsx`)
+| Scenario | Før skive 3 | Nå |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **5** |
+| Gjentatt kaldstart | 6 kall | **3** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **11**, målt |
+| Ventetid før appen tegnes | +1,5 s | **0** |
+
+Suiten **1282/1282**, eslint 0 feil.
+
+### Sett på telefonen, IKKE rørt (nye punkter på lista)
+Ved oppstart fylles også to andre flater etter at grunnen er tegnet:
+lagkassa-kortet (skjelett → «Bli lagets første støttespiller») og
+laghodets undertekst (`Fotball · 2012` → `Fotball · 4 medlemmer`). Begge
+er ekte lasting, ikke feil, men de er samme SLAGS pop-in som knappen var.
+Ikke rørt — utenfor skiva. Se punkt 124 i GJENSTÅR.
+
+### Neste samtale
+Start med `docs/GJENSTÅR.md` § «Skive 4 — Hele reisen på telefon og nett».
+Databasen er i synk med filene; ingenting udeployet der.
+Punkt 102 og 101 står igjen fra skive 3 og skal måles før de fikses.
+
+---
+
+## ▶️▶️ START HER (2026-09-12 kveld, runde 2 — SKIVE 3 FERDIG, PR #58 GRØNN)
+
+**PR #58 er grønn** (js, web, Vercel) og venter på Brage. Ingenting er merget.
+
+### ⚠️ MIGRASJON 00086 ER IKKE KJØRT
+Den er skrevet, tørrkjørt og bevist — men står ukjørt til Brage gir
+klarsignal. Kjøres med:
+
+    node scripts/run-sql.mjs supabase/migrations/00086_feedens_egne_reaksjoner.sql
+    node scripts/run-sql.mjs scripts/verify-00086.sql   # skal si 19/19 GRØNT
+
+Tilbakeføring: `node scripts/run-sql.mjs scripts/rollback-00086.sql`.
+Den gjenskaper 00072-definisjonen ORDRETT (uten `search_path`, slik prod
+faktisk sto) pluss ACL-en. `git checkout` gjør ingenting med en funksjon
+som ligger i basen.
+
+**Tørrkjøringen (19/19 grønt)** kjørte HELE migrasjonen OG tilbakeføringen i
+én subtransaksjon som ble rullet tilbake, og beviste etterpå at prod er
+urørt: samme md5 (`eb06f48c…`), ingen fixturrader, fortsatt ingen
+`search_path`. Den sammenliknet svaret fra den gamle og den nye funksjonen
+BIT FOR BIT (utenom den nye kolonnen), og tilbakeføringen ga byte-identisk
+definisjon og identisk ACL.
+
+**Gammel klient er trygg:** signaturen er uendret og `my_reactions` er lagt
+til SIST. Bygg 1.0 (4) leser JSON, ser ikke nøkkelen, og gjør sin egen
+reactions-spørring som før. Klienten i 1.0 (5) tåler begge baser — voktet
+av `__tests__/feedMineReaksjoner.test.ts`, begge veier.
+
+### Kontrollert mot prod samme kveld (ikke hukommelse)
+- Databasen står på **00085**. 00086 er IKKE registrert.
+- `stripe-checkout` **v11** og `club-support-deactivate` **v6** — begge
+  deployet i skive 2. `push-fanout` står fortsatt på **v13** (punkt 117).
+- `trg_notify_club_payment_active` finnes → **punkt 42 er løst av punkt 96**
+  (00083). De to punktene beskrev samme varsel; 42 er nå strøket med
+  forklaring på hvorfor den gamle kodeobservasjonen fortsatt stemmer
+  (løsningen ble en trigger, ikke en webhook-endring).
+
+### Telefonfunn og fiks, samme kveld
+«Kampknappen spretter litt når man åpner appen» — målt, ikke gjettet, og
+det var IKKE animasjonen: pillen måles på etiketten, og `unknown` hadde
+ingen. 66,7 pt → 84,7 pt på 390 pt skjerm, i ett bilde. `unknown` får nå
+`layoutLabel: 'KAMP'` og reserverer plassen; ordet tegnes fortsatt ikke.
+Vakten krever identisk geometri på seks skjermbredder × to fontskalaer.
+**Gjenstår telefondom på om spretten faktisk er borte (commit 0441239).**
+
+### Oppstartsbudsjettet nå (målt, `bootHttpBudget.test.tsx`)
+| Scenario | Før skive 3 | Etter |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **5** |
+| Gjentatt kaldstart | 6 kall | **3** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **11**, målt |
+| Ventetid før appen tegnes | +1,5 s | **0** |
+
+Suiten **1279/1279**, eslint 0 feil.
+
+### Neste
+102 og 101 etter måling. 88/89 kan ikke måles før bygg 1.0 (5).
+
+---
+
+## ▶️▶️ START HER (2026-09-12 kveld — SKIVE 3: 104, 99, 103 OG KLIENT-40 LUKKET)
+
+### Les i denne rekkefølgen
+1. **`docs/GJENSTÅR.md`** — arbeidslista. Toppen har «Der vi står» og
+   § «Skive 3», som nå har status per punkt.
+2. Denne fila er historikk. Søk, ikke les forfra.
+
+### Det som betyr noe: oppstarten er 1,5 sekunder raskere, og målt
+
+Commit `38b87b2` på `Brage` (ikke pushet). Alt under er MÅLT, ikke anslått.
+
+| Scenario | Før | Etter |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **6** |
+| Gjentatt kaldstart (frø + snapshot) | 6 kall | **4** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **12**, målt |
+| Ventetid før appen tegnes | **+1,5 s** | **0** |
+
+- **Punkt 104 (først, fordi vakten må virke før den brukes).**
+  `bootBudget.test.tsx` påsto seks kall mens den mocket bort api-modulene
+  kallene ville gått gjennom. Ny fil `__tests__/bootHttpBudget.test.tsx`
+  teller på `global.fetch` med HELE apptreet montert — kun transporten,
+  auth-sesjonen og realtime-kanalen er byttet ut. Tre scenarier er låst som
+  EKSAKTE lister, ikke tall: et nytt kall i boot gjør testen rød og krever
+  en beslutning. Den falske ≤6-påstanden er strøket fra den gamle fila,
+  som beholder sin ekte rolle (orkestreringen).
+- **Punkt 99.** `bootReady` og `BOOT_MAX_MS` er borte. Påstanden porten
+  skulle hindre («KAMP» = ingen kamp) er fortsatt borte der den hører
+  hjemme: `unknown` i `matchButton.ts` + `shouldNudge`. Et sent svar bytter
+  etikett; bare et TRYKK flytter brukeren. Dyplenker/reporterflyt går
+  gjennom `flushPendingDeepLink` som før, nå tidligere.
+  ⚠️ **Testen er verifisert å ha tenner** — porten ble satt tilbake
+  midlertidig, og testen ble rød på «Laster Heia».
+- **Punkt 103.** Idrettslista fra DISK (`primeSportsFromDisk`, aldri nett);
+  kravet fra 2026-09-04 står. Feeden signerer ikke lenger miniatyrbilder
+  den aldri tegner. På kjøpet: badgen tok et eget HEAD-kall ved frø-boot
+  fordi regelen sto i mount-effekten og ikke der HTTP-et sendes — flyttet
+  til `refreshUnread`, gjelder nå mount, fokus OG lagbytte.
+- **Punkt 40, klientdelen.** `trackedFetch` avbryter på 20 s (Edge
+  Functions 60 s) og viderefører kallerens eget `signal` urørt.
+  Nettverksfeil oversettes ÉTT sted (`shared/errorMessage`), og en SKRIVING
+  som ikke fikk svar påstår aldri at den feilet — `uncertainWriteMessage`
+  gir «Vi vet ikke om målet ble lagret — sjekk før du prøver på nytt».
+  Databasens egne vaktmeldinger står urørt (den gamle regelen fra A3).
+
+Suiten **1268/1268** (5 s), eslint **0 feil** (13 warnings, samme som før).
+
+### Trenger Brage
+
+1. **Telefondom på ÉN ting:** kampknappens pille står tom (`unknown`,
+   mørk flate + Activity-glyf) i det sekundet kampsvaret er underveis, der
+   den før lå bak oppstartsflaten. Det er den avklarte retningen for punkt
+   99 — og den eneste synlige endringen i hele skiva.
+2. **Godkjenning av migrasjon 00086** (punkt 100). Forslaget med
+   rekkefølge, dører og tilbakeføring står i punkt 100 i GJENSTÅR.
+
+### Neste
+Punkt 100 (etter godkjenning), så 102/101 etter måling. 88 og 89 kan
+fortsatt ikke måles før bygg 1.0 (5).
+
+### Arbeidsmåte-notat til meg selv
+Jest er IKKE tregt: 1268 tester på 5 sekunder. Tiden i denne økta gikk til
+å legge jest-kjøringer i bakgrunnen og så vente på tidsavbrudd på
+kjøringer som tok 1,4 sekunder. Kjør dem i forgrunnen.
+
+---
+
+
 ## ▶️▶️ START HER (2026-09-12 — PUNKT 122 LØST (CI HELGRØNN); SKIVE 2 FERDIG OG I DRIFT)
 
 ### Punkt 122 er LUKKET — årsaken var Node-versjonen, ikke testen alene

@@ -37,8 +37,8 @@ const mockGetUserMemberships = jest.fn();
 jest.mock('../src/lib/api/teams', () => ({
   getUserMemberships: (...a: unknown[]) => mockGetUserMemberships(...a),
   getTeamMemberCount: jest.fn(() => Promise.resolve(12)),
-  // Idrettscachen varmes ved boot (2026-09-04) — irrelevant for disse.
-  getSports: () => Promise.resolve([]),
+  // Idrettscachen varmes fra DISK ved boot (punkt 103) — irrelevant her.
+  primeSportsFromDisk: () => Promise.resolve(),
 }));
 
 const mockReadBootSeed = jest.fn();

@@ -225,6 +225,16 @@ export async function getTeamFeed(
   // Bilde-poster: media[] (jsonb fra RPC) → MediaRef (P4). UI-et får path,
   // aldri URL — men URL-ene varmes opp HER, i ÉN batch per skjermlast, så
   // MediaImage treffer cachen i stedet for å signere per bilde.
+  //
+  // ⚠️ KUN `display` VARMES (punkt 103). `thumbPath` ble signert med i samme
+  // batch, men feeden tegner aldri thumb-varianten: både `FeedCard` og
+  // `CommentThread` ber eksplisitt om `variant="display"`. Det doblet
+  // signeringslista på hver eneste feed-åpning for bilder ingen ser.
+  //
+  // Thumb-en er IKKE borte fra dataen — `ref.thumbPath` står som før, så et
+  // kallsted som en dag vil ha den, får den (resolveren signerer den da
+  // alene). Kampflatene, som faktisk BRUKER thumb (railen, forløpet,
+  // galleriet), varmer begge variantene selv i `getMatchPhotos`.
   const paths: string[] = [];
   rows.forEach((r: any, i: number) => {
     const media = (r.media ?? []) as any[];
@@ -235,7 +245,6 @@ export async function getTeamFeed(
     };
     items[i].media = ref;
     paths.push(ref.path);
-    if (ref.thumbPath) paths.push(ref.thumbPath);
   });
   if (paths.length > 0) {
     await primeMediaUrls(paths);
@@ -246,9 +255,32 @@ export async function getTeamFeed(
   // mest gjentatte bilde, og uten dette ville hver rad signert sin egen.
   await primeAvatars(items.map(i => i.author.avatarPath));
 
-  // get_team_feed sier hvor mange som har reagert, men ikke om JEG har det.
-  // Én ekstra spørring (RLS lar meg se lagets reaksjoner) markerer mine.
-  if (items.length > 0) {
+  /**
+   * HAR JEG HEIET?
+   *
+   * Fra 00086 bærer RPC-en `my_reactions` — mine egne emojier på posten —
+   * og da er svaret allerede i hånden. Før 00086 måtte vi spørre en gang
+   * til, ETTER at feeden var hentet (spørringen trenger post-id-ene), og
+   * den serielle rundturen kostet 150–300 ms på hver eneste feed-åpning
+   * på mobilnett. Det var punkt 100.
+   *
+   * ⚠️ EMOJIEN LESES HER, IKKE I SQL. 00071 skrev ned regelen og 00086
+   * følger den: serveren sier hvilke reaksjoner som er MINE, klienten
+   * avgjør hvilken av dem som er et HEIA. `HEIA_EMOJI` er fortsatt eneste
+   * sted 👏 står skrevet.
+   *
+   * ⚠️ FALLBACKEN ER IKKE PYNT. Mangler nøkkelen står vi mot en base uten
+   * 00086 — og da skal feeden oppføre seg nøyaktig som før, ikke vise
+   * alle innlegg som uheiet. Testen `feedMineReaksjoner` vokter begge veier.
+   */
+  const serverBaererMine =
+    rows.length > 0 && rows.every((r: any) => Array.isArray(r.my_reactions));
+
+  if (serverBaererMine) {
+    rows.forEach((row: any, i: number) => {
+      items[i].iReacted = (row.my_reactions as string[]).includes(HEIA_EMOJI);
+    });
+  } else if (items.length > 0) {
     const userId = myUserId ?? (await getUserIdOrNull());
     if (userId) {
       const {data: mine} = await supabase

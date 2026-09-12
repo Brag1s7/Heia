@@ -70,10 +70,10 @@ test('hele komponenttreet monteres og tegner faktisk noe', async () => {
 
   /**
    * AVMONTER. Uten dette blir hele apptreet stående etter at testen er
-   * ferdig, og da lever effektene videre: `MatchButtonProvider` har en
-   * `setTimeout` på BOOT_MAX_MS (1,5 s) og `TeamProvider` en
-   * AsyncStorage-lesing. Begge rydder korrekt etter seg i opprydningen sin
-   * — men opprydningen kjører bare når treet avmonteres.
+   * ferdig, og da lever effektene videre: `TeamProvider` har en
+   * AsyncStorage-lesing, `useLiveMatch` en pollingtimer. Begge rydder
+   * korrekt etter seg i opprydningen sin — men opprydningen kjører bare
+   * når treet avmonteres.
    *
    * Skjer ikke det, fyrer timeren ETTER at Jest har revet ned miljøet:
    *   ReferenceError: You are trying to `import` a file after the Jest

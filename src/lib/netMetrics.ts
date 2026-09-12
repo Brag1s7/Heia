@@ -18,7 +18,12 @@
  * ⚠️ Grenser (F27): bildebytes kan IKKE måles herfra — native Image laster
  * utenom JS-fetch, og content-length mangler på komprimerte/chunkede svar.
  * Bytes her er «kjent minimum»; fasiten for bytes er serverloggene (P9 lag 3).
- * Realtime går over websocket og synes heller ikke her.
+ * Realtime går over websocket og synes heller ikke her. Bildeopplasting går
+ * via `FileSystem.uploadAsync` (native) og passerer heller ikke denne — det
+ * er grunnen til at tidsgrensa under kan være den samme for ALT som faktisk
+ * kommer hit: her finnes ingen opplastinger, bare spørringer og svar.
+ *
+ * Fra punkt 40 er dette også stedet som setter en TIDSGRENSE på kallene.
  */
 
 /** Ett normalisert endepunkt, f.eks. `POST /rest/v1/rpc/get_team_feed`. */
@@ -70,7 +75,13 @@ let visitBytes = 0;
 let visitStartedAt = Date.now();
 
 function emptyAgg(): EndpointAgg {
-  return {calls: 0, errors: 0, bytesKnown: 0, bytesUnknownCalls: 0, durationMs: 0};
+  return {
+    calls: 0,
+    errors: 0,
+    bytesKnown: 0,
+    bytesUnknownCalls: 0,
+    durationMs: 0,
+  };
 }
 
 /**
@@ -184,25 +195,88 @@ export function noteScreen(name: string | undefined): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// TIDSGRENSE (punkt 40)
+//
+// Supabase-klienten hadde ingen. Målt i felten: fjorten QUIC-tidsavbrudd på
+// NULL byte, som ble hengende i 180 til 360 sekunder før operativsystemet
+// ga opp. For brukeren er det ikke en feil — det er en app som har sluttet
+// å svare, uten et ord om hvorfor og uten noe å gjøre med det.
+//
+// Grensa er en DØDLINJE, ikke en stopp-klokke på stillhet: RN-fetch gir oss
+// ingen framdriftssignaler å måle stillhet med. Derfor er den satt der en
+// ekte tur-retur aldri kan havne, men et hengt kall alltid havner.
+// ---------------------------------------------------------------------------
+
+/**
+ * Spørringer og svar (REST, RPC, auth, storage-signering). Det tregeste
+ * ekte kallet i huset er feedens første side på mobilnett — hundredeler,
+ * ikke sekunder. Tjue sekunder er derfor ikke en grense noe friskt kall kan
+ * komme borti; det er punktet der vi slutter å late som.
+ */
+export const REQUEST_TIMEOUT_MS = 20_000;
+
+/**
+ * Edge Functions gjør mer arbeid per kall (Stripe-runder, utsendinger), og
+ * `club-support-deactivate` jobber seg gjennom et helt lag. De får mer tid —
+ * men de får ikke uendelig.
+ */
+export const FUNCTION_TIMEOUT_MS = 60_000;
+
+/** Meldingen `errorMessage` kjenner igjen. Se `shared/errorMessage.ts`. */
+export const TIMEOUT_MARKER = 'heia/timeout';
+/** Samme for et kall som aldri kom fram (ingen dekning, flymodus, DNS). */
+export const OFFLINE_MARKER = 'heia/offline';
+
+function timeoutFor(url: string): number {
+  return url.includes('/functions/v1/')
+    ? FUNCTION_TIMEOUT_MS
+    : REQUEST_TIMEOUT_MS;
+}
+
 /**
  * Fetch-innpakningen supabase.ts kobler inn. Målingen skal ALDRI kunne
  * påvirke selve kallet: alt rundt `fetch` er beskyttet, og ved nettverksfeil
- * registreres status 0 før feilen kastes videre uendret.
+ * registreres status 0 før feilen kastes videre.
+ *
+ * ⚠️ KALLERENS EGET `signal` MÅ OVERLEVE. supabase-js bruker det til å
+ * avbryte (`.abortSignal()`), og en innpakning som kastet det ville gjort
+ * hver avbrutt spørring udødelig. Derfor lytter vi på det og viderefører
+ * avbruddet — vi erstatter det ikke.
  */
 export const trackedFetch: typeof fetch = async (input, init) => {
   const url =
     typeof input === 'string'
       ? input
       : input instanceof URL
-        ? input.href
-        : input.url;
+      ? input.href
+      : input.url;
   const method =
     init?.method ??
     (typeof input === 'object' && 'method' in input ? input.method : 'GET');
   const started = Date.now();
 
+  const controller = new AbortController();
+  const external = init?.signal;
+  let timedOut = false;
+  const onExternalAbort = () => controller.abort();
+  if (external) {
+    if (external.aborted) {
+      controller.abort();
+    } else {
+      external.addEventListener('abort', onExternalAbort, {once: true});
+    }
+  }
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutFor(url));
+
   try {
-    const response = await fetch(input as RequestInfo, init);
+    const response = await fetch(input as RequestInfo, {
+      ...init,
+      signal: controller.signal,
+    });
     try {
       const len = response.headers.get('content-length');
       record(
@@ -228,7 +302,16 @@ export const trackedFetch: typeof fetch = async (input, init) => {
     } catch {
       // Som over: aldri la målingen skygge for den egentlige feilen.
     }
+    // Vårt eget tidsavbrudd får et merke kalleren kan kjenne igjen. Et
+    // avbrudd kalleren selv ba om (external) slipper urørt gjennom — det er
+    // ikke en feil, det er en kansellering.
+    if (timedOut) {
+      throw new Error(TIMEOUT_MARKER);
+    }
     throw error;
+  } finally {
+    clearTimeout(timer);
+    external?.removeEventListener('abort', onExternalAbort);
   }
 };
 
@@ -237,9 +320,7 @@ export function getNetMetricsSnapshot() {
   return {
     sinceIso: new Date(startedAt).toISOString(),
     totals: {...totals},
-    endpoints: Object.fromEntries(
-      [...endpoints].map(([k, v]) => [k, {...v}]),
-    ),
+    endpoints: Object.fromEntries([...endpoints].map(([k, v]) => [k, {...v}])),
     screens: Object.fromEntries([...screens].map(([k, v]) => [k, {...v}])),
   };
 }
