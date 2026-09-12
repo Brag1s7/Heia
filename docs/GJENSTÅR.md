@@ -31,8 +31,8 @@ og `supabase functions list`) — ikke skrevet av hukommelsen._
 |---|---|---|
 | **Databasen** | migrasjoner t.o.m. **`00086`** (00079–00086 sammenhengende) | ingenting — **i synk** ✅ |
 | **Edge Functions** | `stripe-checkout` **v11** og `club-support-deactivate` **v6** (begge deployet i skive 2) · `push-fanout` **v13 (3. aug)** · øvrige i synk | **én udeployet**: `push-fanout` — punkt 117 |
-| **Nettsiden** heiaapp.no | `main` = `c8791e5` (PR #57 merget) | `Brage` er 4 commits foran (skive 3) — PR #58 |
-| **CI** | grønn på `main` etter #57 | PR #58 kjører. Lokalt: `jest` **1279**, `eslint` 0. CI fyrer bare på PR — se punkt 121 |
+| **Nettsiden** heiaapp.no | `main` = `c415ffa` (PR #58 merget) | ingenting — **i synk** ✅ |
+| **CI** | **grønn på `main`** (`c415ffa`) | `jest` **1282**, `eslint` 0. CI fyrer bare på PR og push til main — se punkt 121 |
 | **Secrets** | `WEB_BASE_URL` og `WEB_INVITE_BASE_URL` satt | — |
 | **runtime_config** | `broadcast` på feed, match og notif · `poll = 0` · `min_build = 0` | — |
 | **TestFlight** | **1.0 (4), lastet opp 18. august** | Se under. Dette er det største avviket. |
@@ -88,7 +88,7 @@ Avhengighetene er reelle — skivene kan ikke byttes om fritt.
 |---|---|---|---|
 | **1** | Miljøer og databaseautorisasjon | ingenting — start her | ~~108~~, ~~109~~, ~~97~~, ~~111~~, ~~30~~ · igjen: 98, 113 |
 | **2** | Betaling og varsler tåler avbrudd | skive 1 (testmiljø å bevise i) | ~~87~~, ~~96~~, ~~107~~, ~~22~~ — **FERDIG 2026-09-12** |
-| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | ~~104~~, ~~99~~, ~~103~~, ~~40 (klient)~~ · igjen: 100 (migrasjon, venter godkjenning), 88, 89, 102, 101 |
+| **3** | Oppstart, nettverk og caching | skive 1 (CI som fanger regresjon) | ~~104~~, ~~99~~, ~~103~~, ~~100~~, ~~40 (klient)~~ — **FERDIG, MERGET OG TELEFONGODKJENT 2026-09-12** · igjen: 88, 89 (krever 1.0 (5)), 102, 101 (skal måles) |
 | **4** | Hele reisen på telefon og nett | skive 1–3 må være i drift | 5–7, 73, 49, 43–45, 94, 105, 106 |
 
 ### Beslutninger som ER tatt (ikke relitigér)

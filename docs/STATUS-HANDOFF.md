@@ -1,5 +1,50 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 — SKIVE 3 HELT LUKKET, MERGET OG TELEFONGODKJENT)
+
+### Tilstanden
+- **Skive 3 er ferdig:** 104, 99, 103, 100 og klientdelen av 40.
+- **PR #58 er MERGET.** `main` = `c415ffa`, CI grønn. `Brage` er i synk.
+- **Databasen står på 00086** — kjørt og bevist i prod (13/13 + røyktest).
+- **Kampknappen er TELEFONGODKJENT.** Blinket er borte.
+- `push-fanout` er eneste udeployede Edge Function (punkt 117).
+
+### Hva skive 3 faktisk ga (målt, `__tests__/bootHttpBudget.test.tsx`)
+| Scenario | Før | Nå |
+|---|---|---|
+| Kaldstart, tom disk | 7 kall | **5** |
+| Gjentatt kaldstart | 6 kall | **3** |
+| Kontekst-RPC feiler | «7–9» (anslag, feil) | **11**, målt |
+| Ventetid før appen tegnes | +1,5 s | **0** |
+
+Suiten **1282/1282**, eslint 0 feil.
+
+### Tre ting fra skive 3 som er verdt å ta med videre
+1. **Vakter for noe VISUELT må sammenlikne det som tegnes**, ikke tallene
+   som gikk inn i tegningen. Kampknapp-vakten var grønn i to runder mens
+   blinket sto på telefonen, fordi den leste `matchButtonGeometry` i
+   stedet for det rendrede treet.
+2. **`git checkout` er ikke en database-tilbakeføring.** Hver migrasjon som
+   rører en funksjon trenger en egen SQL-rollback — og en `DROP FUNCTION`
+   tar ACL-en med seg (00061-fella).
+3. **Tørrkjør migrasjoner** i en subtransaksjon som rulles tilbake, mot
+   prod, FØR push. `scripts/verify-00086.sql` er malen.
+
+### NESTE: skive 4 — hele reisen på telefon og nett
+Start i `docs/GJENSTÅR.md` § «Skive 4». Første jobb er bygg **1.0 (5)**:
+punkt 5 (bumpe byggnummeret), 6 (arkivere/laste opp — Brage), 7 (hva
+bygget bringer) og 73 (invitasjonsreisen er halvveis på).
+
+**Hvorfor det haster:** installert bygg er 1.0 (4) fra 18. august. ALT
+siden — hele designsporet, Broadcast, cold start, skive 1–3 — er usynlig
+til 1.0 (5) er ute. Punkt 88 og 89 kan heller ikke måles før da.
+
+Står igjen fra skive 3, og skal MÅLES før de fikses: punkt 102
+(memoisering av toppen) og 101 (kalenderen henter 30 måneder, ~150 kort).
+Ingen av dem er bevist å være et problem ennå.
+
+---
+
 ## ▶️▶️ START HER (2026-09-12 kveld, runde 3 — SKIVE 3 LUKKET)
 
 ### Tilstanden, i fire linjer
