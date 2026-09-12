@@ -215,26 +215,20 @@ function Harness() {
 // flytter klokka). Query-cachen tømmes av samme grunn: en events-cache fra
 // forrige test ville gjort neste tests kallbudsjett løgnaktig lavt.
 afterEach(async () => {
-  // RYDD I RIKTIG REKKEFØLGE, ellers henger jest-prosessen i fem minutter
-  // etter at testene er ferdige (målt: jest rapporterte 2 s, veggklokka
-  // 5:04, 0 % CPU, fire ventende `Timeout`).
-  //
-  // Kjeden: en henting feiler → appens `retry: 1` legger retryeren til å
-  // sove ett sekund → `clear()` tømmer cachen mens den sover → retryeren
-  // våkner foreldreløs, kjører `Query.fetch` på nytt, og planlegger en
-  // `scheduleGc` på `gcTime` = 5 minutter. Den timeren eies av ingen, og
-  // holder Nodes hendelsesløkke i live. Bevis: stakksporet til de
-  // overlevende timerne endte i `retryer.sleep` og `Query.fetch →
-  // scheduleGc`.
+  // RYDD I RIKTIG REKKEFØLGE. `clear()` alene lot en retryer som lå og sov
+  // (appens `retry: 1`) overleve; den våknet foreldreløs, kjørte
+  // `Query.fetch` på nytt og planla en `scheduleGc` på `gcTime` = 5 minutter.
+  // Den timeren eide ingen, og holdt Nodes hendelsesløkke i live — målt:
+  // jest rapporterte 2 s, veggklokka 5:04 med 0 % CPU.
   //
   // Rekkefølgen er derfor: avbryt MENS fake-klokka fortsatt finnes, kjør de
-  // ventende timerne så den sovende retryeren faktisk vekkes og kan avbrytes,
+  // ventende timerne så den sovende retryeren vekkes og faktisk kan avbrytes,
   // og FØRST DA bytt til ekte klokke og tøm.
   //
-  // Hvorfor ikke bare `await queryClient.cancelQueries()` etter
-  // `useRealTimers()`: da er fake-klokka kastet, den sovende retryeren kan
-  // aldri settle, og løftet innfris aldri. CI traff `timeout-minutes: 15`
-  // med jest stående i 14m31s.
+  // Prøvd og forkastet: (a) avbryte etter `useRealTimers()` — da kan løftet
+  // aldri innfris, og `afterEach` hang; (b) synkron `q.destroy()` uten
+  // venting — da rekker ikke avbruddet gjennom, og lekkasjen kom tilbake
+  // (303 s målt).
   const avbrytes = queryClient.cancelQueries().catch(() => {});
   if (jest.isMockFunction(setTimeout)) {
     jest.runOnlyPendingTimers();
@@ -530,7 +524,7 @@ test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt 
   await ReactTestRenderer.act(async () => {
     renderer?.unmount();
   });
-});
+}, 30_000);
 
 // ---------------------------------------------------------------------------
 // «DEL MED LAGET» ER EN PERMANENT INNGANG (P4, skive 10)

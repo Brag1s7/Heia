@@ -226,7 +226,12 @@ afterEach(async () => {
   //
   // IKKE `await` — se samme begrunnelse i feedRefetch: avbruddet er synkront,
   // mens løftet kan vente evig på en henting som sov på en fake timer.
-  void queryClient.cancelQueries().catch(() => {});
+  // Synkront, se samme begrunnelse i feedRefetch: `destroy()` rydder
+  // gc-timeren og avbryter retryeren uten å vente på noe som helst.
+  queryClient
+    .getQueryCache()
+    .getAll()
+    .forEach(q => q.destroy());
   queryClient.clear();
 });
 
