@@ -745,6 +745,40 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      egen rekkefølge. Vurder å legge `Brage` til i `push`-triggeren, så
      grenen får dom uten at det må åpnes PR.
 
+122. **Én test tidsavbryter på CI: `feedRefetch` «payload-først (B3)».**
+     Bruker **101 ms lokalt** og over **30 000 ms** på GitHubs runner — 300
+     ganger, altså ikke treg maskinvare. 1257 av 1258 tester er grønne;
+     dette er det eneste som står igjen før CI er helgrønn.
+
+     **Sterkeste hypotese, ikke bevist:** testen kjører med `jest.useFakeTimers()`.
+     Feiler en henting, legger appens `retry: 1` retryeren til å sove på en
+     FAKE timer som ingen flytter. Da blir hentingen aldri ferdig, og testen
+     venter til grensen. Lokalt lykkes hentingen på første forsøk, så
+     retryen skjer aldri. Et mellomsteg som fantes en periode
+     (`jest.runOnlyPendingTimers()` i `afterEach`) vekket den sovende
+     retryeren — men samme opprydding brukte `await`, og DET hang CI, så
+     alt ble tatt ut igjen.
+
+     **Neste steg:** flytt fake-klokka der hentingen kan feile, i stedet for
+     å heve grensen. Testen har i dag 30 s, satt etter avtale med Brage.
+     Hev den IKKE videre — 30 s er alt bevist utilstrekkelig.
+
+     **Lærdom verdt å ta med:** CI hadde vært rød sammenhengende siden
+     19. august uten at noen visste det, fordi `tsc` stoppet før jest.
+     «Grønt lokalt» beviste ingenting: arbeidstreet hadde `@types/node` og
+     `.astro/` som en ren `npm ci` ikke har. Verifiser slike steg i en ren
+     klone.
+123. **`A worker process has failed to exit gracefully` står igjen.** Den
+     fantes før dette arbeidet, opptrer i begge halvdeler av testlista hver
+     for seg, forsvinner helt når suiten kjøres serielt, og jest avslutter
+     uansett med 0. Den blokkerer ingenting, men den er et symptom på at
+     noe fortsatt ikke ryddes. Hører sammen med punkt 122.
+
+     ⚠️ **Ikke prøv `--runInBand` som fiks.** Det ble prøvd: serielt finnes
+     ingen arbeider jest kan tvangsavslutte, så ett gjenværende håndtak
+     låser hele prosessen til jobben treffer `timeout-minutes: 15`. Fire
+     kjøringer hang slik.
+
 ### Avkreftet
 
 112. **Bøttegrensene er allerede på plass.** Gjennomgangen meldte at

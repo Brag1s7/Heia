@@ -1,5 +1,58 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 natt — SKIVE 1 FERDIG OG MERGET; NESTE ER SKIVE 2)
+
+### Les i denne rekkefølgen
+1. **`docs/GJENSTÅR.md`** — arbeidslista. Toppen har «Der vi står», skivene
+   og de tatte beslutningene.
+2. **`docs/GJENSTÅR.md` § «Skive 2 — Betaling og varsler tåler avbrudd»**.
+3. Denne fila er historikk. Søk, ikke les forfra.
+
+### Hva som ER i drift
+
+- **Databasen: `00084`**, og 00079–00084 er sammenhengende. Både `00083`
+  (varselet når klubben blir klar) og `00084` (anon-døren, tre grupper) er
+  kjørt i prod og bevist der — 12/12 og 8/8 i transaksjoner som ble rullet
+  tilbake. Anon-åpne SECURITY DEFINER-funksjoner: **26 → 1**.
+- **Nettsiden**: `Brage` merget til `main`. Vercel-variablene står for
+  Production og Preview, previewen bygger grønt, produksjon uendret.
+- **Edge Functions: uendret.** `stripe-checkout` står fortsatt på **v10**
+  (19. aug) og `push-fanout` på **v13** (3. aug). Begge har ferdig, udeployet
+  kode — punkt 117.
+
+### Lukket i skive 1
+108, 109 (miljøseparasjon + nettsiden i CI), 97, 111, 30 (00084), 96
+(00083), 116 (31 typefeil som hadde holdt CI rød siden 19. august).
+Risikosortert og parkert: 98 (`search_path`, ingen konkret utsatt), 114
+(Astro-rådgivningene, minste oppgradering er `astro@7.2.8`).
+
+### DET FØRSTE DU BØR TA: punkt 122
+CI er grønn overalt unntatt **én test**: `feedRefetch` «payload-først (B3)»
+tidsavbryter på GitHubs runner (101 ms lokalt, over 30 000 ms i CI).
+1257 av 1258 passerer. Hypotesen og hva som IKKE virker står i punkt 122 —
+les den før du rører testen. Kort: ikke hev grensen mer, og ikke bruk
+`--runInBand`.
+
+### Så: SKIVE 2 — betaling og varsler tåler avbrudd
+- **Punkt 87** er gjennomgått og **deployklar, ikke deployet**:
+  `supabase functions deploy stripe-checkout`. Tilbakeføring og hele
+  bevisføringen står i punktet.
+- **Punkt 107**: «Deaktiver støtte» må tåle avbrudd og kunne fortsette.
+- **Punkt 22 er avklart** og krever ikke arbeid.
+
+### Arbeidsmåter som kostet tid i natt — les disse
+- **Verifiser CI-steg i en REN KLONE.** «Grønt lokalt» beviste ingenting:
+  arbeidstreet hadde `@types/node` og `.astro/` som `npm ci` ikke gir.
+- **Ikke iterér mot CI.** Hver runde tar opptil 15 minutter. Mål lokalt,
+  bevis årsaken, og push én gang.
+- **`gh` er nå innlogget** (scopes: repo, workflow) — bruk
+  `gh run view --log-failed` i stedet for å be Brage lese logger.
+- **Vercel-CLI er innlogget** via `npx vercel`, scope `heia1`, prosjekt
+  `heia`. Ingen prosjektinnstillinger er rørt.
+
+---
+
+
 ## ▶️▶️ START HER (2026-09-11 natt, runde 3 — ALT ER GRØNT LOKALT OG PÅ VERCEL; BARE PR-EN GJENSTÅR)
 
 ### Det ene som gjenstår: åpne PR-en
