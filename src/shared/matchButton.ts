@@ -82,6 +82,12 @@ export interface MatchButtonState {
   /** Teksten i pillen. */
   label: string;
   /**
+   * Etiketten pillen skal MÅLES på, når den er en annen enn den som tegnes.
+   *
+   * ⚠️ FINNES KUN FOR `unknown`, og den er ikke pynt — se der.
+   */
+  layoutLabel?: string;
+  /**
    * Kortform, brukt KUN når den fulle etiketten ikke får plass (320 pt).
    *
    * ⚠️ Kom av telefonen (Brage 2026-08-21): «RAPPORTER» ble kuttet til
@@ -120,6 +126,27 @@ const UNKNOWN: MatchButtonState = {
   // Tom etikett: pillen står som en rolig plass til svaret lander. Et ord
   // her ville vært det samme hoppet, bare med en annen tekst.
   label: '',
+  /**
+   * ⚠️ MEN DEN MÅLES SOM «KAMP». Telefonfunn 2026-09-12, etter at punkt 99
+   * tok bort oppstartsflaten som skjulte dette: «kampknappen spretter litt
+   * når man åpner appen».
+   *
+   * Det var ikke `shouldNudge` — den sier korrekt nei til sprett fra
+   * `unknown`. Det var GEOMETRI: pillen måles på etiketten, og med en tom
+   * etikett ble den 66,7 pt der `KAMP` gir 84,7 (390 pt skjerm). Pillen
+   * vokste 18 pt og paddingen falt fra 16 til 9 i samme bilde — altså
+   * sprett.
+   *
+   * `idle` er utfallet nesten hver gang (en pågående kamp er unntaket), så
+   * pillen reserverer plassen den kommer til å trenge. Da står den
+   * HELT stille gjennom det vanlige skiftet, og ordet fyller en plass som
+   * alt er der. Går det mot `live` i stedet, endrer den seg én gang — og
+   * det er ekte nyheter, ikke oppstartsstøy.
+   *
+   * Ordet tegnes IKKE: `label` er fortsatt tom, og `MatchTabButton` tegner
+   * det `label` sier — ikke det geometrien målte.
+   */
+  layoutLabel: 'KAMP',
   tabLabel: 'Kamp',
   a11yLabel: 'Kamp. Henter kampstatus',
   disabled: false,

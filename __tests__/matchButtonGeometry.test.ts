@@ -6,7 +6,7 @@ import {
   TAB_BAR_HEIGHT,
   TAB_COUNT,
 } from '../src/shared/matchButtonGeometry';
-import {matchButtonHasGlyph} from '../src/shared/matchButton';
+import {matchButtonHasGlyph, matchButtonState} from '../src/shared/matchButton';
 import {tabBarItemsWidth} from '../src/shared/tabBarLayout';
 
 /**
@@ -136,11 +136,25 @@ describe('fanene er og blir like brede', () => {
     for (const width of WIDTHS) {
       const items = tabBarItemsWidth(width);
       expect(items).toBe(width - 24);
-      const g = matchButtonGeometry(width, 1, 'RAPPORTER', 'RAPPORT', false, items);
+      const g = matchButtonGeometry(
+        width,
+        1,
+        'RAPPORTER',
+        'RAPPORT',
+        false,
+        items,
+      );
       expect(g.itemWidth).toBeCloseTo(items / 5, 5);
       // Kompresjonstrinnet (typen) følger fortsatt VINDUET: 393 pt gir
       // prototypens 13,5 for korte ord selv om slotten er 4,8 pt smalere.
-      const kort = matchButtonGeometry(393, 1, 'KAMP', undefined, true, tabBarItemsWidth(393));
+      const kort = matchButtonGeometry(
+        393,
+        1,
+        'KAMP',
+        undefined,
+        true,
+        tabBarItemsWidth(393),
+      );
       expect(kort.fontSize).toBeCloseTo(13.5, 5);
     }
   });
@@ -196,5 +210,58 @@ describe('kortformen brukes KUN når den fulle ikke får plass', () => {
     const g = matchButtonGeometry(320, 1, 'RAPPORTER', undefined, false);
     expect(g.label).toBe('RAPPORTER');
     expect(g.fontSize).toBe(MIN_FONT);
+  });
+});
+
+/**
+ * «KAMPKNAPPEN SPRETTER LITT NÅR MAN ÅPNER APPEN» (Brage, telefon
+ * 2026-09-12, etter at punkt 99 fjernet oppstartsflaten som skjulte det).
+ *
+ * Årsaken var IKKE nudge-animasjonen — `shouldNudge` sier korrekt nei til
+ * sprett fra `unknown`. Den var geometrisk: pillen måles på etiketten, og
+ * en tom etikett ga 66,7 pt der «KAMP» gir 84,7 på en 390 pt skjerm.
+ *
+ * ⚠️ DENNE TESTEN ER HELE FIKSEN. Forsvinner `layoutLabel`, kommer spretten
+ * tilbake — og den er usynlig i enhver test som bare ser på ett bilde.
+ */
+describe('unknown → idle skal ikke flytte en eneste piksel', () => {
+  const unknown = matchButtonState({
+    presence: null,
+    liveMatch: null,
+    known: false,
+  });
+  const idle = matchButtonState({presence: null, liveMatch: null, known: true});
+
+  it.each([320, 375, 390, 393, 402, 430])(
+    'samme bredde, padding og type på %i pt',
+    w => {
+      for (const fontScale of [1, 1.35]) {
+        const u = matchButtonGeometry(
+          w,
+          fontScale,
+          unknown.layoutLabel ?? unknown.label,
+          unknown.shortLabel,
+          matchButtonHasGlyph(unknown.kind),
+          tabBarItemsWidth(w),
+        );
+        const i = matchButtonGeometry(
+          w,
+          fontScale,
+          idle.layoutLabel ?? idle.label,
+          idle.shortLabel,
+          matchButtonHasGlyph(idle.kind),
+          tabBarItemsWidth(w),
+        );
+        expect(u.width).toBe(i.width);
+        expect(u.paddingH).toBe(i.paddingH);
+        expect(u.fontSize).toBe(i.fontSize);
+        expect(u.glyphSize).toBe(i.glyphSize);
+      }
+    },
+  );
+
+  it('men ordet tegnes fortsatt ikke før vi vet', () => {
+    expect(unknown.label).toBe('');
+    expect(idle.label).toBe('KAMP');
   });
 });

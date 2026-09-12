@@ -88,7 +88,10 @@ export function MatchTabButton({focused = false}: MatchTabButtonProps) {
   const g = matchButtonGeometry(
     width,
     fontScale,
-    state.label,
+    // ⚠️ MÅLES på `layoutLabel` når den finnes, TEGNES fra `state.label`.
+    // Gjelder kun `unknown`, som reserverer «KAMP»-bredden så pillen står
+    // stille når svaret lander (telefonfunn 2026-09-12 — se matchButton.ts).
+    state.layoutLabel ?? state.label,
     state.shortLabel,
     // ⚠️ SAMME KILDE SOM `renderGlyph` under. Lot vi geometrien gjette på
     // ordlengde, ville den regnet med et ikon komponenten aldri tegnet.
@@ -203,7 +206,10 @@ export function MatchTabButton({focused = false}: MatchTabButtonProps) {
               letterSpacing: g.letterSpacing,
             },
           ]}>
-          {g.label}
+          {/* Sier tilstanden INGENTING, tegnes ingenting — uansett hva
+              geometrien målte på. `g.label` kan være kortformen, og den
+              hører til de tilstandene som faktisk har et ord. */}
+          {state.label === '' ? '' : g.label}
         </Text>
       </View>
     </Animated.View>
