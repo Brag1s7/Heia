@@ -16,6 +16,11 @@
  * realtime-kanalen (websocket, ikke HTTP).
  *
  * Hva som telles: hvert HTTP-kall fra appen starter til nettet står stille.
+ *
+ * ⚠️ SERVEREN HER ER EN 00086-SERVER. Feed-svaret bærer `my_reactions`, som
+ * er det klienten møter i prod når migrasjonen er kjørt. Står appen mot en
+ * eldre base, tar `getTeamFeed` sin gamle reactions-spørring — og DET er
+ * voktet i `feedMineReaksjoner.test.ts`, ikke her.
  */
 
 import React from 'react';
@@ -210,6 +215,9 @@ function feedRows() {
       is_pinned: false,
       reaction_counts: {'🎉': 2},
       comment_count: 0,
+      // 00086: RPC-en bærer mine egne reaksjoner, så klienten slipper den
+      // serielle reactions-spørringen (punkt 100).
+      my_reactions: [],
       media: [
         {
           storage_path: `${TEAM_SPACE_ID}/1757000000000-abc.jpg`,
@@ -350,9 +358,6 @@ test('kaldstart med tom disk: kallene er nøyaktig disse', async () => {
       // Feedens bilder og forfatteravatarer — én runde per bucket.
       'POST /storage/v1/object/sign/feed-media',
       'POST /storage/v1/object/sign/avatars',
-      // PUNKT 100: «har jeg reagert» ligger utenfor feed-spørringen og
-      // koster en seriell rundtur ETTER at feeden er hentet.
-      'GET /rest/v1/reactions',
     ].sort(),
   );
 });
@@ -377,7 +382,6 @@ test('gjentatt kaldstart: disken bærer det den kan', async () => {
       'POST /rest/v1/rpc/get_session_context',
       'POST /rest/v1/rpc/get_team_feed',
       'GET /rest/v1/events',
-      'GET /rest/v1/reactions',
       // Signeringen er BORTE: URL-ene fra forrige økt har 24 t og gjelder
       // fortsatt. Det er gevinsten den gjentatte oppstarten faktisk har.
       //
@@ -408,7 +412,6 @@ test('kontekstfeil: fallback-kallene er de gamle enkeltkallene', async () => {
       'POST /rest/v1/rpc/get_session_context',
       'POST /storage/v1/object/sign/feed-media',
       'POST /storage/v1/object/sign/avatars',
-      'GET /rest/v1/reactions',
       // … og så viften, én flate om gangen, nøyaktig som før S2:
       'GET /rest/v1/memberships', // TeamContext
       'GET /rest/v1/profiles', // UserContext
