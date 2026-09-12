@@ -1,5 +1,45 @@
 # Heia — statusoverlevering (for ny chat)
 
+## ▶️▶️ START HER (2026-09-12 — PUNKT 122 LØST OG BEVIST; SKIVE 2 I GANG)
+
+### Punkt 122 er LUKKET — årsaken var Node-versjonen, ikke testen alene
+
+`feedRefetch` «payload-først (B3)» hang på CI fordi **runneren kjører
+Node 22 og Macen Node 24**. Med CI-ens eksakte Node (22.23.2) lokalt
+reproduserte hengingen deterministisk — og ble målt helt inn:
+
+- Retry-hypotesen fra punkt 122 er **motbevist**: null fake timers
+  utestående under hengingen (`jest.getTimerCount()`), og et 120 s-spark
+  på fake-klokka løsnet ingenting.
+- Den virkelige mekanismen: Reacts asynkrone `act` planlegger
+  fortsettelsen sin med `setImmediate`. Jests `useFakeTimers()` faker som
+  standard ALT — også immediates — og på Node 22 kjørte den planlagte
+  fortsettelsen aldri: `await act(...)` hang for alltid. Node 24 tilgir
+  det; derfor «101 ms lokalt, 30 000+ ms på runneren».
+- Fiksen (i `__tests__/feedRefetch.test.tsx`): begge fake-timer-oppsettene
+  bruker nå `doNotFake: ['setImmediate', 'clearImmediate']` — testene
+  trenger bare setTimeout-familien (debounce 400 ms, notify, retry, gc).
+- **Bevis:** kontroll hang 2/2, fiksen grønn 5/5 + 3/3 på Node 22.23.2;
+  hele suiten **1258/1258** på både Node 22 (`--maxWorkers=3`, CI-form)
+  og Node 24. eslint 0, prettier-husstilen fulgt.
+- **Metode for neste gang:** last ned runnerens Node-dur
+  (`nodejs.org/dist/v22.x/node-v22.x-darwin-arm64.tar.gz`), legg `bin/`
+  først i PATH og kjør jest med den — CI-heng skal jages lokalt, ikke med
+  15-minutters CI-runder. Punkt 123 (worker-exit-støyen) står igjen og
+  var IKKE beslektet: det er gc-timere (5 min) + håndtak, målt til ~6 min
+  etterheng in-band.
+
+### Neste: SKIVE 2 — betaling og varsler tåler avbrudd
+
+- **Punkt 87 først:** fiksen er gjennomgått og deployklar —
+  `supabase functions deploy stripe-checkout` (v10 → ny). Tilbakeføring og
+  bevisføring står i punktet og i blokka under (2026-09-12 natt).
+- **Så punkt 107:** «Deaktiver støtte» skal tåle avbrudd og kunne
+  fortsette; «fullført» = kanselleringene er bekreftet.
+- Punkt 22 er avklart og krever ikke arbeid.
+
+---
+
 ## ▶️▶️ START HER (2026-09-12 natt — SKIVE 1 FERDIG OG MERGET; NESTE ER SKIVE 2)
 
 ### Les i denne rekkefølgen

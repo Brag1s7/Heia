@@ -745,34 +745,39 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
      egen rekkefølge. Vurder å legge `Brage` til i `push`-triggeren, så
      grenen får dom uten at det må åpnes PR.
 
-122. **Én test tidsavbryter på CI: `feedRefetch` «payload-først (B3)».**
-     Bruker **101 ms lokalt** og over **30 000 ms** på GitHubs runner — 300
-     ganger, altså ikke treg maskinvare. 1257 av 1258 tester er grønne;
-     dette er det eneste som står igjen før CI er helgrønn.
+122. ~~**Én test tidsavbryter på CI: `feedRefetch` «payload-først (B3)».**~~
+     **LUKKET 2026-09-12.** Årsaken var IKKE retry-hypotesen (motbevist:
+     null fake timers utestående under hengingen, og et 120 s-spark på
+     fake-klokka løsnet ingenting) — den var **Node-versjonen**: runneren
+     kjører Node 22, Macen 24. Med CI-ens eksakte Node (22.23.2) lokalt
+     reproduserte hengingen deterministisk; på 24 finnes den ikke. Målt
+     helt inn: Reacts asynkrone `act` planlegger fortsettelsen sin med
+     `setImmediate`, og med jests standard-faking (som faker ALT, også
+     immediates) kjørte den planlagte fortsettelsen aldri på Node 22 —
+     `await act(...)` hang for alltid. Fiksen i `feedRefetch.test.tsx`:
+     `jest.useFakeTimers({doNotFake: ['setImmediate', 'clearImmediate']})`
+     — testene trenger bare setTimeout-familien (debounce/notify/retry).
+     Bevis: kontroll hang 2/2, fiksen grønn 5/5 + 3/3 på Node 22.23.2;
+     hele suiten 1258/1258 på både Node 22 (`--maxWorkers=3`, CI-form) og
+     Node 24. **Lærdom:** «grønt lokalt» må også bety SAMME Node-dur som
+     runneren — hent `node-v22.x-darwin-arm64` og kjør jest med den i
+     PATH før en CI-heng jages i blinde.
 
-     **Sterkeste hypotese, ikke bevist:** testen kjører med `jest.useFakeTimers()`.
-     Feiler en henting, legger appens `retry: 1` retryeren til å sove på en
-     FAKE timer som ingen flytter. Da blir hentingen aldri ferdig, og testen
-     venter til grensen. Lokalt lykkes hentingen på første forsøk, så
-     retryen skjer aldri. Et mellomsteg som fantes en periode
-     (`jest.runOnlyPendingTimers()` i `afterEach`) vekket den sovende
-     retryeren — men samme opprydding brukte `await`, og DET hang CI, så
-     alt ble tatt ut igjen.
-
-     **Neste steg:** flytt fake-klokka der hentingen kan feile, i stedet for
-     å heve grensen. Testen har i dag 30 s, satt etter avtale med Brage.
-     Hev den IKKE videre — 30 s er alt bevist utilstrekkelig.
-
-     **Lærdom verdt å ta med:** CI hadde vært rød sammenhengende siden
-     19. august uten at noen visste det, fordi `tsc` stoppet før jest.
-     «Grønt lokalt» beviste ingenting: arbeidstreet hadde `@types/node` og
-     `.astro/` som en ren `npm ci` ikke har. Verifiser slike steg i en ren
-     klone.
+     **Lærdom verdt å ta med (fra før):** CI hadde vært rød sammenhengende
+     siden 19. august uten at noen visste det, fordi `tsc` stoppet før
+     jest. «Grønt lokalt» beviste ingenting: arbeidstreet hadde
+     `@types/node` og `.astro/` som en ren `npm ci` ikke har. Verifiser
+     slike steg i en ren klone.
 123. **`A worker process has failed to exit gracefully` står igjen.** Den
      fantes før dette arbeidet, opptrer i begge halvdeler av testlista hver
      for seg, forsvinner helt når suiten kjøres serielt, og jest avslutter
      uansett med 0. Den blokkerer ingenting, men den er et symptom på at
-     noe fortsatt ikke ryddes. Hører sammen med punkt 122.
+     noe fortsatt ikke ryddes. (Var antatt beslektet med punkt 122 — det
+     stemte ikke: 122 var Node 22 + fakede immediates i `act`, se punktet.)
+     Målt 2026-09-12: én enkelt suite in-band holder prosessen i live i
+     **~6 minutter** etter grønt resultat — TanStacks gc-timere (5 min)
+     pluss øvrige håndtak. Det er dette som gjorde `--runInBand` fatal i
+     CI, og det er ryddesaken som gjenstår her.
 
      ⚠️ **Ikke prøv `--runInBand` som fiks.** Det ble prøvd: serielt finnes
      ingen arbeider jest kan tvangsavslutte, så ett gjenværende håndtak
