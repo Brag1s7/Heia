@@ -50,14 +50,26 @@ describe('«vet ikke ennå» — oppstartshoppet (Brage 2026-08-21)', () => {
    * Det var ikke en animasjonsfeil. `KAMP` BETYR «ingen kamp pågår», og det
    * er en påstand appen ikke har dekning for før første henting har landet.
    */
-  it('før første svar sier knappen INGENTING — ikke «KAMP»', () => {
+  it('før første svar er «KAMP» en knappetekst, ikke en påstand', () => {
     const s = matchButtonState({presence: null, liveMatch: null, known: false});
+    // ⚠️ OPPDATERT 2026-09-12, ANDRE TELEFONRUNDE. Etiketten var tom her,
+    // og det var riktig så lenge navigatoren ventet bak oppstartsflaten.
+    // Etter punkt 99 ble den tomme pillen et BLINK i stedet: den tegnet seg
+    // uten ord og fikk ordet et øyeblikk etter. Brage: la «KAMP» stå som
+    // nøytral knappetekst fra første bilde, og bytt til livevisning hvis en
+    // kamp finnes.
+    //
+    // Påstanden fra august er fortsatt borte, for ordet betyr noe annet
+    // her: trykket går til Sesongen i BEGGE tilstander, så «KAMP» beskriver
+    // knappen. Det er STILLINGEN som er en påstand, og den kommer først når
+    // vi vet.
+    expect(s.label).toBe('KAMP');
+    expect(s.tabLabel).toBe('Sesongen');
+    // Men internt vet appen at den ikke vet — og skjermleseren får det.
     expect(s.kind).toBe('unknown');
-    expect(s.label).toBe('');
-    // Den lyver altså ikke, men den er fortsatt trykkbar: Sesongen er
-    // riktig mål uansett hva svaret blir.
-    expect(s.disabled).toBe(false);
     expect(s.a11yLabel).toBe('Kamp. Henter kampstatus');
+    // Trykkbar mens vi venter: Sesongen er riktig mål uansett hva svaret blir.
+    expect(s.disabled).toBe(false);
   });
 
   it('når svaret lander uten kamp, blir det KAMP', () => {

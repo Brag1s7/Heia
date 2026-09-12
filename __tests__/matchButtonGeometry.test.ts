@@ -215,14 +215,21 @@ describe('kortformen brukes KUN når den fulle ikke får plass', () => {
 
 /**
  * «KAMPKNAPPEN SPRETTER LITT NÅR MAN ÅPNER APPEN» (Brage, telefon
- * 2026-09-12, etter at punkt 99 fjernet oppstartsflaten som skjulte det).
+ * 2026-09-12), og runde to: «fortsatt et lite blink før riktig visning».
  *
- * Årsaken var IKKE nudge-animasjonen — `shouldNudge` sier korrekt nei til
- * sprett fra `unknown`. Den var geometrisk: pillen måles på etiketten, og
- * en tom etikett ga 66,7 pt der «KAMP» gir 84,7 på en 390 pt skjerm.
+ * ⚠️ DENNE TESTEN ER IKKE FIKSEN, OG DET ER LÆRDOMMEN.
  *
- * ⚠️ DENNE TESTEN ER HELE FIKSEN. Forsvinner `layoutLabel`, kommer spretten
- * tilbake — og den er usynlig i enhver test som bare ser på ett bilde.
+ * Første forsøk ga `unknown` en egen målings-etikett og sammenliknet
+ * BREDDENE her. De ble like, testen ble grønn — og blinket sto igjen.
+ * `g.width` settes nemlig på den YTRE wrapperen, mens pillen man ser er
+ * innholdsstyrt: padding + glyf + tekst. Med tom etikett var den ~41 pt og
+ * vokste til ~85 når ordet kom.
+ *
+ * Fiksen ble at `unknown` VISER «KAMP» fra første bilde (se
+ * matchButton.ts), og beviset bor der det hører hjemme — i
+ * `matchTabButtonUnknown.test.tsx`, som sammenlikner det som faktisk
+ * TEGNES. Det som står igjen her er geometrien, og den følger nå av seg
+ * selv: samme etikett inn gir samme tall ut.
  */
 describe('unknown → idle skal ikke flytte en eneste piksel', () => {
   const unknown = matchButtonState({
@@ -239,7 +246,7 @@ describe('unknown → idle skal ikke flytte en eneste piksel', () => {
         const u = matchButtonGeometry(
           w,
           fontScale,
-          unknown.layoutLabel ?? unknown.label,
+          unknown.label,
           unknown.shortLabel,
           matchButtonHasGlyph(unknown.kind),
           tabBarItemsWidth(w),
@@ -247,7 +254,7 @@ describe('unknown → idle skal ikke flytte en eneste piksel', () => {
         const i = matchButtonGeometry(
           w,
           fontScale,
-          idle.layoutLabel ?? idle.label,
+          idle.label,
           idle.shortLabel,
           matchButtonHasGlyph(idle.kind),
           tabBarItemsWidth(w),
@@ -259,9 +266,4 @@ describe('unknown → idle skal ikke flytte en eneste piksel', () => {
       }
     },
   );
-
-  it('men ordet tegnes fortsatt ikke før vi vet', () => {
-    expect(unknown.label).toBe('');
-    expect(idle.label).toBe('KAMP');
-  });
 });
