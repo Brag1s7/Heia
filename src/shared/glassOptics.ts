@@ -52,6 +52,24 @@ export const BAR_PEARL: Rgb = [244, 246, 245];
  */
 export type FeedMaterial = 'arena' | 'silver' | 'frost';
 export const FEED_MATERIAL = 'frost' as FeedMaterial;
+
+/**
+ * ⚠️ DIAGNOSEBRYTER — MIDLERTIDIG, IKKE EN DESIGNENDRING (2026-09-12).
+ *
+ * Brage på TestFlight 1.0 (5): feeden hakker under scroll, også ved vanlig
+ * fart. `true` bytter KUN feedkortenes materialkropp (det native
+ * iOS 26-glasset, `HeiaLiquidGlassView`) med en flat `View` som har NØYAKTIG
+ * samme mål: samme `style`, samme `cornerRadius`, samme barn, samme
+ * listeinnstillinger, samme bilder, samme grunn. Én variabel.
+ *
+ * Kantlaget (`FrostEdges`) står med vilje IGJEN — det er én `View` med
+ * border og koster nesten ingenting. Skulle diagnosen bli uklar, er DEN
+ * neste variabel, ikke en av flere samtidig.
+ *
+ * ⚠️ SKAL TILBAKE TIL `false`. Dette er en måling, ikke en beslutning om å
+ * fjerne det godkjente glassdesignet.
+ */
+export const FEED_CARD_FLAT_DIAGNOSTIC = false;
 /** Lyst blekk (MATCH_INK) på feedkortet — kun arenaglasset. */
 export const FEED_INK_LIGHT = FEED_MATERIAL === 'silver';
 

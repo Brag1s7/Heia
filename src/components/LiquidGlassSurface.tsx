@@ -32,6 +32,7 @@ import {
   FEED_EDGES,
   FEED_FROST,
   FEED_GLASS,
+  FEED_CARD_FLAT_DIAGNOSTIC,
   FEED_MATERIAL,
   FROST,
   FEED_REFRACTION,
@@ -121,6 +122,8 @@ export const GLASS = {
     interactive: true,
   },
   control: {tint: 'rgba(244, 246, 245, 0.2)', sheen: 0.09, interactive: false},
+  /** Kun diagnosebryteren (FEED_CARD_FLAT_DIAGNOSTIC). Ikke et designtoken. */
+  cardFlatDiagnostic: 'rgba(247, 249, 247, 0.96)',
   important: {
     tint: rgbaString(FEED_GLASS.important.pearl, FEED_GLASS.important.alpha),
     sheen: FEED_GLASS.important.sheen,
@@ -1119,7 +1122,6 @@ export function useLiquidGlassActive(): boolean {
   return FEED_LIQUID_GLASS_AB && LIQUID_GLASS_SUPPORTED && !reduceTransparency;
 }
 
-
 /** Se `HeiaPearlView` i HeiaLiquidGlassView.h — alle tall i PEARL_NATIVE. */
 interface PearlNativeProps extends ViewProps {
   textureURI: string;
@@ -1342,6 +1344,32 @@ function GlassSurface({
             style={styles.unboundedTop}
           />
         )}
+      </View>
+    );
+  }
+
+  /**
+   * DIAGNOSEN (se `FEED_CARD_FLAT_DIAGNOSTIC` i glassOptics): flat flate med
+   * identiske mål, KUN for feedkortene. Egen gren fordi `SOLID` ikke har
+   * `card` — uten den ville et vanlig kort falt til `OpalSurface`, altså et
+   * ANNET materiale, og målingen hadde sammenliknet to materialer i stedet
+   * for materiale mot ingenting.
+   */
+  if (FEED_CARD_FLAT_DIAGNOSTIC && contentCard) {
+    return (
+      <View
+        testID={`glass-flat-diagnostic-${variant}`}
+        style={[
+          styles.solid,
+          {
+            borderRadius: cornerRadius,
+            backgroundColor: SOLID[variant]?.fill ?? GLASS.cardFlatDiagnostic,
+            borderColor: SOLID[variant]?.edge ?? GLASS.unboundedEdge,
+          },
+          fillStyle,
+          style,
+        ]}>
+        {children}
       </View>
     );
   }
