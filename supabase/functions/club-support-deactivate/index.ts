@@ -14,9 +14,14 @@
 // cancel_at i support_subscriptions — retur herfra beviser
 // ingenting, som alltid.
 //
-// Idempotent: et nytt kall arkiverer ingenting (alt arkivert),
-// returnerer samme abonnementsliste (radene flippes først av
-// webhooken) og cancel_at_period_end=true er trygt å gjenta.
+// Idempotent OG gjenopptakbar (punkt 107, 00085): RPC-en returnerer
+// KUN abonnementene som gjenstår — cancel_at (webhookens bokføring)
+// er fasit for «ferdig». Dør denne funksjonen midt i løkka
+// (veggklokke, nettglipp), er de POST-ede abonnementene alt på vei
+// inn via webhooken, og neste kall får bare resten: hvert forsøk
+// krymper arbeidsmengden, og et vilkårlig stort lag konvergerer.
+// cancel_at_period_end=true er trygt å gjenta for et abonnement hvis
+// webhook ennå ikke har landet.
 //
 // verify_jwt = true: innlogget bruker; betalingsansvarlig-rollen
 // er vakten (DB-siden håndhever den).
@@ -31,7 +36,7 @@ function json(body: Record<string, unknown>, status = 200): Response {
   });
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async req => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', {status: 405});
   }
@@ -41,7 +46,11 @@ Deno.serve(async (req) => {
   const userClient = createClient(
     supabaseUrl,
     Deno.env.get('SUPABASE_ANON_KEY')!,
-    {global: {headers: {Authorization: req.headers.get('Authorization') ?? ''}}},
+    {
+      global: {
+        headers: {Authorization: req.headers.get('Authorization') ?? ''},
+      },
+    },
   );
   const {
     data: {user},
@@ -74,6 +83,8 @@ Deno.serve(async (req) => {
     return json({error: error.message}, 403);
   }
 
+  // Fra 00085 er dette KUN de som gjenstår (cancel_at IS NULL) — et
+  // fortsettelsestrykk gjør aldri ferdig arbeid om igjen.
   const subIds = (data?.subscription_ids ?? []) as string[];
 
   // Stripe per abonnement — enkeltfeil velter ikke resten; et nytt
@@ -102,14 +113,15 @@ Deno.serve(async (req) => {
         error:
           `Nye støttespillere er stoppet, men ${failed.length} av ` +
           `${subIds.length} abonnementer fikk ikke kontakt med Stripe — ` +
-          'prøv «Deaktiver» en gang til.',
+          'prøv igjen, så tas kun de som gjenstår.',
         count: subIds.length,
         canceled,
         failed: failed.length,
+        remaining: failed.length,
       },
       502,
     );
   }
 
-  return json({count: subIds.length, canceled, failed: 0});
+  return json({count: subIds.length, canceled, failed: 0, remaining: 0});
 });
