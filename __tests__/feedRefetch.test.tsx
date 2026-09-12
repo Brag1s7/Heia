@@ -233,9 +233,28 @@ afterEach(() => {
   queryClient.clear();
 });
 
+/**
+ * ⚠️ FAKE TIMERS: `setImmediate`/`clearImmediate` skal ALDRI fakes her.
+ *
+ * Punkt 122: «payload-først (B3)» tidsavbrøt deterministisk på CI (30 s,
+ * 101 ms lokalt). Årsaken er BEVIST lokalt med CI-ens Node (22.23.2, mens
+ * Macen kjører 24): Reacts asynkrone `act` planlegger fortsettelsen sin
+ * med `setImmediate`, og med jests standard-faking (som faker ALT) kjørte
+ * den planlagte fortsettelsen aldri — `await act(...)` hang for alltid,
+ * med null fake timers utestående (målt med jest.getTimerCount(); et
+ * 120 s-spark på fake-klokka løsnet ingenting). Node 24 tilgir det, Node
+ * 22 gjør det ikke — derfor «grønt lokalt, dødt på runneren».
+ *
+ * Testene trenger bare setTimeout-familien: debounce (400 ms), TanStacks
+ * notify/retry og gc. Unntaket under er målt minimalt: med KUN immediates
+ * unntatt er fila grønn 3/3 på Node 22.23.2; uten unntaket henger den
+ * 2/2 (kontroll) — og alle andre fakes står som før.
+ */
+const useFeedFakeTimers = () =>
+  jest.useFakeTimers({doNotFake: ['setImmediate', 'clearImmediate']});
 
 test('TeamHome: målt kallbudsjett ved åpning, og én burst = én refetch', async () => {
-  jest.useFakeTimers();
+  useFeedFakeTimers();
   const {supabase, __burst} = jest.requireMock('../src/lib/supabase');
   const feedCalls = () =>
     supabase.rpc.mock.calls.filter((c: unknown[]) => c[0] === 'get_team_feed')
@@ -357,7 +376,7 @@ test('TeamHome med bilde i feeden: signering er ÉN batch, reactions ÉN runde',
 });
 
 test('payload-først (B3): 👏/kommentar = 0 kall, post-patch, side 1 ved nytt innlegg, resync ved reconnect', async () => {
-  jest.useFakeTimers();
+  useFeedFakeTimers();
   const {supabase, __fire, __reconnect} = jest.requireMock(
     '../src/lib/supabase',
   );
