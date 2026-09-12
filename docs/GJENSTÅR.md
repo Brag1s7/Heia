@@ -902,18 +902,32 @@ mot koden og mot prod-databasen, ikke lest ut av plandokumentene.
        `cachePolicy="memory-disk"` er riktig (punkt 88 er fikset), men
        ingenting forteller expo-image hvilken STØRRELSE bildet skal dekodes
        til — en 2048 px master dekodes til 2048 px selv i en 350 pt rad.
-     · Lista har **ingen `getItemLayout`** og ingen `removeClippedSubviews`,
-       så hver variable korthøyde måles ved montering, med `windowSize={7}`.
+     · Lista har ingen `removeClippedSubviews` og står på `windowSize={7}`,
+       så mange tunge korttrær er montert samtidig.
+       ⚠️ **RETTELSE til mitt eget forslag under:** `getItemLayout` er IKKE
+       en lett fiks her. Den krever kjente høyder, og feedkortene er
+       variable (tekstlengde, bilde/ikke bilde, kampkort). Den kan ikke
+       bare «slås på». Reelle alternativer på JS-siden er
+       `removeClippedSubviews`, lavere `windowSize`/`maxToRenderPerBatch`,
+       et enklere celletre — eller en liste med ekte gjenbruk (FlashList),
+       som er en større, men velprøvd vei.
      · `DaylightGround` (923 linjer SVG, fullskjerm) UNDER lista og
        `MastheadField` (SVG på `absoluteFill`) OVER den — to fullskjerms
        gjennomsiktige lag å blande hver ramme.
 
      **ANBEFALT REKKEFØLGE, og poenget er at de tre første ikke endrer
      utseendet med en eneste piksel:**
-     1. Dekodestørrelse på bilder (RAM først — den drar trolig begge tråder)
-     2. `getItemLayout` på feedlista
-     3. Mål på nytt FØR noe visuelt røres
-     4. Først da: vurder lagene, med Instruments — ikke flere blindtester
+     1. **Dekodestørrelse på bilder.** RAM først — den drar trolig begge
+        tråder. Feeden tegner i dag `display` (2048 px-masteren) i en rad
+        som er ~390 pt bred. ⚠️ Merk: punkt 103 fjernet thumb-SIGNERINGEN
+        fra feeden fordi feeden ikke tegner thumb. Viser det seg at fiksen
+        ER å tegne en mindre variant, må den signeringen tilbake — den
+        endringen var riktig for det feeden gjør i dag, ikke for det den
+        bør gjøre.
+     2. **`removeClippedSubviews` + lavere `windowSize`.** Billig, usynlig.
+     3. **Mål på nytt FØR noe visuelt røres.**
+     4. Først da: celletreet, lagene, og eventuelt FlashList — med
+        Instruments, ikke flere blindtester.
 
      ⚠️ **Dette er en egen skive, ikke en sidesak i skive 4.** Den trenger
      ekte profilering (Instruments/Time Profiler), ikke flere A/B-brytere.
